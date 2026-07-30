@@ -12,6 +12,8 @@ export class Creature implements IMovable {
   public maxTurnSpeed: number;
   public maxHp: number;
   public hp: number;
+  public stealth: number;
+  public baseStealth: number;
   public isAlive: boolean = true;
   public position: Point;
   public angle: number = 0;
@@ -35,7 +37,19 @@ export class Creature implements IMovable {
     this.maxTurnSpeed = Math.max(0, config.maxTurnSpeed);
     this.maxHp = Math.max(1, config.maxHp ?? 100);
     this.hp = Math.min(this.maxHp, config.hp ?? this.maxHp);
-    this.weapons = config.weapons && config.weapons.length > 0 ? [...config.weapons] : createDefaultWeapons();
+    this.baseStealth = config.baseStealth ?? 0;
+    this.stealth = config.stealth ?? this.baseStealth;
+    
+    if (config.weapons && config.weapons.length > 0) {
+      this.weapons = [...config.weapons];
+    } else {
+      const allWeapons = createDefaultWeapons();
+      for (let i = allWeapons.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [allWeapons[i], allWeapons[j]] = [allWeapons[j], allWeapons[i]];
+      }
+      this.weapons = allWeapons.slice(0, 3);
+    }
 
     this.body = new Circle({ x: this.position.x, y: this.position.y }, this.radius);
     this.body.isStatic = false;
@@ -174,6 +188,8 @@ export class Creature implements IMovable {
     maxTurnSpeed?: number;
     hp?: number;
     maxHp?: number;
+    stealth?: number;
+    baseStealth?: number;
   }): void {
     if (params.radius !== undefined) {
       this.radius = params.radius;
@@ -190,6 +206,12 @@ export class Creature implements IMovable {
     }
     if (params.hp !== undefined) {
       this.hp = Math.min(this.maxHp, Math.max(0, params.hp));
+    }
+    if (params.stealth !== undefined) {
+      this.stealth = params.stealth;
+    }
+    if (params.baseStealth !== undefined) {
+      this.baseStealth = params.baseStealth;
     }
     this.hp = Math.min(this.hp, this.maxHp);
     this.isAlive = this.hp > 0;

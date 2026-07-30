@@ -254,7 +254,7 @@ export const App: React.FC = () => {
               Добавить Игрока
             </button>
             <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSpawnModal('ai')}>
-              Добавить ИИ
+              Добавить Бота
             </button>
           </div>
         </div>
@@ -304,7 +304,7 @@ export const App: React.FC = () => {
           {selectedStats ? (
             <div className="stats-list">
               <dl className="stats-list">
-                <div className="stat-row"><dt>Тип:</dt><dd>{selectedStats.type === 'player' ? 'Игрок' : 'ИИ'}</dd></div>
+                <div className="stat-row"><dt>Тип:</dt><dd>{selectedStats.type === 'player' ? 'Игрок' : 'Бот'}</dd></div>
                 <div className="stat-row"><dt>Состояние:</dt><dd>{selectedStats.state}</dd></div>
                 <div className="stat-row"><dt>Радиус:</dt><dd>{selectedStats.radius} px</dd></div>
                 <div className="stat-row"><dt>Масса:</dt><dd>{selectedStats.mass}</dd></div>
@@ -374,7 +374,7 @@ export const App: React.FC = () => {
           <div className="modal-dialog">
             <h3>Параметры нового существа</h3>
             <p className="modal-subtitle">
-              Тип: {pendingSpawnType === 'player' ? 'Игрок' : 'ИИ'}
+              Тип: {pendingSpawnType === 'player' ? 'Игрок' : 'Бот'}
             </p>
             <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
               <label>

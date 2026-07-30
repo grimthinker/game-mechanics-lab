@@ -22,7 +22,8 @@ export const useKeyboardControls = ({
     const app = appRef.current;
     if (!app) return;
 
-    const player = app.selectedCreature?.type === 'player' ? app.selectedCreature : null;
+    const candidate = app.selectedCreature?.type === 'player' ? app.selectedCreature : null;
+    const player = candidate && candidate.isAlive && candidate.hp > 0 ? candidate : null;
     const controlled = controlledCreatureRef.current;
 
     if (controlled && controlled !== player) {
@@ -56,7 +57,7 @@ export const useKeyboardControls = ({
       const key = e.key.toLowerCase();
       if (key === ' ' || e.code === 'Space') {
         const player = controlledCreatureRef.current;
-        if (player) {
+        if (player && player.isAlive && player.hp > 0) {
           player.attack();
           updateStats();
         }

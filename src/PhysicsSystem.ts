@@ -206,34 +206,49 @@ export class PhysicsSystem {
           break;
         }
         case 'angle': {
-          const r = weapon.length ?? 100;
-          const maxAngle = (weapon.angle ?? (Math.PI / 6)) / 2;
-          if (dist <= r + target.radius) {
-            const targetAngle = Math.atan2(dy, dx);
-            let diff = targetAngle - angle;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            while (diff < -Math.PI) diff += Math.PI * 2;
-            if (Math.abs(diff) <= maxAngle) {
-              isHit = !this.isLineOfSightBlocked(pos, target.position);
+          const len = weapon.length ?? 120;
+          const maxAngle = (weapon.angle ?? Math.PI / 6) / 2; // Половина угла сектора
+          const dist = Math.hypot(target.position.x - pos.x, target.position.y - pos.y);
+          const maxDist = len + target.radius;
+        
+          if (dist <= maxDist) {
+            const targetAngle = Math.atan2(target.position.y - pos.y, target.position.x - pos.x);
+            let angleDiff = targetAngle - angle;
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            angleDiff = Math.abs(angleDiff);
+        
+            // Расширяем угловой диапазон на угол, который занимает радиус цели на данной дистанции
+            const angularTolerance = dist > 0 ? Math.asin(Math.min(1, target.radius / dist)) : 0;
+            
+            if (angleDiff <= maxAngle + angularTolerance) {
+              if (!this.isLineOfSightBlocked(pos, target.position)) {
+                isHit = true;
+              }
             }
           }
           break;
         }
         case 'line':
         case 'forward_line': {
-          const len = weapon.length ?? 150;
-          const forwardX = pos.x + Math.cos(angle) * len;
-          const forwardY = pos.y + Math.sin(angle) * len;
-          const result = this.system.raycast({ x: pos.x, y: pos.y }, { x: forwardX, y: forwardY });
-          if (result && result.body === target.body) {
-            isHit = true;
-          } else if (dist <= target.radius + len) {
-            const dot = dx * Math.cos(angle) + dy * Math.sin(angle);
-            if (dot >= 0 && dot <= len) {
-              const perpDist = Math.abs(-Math.sin(angle) * dx + Math.cos(angle) * dy);
-              if (perpDist <= target.radius) {
-                isHit = !this.isLineOfSightBlocked(pos, target.position);
-              }
+          const len = (weapon.length ?? 150);
+          // Максимальная дистанция увеличивается на радиус цели
+          const maxDist = len + target.radius;
+          const dist = Math.hypot(target.position.x - pos.x, target.position.y - pos.y);
+          
+          if (dist <= maxDist) {
+            // Проверка угла / направления с учетом углового допуска для размера цели
+            const targetAngle = Math.atan2(target.position.y - pos.y, target.position.x - pos.x);
+            let angleDiff = Math.abs(targetAngle - angle);
+            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+            angleDiff = Math.abs(angleDiff);
+        
+            // Допуск по углу расширяется на основе радиуса цели и расстояния
+            const angularTolerance = Math.asin(Math.min(1, target.radius / Math.max(1, dist)));
+            const maxAllowedAngle = (Math.PI / 6) + angularTolerance; // Например, для узкого луча/линии
+        
+            if (angleDiff <= maxAllowedAngle && !this.isLineOfSightBlocked(pos, target.position)) {
+              isHit = true;
             }
           }
           break;

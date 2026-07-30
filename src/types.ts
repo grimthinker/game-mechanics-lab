@@ -56,6 +56,8 @@ export interface CreatureConfig {
   maxTurnSpeed: number;
   maxHp?: number;
   hp?: number;
+  stealth?: number;
+  baseStealth?: number;
   weapons?: WeaponConfig[];
 }
 
