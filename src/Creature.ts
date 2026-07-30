@@ -1,5 +1,7 @@
 import { Circle } from 'detect-collisions';
-import { CreatureConfig, CreatureType, IMovable, Point } from './types';
+import { CreatureConfig, CreatureType, CreatureState, IMovable, Point, WeaponConfig, ActiveAttack } from './types';
+import { createDefaultWeapons } from './Weapon';
+import type { PhysicsSystem } from './PhysicsSystem';
 
 export class Creature implements IMovable {
   public readonly id: string;
@@ -11,16 +13,16 @@ export class Creature implements IMovable {
   public maxHp: number;
   public hp: number;
   public isAlive: boolean = true;
-  public isPlayer: boolean = false;
-  public isNPC: boolean = false;
   public position: Point;
-  public angle: number = 0; // В радианах
+  public angle: number = 0;
 
-  // Состояния движения
+  public weapons: WeaponConfig[] = [];
+  public activeAttacks: ActiveAttack[] = [];
+  public hitFlashTimer: number = 0;
+
   private isMovingForward: boolean = false;
   private turningDirection: -1 | 0 | 1 = 0;
 
-  // Коллайдер из detect-collisions
   public body: Circle;
 
   constructor(config: CreatureConfig) {
@@ -32,17 +34,46 @@ export class Creature implements IMovable {
     this.maxSpeed = Math.max(0, config.maxSpeed);
     this.maxTurnSpeed = Math.max(0, config.maxTurnSpeed);
     this.maxHp = Math.max(1, config.maxHp ?? 100);
-    this.hp = Math.min(this.maxHp, Math.max(0, config.hp ?? this.maxHp));
-    this.isPlayer = this.type === 'player';
-    this.isNPC = this.type === 'ai';
+    this.hp = Math.min(this.maxHp, config.hp ?? this.maxHp);
+    this.weapons = config.weapons && config.weapons.length > 0 ? [...config.weapons] : createDefaultWeapons();
 
     this.body = new Circle({ x: this.position.x, y: this.position.y }, this.radius);
-    (this.body as any).entity = this;
+    this.body.isStatic = false;
   }
 
-  // --- Реализация IMovable ---
+  public get state(): CreatureState {
+    if (!this.isAlive || this.hp <= 0) return 'dead';
+    if (this.activeAttacks.length > 0) return 'attacking';
+    if (this.isMovingForward || this.turningDirection !== 0) return 'moving';
+    return 'idle';
+  }
+
+  public get currentSpeed(): number {
+    if (!this.isAlive || this.hp <= 0) return 0;
+    let slow = 1;
+    for (const atk of this.activeAttacks) {
+      const mult = atk.phase === 'prep' ? atk.weapon.prepMoveSlow : atk.weapon.recoveryMoveSlow;
+      if (mult < slow) slow = mult;
+    }
+    return (this.isMovingForward ? this.maxSpeed : 0) * slow;
+  }
+
+  public get currentTurnSpeed(): number {
+    if (!this.isAlive || this.hp <= 0) return 0;
+    let slow = 1;
+    for (const atk of this.activeAttacks) {
+      const mult = atk.phase === 'prep' ? atk.weapon.prepTurnSlow : atk.weapon.recoveryTurnSlow;
+      if (mult < slow) slow = mult;
+    }
+    return this.turningDirection * this.maxTurnSpeed * slow;
+  }
+
+  public getNextAvailableWeapon(): WeaponConfig | undefined {
+    return this.weapons.find(w => !this.activeAttacks.some(a => a.weapon === w));
+  }
+
   public startMovingForward(): void {
-    this.isMovingForward = true;
+    if (this.isAlive && this.hp > 0) this.isMovingForward = true;
   }
 
   public stopMovingForward(): void {
@@ -50,30 +81,73 @@ export class Creature implements IMovable {
   }
 
   public startTurning(direction: -1 | 1): void {
-    this.turningDirection = direction;
+    if (this.isAlive && this.hp > 0) this.turningDirection = direction;
   }
 
   public stopTurning(): void {
     this.turningDirection = 0;
   }
 
-  public get currentSpeed(): number {
-    return this.isMovingForward ? this.maxSpeed : 0;
+  public attack(): WeaponConfig | null {
+    if (!this.isAlive || this.hp <= 0) return null;
+    const freeWeapon = this.getNextAvailableWeapon();
+    if (!freeWeapon) return null;
+
+    this.activeAttacks.push({
+      weapon: freeWeapon,
+      phase: 'prep',
+      timer: freeWeapon.prepTime,
+      totalDuration: freeWeapon.prepTime,
+    });
+    return freeWeapon;
   }
 
-  public get currentTurnSpeed(): number {
-    return this.turningDirection * this.maxTurnSpeed;
-  }
+  public update(
+    dt: number,
+    onHitCallback?: (attacker: Creature, weapon: WeaponConfig) => void,
+    physics?: PhysicsSystem
+  ): void {
+    if (!this.isAlive || this.hp <= 0) return;
 
-  public update(dt: number): void {
-    if (this.turningDirection !== 0) {
-      this.angle += this.turningDirection * this.maxTurnSpeed * dt;
+    if (this.hitFlashTimer > 0) {
+      this.hitFlashTimer--;
     }
 
-    if (this.isMovingForward) {
-      this.position.x += Math.cos(this.angle) * this.maxSpeed * dt;
-      this.position.y += Math.sin(this.angle) * this.maxSpeed * dt;
-      this.body.setPosition(this.position.x, this.position.y);
+    const turnSpeed = this.currentTurnSpeed;
+    if (turnSpeed !== 0) {
+      this.angle += turnSpeed * dt;
+    }
+
+    const speed = this.currentSpeed;
+    if (speed > 0) {
+      const dx = Math.cos(this.angle) * speed * dt;
+      const dy = Math.sin(this.angle) * speed * dt;
+
+      if (physics) {
+        physics.moveCreatureSafe(this, dx, dy);
+      } else {
+        this.position.x += dx;
+        this.position.y += dy;
+        this.body.setPosition(this.position.x, this.position.y);
+      }
+    }
+
+    for (let i = this.activeAttacks.length - 1; i >= 0; i--) {
+      const atk = this.activeAttacks[i];
+      atk.timer -= dt;
+      if (atk.timer <= 0) {
+        if (atk.phase === 'prep') {
+          if (onHitCallback) {
+            onHitCallback(this, atk.weapon);
+          }
+          this.hitFlashTimer = 6;
+          atk.phase = 'recovery';
+          atk.timer = atk.weapon.recoveryTime;
+          atk.totalDuration = atk.weapon.recoveryTime;
+        } else {
+          this.activeAttacks.splice(i, 1);
+        }
+      }
     }
   }
 
@@ -82,9 +156,18 @@ export class Creature implements IMovable {
     this.position.y = this.body.y;
   }
 
-  /**
-   * Обновляет параметры существа (скорость, здоровье и физический радиус коллайдера)
-   */
+  public takeDamage(amount: number): void {
+    if (!this.isAlive || this.hp <= 0) return;
+    this.hp = Math.max(0, this.hp - amount);
+    if (this.hp <= 0) {
+      this.isAlive = false;
+      this.isMovingForward = false;
+      this.turningDirection = 0;
+      this.activeAttacks = [];
+      this.hitFlashTimer = 0;
+    }
+  }
+
   public updateParams(params: {
     radius?: number;
     maxSpeed?: number;
@@ -108,5 +191,7 @@ export class Creature implements IMovable {
     if (params.hp !== undefined) {
       this.hp = Math.min(this.maxHp, Math.max(0, params.hp));
     }
+    this.hp = Math.min(this.hp, this.maxHp);
+    this.isAlive = this.hp > 0;
   }
 }

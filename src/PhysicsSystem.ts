@@ -1,15 +1,16 @@
 import { System, Line, Circle } from 'detect-collisions';
 import { Creature } from './Creature';
-import { ObstacleSegment } from './types';
+import { ObstacleSegment, WeaponConfig, Point } from './types';
 
-// Внутренние параметры физического движка (аналог PHYSICS_CONFIG из old_physic_system)
 const PHYSICS_CONFIG = {
   A: 10,          // Коэффициент жесткости расталкивания существ
   C: 0.5,         // Максимальный коэффициент импульса за один кадр
-  B: 0.01,        // Буфер при выталкивании из стен (предотвращает повторное касание в кеше)
-  d_min: 0.001,   // Минимальный порог смещения (защита от дрожания float-чисел)
-  R_mult: Math.sin(Math.PI / 4) // ~0.707 — множитель радиуса для расчета sub-stepping
+  B: 0.01,        // Буфер при выталкивании из стен [cite: 161]
+  d_min: 0.001,   // Минимальный порог смещения [cite: 166]
+  R_mult: Math.sin(Math.PI / 4) // ~0.707 — множитель радиуса для sub-stepping [cite: 56, 131]
 };
+
+const creaturesMap = new WeakMap<any, Creature>();
 
 export class PhysicsSystem {
   public system: System;
@@ -21,25 +22,25 @@ export class PhysicsSystem {
   }
 
   public addCreature(creature: Creature): void {
+    creaturesMap.set(creature.body, creature);
     this.system.insert(creature.body);
   }
 
   public removeCreature(creature: Creature): void {
+    creaturesMap.delete(creature.body);
     this.system.remove(creature.body);
   }
 
-  // --- Загрузка и управление препятствиями ---
+  // --- Препятствия ---
 
   public loadObstacles(segments: ObstacleSegment[]): void {
     this.clearObstacles();
-
     for (const seg of segments) {
       const line = new Line(
         { x: seg.start.x, y: seg.start.y },
-        { x: seg.end.x, y: seg.end.y }
+        { x: seg.end.x, y: seg.end.y },
+        { isStatic: true }
       );
-      // Помечаем линию как статичный объект для удобства фильтрации
-      line.isStatic = true;
       this.obstacleLines.push(line);
       if (this.obstaclesEnabled) {
         this.system.insert(line);
@@ -50,7 +51,6 @@ export class PhysicsSystem {
   public setObstaclesEnabled(enabled: boolean): void {
     if (this.obstaclesEnabled === enabled) return;
     this.obstaclesEnabled = enabled;
-
     for (const line of this.obstacleLines) {
       if (enabled) {
         this.system.insert(line);
@@ -67,37 +67,26 @@ export class PhysicsSystem {
     this.obstacleLines = [];
   }
 
+  public getObstacleLines(): Line[] {
+    return this.obstacleLines;
+  }
+
   // --- Фильтры коллизий ---
 
-  /**
-   * Проверяет, должны ли два существа сталкиваться друг с другом.
-   * Учитывает статус жизни и правила прохождения (например, Игрок сквозь NPC).
-   */
   private canCollide(c1: Creature, c2: Creature): boolean {
-    // 1. Мертвые существа не участвуют в коллизиях
-    if (c1.isAlive === false || c2.isAlive === false) {
+    if (!c1.isAlive || c1.hp <= 0 || !c2.isAlive || c2.hp <= 0) {
       return false;
     }
-
-    // 2. Игрок и NPC не сталкиваются друг с другом (проходят насквозь)
-    if ((c1.isPlayer && c2.isNPC) || (c2.isPlayer && c1.isNPC)) {
-      return false;
-    }
-
     return true;
   }
 
   // --- Защита от туннелирования (Sub-stepping) ---
 
-  /**
-   * Безопасное перемещение существа с защитой от пролета сквозь стены (Sub-stepping).
-   * Если шаг перемещения больше радиуса, движение бьется на микро-шаги.
-   */
   public moveCreatureSafe(creature: Creature, dx: number, dy: number): void {
     const body = creature.body as Circle;
     const moveSq = dx * dx + dy * dy;
     const radiusThreshold = body.r * PHYSICS_CONFIG.R_mult;
-    
+
     let steps = 1;
     if (moveSq > radiusThreshold * radiusThreshold) {
       const maxDim = Math.max(Math.abs(dx), Math.abs(dy));
@@ -110,16 +99,12 @@ export class PhysicsSystem {
 
     for (let i = 0; i < steps; i++) {
       body.setPosition(body.x + stepX, body.y + stepY);
-      // На каждом микро-шаге выталкиваем существо из стен
       this.resolveObstaclesForCreature(creature);
     }
 
     creature.syncFromPhysics();
   }
 
-  /**
-   * Разрешение столкновений конкретного существа со стенами (с учетом буфера B).
-   */
   private resolveObstaclesForCreature(creature: Creature): void {
     if (!this.obstaclesEnabled) return;
 
@@ -127,7 +112,6 @@ export class PhysicsSystem {
     for (const wall of potentials) {
       if (wall instanceof Line && this.system.checkCollision(creature.body, wall)) {
         const response = this.system.response;
-        // Добавляем буфер B, чтобы гарантированно вывести тело из коллизии
         const pushX = response.overlap * response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x);
         const pushY = response.overlap * response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y);
 
@@ -139,70 +123,156 @@ export class PhysicsSystem {
     }
   }
 
-  // --- Главный цикл разрешения столкновений ---
+  // --- Главный цикл обновления физики ---
 
-  /**
-   * Комплексное разрешение всех столкновений за кадр с учетом dt.
-   */
-  public resolveCollisions(creatures: Creature[], dt: number): void {
+  public update(dt: number, creatures: Creature[]): void {
     this.system.update();
 
-    // Расчет коэффициента силы выталкивания с ограничением C
-    let mult = PHYSICS_CONFIG.A * dt;
-    mult = mult > PHYSICS_CONFIG.C ? PHYSICS_CONFIG.C : mult;
+    // 1. Расталкивание существ друг с другом с учетом масс (Step 1) [cite: 155]
+    this.system.checkAll((response) => {
+      const c1 = response.a;
+      const c2 = response.b;
 
-    // 1. Столкновение существ друг с другом (Soft Push-Back + Фильтры + Масса)
-    for (let i = 0; i < creatures.length; i++) {
-      for (let j = i + 1; j < creatures.length; j++) {
-        const c1 = creatures[i];
-        const c2 = creatures[j];
+      if (c1.isStatic || c2.isStatic) return;
 
-        // Применяем фильтр коллизий
-        if (!this.canCollide(c1, c2)) continue;
+      const creature1 = creaturesMap.get(c1);
+      const creature2 = creaturesMap.get(c2);
+      if (!creature1 || !creature2) return;
 
-        if (this.system.checkCollision(c1.body, c2.body)) {
-          const response = this.system.response;
+      if (!this.canCollide(creature1, creature2)) return;
 
-          const overlapX = response.overlap * response.overlapV.x;
-          const overlapY = response.overlap * response.overlapV.y;
+      const overlapX = response.overlap * response.overlapV.x;
+      const overlapY = response.overlap * response.overlapV.y;
 
-          // Распределение сдвига обратно пропорционально массе
-          const totalMass = c1.mass + c2.mass;
-          const ratio1 = c2.mass / totalMass;
-          const ratio2 = c1.mass / totalMass;
+      const totalMass = creature1.mass + creature2.mass;
+      const ratio1 = creature2.mass / totalMass;
+      const ratio2 = creature1.mass / totalMass;
 
-          // Плавное выталкивание с учетом dt (множитель mult)
-          const deltaX1 = mult * overlapX * ratio1;
-          const deltaY1 = mult * overlapY * ratio1;
-          const deltaX2 = mult * overlapX * ratio2;
-          const deltaY2 = mult * overlapY * ratio2;
+      const mult = Math.min(PHYSICS_CONFIG.C, dt * PHYSICS_CONFIG.A);
+      const deltaX1 = mult * overlapX * ratio1;
+      const deltaY1 = mult * overlapY * ratio1;
+      const deltaX2 = mult * overlapX * ratio2;
+      const deltaY2 = mult * overlapY * ratio2;
 
-          // Проверка порога минимального смещения d_min
-          const moved1 = Math.abs(deltaX1) > PHYSICS_CONFIG.d_min || Math.abs(deltaY1) > PHYSICS_CONFIG.d_min;
-          const moved2 = Math.abs(deltaX2) > PHYSICS_CONFIG.d_min || Math.abs(deltaY2) > PHYSICS_CONFIG.d_min;
-
-          if (moved1) {
-            c1.body.setPosition(c1.body.x - deltaX1, c1.body.y - deltaY1);
-            c1.syncFromPhysics();
-          }
-          if (moved2) {
-            c2.body.setPosition(c2.body.x + deltaX2, c2.body.y + deltaY2);
-            c2.syncFromPhysics();
-          }
-        }
+      if (Math.abs(deltaX1) > PHYSICS_CONFIG.d_min || Math.abs(deltaY1) > PHYSICS_CONFIG.d_min) {
+        creature1.body.setPosition(creature1.body.x - deltaX1, creature1.body.y - deltaY1);
+        creature1.syncFromPhysics();
       }
-    }
+      if (Math.abs(deltaX2) > PHYSICS_CONFIG.d_min || Math.abs(deltaY2) > PHYSICS_CONFIG.d_min) {
+        creature2.body.setPosition(creature2.body.x + deltaX2, creature2.body.y + deltaY2);
+        creature2.syncFromPhysics();
+      }
+    });
 
-    // 2. Столкновения существ с препятствиями
+    // 2. Гарантированное вторичное выталкивание всех существ из стен (Step 2) [cite: 156]
     if (this.obstaclesEnabled) {
       for (const creature of creatures) {
+        if (!creature.isAlive) continue;
         this.resolveObstaclesForCreature(creature);
         creature.syncFromPhysics();
       }
     }
   }
 
-  public getObstacleLines(): Line[] {
-    return this.obstacleLines;
+  // --- Проверка препятствий при атаках ---
+
+  private isLineOfSightBlocked(from: Point, to: Point): boolean {
+    if (!this.obstaclesEnabled) return false;
+    const rayResult = this.system.raycast(from, to);
+    return rayResult ? rayResult.body instanceof Line : false;
+  }
+
+  // --- Попадания атак ---
+
+  public checkWeaponHits(attacker: Creature, weapon: WeaponConfig, allCreatures: Creature[]): Creature[] {
+    const hitCreatures: Creature[] = [];
+    const pos = attacker.position;
+    const angle = attacker.angle;
+
+    for (const target of allCreatures) {
+      if (target === attacker || !target.isAlive || target.hp <= 0) continue;
+
+      let isHit = false;
+      const dx = target.position.x - pos.x;
+      const dy = target.position.y - pos.y;
+      const dist = Math.hypot(dx, dy);
+
+      switch (weapon.hitZoneType) {
+        case 'radius': {
+          const r = weapon.radius ?? 50;
+          if (dist <= r + target.radius) {
+            isHit = !this.isLineOfSightBlocked(pos, target.position);
+          }
+          break;
+        }
+        case 'angle': {
+          const r = weapon.length ?? 100;
+          const maxAngle = (weapon.angle ?? (Math.PI / 6)) / 2;
+          if (dist <= r + target.radius) {
+            const targetAngle = Math.atan2(dy, dx);
+            let diff = targetAngle - angle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            if (Math.abs(diff) <= maxAngle) {
+              isHit = !this.isLineOfSightBlocked(pos, target.position);
+            }
+          }
+          break;
+        }
+        case 'line':
+        case 'forward_line': {
+          const len = weapon.length ?? 150;
+          const forwardX = pos.x + Math.cos(angle) * len;
+          const forwardY = pos.y + Math.sin(angle) * len;
+          const result = this.system.raycast({ x: pos.x, y: pos.y }, { x: forwardX, y: forwardY });
+          if (result && result.body === target.body) {
+            isHit = true;
+          } else if (dist <= target.radius + len) {
+            const dot = dx * Math.cos(angle) + dy * Math.sin(angle);
+            if (dot >= 0 && dot <= len) {
+              const perpDist = Math.abs(-Math.sin(angle) * dx + Math.cos(angle) * dy);
+              if (perpDist <= target.radius) {
+                isHit = !this.isLineOfSightBlocked(pos, target.position);
+              }
+            }
+          }
+          break;
+        }
+        case 'shrapnel': {
+          const len = weapon.length ?? 120;
+          const maxAngle = (weapon.angle ?? Math.PI / 3) / 2;
+          const count = weapon.rayCount ?? 5;
+          for (let i = 0; i < count; i++) {
+            const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
+            const rayAngle = angle + fraction * (maxAngle * 2);
+            const rx = pos.x + Math.cos(rayAngle) * len;
+            const ry = pos.y + Math.sin(rayAngle) * len;
+            const res = this.system.raycast({ x: pos.x, y: pos.y }, { x: rx, y: ry });
+            if (res && res.body === target.body) {
+              isHit = true;
+              break;
+            }
+          }
+          break;
+        }
+        case 'offset_radius': {
+          const offset = weapon.offsetDistance ?? 70;
+          const r = weapon.radius ?? 35;
+          const centerX = pos.x + Math.cos(angle) * offset;
+          const centerY = pos.y + Math.sin(angle) * offset;
+          const dCenter = Math.hypot(target.position.x - centerX, target.position.y - centerY);
+          if (dCenter <= r + target.radius) {
+            isHit = !this.isLineOfSightBlocked(pos, target.position);
+          }
+          break;
+        }
+      }
+
+      if (isHit) {
+        hitCreatures.push(target);
+      }
+    }
+
+    return hitCreatures;
   }
 }

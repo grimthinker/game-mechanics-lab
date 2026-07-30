@@ -2,7 +2,6 @@ import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEve
 import { GameApp } from './GameApp';
 import { CreatureType } from './types';
 
-
 interface PlacementConfig {
   type: CreatureType;
   radius: number;
@@ -12,9 +11,9 @@ interface PlacementConfig {
 }
 
 interface UseCanvasInteractionProps {
-  appRef: React.MutableRefObject<GameApp | null>;
+  appRef: MutableRefObject<GameApp | null>;
   placementConfig: PlacementConfig | null;
-  setPlacementConfig: React.Dispatch<React.SetStateAction<PlacementConfig | null>>;
+  setPlacementConfig: Dispatch<SetStateAction<PlacementConfig | null>>;
   syncPlayerControls: () => void;
   updateStats: () => void;
 }
@@ -28,41 +27,38 @@ export const useCanvasInteraction = ({
 }: UseCanvasInteractionProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Обработка колеса мыши (зум)
   useEffect(() => {
     const canvas = canvasRef.current;
-    const app = appRef.current;
-    if (!canvas || !app) return;
+    if (!canvas) return;
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      app.zoomAt(e.clientX, e.clientY, e.deltaY);
+      appRef.current?.zoomAt(e.clientX, e.clientY, e.deltaY);
     };
 
     canvas.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       canvas.removeEventListener('wheel', onWheel);
     };
-  }, [appRef]);
+  }, []);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (e.button === 0 && app) {
       app.startPan(e.clientX, e.clientY);
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     if (appRef.current) {
       appRef.current.pan(e.clientX, e.clientY);
     }
   };
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseUp = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (e.button !== 0 || !app) return;
 
-    // Режим выбора места для спавна
     if (placementConfig) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
       app.spawnCreature(
@@ -80,7 +76,6 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Обычный режим: выбор существа или панорамирование
     const wasDragging = app.endPan();
     if (!wasDragging) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);

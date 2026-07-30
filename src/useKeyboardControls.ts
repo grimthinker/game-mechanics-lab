@@ -42,7 +42,6 @@ export const useKeyboardControls = ({
     else player.stopTurning();
   }, [appRef]);
 
-  // Глобальные обработчики клавиатуры
   useEffect(() => {
     const CONTROL_KEYS = new Set(['w', 'a', 'd']);
 
@@ -55,6 +54,16 @@ export const useKeyboardControls = ({
     const onKeyDown = (e: KeyboardEvent) => {
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
       const key = e.key.toLowerCase();
+      if (key === ' ' || e.code === 'Space') {
+        const player = controlledCreatureRef.current;
+        if (player) {
+          player.attack();
+          updateStats();
+        }
+        e.preventDefault();
+        return;
+      }
+
       if (!CONTROL_KEYS.has(key) || keysPressedRef.current.has(key)) return;
 
       keysPressedRef.current.add(key);
@@ -84,9 +93,7 @@ export const useKeyboardControls = ({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [isModalOpen, isEditModalOpen, syncPlayerControls]);
+  }, [isModalOpen, isEditModalOpen, syncPlayerControls, updateStats]);
 
-  return {
-    syncPlayerControls,
-  };
+  return { syncPlayerControls };
 };

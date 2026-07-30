@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
-import { CreatureType, STANDARD_RADII } from './types';
+import { CreatureType, STANDARD_RADII, CreatureState, WeaponConfig } from './types';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { useKeyboardControls } from './useKeyboardControls';
 
@@ -14,6 +14,8 @@ interface CreatureStats {
   maxTurnSpeed: number;
   hp: number;
   maxHp: number;
+  state: CreatureState;
+  weapons: WeaponConfig[];
 }
 
 interface PlacementConfig {
@@ -31,7 +33,6 @@ export const App: React.FC = () => {
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedStats, setSelectedStats] = useState<CreatureStats | null>(null);
 
-  // Модальные окна
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType | null>(null);
   const [radius, setRadius] = useState<number>(24);
@@ -39,16 +40,20 @@ export const App: React.FC = () => {
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
   const [maxTurnSpeed, setMaxTurnSpeed] = useState<number>(270);
 
-  // Режим выбора места
   const [placementConfig, setPlacementConfig] = useState<PlacementConfig | null>(null);
 
-  // Модальное окно редактирования
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editRadius, setEditRadius] = useState<number>(24);
   const [editMaxSpeed, setEditMaxSpeed] = useState<number>(150);
   const [editMaxTurnSpeed, setEditMaxTurnSpeed] = useState<number>(270);
   const [editHp, setEditHp] = useState<number>(100);
   const [editMaxHp, setEditMaxHp] = useState<number>(100);
+
+  const [selectedWeaponForEdit, setSelectedWeaponForEdit] = useState<WeaponConfig | null>(null);
+  const [editWeaponName, setEditWeaponName] = useState<string>('');
+  const [editWeaponDamage, setEditWeaponDamage] = useState<number>(25);
+  const [editWeaponPrepTime, setEditWeaponPrepTime] = useState<number>(0.2);
+  const [editWeaponRecoveryTime, setEditWeaponRecoveryTime] = useState<number>(0.3);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -68,10 +73,11 @@ export const App: React.FC = () => {
       maxTurnSpeed: (c.maxTurnSpeed * 180) / Math.PI,
       hp: c.hp,
       maxHp: c.maxHp,
+      state: c.state,
+      weapons: [...c.weapons],
     });
   }, []);
 
-  // Хуки клавиатуры и мыши
   const { syncPlayerControls } = useKeyboardControls({
     appRef,
     isModalOpen,
@@ -88,45 +94,20 @@ export const App: React.FC = () => {
       updateStats,
     });
 
-  // Инициализация при старте
   useEffect(() => {
     if (!canvasRef.current) return;
-
     const app = new GameApp(canvasRef.current);
     appRef.current = app;
-
-    app.onFrame = () => {
-      updateStats();
-    };
-
     app.start();
+    app.onFrame = updateStats;
     app.spawnCreature('player');
     updateStats();
-  }, [canvasRef, updateStats]);
 
-  const handleObstaclesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const checked = e.target.checked;
-    setObstaclesEnabled(checked);
-    appRef.current?.physics.setObstaclesEnabled(checked);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const data = JSON.parse(evt.target?.result as string);
-        if (Array.isArray(data) && appRef.current) {
-          appRef.current.loadObstaclesFromData(data);
-        }
-      } catch {
-        alert('Ошибка при чтении JSON файла!');
-      }
+    return () => {
+      app.destroy();
+      appRef.current = null;
     };
-    reader.readAsText(file);
-  };
+  }, [canvasRef, updateStats]);
 
   const openSpawnModal = (type: CreatureType) => {
     setPendingSpawnType(type);
@@ -153,7 +134,6 @@ export const App: React.FC = () => {
   const openEditModal = () => {
     const c = appRef.current?.selectedCreature;
     if (!c) return;
-
     setEditRadius(c.radius);
     setEditMaxSpeed(c.maxSpeed);
     setEditMaxTurnSpeed(Math.round((c.maxTurnSpeed * 180) / Math.PI));
@@ -169,7 +149,6 @@ export const App: React.FC = () => {
   const handleEditConfirm = () => {
     const c = appRef.current?.selectedCreature;
     if (!c) return;
-
     c.updateParams({
       radius: editRadius,
       maxSpeed: editMaxSpeed,
@@ -177,9 +156,38 @@ export const App: React.FC = () => {
       hp: editHp,
       maxHp: editMaxHp,
     });
-
-    updateStats();
     closeEditModal();
+    updateStats();
+  };
+
+  const openWeaponEditModal = (weapon: WeaponConfig) => {
+    setSelectedWeaponForEdit(weapon);
+    setEditWeaponName(weapon.name);
+    setEditWeaponDamage(weapon.baseDamage);
+    setEditWeaponPrepTime(weapon.prepTime);
+    setEditWeaponRecoveryTime(weapon.recoveryTime);
+  };
+
+  const closeWeaponEditModal = () => {
+    setSelectedWeaponForEdit(null);
+  };
+
+  const handleWeaponEditConfirm = () => {
+    if (!selectedWeaponForEdit) return;
+    selectedWeaponForEdit.name = editWeaponName;
+    selectedWeaponForEdit.baseDamage = editWeaponDamage;
+    selectedWeaponForEdit.prepTime = editWeaponPrepTime;
+    selectedWeaponForEdit.recoveryTime = editWeaponRecoveryTime;
+    closeWeaponEditModal();
+    updateStats();
+  };
+
+  const handleDeleteCreature = () => {
+    const app = appRef.current;
+    if (!app) return;
+    app.deleteSelectedCreature();
+    syncPlayerControls();
+    updateStats();
   };
 
   return (
@@ -193,135 +201,164 @@ export const App: React.FC = () => {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         />
+        {placementConfig && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(41, 128, 185, 0.9)',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              display: 'flex',
+              gap: '15px',
+              alignItems: 'center',
+              zIndex: 50,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            }}
+          >
+            <span>Выберите место для спавна на поле</span>
+            <button
+              className="btn btn-sm"
+              style={{ backgroundColor: '#c0392b' }}
+              onClick={() => setPlacementConfig(null)}
+            >
+              Отмена
+            </button>
+          </div>
+        )}
       </div>
 
-      <aside id="toolbar">
-        <h2>Панель управления</h2>
+      <div id="toolbar">
+        <div className="tool-group">
+          <h3>Управление спавном</h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openSpawnModal('player')}>
+              Добавить Игрока
+            </button>
+            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSpawnModal('ai')}>
+              Добавить ИИ
+            </button>
+          </div>
+        </div>
 
-        <section className="tool-group">
+        <div className="tool-group">
           <h3>Препятствия</h3>
-          <label className="checkbox-label">
+          <label>
+            Включить коллизии
             <input
               type="checkbox"
               checked={obstaclesEnabled}
-              onChange={handleObstaclesChange}
+              onChange={(e) => {
+                setObstaclesEnabled(e.target.checked);
+                appRef.current?.physics.setObstaclesEnabled(e.target.checked);
+              }}
             />
-            Включить препятствия
           </label>
-          <div className="file-input-wrapper">
-            <button className="btn" onClick={() => fileInputRef.current?.click()}>
-              Загрузить JSON препятствий
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".json"
-              style={{ display: 'none' }}
-              onChange={handleFileChange}
-            />
-          </div>
-        </section>
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            accept=".json"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                try {
+                  const data = JSON.parse(evt.target?.result as string);
+                  if (Array.isArray(data)) {
+                    appRef.current?.loadObstaclesFromData(data);
+                  }
+                } catch {
+                  alert('Ошибка при чтении JSON файла!');
+                }
+              };
+              reader.readAsText(file);
+            }}
+          />
+          <button className="btn" onClick={() => fileInputRef.current?.click()}>
+            Загрузить JSON препятствий
+          </button>
+        </div>
 
-        <section className="tool-group">
-          <h3>Добавить существо</h3>
-          {placementConfig ? (
-            <>
-              <p className="selection-hint">Выберите место</p>
-              <button
-                className="btn"
-                onClick={() => {
-                  setPlacementConfig(null);
-                  appRef.current?.endPan();
-                }}
-              >
-                Отмена
-              </button>
-            </>
-          ) : (
-            <>
-              <button className="btn btn-primary" onClick={() => openSpawnModal('player')}>
-                + Игрок (Player)
-              </button>
-              <button className="btn btn-secondary" onClick={() => openSpawnModal('ai')}>
-                + ИИ (AI)
-              </button>
-            </>
-          )}
-        </section>
-
-        <section className="tool-group">
+        <div className="tool-group">
           <h3>Выбранное существо</h3>
-          {!selectedStats ? (
-            <p className="selection-hint">Кликните по существу на поле</p>
-          ) : (
-            <>
+          {selectedStats ? (
+            <div className="stats-list">
               <dl className="stats-list">
-                <div className="stat-row">
-                  <dt>Тип</dt>
-                  <dd>{selectedStats.type === 'player' ? 'Игрок' : 'ИИ'}</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Радиус</dt>
-                  <dd>{selectedStats.radius} px</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Масса</dt>
-                  <dd>{selectedStats.mass}</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Жизни (HP)</dt>
-                  <dd>{selectedStats.hp} / {selectedStats.maxHp}</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Макс. скорость</dt>
-                  <dd>{selectedStats.maxSpeed.toFixed(0)} px/с</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Макс. поворот</dt>
-                  <dd>{selectedStats.maxTurnSpeed.toFixed(0)} °/с</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Текущая скорость</dt>
-                  <dd>{selectedStats.currentSpeed.toFixed(0)} px/с</dd>
-                </div>
-                <div className="stat-row">
-                  <dt>Текущий поворот</dt>
-                  <dd>{selectedStats.currentTurnSpeed.toFixed(0)} °/с</dd>
-                </div>
+                <div className="stat-row"><dt>Тип:</dt><dd>{selectedStats.type === 'player' ? 'Игрок' : 'ИИ'}</dd></div>
+                <div className="stat-row"><dt>Состояние:</dt><dd>{selectedStats.state}</dd></div>
+                <div className="stat-row"><dt>Радиус:</dt><dd>{selectedStats.radius} px</dd></div>
+                <div className="stat-row"><dt>Масса:</dt><dd>{selectedStats.mass}</dd></div>
+                <div className="stat-row"><dt>Здоровье (HP):</dt><dd>{selectedStats.hp} / {selectedStats.maxHp}</dd></div>
+                <div className="stat-row"><dt>Текущая скорость:</dt><dd>{selectedStats.currentSpeed.toFixed(0)} px/с</dd></div>
+                <div className="stat-row"><dt>Текущий поворот:</dt><dd>{selectedStats.currentTurnSpeed.toFixed(0)} °/с</dd></div>
+                <div className="stat-row"><dt>Макс. скорость:</dt><dd>{selectedStats.maxSpeed} px/с</dd></div>
+                <div className="stat-row"><dt>Макс. поворот:</dt><dd>{selectedStats.maxTurnSpeed} °/с</dd></div>
               </dl>
-              <button className="btn btn-sm" onClick={openEditModal}>
-                Изменить
-              </button>
-            </>
-          )}
-        </section>
 
-        <section className="tool-group">
-          <h3>Управление игроком</h3>
-          <p className="control-hint">Выберите существо-игрока на поле</p>
+              <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Арсенал (клик для изменения):</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                {selectedStats.weapons.map((w) => (
+                  <div
+                    key={w.id}
+                    onClick={() => openWeaponEditModal(w)}
+                    style={{
+                      backgroundColor: '#1e1e1e',
+                      padding: '6px 8px',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      border: '1px solid #444',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <span>{w.name}</span>
+                    <span style={{ color: '#f1c40f' }}>{w.baseDamage} урона</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
+                  Изменить
+                </button>
+                <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteCreature}>
+                  Удалить
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="selection-hint">Существо не выбрано</p>
+          )}
+        </div>
+
+        <div className="tool-group">
+          <h3>Управление</h3>
           <ul className="control-keys">
-            <li><kbd>W</kbd> — вперёд</li>
-            <li><kbd>A</kbd> — поворот влево</li>
-            <li><kbd>D</kbd> — поворот вправо</li>
+            <li><kbd>W</kbd> Движение вперед</li>
+            <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
+            <li><kbd>Пробел</kbd> Атака оружием</li>
           </ul>
-        </section>
-      </aside>
+        </div>
+      </div>
 
       {isModalOpen && (
         <div className="modal">
           <div className="modal-backdrop" onClick={closeSpawnModal} />
-          <div className="modal-dialog" role="dialog" aria-labelledby="spawn-modal-title">
-            <h3 id="spawn-modal-title">Параметры нового существа</h3>
+          <div className="modal-dialog">
+            <h3>Параметры нового существа</h3>
             <p className="modal-subtitle">
               Тип: {pendingSpawnType === 'player' ? 'Игрок' : 'ИИ'}
             </p>
             <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
               <label>
-                Радиус (Размер):
-                <select
-                  value={radius}
-                  onChange={(e) => setRadius(Number(e.target.value))}
-                >
+                Радиус:
+                <select value={radius} onChange={(e) => setRadius(Number(e.target.value))}>
                   {STANDARD_RADII.map((r) => (
                     <option key={r} value={r}>
                       {r} px
@@ -367,7 +404,7 @@ export const App: React.FC = () => {
                 Отмена
               </button>
               <button type="button" className="btn btn-primary" onClick={handleSpawnConfirm}>
-                Создать
+                Выбрать место
               </button>
             </div>
           </div>
@@ -377,15 +414,12 @@ export const App: React.FC = () => {
       {isEditModalOpen && (
         <div className="modal">
           <div className="modal-backdrop" onClick={closeEditModal} />
-          <div className="modal-dialog" role="dialog" aria-labelledby="edit-modal-title">
-            <h3 id="edit-modal-title">Редактировать существо</h3>
+          <div className="modal-dialog">
+            <h3>Изменить параметры существа</h3>
             <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
               <label>
                 Радиус:
-                <select
-                  value={editRadius}
-                  onChange={(e) => setEditRadius(Number(e.target.value))}
-                >
+                <select value={editRadius} onChange={(e) => setEditRadius(Number(e.target.value))}>
                   {STANDARD_RADII.map((r) => (
                     <option key={r} value={r}>
                       {r} px
@@ -394,7 +428,7 @@ export const App: React.FC = () => {
                 </select>
               </label>
               <label>
-                Текущие HP:
+                Текущее HP:
                 <input
                   type="number"
                   value={editHp}
@@ -441,6 +475,65 @@ export const App: React.FC = () => {
                 Отмена
               </button>
               <button type="button" className="btn btn-primary" onClick={handleEditConfirm}>
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedWeaponForEdit && (
+        <div className="modal">
+          <div className="modal-backdrop" onClick={closeWeaponEditModal} />
+          <div className="modal-dialog">
+            <h3>Изменить параметры оружия</h3>
+            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
+              <label>
+                Название:
+                <input
+                  type="text"
+                  value={editWeaponName}
+                  onChange={(e) => setEditWeaponName(e.target.value)}
+                />
+              </label>
+              <label>
+                Базовый урон:
+                <input
+                  type="number"
+                  value={editWeaponDamage}
+                  min={0}
+                  max={500}
+                  onChange={(e) => setEditWeaponDamage(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Подготовка (сек):
+                <input
+                  type="number"
+                  value={editWeaponPrepTime}
+                  min={0.05}
+                  max={5}
+                  step={0.05}
+                  onChange={(e) => setEditWeaponPrepTime(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Восстановление (сек):
+                <input
+                  type="number"
+                  value={editWeaponRecoveryTime}
+                  min={0.05}
+                  max={5}
+                  step={0.05}
+                  onChange={(e) => setEditWeaponRecoveryTime(Number(e.target.value))}
+                />
+              </label>
+            </form>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={closeWeaponEditModal}>
+                Отмена
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleWeaponEditConfirm}>
                 Применить
               </button>
             </div>
