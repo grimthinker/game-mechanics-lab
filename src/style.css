@@ -1,0 +1,217 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: #1a1a1a;
+  color: #ecf0f1;
+}
+
+#app {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+}
+
+#canvas-container {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  background-color: #111;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+#toolbar {
+  width: 320px;
+  background-color: #242424;
+  border-left: 1px solid #333;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+}
+
+.tool-group {
+  background-color: #2d2d2d;
+  padding: 12px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tool-group h3 {
+  font-size: 14px;
+  color: #bdc3c7;
+  border-bottom: 1px solid #444;
+  padding-bottom: 4px;
+}
+
+label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+input[type="number"], select {
+  background-color: #1a1a1a;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn {
+  background-color: #34495e;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.btn:hover { background-color: #415b76; }
+.btn-primary { background-color: #2980b9; }
+.btn-primary:hover { background-color: #3498db; }
+.btn-secondary { background-color: #8e44ad; }
+.btn-secondary:hover { background-color: #9b59b6; }
+.btn-sm { font-size: 11px; padding: 6px; }
+
+.test-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 4px;
+}
+
+.control-hint {
+  font-size: 12px;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+.control-keys {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.control-keys li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 24px;
+  padding: 2px 6px;
+  background-color: #1a1a1a;
+  border: 1px solid #555;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: center;
+  color: #ecf0f1;
+}
+
+.selection-hint {
+  font-size: 12px;
+  color: #95a5a6;
+  font-style: italic;
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.stat-row dt {
+  color: #bdc3c7;
+}
+
+.stat-row dd {
+  font-weight: 600;
+  color: #f1c40f;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.modal-dialog {
+  position: relative;
+  width: min(360px, calc(100vw - 32px));
+  background-color: #2d2d2d;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.modal-dialog h3 {
+  font-size: 16px;
+  color: #ecf0f1;
+}
+
+.modal-subtitle {
+  font-size: 13px;
+  color: #95a5a6;
+  margin-top: -6px;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
