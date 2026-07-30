@@ -8,6 +8,8 @@ export class Creature implements IMovable {
   public mass: number;
   public maxSpeed: number;
   public maxTurnSpeed: number;
+  public maxHp: number;
+  public hp: number;
   public isAlive: boolean = true;
   public isPlayer: boolean = false;
   public isNPC: boolean = false;
@@ -29,11 +31,12 @@ export class Creature implements IMovable {
     this.mass = Math.max(0.1, config.mass);
     this.maxSpeed = Math.max(0, config.maxSpeed);
     this.maxTurnSpeed = Math.max(0, config.maxTurnSpeed);
-    
+    this.maxHp = Math.max(1, config.maxHp ?? 100);
+    this.hp = Math.min(this.maxHp, Math.max(0, config.hp ?? this.maxHp));
+    this.isPlayer = this.type === 'player';
+    this.isNPC = this.type === 'ai';
 
-    // Создаем физическое тело-окружность
     this.body = new Circle({ x: this.position.x, y: this.position.y }, this.radius);
-    // Сохраняем ссылку на сам Creature внутри тела для удобной идентификации
     (this.body as any).entity = this;
   }
 
@@ -62,26 +65,48 @@ export class Creature implements IMovable {
     return this.turningDirection * this.maxTurnSpeed;
   }
 
-  // --- Обновление логики движения ---
   public update(dt: number): void {
-    // 1. Поворот (мгновенная скорость)
     if (this.turningDirection !== 0) {
       this.angle += this.turningDirection * this.maxTurnSpeed * dt;
     }
 
-    // 2. Поступательное движение вперед (без инерции)
     if (this.isMovingForward) {
       this.position.x += Math.cos(this.angle) * this.maxSpeed * dt;
       this.position.y += Math.sin(this.angle) * this.maxSpeed * dt;
+      this.body.setPosition(this.position.x, this.position.y);
     }
-
-    // 3. Синхронизация позиции физического тела
-    this.body.setPosition(this.position.x, this.position.y);
   }
 
-  // Синхронизация позиции обратно из физического тела (после решения коллизий)
   public syncFromPhysics(): void {
     this.position.x = this.body.x;
     this.position.y = this.body.y;
+  }
+
+  /**
+   * Обновляет параметры существа (скорость, здоровье и физический радиус коллайдера)
+   */
+  public updateParams(params: {
+    radius?: number;
+    maxSpeed?: number;
+    maxTurnSpeed?: number;
+    hp?: number;
+    maxHp?: number;
+  }): void {
+    if (params.radius !== undefined) {
+      this.radius = params.radius;
+      this.body.r = params.radius;
+    }
+    if (params.maxSpeed !== undefined) {
+      this.maxSpeed = Math.max(0, params.maxSpeed);
+    }
+    if (params.maxTurnSpeed !== undefined) {
+      this.maxTurnSpeed = Math.max(0, params.maxTurnSpeed);
+    }
+    if (params.maxHp !== undefined) {
+      this.maxHp = Math.max(1, params.maxHp);
+    }
+    if (params.hp !== undefined) {
+      this.hp = Math.min(this.maxHp, Math.max(0, params.hp));
+    }
   }
 }

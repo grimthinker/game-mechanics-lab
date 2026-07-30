@@ -16,6 +16,14 @@ export class GameApp {
   private readonly minScale = 0.25;
   private readonly maxScale = 4;
 
+  // Переменные для панорамирования камеры
+  private isPanning: boolean = false;
+  private panStartScreenPos: Point = { x: 0, y: 0 };
+  private isMouseDownOnCreature: boolean = false;
+  private panStartX: number = 0;
+  private panStartY: number = 0;
+  private totalPanDistance: number = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -39,11 +47,12 @@ export class GameApp {
     mass: number = 10,
     maxSpeed: number = 150,
     maxTurnSpeedDeg: number = 270,
+    position?: Point,
   ): Creature {
     const config: CreatureConfig = {
       id: `creature_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
       type,
-      position: {
+      position: position ? { ...position } : {
         x: 100 + Math.random() * (this.canvas.width - 200),
         y: 100 + Math.random() * (this.canvas.height - 200),
       },
@@ -100,6 +109,32 @@ export class GameApp {
     this.camera.offsetY = screen.y - world.y * newScale;
   }
 
+  // --- Перемещение камеры (Pan) ---
+
+  public startPan(clientX: number, clientY: number): void {
+    this.isPanning = true;
+    this.panStartX = clientX;
+    this.panStartY = clientY;
+    this.totalPanDistance = 0;
+  }
+
+  public pan(clientX: number, clientY: number): void {
+    if (!this.isPanning) return;
+    const dx = clientX - this.panStartX;
+    const dy = clientY - this.panStartY;
+    this.camera.offsetX += dx;
+    this.camera.offsetY += dy;
+    this.panStartX = clientX;
+    this.panStartY = clientY;
+    this.totalPanDistance += Math.abs(dx) + Math.abs(dy);
+  }
+
+  public endPan(): boolean {
+    if (!this.isPanning) return false;
+    this.isPanning = false;
+    return this.totalPanDistance > 4;
+  }
+
   private getScreenPoint(clientX: number, clientY: number): Point {
     const rect = this.canvas.getBoundingClientRect();
     const scaleX = this.canvas.width / rect.width;
@@ -130,18 +165,14 @@ export class GameApp {
   private loop(currentTime: number): void {
     if (!this.isRunning) return;
 
-    const dt = Math.min((currentTime - this.lastTime) / 1000, 0.1); // Лимит dt (не более 100ms)
+    const dt = Math.min((currentTime - this.lastTime) / 1000, 0.1);
     this.lastTime = currentTime;
 
-    // 1. Обновление состояния существ
     for (const creature of this.creatures) {
       creature.update(dt);
     }
 
-    // 2. Расчет физики и коллизий
     this.physics.resolveCollisions(this.creatures, dt);
-
-    // 3. Отрисовка кадра
     this.render();
 
     this.onFrame?.();

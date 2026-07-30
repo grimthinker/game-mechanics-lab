@@ -1,3 +1,5 @@
+CSS
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -13,7 +15,7 @@ body, html {
   color: #ecf0f1;
 }
 
-#app {
+#root, #app {
   display: flex;
   width: 100vw;
   height: 100vh;
@@ -30,7 +32,11 @@ body, html {
   width: 100%;
   height: 100%;
   display: block;
-  cursor: crosshair;
+  cursor: grab;
+}
+
+#game-canvas:active {
+  cursor: grabbing;
 }
 
 #toolbar {
@@ -167,10 +173,6 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.modal[hidden] {
-  display: none;
 }
 
 .modal-backdrop {
