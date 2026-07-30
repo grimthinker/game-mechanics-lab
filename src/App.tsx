@@ -80,7 +80,7 @@ export const App: React.FC = () => {
 
   const { syncPlayerControls } = useKeyboardControls({
     appRef,
-    isModalOpen,
+    isModalOpen: isModalOpen || !!selectedWeaponForEdit,
     isEditModalOpen,
     updateStats,
   });
@@ -189,6 +189,22 @@ export const App: React.FC = () => {
     syncPlayerControls();
     updateStats();
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.code === 'Escape') {
+        if (selectedWeaponForEdit) {
+          closeWeaponEditModal();
+        } else if (isEditModalOpen) {
+          closeEditModal();
+        } else if (isModalOpen) {
+          closeSpawnModal();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isModalOpen, isEditModalOpen, selectedWeaponForEdit]);
 
   return (
     <div id="app">
@@ -348,7 +364,12 @@ export const App: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="modal">
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeSpawnModal();
+          }}
+        >
           <div className="modal-backdrop" onClick={closeSpawnModal} />
           <div className="modal-dialog">
             <h3>Параметры нового существа</h3>
@@ -412,7 +433,12 @@ export const App: React.FC = () => {
       )}
 
       {isEditModalOpen && (
-        <div className="modal">
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeEditModal();
+          }}
+        >
           <div className="modal-backdrop" onClick={closeEditModal} />
           <div className="modal-dialog">
             <h3>Изменить параметры существа</h3>
@@ -483,7 +509,12 @@ export const App: React.FC = () => {
       )}
 
       {selectedWeaponForEdit && (
-        <div className="modal">
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeWeaponEditModal();
+          }}
+        >
           <div className="modal-backdrop" onClick={closeWeaponEditModal} />
           <div className="modal-dialog">
             <h3>Изменить параметры оружия</h3>

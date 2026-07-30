@@ -248,6 +248,9 @@ export class GameApp {
     for (const c of this.creatures) {
       this.ctx.save();
       this.ctx.translate(c.position.x, c.position.y);
+
+      // Вращаем только тело существа и зоны атаки оружия
+      this.ctx.save();
       this.ctx.rotate(c.angle);
 
       let color = c.type === 'player' ? '#3498db' : '#e74c3c';
@@ -375,6 +378,10 @@ export class GameApp {
         }
       }
 
+      // Восстанавливаем контекст после поворота, оставаясь в точке (c.position.x, c.position.y)
+      this.ctx.restore();
+
+      // Рисуем полоску здоровья горизонтально поверх изображения зоны попадания
       if (c.isAlive) {
         const barW = c.radius * 2;
         const barH = 4 / this.camera.scale;

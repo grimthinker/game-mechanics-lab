@@ -1,7 +1,7 @@
 import { WeaponConfig } from './types';
 
 export function createDefaultWeapons(): WeaponConfig[] {
-  return [
+  const weapons: WeaponConfig[] = [
     {
       id: `weapon_line_${Math.random().toString(36).substring(2, 6)}`,
       name: 'Прямой удар (Линия)',
@@ -17,7 +17,7 @@ export function createDefaultWeapons(): WeaponConfig[] {
       critChance: 0.15,
       critMultiplier: 2.0,
       hitZoneType: 'forward_line',
-      length: 150, // Дальность увеличена до 150px
+      length: 150,
     },
     {
       id: `weapon_angle_${Math.random().toString(36).substring(2, 6)}`,
@@ -31,11 +31,11 @@ export function createDefaultWeapons(): WeaponConfig[] {
       baseDamage: 20,
       minMultiplier: 0.9,
       maxMultiplier: 1.1,
-      critChance: 0.2,
-      critMultiplier: 2.0,
+      critChance: 0.1,
+      critMultiplier: 1.8,
       hitZoneType: 'angle',
-      length: 100,             // Расстояние 100px
-      angle: Math.PI / 6,      // Угол 30 градусов
+      length: 100,
+      angle: Math.PI / 6,
     },
     {
       id: `weapon_radius_${Math.random().toString(36).substring(2, 6)}`,
@@ -74,7 +74,7 @@ export function createDefaultWeapons(): WeaponConfig[] {
       rayCount: 5,
     },
     {
-      id: `weapon_offset_${Math.random().toString(36).substring(2, 6)}`,
+      id: `weapon_offset_radius_${Math.random().toString(36).substring(2, 6)}`,
       name: 'Выносная сфера',
       prepTime: 0.2,
       recoveryTime: 0.3,
@@ -82,14 +82,21 @@ export function createDefaultWeapons(): WeaponConfig[] {
       recoveryTurnSlow: 0.8,
       prepMoveSlow: 0.5,
       recoveryMoveSlow: 0.8,
-      baseDamage: 35,
-      minMultiplier: 0.9,
-      maxMultiplier: 1.1,
+      baseDamage: 22,
+      minMultiplier: 0.85,
+      maxMultiplier: 1.15,
       critChance: 0.15,
       critMultiplier: 2.0,
       hitZoneType: 'offset_radius',
       offsetDistance: 70,
       radius: 35,
-    }
+    },
   ];
+
+  for (let i = weapons.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [weapons[i], weapons[j]] = [weapons[j], weapons[i]];
+  }
+
+  return weapons;
 }
