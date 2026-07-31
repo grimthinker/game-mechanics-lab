@@ -377,7 +377,7 @@ export const App: React.FC = () => {
             <li><kbd>W</kbd> Движение вперед</li>
             <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
             <li><kbd>LShift</kbd> Бег (удержание)</li>
-            <li><kbd>LCtrl</kbd> Полуприсяд (удержание)</li>
+            <li><kbd>C</kbd> Полуприсяд (удержание)</li>
             <li><kbd>Пробел</kbd> Атака оружием</li>
           </ul>
         </div>

@@ -9,6 +9,22 @@ interface UseKeyboardControlsProps {
   updateStats: () => void;
 }
 
+const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c']);
+
+const getKeyName = (e: KeyboardEvent): string => {
+  switch (e.code) {
+    case 'KeyW': return 'w';
+    case 'KeyA': return 'a';
+    case 'KeyS': return 's';
+    case 'KeyD': return 'd';
+    case 'ShiftLeft':
+    case 'ShiftRight': return 'shift';
+    case 'KeyC': return 'c';
+    case 'Space': return ' ';
+    default: return e.key.toLowerCase();
+  }
+};
+
 export const useKeyboardControls = ({
   appRef,
   isModalOpen,
@@ -37,32 +53,36 @@ export const useKeyboardControls = ({
     if (!player) return;
 
     const keys = keysPressedRef.current;
-    if (keys.has('w')) player.startMovingForward();
-    else player.stopMovingForward();
+    if (keys.has('w')) {
+      player.startMovingForward();
+    } else {
+      player.stopMovingForward();
+    }
 
-    if (keys.has('a')) player.startTurning(-1);
-    else if (keys.has('d')) player.startTurning(1);
-    else player.stopTurning();
+    if (keys.has('a') && !keys.has('d')) {
+      player.startTurning(-1);
+    } else if (keys.has('d') && !keys.has('a')) {
+      player.startTurning(1);
+    } else {
+      player.stopTurning();
+    }
 
-    if (keys.has('shift')) player.startRunning();
-    else player.stopRunning();
+    if (keys.has('shift')) {
+      player.startRunning();
+    } else {
+      player.stopRunning();
+    }
 
-    if (keys.has('control')) player.startCrouching();
-    else player.stopCrouching();
+    if (keys.has('c')) {
+      player.startCrouching();
+    } else {
+      player.stopCrouching();
+    }
   }, [appRef]);
 
   useEffect(() => {
-    const CONTROL_KEYS = new Set(['w', 'a', 'd', 'shift', 'control']);
-
-    const getKeyName = (e: KeyboardEvent): string => {
-      const k = e.key.toLowerCase();
-      if (e.code === 'ShiftLeft' || k === 'shift') return 'shift';
-      if (e.code === 'ControlLeft' || k === 'control') return 'control';
-      return k;
-    };
-
     const isTextInputTarget = (target: EventTarget | null): boolean => {
-      if (!(target instanceof HTMLElement)) return false;
+      if (!target || !(target instanceof HTMLElement)) return false;
       const tag = target.tagName;
       return tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
     };

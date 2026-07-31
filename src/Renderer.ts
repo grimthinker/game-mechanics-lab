@@ -119,12 +119,8 @@ export class Renderer {
             case 'forward_line': {
               const len = weaponToDraw.length ?? 150;
               this.ctx.beginPath();
-              this.ctx.moveTo(0, -c.radius);
-              this.ctx.lineTo(len, -c.radius);
-              this.ctx.lineTo(len, c.radius);
-              this.ctx.lineTo(0, c.radius);
-              this.ctx.closePath();
-              this.ctx.fill();
+              this.ctx.moveTo(0, 0);
+              this.ctx.lineTo(len, 0);
               this.ctx.stroke();
               break;
             }
