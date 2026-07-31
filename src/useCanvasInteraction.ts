@@ -63,23 +63,25 @@ export const useCanvasInteraction = ({
     if (e.button !== 0 || !app) return;
 
     if (placementConfig) {
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
-      app.spawnCreature(
-        placementConfig.type,
-        placementConfig.radius,
-        placementConfig.mass,
-        placementConfig.maxSpeed,
-        placementConfig.maxTurnSpeed,
-        point,
-        undefined,
-        placementConfig.runSpeedMultiplier,
-        placementConfig.crouchSpeedMultiplier,
-        placementConfig.crouchStealthMultiplier,
-      );
-      setPlacementConfig(null);
-      app.endPan();
-      syncPlayerControls();
-      updateStats();
+      const wasDragging = app.endPan();
+      if (!wasDragging) {
+        const point = app.getCanvasPoint(e.clientX, e.clientY);
+        app.spawnCreature(
+          placementConfig.type,
+          placementConfig.radius,
+          placementConfig.mass,
+          placementConfig.maxSpeed,
+          placementConfig.maxTurnSpeed,
+          point,
+          undefined,
+          placementConfig.runSpeedMultiplier,
+          placementConfig.crouchSpeedMultiplier,
+          placementConfig.crouchStealthMultiplier,
+        );
+        setPlacementConfig(null);
+        syncPlayerControls();
+        updateStats();
+      }
       return;
     }
 

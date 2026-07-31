@@ -228,7 +228,7 @@ export const App: React.FC = () => {
     c.updateParams({
       radius: editRadius,
       maxSpeed: editMaxSpeed,
-      maxTurnSpeed: editMaxTurnSpeed,
+      maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
       hp: editHp,
       maxHp: editMaxHp,
       runSpeedMultiplier: editRunSpeedMultiplier,
@@ -400,6 +400,23 @@ export const App: React.FC = () => {
         } else if (isModalOpen) {
           closeSpawnModal();
         }
+      } else if (e.key === 'Enter' || e.code === 'Enter') {
+        if (isModalOpen) {
+          e.preventDefault();
+          handleSpawnConfirm();
+        } else if (isEditModalOpen) {
+          e.preventDefault();
+          handleEditConfirm();
+        } else if (selectedWeaponForEdit) {
+          e.preventDefault();
+          handleWeaponEditConfirm();
+        } else if (selectedArmorForEdit) {
+          e.preventDefault();
+          handleArmorEditConfirm();
+        } else if (selectedBagForEdit) {
+          e.preventDefault();
+          handleBagEditConfirm();
+        }
       } else if (e.code === 'Space' || e.key === ' ') {
         // Проверяем открытые модальные окна, чтобы не триггерить паузу при вводе текста
         if (
@@ -433,6 +450,16 @@ export const App: React.FC = () => {
     selectedArmorForEdit,
     selectedBagForEdit,
     togglePause,
+    closeSpawnModal,
+    closeEditModal,
+    closeWeaponEditModal,
+    closeArmorEditModal,
+    closeBagEditModal,
+    handleSpawnConfirm,
+    handleEditConfirm,
+    handleWeaponEditConfirm,
+    handleArmorEditConfirm,
+    handleBagEditConfirm,
   ]);
 
   const getSlotTypeName = (type: string) => {
@@ -782,7 +809,7 @@ export const App: React.FC = () => {
                 />
               </label>
               <label>
-                Макс. поворот (°/с):
+                Макс. скорость поворота (°/с):
                 <input
                   type="number"
                   value={maxTurnSpeed}
@@ -891,7 +918,7 @@ export const App: React.FC = () => {
                 />
               </label>
               <label>
-                Макс. поворот (°/с):
+                Макс. скорость поворота (°/с):
                 <input
                   type="number"
                   value={editMaxTurnSpeed}
