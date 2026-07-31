@@ -1,5 +1,5 @@
 import { Circle } from 'detect-collisions';
-import { CreatureType, CreatureState, Point, WeaponConfig, ActiveAttack } from '../types';
+import { Point } from '../types';
 
 export type EntityId = string;
 
@@ -16,13 +16,26 @@ export interface PhysicsBodyComponent {
   isStatic: boolean;
 }
 
+export interface StatValue {
+  base: number;
+  current: number;
+}
+
+export interface StatsComponent {
+  hp: StatValue;
+  maxHp: StatValue;
+  maxSpeed: StatValue;
+  maxTurnSpeed: StatValue;
+  stealth: StatValue;
+  runSpeedMultiplier: StatValue;
+  crouchSpeedMultiplier: StatValue;
+  crouchStealthMultiplier: StatValue;
+  interactionRange: StatValue;
+}
+
 export interface VelocityComponent {
-  maxSpeed: number;
-  maxTurnSpeed: number;
   currentSpeed: number;
   currentTurnSpeed: number;
-  runSpeedMultiplier: number;
-  crouchSpeedMultiplier: number;
 }
 
 export interface InputComponent {
@@ -34,27 +47,71 @@ export interface InputComponent {
 }
 
 export interface HealthComponent {
-  hp: number;
-  maxHp: number;
   isAlive: boolean;
   hitFlashTimer: number;
 }
 
 export interface StealthComponent {
-  stealth: number;
-  baseStealth: number;
-  crouchStealthMultiplier: number;
+  isCrouching: boolean;
 }
 
-export interface WeaponInventoryComponent {
-  weapons: WeaponConfig[];
-  activeAttacks: ActiveAttack[];
+export type ItemType = 'weapon' | 'armor' | 'bag' | 'resource' | 'other';
+
+// Карта соответствия типа предмета и его интерфейса конфига
+type ItemConfigMap = {
+  weapon: WeaponConfig;
+  armor: ArmorConfig;
+  bag: InventoryConfig;
+  resource: ItemConfig;
+  other: ItemConfig;
+};
+
+export type ItemData<T extends ItemType = ItemType> = {
+  [K in T]: {
+    id: string;
+    name: string;
+    type: K;
+    maxStack: number;
+    config?: ItemConfigMap[K]; // Конфиг автоматически подстроится под тип K
+  };
+}[T];
+
+export interface InventorySlot {
+  item: ItemData | null;
+  count: number;
+}
+
+export interface InventoryComponent {
+  size: InventorySize;
+  slots: InventorySlot[][];
+}
+
+export type EquipSlotType = 'armor' | 'bag' | 'weapon';
+
+export interface EquipSlot {
+  type: EquipSlotType;
+  item: ItemData | null;
+}
+
+export interface EquipComponent {
+  slots: EquipSlot[];
+}
+
+export interface ActiveAttackComponent {
+  attacks: ActiveAttack[];
 }
 
 export interface CreatureMetaComponent {
   id: string;
   type: CreatureType;
   state: CreatureState;
+}
+
+export interface ItemComponent {
+  id: string;
+  name: string;
+  type: ItemType;
+  config?: WeaponConfig | ItemConfig | ArmorConfig | InventoryConfig;
 }
 
 export interface EntityComponents {
@@ -64,6 +121,104 @@ export interface EntityComponents {
   input?: InputComponent;
   health?: HealthComponent;
   stealth?: StealthComponent;
-  weaponInventory?: WeaponInventoryComponent;
+  stats?: StatsComponent;
+  inventory?: InventoryComponent;
+  equip?: EquipComponent;
+  activeAttacks?: ActiveAttackComponent;
+  item?: ItemComponent;
   meta?: CreatureMetaComponent;
+}
+
+export type CreatureType = 'player' | 'ai';
+
+export const STANDARD_RADII = [12, 16, 24, 32] as const;
+export type StandardRadius = (typeof STANDARD_RADII)[number];
+
+export type CreatureState = 'idle' | 'moving' | 'running' | 'crouching' | 'attacking' | 'dead';
+
+export type HitZoneType = 'radius' | 'angle' | 'line' | 'shrapnel' | 'forward_line' | 'offset_radius';
+
+export type InventorySize = {
+  width: number;
+  height: number;
+}
+
+export interface ItemConfig {
+    id: string;
+    name: string;
+    invWeight: number;
+    radius: number;
+    maxStack?: number;
+}
+
+export interface InventoryConfig extends ItemConfig {
+  size: InventorySize
+}
+
+export interface ArmorConfig extends ItemConfig {
+  defense: number;
+  flat_reduction: number;
+}
+
+export type HitZoneConfig = {
+  hitZoneType: HitZoneType;
+  radius?: number;
+  angle?: number;
+  length?: number;
+  rayCount?: number;
+  offsetDistance?: number;
+  pierceObstacles?: boolean;
+  piercePlayers?: boolean;
+  pierceBots?: boolean;
+}
+
+export interface WeaponConfig extends ItemConfig {
+  prepTime: number;
+  recoveryTime: number;
+  prepTurnSlow: number;
+  recoveryTurnSlow: number;
+  prepMoveSlow: number;
+  recoveryMoveSlow: number;
+  baseDamage: number;
+  minMultiplier: number;
+  maxMultiplier: number;
+  critChance: number;
+  critMultiplier: number;
+  zone: HitZoneConfig;
+}
+
+export interface ActiveAttack {
+  weapon: WeaponConfig;
+  phase: 'prep' | 'recovery';
+  timer: number;
+  totalDuration: number;
+}
+
+export interface CreatureConfig {
+  id: string;
+  type: CreatureType;
+  position: Point;
+  radius: number;
+  mass: number;
+  maxSpeed: number;
+  maxTurnSpeed: number;
+  maxHp?: number;
+  hp?: number;
+  stealth?: number;
+  baseStealth?: number;
+  weapons?: WeaponConfig[];
+  runSpeedMultiplier?: number;
+  crouchSpeedMultiplier?: number;
+  crouchStealthMultiplier?: number;
+}
+
+export interface IMovable {
+  startMovingForward(): void;
+  stopMovingForward(): void;
+  startTurning(direction: -1 | 1): void;
+  stopTurning(): void;
+  startRunning(): void;
+  stopRunning(): void;
+  startCrouching(): void;
+  stopCrouching(): void;
 }

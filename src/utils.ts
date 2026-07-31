@@ -1,4 +1,5 @@
-import { Point } from "./types";
+import { Point } from "detect-collisions";
+
 
 export function vec2_distance_to(start: Point, end: Point): number {
     const dx = end.x - start.x;

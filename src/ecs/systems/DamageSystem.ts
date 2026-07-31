@@ -2,22 +2,22 @@ import { World } from '../World';
 
 export class DamageSystem {
   public update(_dt: number, world: World): void {
-    const entities = world.getEntitiesWith('health', 'input', 'weaponInventory', 'meta');
+    const entities = world.getEntitiesWith('health', 'input', 'activeAttacks', 'meta', 'stats');
 
-    for (const [id, { health, input, weaponInventory, meta }] of entities) {
+    for (const [id, { health, input, activeAttacks, meta, stats }] of entities) {
       if (health.hitFlashTimer > 0) {
         health.hitFlashTimer--;
       }
 
-      if (health.hp <= 0 && health.isAlive) {
+      if (stats.hp.current <= 0 && health.isAlive) {
         health.isAlive = false;
-        health.hp = 0;
+        stats.hp.current = 0;
         input.isMovingForward = false;
         input.turningDirection = 0;
         input.isRunning = false;
         input.isCrouching = false;
         input.wantsAttack = false;
-        weaponInventory.activeAttacks = [];
+        activeAttacks.attacks = [];
         meta.state = 'dead';
       }
     }

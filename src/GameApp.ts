@@ -1,23 +1,24 @@
 import { Circle } from 'detect-collisions';
 import { World } from './ecs/World';
-import { EntityId } from './ecs/types';
+import {
+  CreatureState,
+  CreatureType,
+  EntityId,
+  IMovable,
+  WeaponConfig,
+  EquipComponent,
+  InventoryComponent,
+  ItemData,
+} from './ecs/types';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { MovementSystem } from './ecs/systems/MovementSystem';
 import { AttackSystem } from './ecs/systems/AttackSystem';
 import { DamageSystem } from './ecs/systems/DamageSystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
-import { createDefaultWeapons } from './Weapon';
-import {
-  CreatureType,
-  CreatureState,
-  ObstacleSegment,
-  Point,
-  WeaponConfig,
-  IMovable,
-} from './types';
+import { createRandomWeaponItem } from './Weapon';
+import { ObstacleSegment, Point } from './types';
 
-// Адаптер для полной обратной совместимости с React-хуками и App.tsx
 export class EntityAdapter implements IMovable {
   constructor(
     public readonly id: EntityId,
@@ -38,19 +39,19 @@ export class EntityAdapter implements IMovable {
     return this.world.getComponent(this.id, 'physicsBody')!.mass;
   }
   public get hp(): number {
-    return this.world.getComponent(this.id, 'health')!.hp;
+    return this.world.getComponent(this.id, 'stats')!.hp.current;
   }
   public get maxHp(): number {
-    return this.world.getComponent(this.id, 'health')!.maxHp;
+    return this.world.getComponent(this.id, 'stats')!.maxHp.current;
   }
   public get isAlive(): boolean {
     return this.world.getComponent(this.id, 'health')!.isAlive;
   }
   public get maxSpeed(): number {
-    return this.world.getComponent(this.id, 'velocity')!.maxSpeed;
+    return this.world.getComponent(this.id, 'stats')!.maxSpeed.current;
   }
   public get maxTurnSpeed(): number {
-    return this.world.getComponent(this.id, 'velocity')!.maxTurnSpeed;
+    return this.world.getComponent(this.id, 'stats')!.maxTurnSpeed.current;
   }
   public get currentSpeed(): number {
     return this.world.getComponent(this.id, 'velocity')!.currentSpeed;
@@ -59,22 +60,25 @@ export class EntityAdapter implements IMovable {
     return this.world.getComponent(this.id, 'velocity')!.currentTurnSpeed;
   }
   public get runSpeedMultiplier(): number {
-    return this.world.getComponent(this.id, 'velocity')!.runSpeedMultiplier;
+    return this.world.getComponent(this.id, 'stats')!.runSpeedMultiplier.current;
   }
   public get crouchSpeedMultiplier(): number {
-    return this.world.getComponent(this.id, 'velocity')!.crouchSpeedMultiplier;
+    return this.world.getComponent(this.id, 'stats')!.crouchSpeedMultiplier.current;
   }
   public get crouchStealthMultiplier(): number {
-    return this.world.getComponent(this.id, 'stealth')!.crouchStealthMultiplier;
+    return this.world.getComponent(this.id, 'stats')!.crouchStealthMultiplier.current;
   }
-  public get weapons(): WeaponConfig[] {
-    return this.world.getComponent(this.id, 'weaponInventory')!.weapons;
+  public get equip(): EquipComponent | undefined {
+    return this.world.getComponent(this.id, 'equip');
+  }
+  public get inventory(): InventoryComponent | undefined {
+    return this.world.getComponent(this.id, 'inventory');
   }
 
   public startMovingForward(): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    if (input && health?.isAlive && health.hp > 0) input.isMovingForward = true;
+    if (input && health?.isAlive && this.hp > 0) input.isMovingForward = true;
   }
   public stopMovingForward(): void {
     const input = this.world.getComponent(this.id, 'input');
@@ -83,7 +87,7 @@ export class EntityAdapter implements IMovable {
   public startTurning(direction: -1 | 1): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    if (input && health?.isAlive && health.hp > 0) input.turningDirection = direction;
+    if (input && health?.isAlive && this.hp > 0) input.turningDirection = direction;
   }
   public stopTurning(): void {
     const input = this.world.getComponent(this.id, 'input');
@@ -92,7 +96,7 @@ export class EntityAdapter implements IMovable {
   public startRunning(): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    if (input && health?.isAlive && health.hp > 0) {
+    if (input && health?.isAlive && this.hp > 0) {
       input.isRunning = true;
       input.isCrouching = false;
     }
@@ -104,7 +108,7 @@ export class EntityAdapter implements IMovable {
   public startCrouching(): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    if (input && health?.isAlive && health.hp > 0) {
+    if (input && health?.isAlive && this.hp > 0) {
       input.isCrouching = true;
       input.isRunning = false;
     }
@@ -118,6 +122,57 @@ export class EntityAdapter implements IMovable {
     if (input) input.wantsAttack = true;
   }
 
+//   // ADDED: Logic to pick up an item from the ground within interaction range into equipment
+//   public pickUpItem(): boolean {
+//     const transform = this.world.getComponent(this.id, 'transform');
+//     const stats = this.world.getComponent(this.id, 'stats');
+//     const equip = this.world.getComponent(this.id, 'equip');
+//     if (!transform || !stats || !equip) return false;
+
+//     const itemEntities = this.world.getEntitiesWith('transform', 'item');
+//     for (const [itemId, { transform: itemTransform, item }] of itemEntities) {
+//       const dist = Math.hypot(transform.x - itemTransform.x, transform.y - itemTransform.y);
+//       if (dist <= stats.interactionRange.current) {
+//         const targetSlot = equip.slots.find((s) => s.type === item.type && s.item === null);
+//         if (targetSlot) {
+//           targetSlot.item = {
+//             id: item.id,
+//             name: item.name,
+//             type: item.type,
+//             maxStack: 99,
+//             config: item.config,
+//           };
+//           this.world.removeEntity(itemId);
+//           return true;
+//         }
+//       }
+//     }
+//     return false;
+//   }
+
+//   // ADDED: Logic to drop an item from equipment slot onto the ground as a non-physical object
+//   public dropItem(slotIndex: number): void {
+//     const transform = this.world.getComponent(this.id, 'transform');
+//     const equip = this.world.getComponent(this.id, 'equip');
+//     if (!transform || !equip) return;
+
+//     const slot = equip.slots[slotIndex];
+//     if (!slot || !slot.item) return;
+
+//     const itemData = slot.item;
+//     slot.item = null;
+
+//     const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+//     this.world.createEntity(itemId);
+//     this.world.addComponent(itemId, 'transform', { x: transform.x, y: transform.y, angle: 0 });
+//     this.world.addComponent(itemId, 'item', {
+//       id: itemData.id,
+//       name: itemData.name,
+//       type: itemData.type,
+//       config: itemData.config,
+//     });
+//   }
+
   public updateParams(params: {
     radius?: number;
     maxSpeed?: number;
@@ -129,24 +184,61 @@ export class EntityAdapter implements IMovable {
     crouchStealthMultiplier?: number;
   }): void {
     const phys = this.world.getComponent(this.id, 'physicsBody');
-    const vel = this.world.getComponent(this.id, 'velocity');
+    const stats = this.world.getComponent(this.id, 'stats');
     const health = this.world.getComponent(this.id, 'health');
-    const stealth = this.world.getComponent(this.id, 'stealth');
 
     if (params.radius !== undefined && phys) {
       phys.radius = params.radius;
       phys.body.r = params.radius;
     }
-    if (params.maxSpeed !== undefined && vel) vel.maxSpeed = Math.max(0, params.maxSpeed);
-    if (params.maxTurnSpeed !== undefined && vel) vel.maxTurnSpeed = Math.max(0, params.maxTurnSpeed);
-    if (params.maxHp !== undefined && health) health.maxHp = Math.max(1, params.maxHp);
-    if (params.hp !== undefined && health) {
-      health.hp = Math.min(health.maxHp, Math.max(0, params.hp));
-      health.isAlive = health.hp > 0;
+    if (stats) {
+      if (params.maxSpeed !== undefined) {
+        const val = Math.max(0, params.maxSpeed);
+        stats.maxSpeed.base = val;
+        stats.maxSpeed.current = val;
+      }
+      if (params.maxTurnSpeed !== undefined) {
+        const val = Math.max(0, params.maxTurnSpeed);
+        stats.maxTurnSpeed.base = val;
+        stats.maxTurnSpeed.current = val;
+      }
+      if (params.maxHp !== undefined) {
+        const val = Math.max(1, params.maxHp);
+        stats.maxHp.base = val;
+        stats.maxHp.current = val;
+      }
+      if (params.hp !== undefined) {
+        const val = Math.min(stats.maxHp.current, Math.max(0, params.hp));
+        stats.hp.base = val;
+        stats.hp.current = val;
+        if (health) health.isAlive = val > 0;
+      }
+      if (params.runSpeedMultiplier !== undefined) {
+        const val = Math.max(0.1, params.runSpeedMultiplier);
+        stats.runSpeedMultiplier.base = val;
+        stats.runSpeedMultiplier.current = val;
+      }
+      if (params.crouchSpeedMultiplier !== undefined) {
+        const val = Math.max(0.1, params.crouchSpeedMultiplier);
+        stats.crouchSpeedMultiplier.base = val;
+        stats.crouchSpeedMultiplier.current = val;
+      }
+      if (params.crouchStealthMultiplier !== undefined) {
+        const val = Math.max(1, params.crouchStealthMultiplier);
+        stats.crouchStealthMultiplier.base = val;
+        stats.crouchStealthMultiplier.current = val;
+      }
     }
-    if (params.runSpeedMultiplier !== undefined && vel) vel.runSpeedMultiplier = Math.max(0.1, params.runSpeedMultiplier);
-    if (params.crouchSpeedMultiplier !== undefined && vel) vel.crouchSpeedMultiplier = Math.max(0.1, params.crouchSpeedMultiplier);
-    if (params.crouchStealthMultiplier !== undefined && stealth) stealth.crouchStealthMultiplier = Math.max(1, params.crouchStealthMultiplier);
+  }
+
+  public canInteractWith(targetId: EntityId): boolean {
+    const transform = this.world.getComponent(this.id, 'transform');
+    const targetTransform = this.world.getComponent(targetId, 'transform');
+    const stats = this.world.getComponent(this.id, 'stats');
+    if (!transform || !targetTransform || !stats) return false;
+
+    const dist = Math.hypot(transform.x - targetTransform.x, transform.y - targetTransform.y);
+    return dist <= stats.interactionRange.current;
   }
 }
 
@@ -196,7 +288,7 @@ export class GameApp {
     maxSpeed: number = 150,
     maxTurnSpeedDeg: number = 270,
     position?: Point,
-    weapons?: WeaponConfig[],
+    _weapons?: WeaponConfig[],
     runSpeedMultiplier: number = 1.5,
     crouchSpeedMultiplier: number = 0.5,
     crouchStealthMultiplier: number = 1.5
@@ -213,27 +305,12 @@ export class GameApp {
     const body = new Circle({ x: pos.x, y: pos.y }, radius);
     body.isStatic = false;
 
-    let initialWeapons = weapons;
-    if (!initialWeapons || initialWeapons.length === 0) {
-      const allWeapons = createDefaultWeapons();
-      for (let i = allWeapons.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allWeapons[i], allWeapons[j]] = [allWeapons[j], allWeapons[i]];
-      }
-      initialWeapons = allWeapons.slice(0, 3);
-    }
+    const initialWeaponItem: ItemData = createRandomWeaponItem();
 
     this.world.createEntity(id);
     this.world.addComponent(id, 'transform', { x: pos.x, y: pos.y, angle: 0 });
     this.world.addComponent(id, 'physicsBody', { body, radius, mass: Math.max(0.1, mass), isStatic: false });
-    this.world.addComponent(id, 'velocity', {
-      maxSpeed: Math.max(0, maxSpeed),
-      maxTurnSpeed: (Math.max(0, maxTurnSpeedDeg) * Math.PI) / 180,
-      currentSpeed: 0,
-      currentTurnSpeed: 0,
-      runSpeedMultiplier: Math.max(0.1, runSpeedMultiplier),
-      crouchSpeedMultiplier: Math.max(0.1, crouchSpeedMultiplier),
-    });
+    this.world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
     this.world.addComponent(id, 'input', {
       isMovingForward: false,
       turningDirection: 0,
@@ -241,13 +318,39 @@ export class GameApp {
       isCrouching: false,
       wantsAttack: false,
     });
-    this.world.addComponent(id, 'health', { hp: 100, maxHp: 100, isAlive: true, hitFlashTimer: 0 });
-    this.world.addComponent(id, 'stealth', {
-      stealth: 0,
-      baseStealth: 0,
-      crouchStealthMultiplier: Math.max(1, crouchStealthMultiplier),
+    this.world.addComponent(id, 'health', { isAlive: true, hitFlashTimer: 0 });
+    this.world.addComponent(id, 'stealth', { isCrouching: false });
+    this.world.addComponent(id, 'stats', {
+      hp: { base: 100, current: 100 },
+      maxHp: { base: 100, current: 100 },
+      maxSpeed: { base: Math.max(0, maxSpeed), current: Math.max(0, maxSpeed) },
+      maxTurnSpeed: {
+        base: (Math.max(0, maxTurnSpeedDeg) * Math.PI) / 180,
+        current: (Math.max(0, maxTurnSpeedDeg) * Math.PI) / 180,
+      },
+      stealth: { base: 0, current: 0 },
+      runSpeedMultiplier: {
+        base: Math.max(0.1, runSpeedMultiplier),
+        current: Math.max(0.1, runSpeedMultiplier),
+      },
+      crouchSpeedMultiplier: {
+        base: Math.max(0.1, crouchSpeedMultiplier),
+        current: Math.max(0.1, crouchSpeedMultiplier),
+      },
+      crouchStealthMultiplier: {
+        base: Math.max(1, crouchStealthMultiplier),
+        current: Math.max(1, crouchStealthMultiplier),
+      },
+      interactionRange: { base: 100, current: 100 },
     });
-    this.world.addComponent(id, 'weaponInventory', { weapons: [...initialWeapons], activeAttacks: [] });
+    this.world.addComponent(id, 'equip', {
+      slots: [
+        { type: 'armor', item: null },
+        { type: 'bag', item: null },
+        { type: 'weapon', item: initialWeaponItem },
+      ],
+    });
+    this.world.addComponent(id, 'activeAttacks', { attacks: [] });
     this.world.addComponent(id, 'meta', { id, type, state: 'idle' });
 
     this.physics.registerBody(id, body);
@@ -284,7 +387,6 @@ export class GameApp {
     const dt = Math.min(0.1, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
-    // Последовательный запуск изолированных систем ECS
     this.movementSystem.update(dt, this.world, this.physics);
     this.attackSystem.update(dt, this.world, this.physics);
     this.physics.update(dt, this.world);
@@ -307,7 +409,7 @@ export class GameApp {
   }
 
   public pickCreatureAt(worldPoint: Point): EntityAdapter | null {
-    const entities = this.world.getEntitiesWith('transform', 'physicsBody');
+    const entities = this.world.getEntitiesWith('transform', 'physicsBody', 'meta');
     for (let i = entities.length - 1; i >= 0; i--) {
       const [id, { transform, physicsBody }] = entities[i];
       const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);

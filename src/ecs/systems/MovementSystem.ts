@@ -8,28 +8,29 @@ export class MovementSystem {
       'velocity',
       'input',
       'health',
-      'weaponInventory',
+      'activeAttacks',
       'stealth',
-      'meta'
+      'meta',
+      'stats'
     );
 
-    for (const [id, { transform, velocity, input, health, weaponInventory, stealth, meta }] of entities) {
-      if (!health.isAlive || health.hp <= 0) {
+    for (const [id, { transform, velocity, input, health, activeAttacks, stealth, meta, stats }] of entities) {
+      if (!health.isAlive || stats.hp.current <= 0) {
         velocity.currentSpeed = 0;
         velocity.currentTurnSpeed = 0;
         meta.state = 'dead';
         continue;
       }
 
-      // 1. Расчет стелса
-      stealth.stealth = input.isCrouching
-        ? stealth.baseStealth * stealth.crouchStealthMultiplier
-        : stealth.baseStealth;
+      // 1. Расчет стелса через текущие статы
+      stats.stealth.current = input.isCrouching
+        ? stats.stealth.base * stats.crouchStealthMultiplier.current
+        : stats.stealth.base;
 
       // 2. Расчет замедления от атак
       let moveSlow = 1;
       let turnSlow = 1;
-      for (const atk of weaponInventory.activeAttacks) {
+      for (const atk of activeAttacks.attacks) {
         const mMove = atk.phase === 'prep' ? atk.weapon.prepMoveSlow : atk.weapon.recoveryMoveSlow;
         const mTurn = atk.phase === 'prep' ? atk.weapon.prepTurnSlow : atk.weapon.recoveryTurnSlow;
         if (mMove < moveSlow) moveSlow = mMove;
@@ -39,13 +40,13 @@ export class MovementSystem {
       // 3. Множитель скорости
       let speedMult = 1;
       if (input.isRunning) {
-        speedMult = velocity.runSpeedMultiplier;
+        speedMult = stats.runSpeedMultiplier.current;
       } else if (input.isCrouching) {
-        speedMult = velocity.crouchSpeedMultiplier;
+        speedMult = stats.crouchSpeedMultiplier.current;
       }
 
-      velocity.currentSpeed = (input.isMovingForward ? velocity.maxSpeed * speedMult : 0) * moveSlow;
-      velocity.currentTurnSpeed = input.turningDirection * velocity.maxTurnSpeed * turnSlow;
+      velocity.currentSpeed = (input.isMovingForward ? stats.maxSpeed.current * speedMult : 0) * moveSlow;
+      velocity.currentTurnSpeed = input.turningDirection * stats.maxTurnSpeed.current * turnSlow;
 
       // 4. Поворот
       if (velocity.currentTurnSpeed !== 0) {
@@ -59,8 +60,8 @@ export class MovementSystem {
         physics.moveEntitySafe(world, id, dx, dy);
       }
 
-      // 6. Обновление состояния (Meta)
-      if (weaponInventory.activeAttacks.length > 0) {
+      // 6. Обновление состояния
+      if (activeAttacks.attacks.length > 0) {
         meta.state = 'attacking';
       } else if (input.isRunning && (input.isMovingForward || input.turningDirection !== 0)) {
         meta.state = 'running';

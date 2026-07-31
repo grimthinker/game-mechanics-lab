@@ -1,31 +1,31 @@
+import { WeaponConfig } from '../types';
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
-import { WeaponConfig } from '../../types';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
-    const entities = world.getEntitiesWith('weaponInventory', 'health', 'input');
+    const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input', 'stats');
 
-    for (const [id, { weaponInventory, health, input }] of entities) {
-      if (!health.isAlive || health.hp <= 0) continue;
+    for (const [id, { equip, activeAttacks, health, input, stats }] of entities) {
+      if (!health.isAlive || stats.hp.current <= 0) continue;
 
       if (input.wantsAttack && !input.isRunning) {
-        const freeWeapon = weaponInventory.weapons.find(
-          (w) => !weaponInventory.activeAttacks.some((a) => a.weapon === w)
-        );
-        if (freeWeapon) {
-          weaponInventory.activeAttacks.push({
-            weapon: freeWeapon,
+        const weaponSlot = equip.slots.find((s) => s.type === 'weapon' && s.item !== null);
+        const weaponConfig: WeaponConfig | undefined = (weaponSlot?.item?.type === 'weapon') ? weaponSlot.item.config : undefined;
+
+        if (weaponConfig && !activeAttacks.attacks.some((a) => a.weapon === weaponConfig)) {
+          activeAttacks.attacks.push({
+            weapon: weaponConfig,
             phase: 'prep',
-            timer: freeWeapon.prepTime,
-            totalDuration: freeWeapon.prepTime,
+            timer: weaponConfig.prepTime,
+            totalDuration: weaponConfig.prepTime,
           });
         }
         input.wantsAttack = false;
       }
 
-      for (let i = weaponInventory.activeAttacks.length - 1; i >= 0; i--) {
-        const atk = weaponInventory.activeAttacks[i];
+      for (let i = activeAttacks.attacks.length - 1; i >= 0; i--) {
+        const atk = activeAttacks.attacks[i];
         atk.timer -= dt;
 
         if (atk.timer <= 0) {
@@ -36,7 +36,7 @@ export class AttackSystem {
             atk.timer = atk.weapon.recoveryTime;
             atk.totalDuration = atk.weapon.recoveryTime;
           } else {
-            weaponInventory.activeAttacks.splice(i, 1);
+            activeAttacks.attacks.splice(i, 1);
           }
         }
       }
@@ -53,7 +53,8 @@ export class AttackSystem {
 
     for (const targetId of targetIds) {
       const targetHealth = world.getComponent(targetId, 'health');
-      if (!targetHealth || !targetHealth.isAlive) continue;
+      const targetStats = world.getComponent(targetId, 'stats');
+      if (!targetHealth || !targetHealth.isAlive || !targetStats) continue;
 
       const mult =
         weapon.minMultiplier +
@@ -62,7 +63,8 @@ export class AttackSystem {
       const isCrit = Math.random() < weapon.critChance;
       if (isCrit) damage *= weapon.critMultiplier;
 
-      targetHealth.hp = Math.max(0, targetHealth.hp - Math.round(damage));
+      const dmgValue = Math.round(damage);
+      targetStats.hp.current = Math.max(0, targetStats.hp.current - dmgValue);
       targetHealth.hitFlashTimer = 6;
     }
   }

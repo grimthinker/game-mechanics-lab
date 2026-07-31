@@ -70,112 +70,146 @@ export class Renderer {
   }
 
   private renderEntities(world: World, camera: Camera, selectedId: EntityId | null): void {
-    const entities = world.getEntitiesWith(
-      'transform',
-      'physicsBody',
-      'health',
-      'weaponInventory',
-      'meta'
-    );
+    // Запрашиваем только базовые визуальные компоненты, чтобы избежать ошибок типов
+    const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
 
     // 1. Отрисовка зон атак живых существ
-    for (const [, { transform, health, weaponInventory }] of entities) {
-      const activeAtk = weaponInventory.activeAttacks[0];
-      const weaponToDraw =
-        activeAtk?.weapon ||
-        weaponInventory.weapons.find(
-          (w) => !weaponInventory.activeAttacks.some((a) => a.weapon === w)
-        );
+    for (const [id, { transform }] of entities) {
+      const healthComp = world.getComponent(id, 'health');
+      const statsComp = world.getComponent(id, 'stats' as any) as any;
+      const equipComp = world.getComponent(id, 'equip' as any) as any;
 
-      if (health.isAlive && weaponToDraw) {
-        this.ctx.save();
-        this.ctx.translate(transform.x, transform.y);
-        this.ctx.rotate(transform.angle);
+      // Считываем HP и статус жизни с поддержкой StatsComponent и HealthComponent
+      const hp = statsComp?.hp?.current ?? 0;
+      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+      const hitFlashTimer = healthComp?.hitFlashTimer ?? 0;
 
-        let zoneAlpha = 0.15;
-        let zoneColor = '#f1c40f';
+      if (!isAlive) continue;
 
-        if (health.hitFlashTimer > 0) {
-          zoneColor = '#e74c3c';
-          zoneAlpha = 0.9;
-        } else if (activeAtk) {
-          if (activeAtk.phase === 'prep') {
-            zoneColor = '#f39c12';
-            zoneAlpha = 0.5;
-          } else if (activeAtk.phase === 'recovery') {
-            zoneAlpha = 0;
-          }
-        }
+      // Ищем первую ячейку типа 'weapon', в которой экипировано оружие
+      const slots = Array.isArray(equipComp)
+        ? equipComp
+        : equipComp?.slots || equipComp?.items || [];
 
-        if (zoneAlpha > 0) {
-          this.ctx.fillStyle = zoneColor;
-          this.ctx.strokeStyle = zoneColor;
-          this.ctx.globalAlpha = zoneAlpha;
-          this.ctx.lineWidth = 2 / camera.scale;
+      const weaponSlot = slots.find(
+        (s: any) =>
+          (s.type === 'weapon' || s.slotType === 'weapon') &&
+          s.item !== null &&
+          s.item !== undefined
+      );
 
-          switch (weaponToDraw.hitZoneType) {
-            case 'radius': {
-              const r = weaponToDraw.radius ?? 50;
-              this.ctx.beginPath();
-              this.ctx.arc(0, 0, r, 0, Math.PI * 2);
-              this.ctx.fill();
-              this.ctx.stroke();
-              break;
-            }
-            case 'angle': {
-              const len = weaponToDraw.length ?? 100;
-              const maxAngle = (weaponToDraw.angle ?? Math.PI / 6) / 2;
-              this.ctx.beginPath();
-              this.ctx.moveTo(0, 0);
-              this.ctx.arc(0, 0, len, -maxAngle, maxAngle);
-              this.ctx.closePath();
-              this.ctx.fill();
-              this.ctx.stroke();
-              break;
-            }
-            case 'line':
-            case 'forward_line': {
-              const len = weaponToDraw.length ?? 150;
-              this.ctx.beginPath();
-              this.ctx.moveTo(0, 0);
-              this.ctx.lineTo(len, 0);
-              this.ctx.stroke();
-              break;
-            }
-            case 'shrapnel': {
-              const len = weaponToDraw.length ?? 120;
-              const maxAngle = (weaponToDraw.angle ?? Math.PI / 3) / 2;
-              const count = weaponToDraw.rayCount ?? 5;
-              for (let i = 0; i < count; i++) {
-                const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
-                const rayAngle = fraction * (maxAngle * 2);
-                this.ctx.beginPath();
-                this.ctx.moveTo(0, 0);
-                this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
-                this.ctx.stroke();
-              }
-              break;
-            }
-            case 'offset_radius': {
-              const offset = weaponToDraw.offsetDistance ?? 70;
-              const r = weaponToDraw.radius ?? 35;
-              this.ctx.beginPath();
-              this.ctx.arc(offset, 0, r, 0, Math.PI * 2);
-              this.ctx.fill();
-              this.ctx.stroke();
-              break;
-            }
-          }
-        }
-        this.ctx.restore();
+      // Извлекаем конфиг оружия ({ config: WeaponConfig } либо прямой WeaponConfig)
+      const weaponToDraw: any =
+        weaponSlot?.item?.config ||
+        weaponSlot?.item?.data ||
+        weaponSlot?.item;
+
+      // Если ни в одной ячейке оружия нет предмета — зона поражения не отображается
+      if (!weaponToDraw) {
+        continue
       }
+
+      // Получаем активную атаку (для подсветки фазы prep / recovery)
+      const activeAttacksComp =
+        world.getComponent(id, 'activeAttacks' as any) ||
+        world.getComponent(id, 'activeAttack' as any) ||
+        equipComp?.activeAttacks;
+
+      const activeAtkList = Array.isArray(activeAttacksComp)
+        ? activeAttacksComp
+        : (activeAttacksComp as any)?.attacks || [];
+      const activeAtk = activeAtkList[0];
+
+      this.ctx.save();
+      this.ctx.translate(transform.x, transform.y);
+      this.ctx.rotate(transform.angle);
+
+      let zoneAlpha = 0.15;
+      let zoneColor = '#f1c40f';
+
+      if (hitFlashTimer > 0) {
+        zoneColor = '#e74c3c';
+        zoneAlpha = 0.9;
+      } else if (activeAtk) {
+        if (activeAtk.phase === 'prep') {
+          zoneColor = '#f39c12';
+          zoneAlpha = 0.5;
+        } else if (activeAtk.phase === 'recovery') {
+          zoneAlpha = 0;
+        }
+      }
+
+      if (zoneAlpha > 0) {
+        this.ctx.fillStyle = zoneColor;
+        this.ctx.strokeStyle = zoneColor;
+        this.ctx.globalAlpha = zoneAlpha;
+        this.ctx.lineWidth = 2 / camera.scale;
+        const zone = weaponToDraw.zone;
+        
+        switch (zone.hitZoneType) {
+          case 'radius': {
+            const r = zone.radius ?? 50;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+            break;
+          }
+          case 'angle': {
+            const len = zone.length ?? zone.range ?? 100;
+            const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.arc(0, 0, len, -maxAngle, maxAngle);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+            break;
+          }
+          case 'line':
+          case 'forward_line': {
+            const len = zone.length ?? zone.range ?? 150;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.lineTo(len, 0);
+            this.ctx.stroke();
+            break;
+          }
+          case 'shrapnel': {
+            const len = zone.length ?? zone.range ?? 120;
+            const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
+            const count = zone.rayCount ?? zone.numLines ?? zone.lines ?? 5;
+            for (let i = 0; i < count; i++) {
+              const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
+              const rayAngle = fraction * (maxAngle * 2);
+              this.ctx.beginPath();
+              this.ctx.moveTo(0, 0);
+              this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
+              this.ctx.stroke();
+            }
+            break;
+          }
+          case 'offset_radius': {
+            const offset = zone.offsetDistance ?? 70;
+            const r = zone.radius ?? 35;
+            this.ctx.beginPath();
+            this.ctx.arc(offset, 0, r, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+            break;
+          }
+        }
+      }
+      this.ctx.restore();
     }
 
     const renderBody = (
       id: EntityId,
       transform: any,
       phys: any,
-      health: any,
+      isAlive: boolean,
+      hp: number,
+      maxHp: number,
       meta: any
     ) => {
       this.ctx.save();
@@ -185,7 +219,7 @@ export class Renderer {
       this.ctx.rotate(transform.angle);
 
       let fillColor = '#34495e';
-      if (!health.isAlive) {
+      if (!isAlive) {
         fillColor = '#7f8c8d';
       } else {
         switch (meta.state) {
@@ -243,10 +277,10 @@ export class Renderer {
 
       this.ctx.restore();
 
-      if (health.isAlive) {
+      if (isAlive) {
         const barW = phys.radius * 2;
         const barH = 4 / camera.scale;
-        const hpRatio = Math.max(0, Math.min(1, health.hp / health.maxHp));
+        const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
         this.ctx.fillStyle = '#c0392b';
         this.ctx.fillRect(-barW / 2, -phys.radius - 16 / camera.scale, barW, barH);
         this.ctx.fillStyle = '#2ecc71';
@@ -263,16 +297,30 @@ export class Renderer {
     };
 
     // 2. Мертвые существа (слой ниже)
-    for (const [id, { transform, physicsBody, health, meta }] of entities) {
-      if (!health.isAlive) {
-        renderBody(id, transform, physicsBody, health, meta);
+    for (const [id, { transform, physicsBody, meta }] of entities) {
+      const healthComp = world.getComponent(id, 'health');
+      const statsComp = world.getComponent(id, 'stats' as any) as any;
+
+      const hp = statsComp?.hp?.current ?? 0;
+      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
+      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+
+      if (!isAlive) {
+        renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
       }
     }
 
     // 3. Живые существа (верхний слой)
-    for (const [id, { transform, physicsBody, health, meta }] of entities) {
-      if (health.isAlive) {
-        renderBody(id, transform, physicsBody, health, meta);
+    for (const [id, { transform, physicsBody, meta }] of entities) {
+      const healthComp = world.getComponent(id, 'health');
+      const statsComp = world.getComponent(id, 'stats' as any) as any;
+
+      const hp = statsComp?.hp?.current ?? 0;
+      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
+      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+
+      if (isAlive) {
+        renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
       }
     }
   }

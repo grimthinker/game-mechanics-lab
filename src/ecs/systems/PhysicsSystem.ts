@@ -1,7 +1,7 @@
 import { System, Line, Circle } from 'detect-collisions';
 import { World } from '../World';
-import { EntityId } from '../types';
-import { ObstacleSegment, WeaponConfig, Point } from '../../types';
+import { EntityId, WeaponConfig } from '../types';
+import { ObstacleSegment, Point } from '../../types';
 
 const PHYSICS_CONFIG = {
   A: 10,
@@ -128,8 +128,10 @@ export class PhysicsSystem {
       if (!id1 || !id2) return;
 
       const h1 = world.getComponent(id1, 'health');
+      const s1 = world.getComponent(id1, 'stats');
       const h2 = world.getComponent(id2, 'health');
-      if (!h1 || !h1.isAlive || h1.hp <= 0 || !h2 || !h2.isAlive || h2.hp <= 0) {
+      const s2 = world.getComponent(id2, 'stats');
+      if (!h1 || !h1.isAlive || !s1 || s1.hp.current <= 0 || !h2 || !h2.isAlive || !s2 || s2.hp.current <= 0) {
         return;
       }
 
@@ -214,7 +216,8 @@ export class PhysicsSystem {
 
       if (hitEntityId) {
         const hitHealth = world.getComponent(hitEntityId, 'health');
-        if (hitHealth && (!hitHealth.isAlive || hitHealth.hp <= 0)) {
+        const hitStats = world.getComponent(hitEntityId, 'stats');
+        if (hitHealth && (!hitHealth.isAlive || (hitStats && hitStats.hp.current <= 0))) {
           currStart = {
             x: hitPoint.x + ux * 1,
             y: hitPoint.y + uy * 1,
@@ -240,7 +243,7 @@ export class PhysicsSystem {
       }
 
       if (hitBody instanceof Line) {
-        if (weapon.pierceObstacles) {
+        if (weapon.zone.pierceObstacles) {
           currStart = {
             x: hitPoint.x + ux * 1,
             y: hitPoint.y + uy * 1,
@@ -256,7 +259,7 @@ export class PhysicsSystem {
 
         if (hitMeta && hitTransform) {
           if (hitMeta.type === 'player') {
-            if (weapon.piercePlayers) {
+            if (weapon.zone.piercePlayers) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +
                 (hitTransform.y - from.y) * uy;
@@ -270,7 +273,7 @@ export class PhysicsSystem {
               return false;
             }
           } else if (hitMeta.type === 'ai') {
-            if (weapon.pierceBots) {
+            if (weapon.zone.pierceBots) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +
                 (hitTransform.y - from.y) * uy;
@@ -322,10 +325,10 @@ export class PhysicsSystem {
     const pos = { x: attackerTransform.x, y: attackerTransform.y };
     const angle = attackerTransform.angle;
 
-    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health');
+    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health', 'stats');
 
-    for (const [targetId, { transform, physicsBody, health }] of targets) {
-      if (targetId === attackerId || !health.isAlive || health.hp <= 0) continue;
+    for (const [targetId, { transform, physicsBody, health, stats }] of targets) {
+      if (targetId === attackerId || !health.isAlive || stats.hp.current <= 0) continue;
 
       let isHit = false;
       const targetPos = { x: transform.x, y: transform.y };
@@ -333,7 +336,7 @@ export class PhysicsSystem {
       const dy = targetPos.y - pos.y;
       const dist = Math.hypot(dx, dy);
 
-      switch (weapon.hitZoneType) {
+      switch (weapon.zone.hitZoneType) {
         case 'radius': {
           const r = weapon.radius ?? 50;
           if (dist <= r + physicsBody.radius) {
@@ -342,8 +345,8 @@ export class PhysicsSystem {
           break;
         }
         case 'angle': {
-          const len = weapon.length ?? 120;
-          const maxAngle = (weapon.angle ?? Math.PI / 6) / 2;
+          const len = weapon.zone.length ?? 120;
+          const maxAngle = (weapon.zone.angle ?? Math.PI / 6) / 2;
           const maxDist = len + physicsBody.radius;
 
           if (dist <= maxDist) {
@@ -366,7 +369,7 @@ export class PhysicsSystem {
         }
         case 'line':
         case 'forward_line': {
-          const len = weapon.length ?? 150;
+          const len = weapon.zone.length ?? 150;
           const endPoint = {
             x: pos.x + Math.cos(angle) * len,
             y: pos.y + Math.sin(angle) * len,
@@ -380,9 +383,9 @@ export class PhysicsSystem {
           break;
         }
         case 'shrapnel': {
-          const len = weapon.length ?? 120;
-          const maxAngle = (weapon.angle ?? Math.PI / 3) / 2;
-          const count = weapon.rayCount ?? 5;
+          const len = weapon.zone.length ?? 120;
+          const maxAngle = (weapon.zone.angle ?? Math.PI / 3) / 2;
+          const count = weapon.zone.rayCount ?? 5;
           for (let i = 0; i < count; i++) {
             const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
             const rayAngle = angle + fraction * (maxAngle * 2);
@@ -401,7 +404,7 @@ export class PhysicsSystem {
           break;
         }
         case 'offset_radius': {
-          const offset = weapon.offsetDistance ?? 70;
+          const offset = weapon.zone.offsetDistance ?? 70;
           const r = weapon.radius ?? 35;
           const centerX = pos.x + Math.cos(angle) * offset;
           const centerY = pos.y + Math.sin(angle) * offset;

@@ -1,6 +1,6 @@
 import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react';
 import { GameApp } from './GameApp';
-import { CreatureType } from './types';
+import { CreatureType } from './ecs/types';
 
 interface PlacementConfig {
   type: CreatureType;

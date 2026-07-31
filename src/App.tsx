@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
-import { CreatureType, STANDARD_RADII, CreatureState, WeaponConfig } from './types';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { useKeyboardControls } from './useKeyboardControls';
+import { CreatureType, CreatureState, WeaponConfig, STANDARD_RADII, EquipSlot } from './ecs/types';
 
 interface CreatureStats {
   type: CreatureType;
@@ -15,7 +15,7 @@ interface CreatureStats {
   hp: number;
   maxHp: number;
   state: CreatureState;
-  weapons: WeaponConfig[];
+  equipSlots: EquipSlot[];
 }
 
 interface PlacementConfig {
@@ -79,6 +79,7 @@ export const App: React.FC = () => {
     }
 
     const c = app.selectedCreature;
+    const eq = c.equip;
     setSelectedStats({
       type: c.type,
       radius: c.radius,
@@ -90,7 +91,7 @@ export const App: React.FC = () => {
       hp: c.hp,
       maxHp: c.maxHp,
       state: c.state,
-      weapons: [...c.weapons],
+      equipSlots: eq ? eq.slots.map((s) => ({ ...s })) : [],
     });
   }, []);
 
@@ -174,7 +175,7 @@ export const App: React.FC = () => {
     c.updateParams({
       radius: editRadius,
       maxSpeed: editMaxSpeed,
-      maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
+      maxTurnSpeed: editMaxTurnSpeed,
       hp: editHp,
       maxHp: editMaxHp,
       runSpeedMultiplier: editRunSpeedMultiplier,
@@ -249,6 +250,19 @@ export const App: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModalOpen, isEditModalOpen, selectedWeaponForEdit]);
+
+  const getSlotTypeName = (type: string) => {
+    switch (type) {
+      case 'armor':
+        return 'Броня';
+      case 'bag':
+        return 'Сумка';
+      case 'weapon':
+        return 'Оружие';
+      default:
+        return type;
+    }
+  };
 
   return (
     <div id="app">
@@ -359,28 +373,44 @@ export const App: React.FC = () => {
                 <div className="stat-row"><dt>Макс. поворот:</dt><dd>{selectedStats.maxTurnSpeed} °/с</dd></div>
               </dl>
 
-              <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Арсенал (клик для изменения):</h4>
+              <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
+                Экипировка (клик по оружию для настройки):
+              </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                {selectedStats.weapons.map((w) => (
-                  <div
-                    key={w.id}
-                    onClick={() => openWeaponEditModal(w)}
-                    style={{
-                      backgroundColor: '#1e1e1e',
-                      padding: '6px 8px',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      border: '1px solid #444',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span>{w.name}</span>
-                    <span style={{ color: '#f1c40f' }}>{w.baseDamage} урона</span>
-                  </div>
-                ))}
+                {selectedStats.equipSlots.map((slot, index) => {
+                  const isWeapon = slot.type === 'weapon' && slot.item?.type === 'weapon';
+                  return (
+                    <div
+                      key={`${slot.type}_${index}`}
+                      onClick={() => {
+                        if (isWeapon && slot.item?.type === 'weapon' && slot.item?.config) {
+                          openWeaponEditModal((slot.item.config as WeaponConfig));
+                        }
+                      }}
+                      style={{
+                        backgroundColor: '#1e1e1e',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        cursor: isWeapon ? 'pointer' : 'default',
+                        fontSize: '12px',
+                        border: '1px solid #444',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
+                      <span>
+                        {slot.item ? slot.item.name : 'Пусто'}
+                        {isWeapon && (
+                          <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
+                            ({(slot.item!.config as WeaponConfig).baseDamage} урона)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
@@ -723,7 +753,7 @@ export const App: React.FC = () => {
                   />
                 </label>
               )}
-              {selectedWeaponForEdit && ['line', 'forward_line', 'shrapnel'].includes(selectedWeaponForEdit.hitZoneType) && (
+              {selectedWeaponForEdit && ['line', 'forward_line', 'shrapnel'].includes(selectedWeaponForEdit.zone.hitZoneType) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                     <input

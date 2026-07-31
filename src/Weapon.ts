@@ -1,4 +1,4 @@
-import { WeaponConfig } from './types';
+import { WeaponConfig, ItemData } from './ecs/types';
 
 export function createDefaultWeapons(): WeaponConfig[] {
   const weapons: WeaponConfig[] = [
@@ -16,8 +16,12 @@ export function createDefaultWeapons(): WeaponConfig[] {
       maxMultiplier: 1.2,
       critChance: 0.15,
       critMultiplier: 2.0,
-      hitZoneType: 'forward_line',
-      length: 150,
+      zone: {
+        hitZoneType: 'forward_line',
+        length: 150,
+    },
+    invWeight: 1,
+    radius: 10
     },
     {
       id: `weapon_angle_${Math.random().toString(36).substring(2, 6)}`,
@@ -33,9 +37,13 @@ export function createDefaultWeapons(): WeaponConfig[] {
       maxMultiplier: 1.1,
       critChance: 0.1,
       critMultiplier: 1.8,
-      hitZoneType: 'angle',
-      length: 100,
-      angle: Math.PI / 6,
+      zone: {
+        hitZoneType: 'angle',
+        length: 100,
+        angle: Math.PI / 6,
+    },
+      invWeight: 1,
+      radius: 10
     },
     {
       id: `weapon_radius_${Math.random().toString(36).substring(2, 6)}`,
@@ -51,8 +59,12 @@ export function createDefaultWeapons(): WeaponConfig[] {
       maxMultiplier: 1.3,
       critChance: 0.1,
       critMultiplier: 2.5,
-      hitZoneType: 'radius',
-      radius: 50,
+      zone: {
+        hitZoneType: 'radius',
+        radius: 50,
+    },
+    invWeight: 1,
+    radius: 10
     },
     {
       id: `weapon_shrapnel_${Math.random().toString(36).substring(2, 6)}`,
@@ -68,10 +80,14 @@ export function createDefaultWeapons(): WeaponConfig[] {
       maxMultiplier: 1.5,
       critChance: 0.25,
       critMultiplier: 2.0,
-      hitZoneType: 'shrapnel',
-      length: 120,
-      angle: Math.PI / 3,
-      rayCount: 5,
+      zone: {
+        hitZoneType: 'shrapnel',
+        length: 120,
+        angle: Math.PI / 3,
+        rayCount: 5,
+      },
+      invWeight: 1,
+      radius: 10
     },
     {
       id: `weapon_offset_radius_${Math.random().toString(36).substring(2, 6)}`,
@@ -87,9 +103,13 @@ export function createDefaultWeapons(): WeaponConfig[] {
       maxMultiplier: 1.15,
       critChance: 0.15,
       critMultiplier: 2.0,
-      hitZoneType: 'offset_radius',
-      offsetDistance: 70,
-      radius: 35,
+      zone: {
+        hitZoneType: 'offset_radius',
+        offsetDistance: 70,
+        radius: 35,
+    },
+    invWeight: 1,
+    radius: 10
     },
   ];
 
@@ -99,4 +119,16 @@ export function createDefaultWeapons(): WeaponConfig[] {
   }
 
   return weapons;
+}
+
+export function createRandomWeaponItem(): ItemData {
+  const allWeapons = createDefaultWeapons();
+  const w = allWeapons[0];
+  return {
+    id: w.id,
+    name: w.name,
+    type: 'weapon',
+    maxStack: 1,
+    config: w,
+  };
 }
