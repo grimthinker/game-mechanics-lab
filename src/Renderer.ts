@@ -70,139 +70,9 @@ export class Renderer {
   }
 
   private renderEntities(world: World, camera: Camera, selectedId: EntityId | null): void {
-    // Запрашиваем только базовые визуальные компоненты, чтобы избежать ошибок типов
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
 
-    // 1. Отрисовка зон атак живых существ
-    for (const [id, { transform }] of entities) {
-      const healthComp = world.getComponent(id, 'health');
-      const statsComp = world.getComponent(id, 'stats' as any) as any;
-      const equipComp = world.getComponent(id, 'equip' as any) as any;
-
-      // Считываем HP и статус жизни с поддержкой StatsComponent и HealthComponent
-      const hp = statsComp?.hp?.current ?? 0;
-      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
-      const hitFlashTimer = healthComp?.hitFlashTimer ?? 0;
-
-      if (!isAlive) continue;
-
-      // Ищем первую ячейку типа 'weapon', в которой экипировано оружие
-      const slots = Array.isArray(equipComp)
-        ? equipComp
-        : equipComp?.slots || equipComp?.items || [];
-
-      const weaponSlot = slots.find(
-        (s: any) =>
-          (s.type === 'weapon' || s.slotType === 'weapon') &&
-          s.item !== null &&
-          s.item !== undefined
-      );
-
-      // Извлекаем конфиг оружия ({ config: WeaponConfig } либо прямой WeaponConfig)
-      const weaponToDraw: any =
-        weaponSlot?.item?.config ||
-        weaponSlot?.item?.data ||
-        weaponSlot?.item;
-
-      // Если ни в одной ячейке оружия нет предмета — зона поражения не отображается
-      if (!weaponToDraw) {
-        continue
-      }
-
-      // Получаем активную атаку (для подсветки фазы prep / recovery)
-      const activeAttacksComp =
-        world.getComponent(id, 'activeAttacks' as any) ||
-        world.getComponent(id, 'activeAttack' as any) ||
-        equipComp?.activeAttacks;
-
-      const activeAtkList = Array.isArray(activeAttacksComp)
-        ? activeAttacksComp
-        : (activeAttacksComp as any)?.attacks || [];
-      const activeAtk = activeAtkList[0];
-
-      this.ctx.save();
-      this.ctx.translate(transform.x, transform.y);
-      this.ctx.rotate(transform.angle);
-
-      let zoneAlpha = 0.15;
-      let zoneColor = '#f1c40f';
-
-      if (hitFlashTimer > 0) {
-        zoneColor = '#e74c3c';
-        zoneAlpha = 0.9;
-      } else if (activeAtk) {
-        if (activeAtk.phase === 'prep') {
-          zoneColor = '#f39c12';
-          zoneAlpha = 0.5;
-        } else if (activeAtk.phase === 'recovery') {
-          zoneAlpha = 0;
-        }
-      }
-
-      if (zoneAlpha > 0) {
-        this.ctx.fillStyle = zoneColor;
-        this.ctx.strokeStyle = zoneColor;
-        this.ctx.globalAlpha = zoneAlpha;
-        this.ctx.lineWidth = 2 / camera.scale;
-        const zone = weaponToDraw.zone;
-        
-        switch (zone.hitZoneType) {
-          case 'radius': {
-            const r = zone.radius ?? 50;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, r, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.stroke();
-            break;
-          }
-          case 'angle': {
-            const len = zone.length ?? zone.range ?? 100;
-            const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, 0);
-            this.ctx.arc(0, 0, len, -maxAngle, maxAngle);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.stroke();
-            break;
-          }
-          case 'line':
-          case 'forward_line': {
-            const len = zone.length ?? zone.range ?? 150;
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, 0);
-            this.ctx.lineTo(len, 0);
-            this.ctx.stroke();
-            break;
-          }
-          case 'shrapnel': {
-            const len = zone.length ?? zone.range ?? 120;
-            const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
-            const count = zone.rayCount ?? zone.numLines ?? zone.lines ?? 5;
-            for (let i = 0; i < count; i++) {
-              const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
-              const rayAngle = fraction * (maxAngle * 2);
-              this.ctx.beginPath();
-              this.ctx.moveTo(0, 0);
-              this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
-              this.ctx.stroke();
-            }
-            break;
-          }
-          case 'offset_radius': {
-            const offset = zone.offsetDistance ?? 70;
-            const r = zone.radius ?? 35;
-            this.ctx.beginPath();
-            this.ctx.arc(offset, 0, r, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.stroke();
-            break;
-          }
-        }
-      }
-      this.ctx.restore();
-    }
-
+    // ИЗМЕНЕНО: Общий метод отрисовки тела и полоски здоровья (без текста ID)
     const renderBody = (
       id: EntityId,
       transform: any,
@@ -277,6 +147,7 @@ export class Renderer {
 
       this.ctx.restore();
 
+      // Отрисовка полоски здоровья (ID удален отсюда для отрисовки поверх всего в конце)
       if (isAlive) {
         const barW = phys.radius * 2;
         const barH = 4 / camera.scale;
@@ -285,18 +156,12 @@ export class Renderer {
         this.ctx.fillRect(-barW / 2, -phys.radius - 16 / camera.scale, barW, barH);
         this.ctx.fillStyle = '#2ecc71';
         this.ctx.fillRect(-barW / 2, -phys.radius - 16 / camera.scale, barW * hpRatio, barH);
-
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText(meta.id, 0, -phys.radius - 20 / camera.scale);
       }
 
       this.ctx.restore();
     };
 
-    // 2. Мертвые существа (слой ниже)
+    // 1. Мертвые существа (нижний слой)
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -310,7 +175,7 @@ export class Renderer {
       }
     }
 
-    // 3. Живые существа (верхний слой)
+    // 2. Живые существа (базовый слой существ)
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -321,6 +186,155 @@ export class Renderer {
 
       if (isAlive) {
         renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
+      }
+    }
+
+    // ИЗМЕНЕНО: 3. Зоны поражения поверх всех существ, после чего атакующее существо перерисовывается поверх своей зоны
+    for (const [id, { transform, physicsBody, meta }] of entities) {
+      const healthComp = world.getComponent(id, 'health');
+      const statsComp = world.getComponent(id, 'stats' as any) as any;
+      const equipComp = world.getComponent(id, 'equip' as any) as any;
+
+      const hp = statsComp?.hp?.current ?? 0;
+      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
+      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+      const hitFlashTimer = healthComp?.hitFlashTimer ?? 0;
+
+      if (!isAlive) continue;
+
+      const slots = Array.isArray(equipComp)
+        ? equipComp
+        : equipComp?.slots || equipComp?.items || [];
+
+      const weaponSlot = slots.find(
+        (s: any) =>
+          (s.type === 'weapon' || s.slotType === 'weapon') &&
+          s.item !== null &&
+          s.item !== undefined
+      );
+
+      const weaponToDraw: any =
+        weaponSlot?.item?.config ||
+        weaponSlot?.item?.data ||
+        weaponSlot?.item;
+
+      if (!weaponToDraw || !weaponToDraw.zone) {
+        continue;
+      }
+
+      const activeAttacksComp =
+        world.getComponent(id, 'activeAttacks' as any) ||
+        world.getComponent(id, 'activeAttack' as any) ||
+        equipComp?.activeAttacks;
+
+      const activeAtkList = Array.isArray(activeAttacksComp)
+        ? activeAttacksComp
+        : (activeAttacksComp as any)?.attacks || [];
+      const activeAtk = activeAtkList[0];
+
+      this.ctx.save();
+      this.ctx.translate(transform.x, transform.y);
+      this.ctx.rotate(transform.angle);
+
+      let zoneAlpha = 0.15;
+      let zoneColor = '#f1c40f';
+
+      if (hitFlashTimer > 0) {
+        zoneColor = '#e74c3c';
+        zoneAlpha = 0.9;
+      } else if (activeAtk) {
+        if (activeAtk.phase === 'prep') {
+          zoneColor = '#f39c12';
+          zoneAlpha = 0.5;
+        } else if (activeAtk.phase === 'recovery') {
+          zoneAlpha = 0;
+        }
+      }
+
+      if (zoneAlpha > 0) {
+        this.ctx.fillStyle = zoneColor;
+        this.ctx.strokeStyle = zoneColor;
+        this.ctx.globalAlpha = zoneAlpha;
+        this.ctx.lineWidth = 2 / camera.scale;
+        const zone = weaponToDraw.zone;
+
+        switch (zone.hitZoneType) {
+          case 'radius': {
+            const r = zone.radius ?? 50;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+            break;
+          }
+          case 'angle': {
+            const len = zone.length ?? zone.range ?? 100;
+            const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.arc(0, 0, len, -maxAngle, maxAngle);
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+            break;
+          }
+          case 'line':
+          case 'forward_line': {
+            const len = zone.length ?? zone.range ?? 150;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, 0);
+            this.ctx.lineTo(len, 0);
+            this.ctx.stroke();
+            break;
+          }
+          case 'shrapnel': {
+            const len = zone.length ?? zone.range ?? 120;
+            const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
+            const count = zone.rayCount ?? zone.numLines ?? zone.lines ?? 5;
+            for (let i = 0; i < count; i++) {
+              const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
+              const rayAngle = fraction * (maxAngle * 2);
+              this.ctx.beginPath();
+              this.ctx.moveTo(0, 0);
+              this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
+              this.ctx.stroke();
+            }
+            break;
+          }
+          case 'offset_radius': {
+            const offset = zone.offsetDistance ?? 70;
+            const r = zone.radius ?? 35;
+            this.ctx.beginPath();
+            this.ctx.arc(offset, 0, r, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+            break;
+          }
+        }
+      }
+      this.ctx.restore();
+
+      // ИЗМЕНЕНО: Повторная отрисовка самого атакующего существа поверх его зоны поражения
+      renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
+    }
+
+    // ДОБАВЛЕНО: 4. Отрисовка ID поверх всех существ, зон поражения и линий здоровья
+    for (const [id, { transform, physicsBody, meta }] of entities) {
+      const healthComp = world.getComponent(id, 'health');
+      const statsComp = world.getComponent(id, 'stats' as any) as any;
+
+      const hp = statsComp?.hp?.current ?? 0;
+      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+
+      if (isAlive) {
+        this.ctx.save();
+        this.ctx.translate(transform.x, transform.y);
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText(meta.id, 0, -physicsBody.radius - 20 / camera.scale);
+        this.ctx.restore();
       }
     }
   }

@@ -122,56 +122,19 @@ export class EntityAdapter implements IMovable {
     if (input) input.wantsAttack = true;
   }
 
-//   // ADDED: Logic to pick up an item from the ground within interaction range into equipment
-//   public pickUpItem(): boolean {
-//     const transform = this.world.getComponent(this.id, 'transform');
-//     const stats = this.world.getComponent(this.id, 'stats');
-//     const equip = this.world.getComponent(this.id, 'equip');
-//     if (!transform || !stats || !equip) return false;
+  // ДОБАВЛЕНО: Безопасное изменение размера инвентаря (только если все ячейки пустые)
+  public updateInventorySize(width: number, height: number): boolean {
+    const inv = this.world.getComponent(this.id, 'inventory');
+    if (!inv) return false;
+    const isEmpty = inv.slots.every((row) => row.every((cell) => !cell.item));
+    if (!isEmpty) return false;
 
-//     const itemEntities = this.world.getEntitiesWith('transform', 'item');
-//     for (const [itemId, { transform: itemTransform, item }] of itemEntities) {
-//       const dist = Math.hypot(transform.x - itemTransform.x, transform.y - itemTransform.y);
-//       if (dist <= stats.interactionRange.current) {
-//         const targetSlot = equip.slots.find((s) => s.type === item.type && s.item === null);
-//         if (targetSlot) {
-//           targetSlot.item = {
-//             id: item.id,
-//             name: item.name,
-//             type: item.type,
-//             maxStack: 99,
-//             config: item.config,
-//           };
-//           this.world.removeEntity(itemId);
-//           return true;
-//         }
-//       }
-//     }
-//     return false;
-//   }
-
-//   // ADDED: Logic to drop an item from equipment slot onto the ground as a non-physical object
-//   public dropItem(slotIndex: number): void {
-//     const transform = this.world.getComponent(this.id, 'transform');
-//     const equip = this.world.getComponent(this.id, 'equip');
-//     if (!transform || !equip) return;
-
-//     const slot = equip.slots[slotIndex];
-//     if (!slot || !slot.item) return;
-
-//     const itemData = slot.item;
-//     slot.item = null;
-
-//     const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-//     this.world.createEntity(itemId);
-//     this.world.addComponent(itemId, 'transform', { x: transform.x, y: transform.y, angle: 0 });
-//     this.world.addComponent(itemId, 'item', {
-//       id: itemData.id,
-//       name: itemData.name,
-//       type: itemData.type,
-//       config: itemData.config,
-//     });
-//   }
+    inv.size = { width, height };
+    inv.slots = Array.from({ length: height }, () =>
+      Array.from({ length: width }, () => ({ item: null, count: 0 }))
+    );
+    return true;
+  }
 
   public updateParams(params: {
     radius?: number;
@@ -289,9 +252,9 @@ export class GameApp {
     maxTurnSpeedDeg: number = 270,
     position?: Point,
     _weapons?: WeaponConfig[],
-    runSpeedMultiplier: number = 1.5,
-    crouchSpeedMultiplier: number = 0.5,
-    crouchStealthMultiplier: number = 1.5
+    runSpeedMultiplier: number = 2.5,
+    crouchSpeedMultiplier: number = 0.3,
+    crouchStealthMultiplier: number = 2.5
   ): EntityAdapter {
     const prefix = type === 'player' ? 'player' : 'bot';
     const id = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
@@ -306,6 +269,35 @@ export class GameApp {
     body.isStatic = false;
 
     const initialWeaponItem: ItemData = createRandomWeaponItem();
+
+    const initialArmorItem: ItemData = {
+      id: `armor_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      name: 'Стандартный бронежилет',
+      type: 'armor',
+      maxStack: 1,
+      config: {
+        id: `armor_cfg_${Math.random().toString(36).substring(2, 5)}`,
+        name: 'Стандартный бронежилет',
+        invWeight: 3,
+        radius: 12,
+        defense: 15,
+        flat_reduction: 3,
+      },
+    };
+
+    const initialBagItem: ItemData = {
+      id: `bag_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      name: 'Походный рюкзак',
+      type: 'bag',
+      maxStack: 1,
+      config: {
+        id: `bag_cfg_${Math.random().toString(36).substring(2, 5)}`,
+        name: 'Походный рюкзак',
+        invWeight: 1,
+        radius: 15,
+        size: { width: 6, height: 4 },
+      },
+    };
 
     this.world.createEntity(id);
     this.world.addComponent(id, 'transform', { x: pos.x, y: pos.y, angle: 0 });
@@ -343,10 +335,19 @@ export class GameApp {
       },
       interactionRange: { base: 100, current: 100 },
     });
+
+    const emptySlots = Array.from({ length: 4 }, () =>
+      Array.from({ length: 6 }, () => ({ item: null, count: 0 }))
+    );
+    this.world.addComponent(id, 'inventory', {
+      size: { width: 6, height: 4 },
+      slots: emptySlots,
+    });
+
     this.world.addComponent(id, 'equip', {
       slots: [
-        { type: 'armor', item: null },
-        { type: 'bag', item: null },
+        { type: 'armor', item: initialArmorItem },
+        { type: 'bag', item: initialBagItem },
         { type: 'weapon', item: initialWeaponItem },
       ],
     });

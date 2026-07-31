@@ -2,7 +2,16 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { useKeyboardControls } from './useKeyboardControls';
-import { CreatureType, CreatureState, WeaponConfig, STANDARD_RADII, EquipSlot } from './ecs/types';
+import {
+  CreatureType,
+  CreatureState,
+  WeaponConfig,
+  ArmorConfig,
+  InventoryConfig,
+  ItemData,
+  STANDARD_RADII,
+  EquipSlot,
+} from './ecs/types';
 
 interface CreatureStats {
   type: CreatureType;
@@ -16,6 +25,11 @@ interface CreatureStats {
   maxHp: number;
   state: CreatureState;
   equipSlots: EquipSlot[];
+  // ДОБАВЛЕНО: данные инвентаря для отображения сетки
+  inventory?: {
+    size: { width: number; height: number };
+    slots: { item: ItemData | null; count: number }[][];
+  };
 }
 
 interface PlacementConfig {
@@ -71,6 +85,20 @@ export const App: React.FC = () => {
   const [editWeaponPiercePlayers, setEditWeaponPiercePlayers] = useState<boolean>(false);
   const [editWeaponPierceBots, setEditWeaponPierceBots] = useState<boolean>(false);
 
+  // ДОБАВЛЕНО: состояния для редактирования брони
+  const [selectedArmorForEdit, setSelectedArmorForEdit] = useState<ArmorConfig | null>(null);
+  const [editArmorName, setEditArmorName] = useState<string>('');
+  const [editArmorDefense, setEditArmorDefense] = useState<number>(15);
+  const [editArmorFlatReduction, setEditArmorFlatReduction] = useState<number>(3);
+  const [editArmorWeight, setEditArmorWeight] = useState<number>(3);
+
+  // ДОБАВЛЕНО: состояния для редактирования сумки
+  const [selectedBagForEdit, setSelectedBagForEdit] = useState<InventoryConfig | null>(null);
+  const [editBagName, setEditBagName] = useState<string>('');
+  const [editBagWidth, setEditBagWidth] = useState<number>(6);
+  const [editBagHeight, setEditBagHeight] = useState<number>(4);
+  const [editBagWeight, setEditBagWeight] = useState<number>(1);
+
   const updateStats = useCallback(() => {
     const app = appRef.current;
     if (!app || !app.selectedCreature) {
@@ -80,6 +108,8 @@ export const App: React.FC = () => {
 
     const c = app.selectedCreature;
     const eq = c.equip;
+    const inv = c.inventory;
+
     setSelectedStats({
       type: c.type,
       radius: c.radius,
@@ -92,12 +122,24 @@ export const App: React.FC = () => {
       maxHp: c.maxHp,
       state: c.state,
       equipSlots: eq ? eq.slots.map((s) => ({ ...s })) : [],
+      // ДОБАВЛЕНО: считываем состояние инвентаря
+      inventory: inv
+        ? {
+            size: { ...inv.size },
+            slots: inv.slots.map((row) => row.map((cell) => ({ ...cell }))),
+          }
+        : undefined,
     });
   }, []);
 
   const { syncPlayerControls } = useKeyboardControls({
     appRef,
-    isModalOpen: isModalOpen || !!selectedWeaponForEdit,
+    // ИЗМЕНЕНО: отключаем управление при открытых окнах настройки брони или сумки
+    isModalOpen:
+      isModalOpen ||
+      !!selectedWeaponForEdit ||
+      !!selectedArmorForEdit ||
+      !!selectedBagForEdit,
     isEditModalOpen,
     updateStats,
   });
@@ -227,6 +269,86 @@ export const App: React.FC = () => {
     updateStats();
   };
 
+  // ДОБАВЛЕНО: обработчики редактирования брони
+  const openArmorEditModal = (armor: ArmorConfig) => {
+    setSelectedArmorForEdit(armor);
+    setEditArmorName(armor.name || '');
+    setEditArmorDefense(armor.defense ?? 15);
+    setEditArmorFlatReduction(armor.flat_reduction ?? 3);
+    setEditArmorWeight(armor.invWeight ?? 3);
+  };
+
+  const closeArmorEditModal = () => {
+    setSelectedArmorForEdit(null);
+  };
+
+  const handleArmorEditConfirm = () => {
+    if (!selectedArmorForEdit) return;
+    selectedArmorForEdit.name = editArmorName;
+    selectedArmorForEdit.defense = editArmorDefense;
+    selectedArmorForEdit.flat_reduction = editArmorFlatReduction;
+    selectedArmorForEdit.invWeight = editArmorWeight;
+    closeArmorEditModal();
+    updateStats();
+  };
+
+  // ДОБАВЛЕНО: обработчики редактирования сумки
+  const openBagEditModal = (bag: InventoryConfig) => {
+    setSelectedBagForEdit(bag);
+    setEditBagName(bag.name || '');
+    setEditBagWidth(bag.size?.width ?? 6);
+    setEditBagHeight(bag.size?.height ?? 4);
+    setEditBagWeight(bag.invWeight ?? 1);
+  };
+
+  const closeBagEditModal = () => {
+    setSelectedBagForEdit(null);
+  };
+
+  const handleBagEditConfirm = () => {
+    if (!selectedBagForEdit) return;
+    selectedBagForEdit.name = editBagName;
+    selectedBagForEdit.invWeight = editBagWeight;
+
+    // Изменение размера сумки разрешено только для пустого инвентаря
+    const c = appRef.current?.selectedCreature;
+    const isInventoryEmpty =
+      !c?.inventory ||
+      c.inventory.slots.every((row) => row.every((cell) => !cell.item));
+
+    if (
+      isInventoryEmpty &&
+      (selectedBagForEdit.size.width !== editBagWidth ||
+        selectedBagForEdit.size.height !== editBagHeight)
+    ) {
+      selectedBagForEdit.size = { width: editBagWidth, height: editBagHeight };
+      if (c) {
+        c.updateInventorySize(editBagWidth, editBagHeight);
+      }
+    }
+
+    closeBagEditModal();
+    updateStats();
+  };
+
+  // ДОБАВЛЕНО: универсальное открытие модального окна предмета (с закрытием предыдущих)
+  const openItemEditModal = (item: ItemData) => {
+    if (!item.config) return;
+    if (item.type === 'weapon') {
+      closeArmorEditModal();
+      closeBagEditModal();
+      openWeaponEditModal(item.config as WeaponConfig);
+    } else if (item.type === 'armor') {
+      closeWeaponEditModal();
+      closeBagEditModal();
+      openArmorEditModal(item.config as ArmorConfig);
+    } else if (item.type === 'bag') {
+      closeWeaponEditModal();
+      closeArmorEditModal();
+      openBagEditModal(item.config as InventoryConfig);
+    }
+  };
+
   const handleDeleteCreature = () => {
     const app = appRef.current;
     if (!app) return;
@@ -240,6 +362,10 @@ export const App: React.FC = () => {
       if (e.key === 'Escape' || e.code === 'Escape') {
         if (selectedWeaponForEdit) {
           closeWeaponEditModal();
+        } else if (selectedArmorForEdit) {
+          closeArmorEditModal();
+        } else if (selectedBagForEdit) {
+          closeBagEditModal();
         } else if (isEditModalOpen) {
           closeEditModal();
         } else if (isModalOpen) {
@@ -249,7 +375,13 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isEditModalOpen, selectedWeaponForEdit]);
+  }, [
+    isModalOpen,
+    isEditModalOpen,
+    selectedWeaponForEdit,
+    selectedArmorForEdit,
+    selectedBagForEdit,
+  ]);
 
   const getSlotTypeName = (type: string) => {
     switch (type) {
@@ -263,6 +395,10 @@ export const App: React.FC = () => {
         return type;
     }
   };
+
+  const isBagInventoryEmpty =
+    !selectedStats?.inventory ||
+    selectedStats.inventory.slots.every((row) => row.every((cell) => !cell.item));
 
   return (
     <div id="app">
@@ -374,24 +510,31 @@ export const App: React.FC = () => {
               </dl>
 
               <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
-                Экипировка (клик по оружию для настройки):
+                Экипировка (клик по предмету для настройки):
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
                 {selectedStats.equipSlots.map((slot, index) => {
-                  const isWeapon = slot.type === 'weapon' && slot.item?.type === 'weapon';
+                  const item = slot.item;
+                  const hasEditableItem =
+                    item && ['weapon', 'armor', 'bag'].includes(item.type) && !!item.config;
+                  const isWeapon = item?.type === 'weapon';
+                  const isArmor = item?.type === 'armor';
+                  const isBag = item?.type === 'bag';
+
                   return (
                     <div
                       key={`${slot.type}_${index}`}
                       onClick={() => {
-                        if (isWeapon && slot.item?.type === 'weapon' && slot.item?.config) {
-                          openWeaponEditModal((slot.item.config as WeaponConfig));
+                        // ИЗМЕНЕНО: открытие соответствующего окна настройки для любого экипированного предмета
+                        if (hasEditableItem && item) {
+                          openItemEditModal(item);
                         }
                       }}
                       style={{
                         backgroundColor: '#1e1e1e',
                         padding: '6px 8px',
                         borderRadius: '4px',
-                        cursor: isWeapon ? 'pointer' : 'default',
+                        cursor: hasEditableItem ? 'pointer' : 'default',
                         fontSize: '12px',
                         border: '1px solid #444',
                         display: 'flex',
@@ -401,10 +544,20 @@ export const App: React.FC = () => {
                     >
                       <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
                       <span>
-                        {slot.item ? slot.item.name : 'Пусто'}
-                        {isWeapon && (
+                        {item ? item.name : 'Пусто'}
+                        {isWeapon && item?.config && (
                           <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
-                            ({(slot.item!.config as WeaponConfig).baseDamage} урона)
+                            ({(item.config as WeaponConfig).baseDamage} урона)
+                          </span>
+                        )}
+                        {isArmor && item?.config && (
+                          <span style={{ color: '#3498db', marginLeft: '6px' }}>
+                            ({(item.config as ArmorConfig).defense} защиты)
+                          </span>
+                        )}
+                        {isBag && item?.config && (
+                          <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
+                            ({(item.config as InventoryConfig).size.width}x{(item.config as InventoryConfig).size.height})
                           </span>
                         )}
                       </span>
@@ -787,6 +940,202 @@ export const App: React.FC = () => {
                 Отмена
               </button>
               <button type="button" className="btn btn-primary" onClick={handleWeaponEditConfirm}>
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ДОБАВЛЕНО: Модальное окно для настройки Брони */}
+      {selectedArmorForEdit && (
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeArmorEditModal();
+          }}
+        >
+          <div className="modal-backdrop" onClick={closeArmorEditModal} />
+          <div className="modal-dialog">
+            <h3>Изменить параметры брони</h3>
+            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
+              <label>
+                Название:
+                <input
+                  type="text"
+                  value={editArmorName}
+                  onChange={(e) => setEditArmorName(e.target.value)}
+                />
+              </label>
+              <label>
+                Защита:
+                <input
+                  type="number"
+                  value={editArmorDefense}
+                  min={0}
+                  max={100}
+                  onChange={(e) => setEditArmorDefense(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Поглощение урона:
+                <input
+                  type="number"
+                  value={editArmorFlatReduction}
+                  min={0}
+                  max={100}
+                  onChange={(e) => setEditArmorFlatReduction(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Вес:
+                <input
+                  type="number"
+                  value={editArmorWeight}
+                  min={0}
+                  max={100}
+                  onChange={(e) => setEditArmorWeight(Number(e.target.value))}
+                />
+              </label>
+            </form>
+            <div className="modal-actions">
+              <button type="button" className="btn" onClick={closeArmorEditModal}>
+                Отмена
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleArmorEditConfirm}>
+                Применить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ДОБАВЛЕНО: Модальное окно для настройки Сумки с интерактивной сеткой инвентаря */}
+      {selectedBagForEdit && (
+        <div
+          className="modal"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeBagEditModal();
+          }}
+        >
+          <div className="modal-backdrop" onClick={closeBagEditModal} />
+          <div className="modal-dialog">
+            <h3>Изменить параметры сумки</h3>
+            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
+              <label>
+                Название:
+                <input
+                  type="text"
+                  value={editBagName}
+                  onChange={(e) => setEditBagName(e.target.value)}
+                />
+              </label>
+              <label>
+                Ширина инвентаря (ячейки):
+                <input
+                  type="number"
+                  value={editBagWidth}
+                  min={1}
+                  max={12}
+                  disabled={!isBagInventoryEmpty}
+                  onChange={(e) => setEditBagWidth(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Высота инвентаря (ячейки):
+                <input
+                  type="number"
+                  value={editBagHeight}
+                  min={1}
+                  max={12}
+                  disabled={!isBagInventoryEmpty}
+                  onChange={(e) => setEditBagHeight(Number(e.target.value))}
+                />
+              </label>
+              {!isBagInventoryEmpty && (
+                <p style={{ fontSize: '12px', color: '#e74c3c', margin: '4px 0' }}>
+                  Размер инвентаря можно изменить только когда сумка пуста
+                </p>
+              )}
+              <label>
+                Вес:
+                <input
+                  type="number"
+                  value={editBagWeight}
+                  min={0}
+                  max={100}
+                  onChange={(e) => setEditBagWeight(Number(e.target.value))}
+                />
+              </label>
+            </form>
+
+            {/* Сетка инвентаря: при клике на предмет открывается его окно настройки */}
+            <div style={{ marginTop: '12px' }}>
+              <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>
+                Инвентарь сумки (нажмите на предмет для настройки):
+              </h4>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${
+                    selectedStats?.inventory?.size.width || editBagWidth
+                  }, 38px)`,
+                  gap: '4px',
+                  justifyContent: 'center',
+                  backgroundColor: '#111',
+                  padding: '10px',
+                  borderRadius: '6px',
+                  border: '1px solid #333',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                }}
+              >
+                {(
+                  selectedStats?.inventory?.slots ||
+                  Array.from({ length: editBagHeight }, () =>
+                    Array.from({ length: editBagWidth }, () => ({ item: null, count: 0 }))
+                  )
+                ).map((row, rIdx) =>
+                  row.map((cell, cIdx) => {
+                    const item = cell.item;
+                    return (
+                      <div
+                        key={`${rIdx}_${cIdx}`}
+                        onClick={() => {
+                          if (item) openItemEditModal(item);
+                        }}
+                        title={item ? `${item.name} (${item.type})` : 'Пустая ячейка'}
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          backgroundColor: item ? '#2980b9' : '#222',
+                          border: '1px solid #444',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: item ? 'pointer' : 'default',
+                          fontSize: '10px',
+                          color: '#fff',
+                          textAlign: 'center',
+                          padding: '2px',
+                          overflow: 'hidden',
+                          userSelect: 'none',
+                        }}
+                      >
+                        {item ? item.name.substring(0, 5) : ''}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="modal-actions" style={{ marginTop: '16px' }}>
+              <button type="button" className="btn" onClick={closeBagEditModal}>
+                Отмена
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleBagEditConfirm}>
                 Применить
               </button>
             </div>
