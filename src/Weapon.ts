@@ -21,7 +21,7 @@ export function createDefaultWeapons(): WeaponConfig[] {
     },
     {
       id: `weapon_angle_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Угловой взмах (30°)',
+      name: 'Угловой взмах',
       prepTime: 0.25,
       recoveryTime: 0.35,
       prepTurnSlow: 0.4,

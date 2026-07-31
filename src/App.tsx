@@ -63,6 +63,10 @@ export const App: React.FC = () => {
   const [editWeaponDamage, setEditWeaponDamage] = useState<number>(25);
   const [editWeaponPrepTime, setEditWeaponPrepTime] = useState<number>(0.2);
   const [editWeaponRecoveryTime, setEditWeaponRecoveryTime] = useState<number>(0.3);
+  const [editWeaponRange, setEditWeaponRange] = useState<number>(0);
+  const [editWeaponRadius, setEditWeaponRadius] = useState<number>(0);
+  const [editWeaponNumLines, setEditWeaponNumLines] = useState<number>(1);
+  const [editWeaponAngle, setEditWeaponAngle] = useState<number>(0);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -179,11 +183,16 @@ export const App: React.FC = () => {
   };
 
   const openWeaponEditModal = (weapon: WeaponConfig) => {
+    const w = weapon as any;
     setSelectedWeaponForEdit(weapon);
-    setEditWeaponName(weapon.name);
-    setEditWeaponDamage(weapon.baseDamage);
-    setEditWeaponPrepTime(weapon.prepTime);
-    setEditWeaponRecoveryTime(weapon.recoveryTime);
+    setEditWeaponName(w.name || '');
+    setEditWeaponDamage(w.baseDamage ?? 25);
+    setEditWeaponPrepTime(w.prepTime ?? 0.2);
+    setEditWeaponRecoveryTime(w.recoveryTime ?? 0.3);
+    setEditWeaponRange(w.range ?? w.length ?? 0);
+    setEditWeaponRadius(w.radius ?? 0);
+    setEditWeaponNumLines(w.numLines ?? w.lines ?? w.rayCount ?? 1);
+    setEditWeaponAngle(w.angle !== undefined ? Math.round((w.angle * 180) / Math.PI) : 0);
   };
 
   const closeWeaponEditModal = () => {
@@ -192,10 +201,18 @@ export const App: React.FC = () => {
 
   const handleWeaponEditConfirm = () => {
     if (!selectedWeaponForEdit) return;
-    selectedWeaponForEdit.name = editWeaponName;
-    selectedWeaponForEdit.baseDamage = editWeaponDamage;
-    selectedWeaponForEdit.prepTime = editWeaponPrepTime;
-    selectedWeaponForEdit.recoveryTime = editWeaponRecoveryTime;
+    const w = selectedWeaponForEdit as any;
+    w.name = editWeaponName;
+    w.baseDamage = editWeaponDamage;
+    w.prepTime = editWeaponPrepTime;
+    w.recoveryTime = editWeaponRecoveryTime;
+    if (w.range !== undefined) w.range = editWeaponRange;
+    if (w.length !== undefined) w.length = editWeaponRange;
+    if (w.radius !== undefined) w.radius = editWeaponRadius;
+    if (w.numLines !== undefined) w.numLines = editWeaponNumLines;
+    if (w.lines !== undefined) w.lines = editWeaponNumLines;
+    if (w.rayCount !== undefined) w.rayCount = editWeaponNumLines;
+    if (w.angle !== undefined) w.angle = (editWeaponAngle * Math.PI) / 180;
     closeWeaponEditModal();
     updateStats();
   };
@@ -645,6 +662,58 @@ export const App: React.FC = () => {
                   onChange={(e) => setEditWeaponRecoveryTime(Number(e.target.value))}
                 />
               </label>
+              {(((selectedWeaponForEdit as any).range !== undefined) || ((selectedWeaponForEdit as any).length !== undefined)) && (
+                <label>
+                  Дальность / Длина:
+                  <input
+                    type="number"
+                    value={editWeaponRange}
+                    min={0}
+                    max={2000}
+                    step={10}
+                    onChange={(e) => setEditWeaponRange(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {((selectedWeaponForEdit as any).radius !== undefined) && (
+                <label>
+                  Радиус:
+                  <input
+                    type="number"
+                    value={editWeaponRadius}
+                    min={0}
+                    max={500}
+                    step={5}
+                    onChange={(e) => setEditWeaponRadius(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {(((selectedWeaponForEdit as any).numLines !== undefined) || ((selectedWeaponForEdit as any).lines !== undefined) || ((selectedWeaponForEdit as any).rayCount !== undefined)) && (
+                <label>
+                  Количество лучей / линий:
+                  <input
+                    type="number"
+                    value={editWeaponNumLines}
+                    min={1}
+                    max={50}
+                    step={1}
+                    onChange={(e) => setEditWeaponNumLines(Number(e.target.value))}
+                  />
+                </label>
+              )}
+              {((selectedWeaponForEdit as any).angle !== undefined) && (
+                <label>
+                  Угол (°):
+                  <input
+                    type="number"
+                    value={editWeaponAngle}
+                    min={0}
+                    max={360}
+                    step={1}
+                    onChange={(e) => setEditWeaponAngle(Number(e.target.value))}
+                  />
+                </label>
+              )}
             </form>
             <div className="modal-actions">
               <button type="button" className="btn" onClick={closeWeaponEditModal}>
