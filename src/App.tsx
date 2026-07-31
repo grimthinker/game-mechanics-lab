@@ -49,6 +49,7 @@ export const App: React.FC = () => {
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedStats, setSelectedStats] = useState<CreatureStats | null>(null);
+  const [isPaused, setIsPaused] = useState<boolean>(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType | null>(null);
@@ -139,7 +140,8 @@ export const App: React.FC = () => {
       isModalOpen ||
       !!selectedWeaponForEdit ||
       !!selectedArmorForEdit ||
-      !!selectedBagForEdit,
+      !!selectedBagForEdit ||
+      isPaused,
     isEditModalOpen,
     updateStats,
   });
@@ -167,6 +169,14 @@ export const App: React.FC = () => {
       appRef.current = null;
     };
   }, [canvasRef, updateStats]);
+
+  const togglePause = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    const nextState = !app.isPaused;
+    app.isPaused = nextState;
+    setIsPaused(nextState);
+  }, []);
 
   const openSpawnModal = (type: CreatureType) => {
     setPendingSpawnType(type);
@@ -371,6 +381,28 @@ export const App: React.FC = () => {
         } else if (isModalOpen) {
           closeSpawnModal();
         }
+      } else if (e.code === 'Space' || e.key === ' ') {
+        // Проверяем открытые модальные окна, чтобы не триггерить паузу при вводе текста
+        if (
+          isModalOpen ||
+          isEditModalOpen ||
+          selectedWeaponForEdit ||
+          selectedArmorForEdit ||
+          selectedBagForEdit
+        ) {
+          return;
+        }
+
+        const app = appRef.current;
+        const hasSelected = !!app?.selectedCreature;
+
+        if (!hasSelected) {
+          e.preventDefault();
+          togglePause();
+        } else if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          togglePause();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -381,6 +413,7 @@ export const App: React.FC = () => {
     selectedWeaponForEdit,
     selectedArmorForEdit,
     selectedBagForEdit,
+    togglePause,
   ]);
 
   const getSlotTypeName = (type: string) => {
@@ -411,6 +444,27 @@ export const App: React.FC = () => {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         />
+        {isPaused && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(231, 76, 60, 0.9)',
+              color: '#fff',
+              padding: '8px 20px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              zIndex: 50,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              pointerEvents: 'none',
+              letterSpacing: '1px',
+            }}
+          >
+            ПАУЗА
+          </div>
+        )}
         {placementConfig && (
           <div
             style={{
@@ -582,13 +636,20 @@ export const App: React.FC = () => {
 
         <div className="tool-group">
           <h3>Управление</h3>
-          <ul className="control-keys">
-            <li><kbd>W</kbd> Движение вперед</li>
-            <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
-            <li><kbd>LShift</kbd> Бег (удержание)</li>
-            <li><kbd>C</kbd> Полуприсяд (удержание)</li>
-            <li><kbd>Пробел</kbd> Атака оружием</li>
-          </ul>
+          {selectedStats ? (
+            <ul className="control-keys">
+              <li><kbd>W</kbd> Движение вперед</li>
+              <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
+              <li><kbd>LShift</kbd> Бег (удержание)</li>
+              <li><kbd>C</kbd> Полуприсяд (удержание)</li>
+              <li><kbd>Пробел</kbd> Атака оружием</li>
+              <li><kbd>LCtrl</kbd> + <kbd>Пробел</kbd> Пауза / Возобновление</li>
+            </ul>
+          ) : (
+            <ul className="control-keys">
+              <li><kbd>Пробел</kbd> Пауза / Возобновление симуляции</li>
+            </ul>
+          )}
         </div>
       </div>
 

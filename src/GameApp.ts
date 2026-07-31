@@ -220,6 +220,7 @@ export class GameApp {
 
   private lastTime: number = 0;
   private isRunning: boolean = false;
+  public isPaused: boolean = false; // ДОБАВЛЕНО: состояние паузы
   private handleResize = () => this.resizeCanvas();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -388,10 +389,12 @@ export class GameApp {
     const dt = Math.min(0.1, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
-    this.movementSystem.update(dt, this.world, this.physics);
-    this.attackSystem.update(dt, this.world, this.physics);
-    this.physics.update(dt, this.world);
-    this.damageSystem.update(dt, this.world);
+    if (!this.isPaused) {
+      this.movementSystem.update(dt, this.world, this.physics);
+      this.attackSystem.update(dt, this.world, this.physics);
+      this.physics.update(dt, this.world);
+      this.damageSystem.update(dt, this.world);
+    }
 
     this.renderer.render(
       this.camera,

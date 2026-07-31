@@ -72,14 +72,12 @@ export class Renderer {
   private renderEntities(world: World, camera: Camera, selectedId: EntityId | null): void {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
 
-    // ИЗМЕНЕНО: Общий метод отрисовки тела и полоски здоровья (без текста ID)
+    // ИЗМЕНЕНО: Метод отрисовки только тела существа (без полоски здоровья и текста ID)
     const renderBody = (
       id: EntityId,
       transform: any,
       phys: any,
       isAlive: boolean,
-      hp: number,
-      maxHp: number,
       meta: any
     ) => {
       this.ctx.save();
@@ -146,18 +144,6 @@ export class Renderer {
       this.ctx.stroke();
 
       this.ctx.restore();
-
-      // Отрисовка полоски здоровья (ID удален отсюда для отрисовки поверх всего в конце)
-      if (isAlive) {
-        const barW = phys.radius * 2;
-        const barH = 4 / camera.scale;
-        const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
-        this.ctx.fillStyle = '#c0392b';
-        this.ctx.fillRect(-barW / 2, -phys.radius - 16 / camera.scale, barW, barH);
-        this.ctx.fillStyle = '#2ecc71';
-        this.ctx.fillRect(-barW / 2, -phys.radius - 16 / camera.scale, barW * hpRatio, barH);
-      }
-
       this.ctx.restore();
     };
 
@@ -167,11 +153,10 @@ export class Renderer {
       const statsComp = world.getComponent(id, 'stats' as any) as any;
 
       const hp = statsComp?.hp?.current ?? 0;
-      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
       const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
 
       if (!isAlive) {
-        renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
+        renderBody(id, transform, physicsBody, isAlive, meta);
       }
     }
 
@@ -181,11 +166,10 @@ export class Renderer {
       const statsComp = world.getComponent(id, 'stats' as any) as any;
 
       const hp = statsComp?.hp?.current ?? 0;
-      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
       const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
 
       if (isAlive) {
-        renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
+        renderBody(id, transform, physicsBody, isAlive, meta);
       }
     }
 
@@ -196,7 +180,6 @@ export class Renderer {
       const equipComp = world.getComponent(id, 'equip' as any) as any;
 
       const hp = statsComp?.hp?.current ?? 0;
-      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
       const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
       const hitFlashTimer = healthComp?.hitFlashTimer ?? 0;
 
@@ -239,7 +222,7 @@ export class Renderer {
       let zoneAlpha = 0.15;
       let zoneColor = '#f1c40f';
 
-      if (hitFlashTimer > 0) {
+      if (hitFlashTimer > 0 && activeAtk) {
         zoneColor = '#e74c3c';
         zoneAlpha = 0.9;
       } else if (activeAtk) {
@@ -314,11 +297,33 @@ export class Renderer {
       }
       this.ctx.restore();
 
-      // ИЗМЕНЕНО: Повторная отрисовка самого атакующего существа поверх его зоны поражения
-      renderBody(id, transform, physicsBody, isAlive, hp, maxHp, meta);
+      // Повторная отрисовка самого атакующего существа поверх его зоны поражения
+      renderBody(id, transform, physicsBody, isAlive, meta);
     }
 
-    // ДОБАВЛЕНО: 4. Отрисовка ID поверх всех существ, зон поражения и линий здоровья
+    for (const [id, { transform, physicsBody }] of entities) {
+      const healthComp = world.getComponent(id, 'health');
+      const statsComp = world.getComponent(id, 'stats' as any) as any;
+
+      const hp = statsComp?.hp?.current ?? 0;
+      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
+      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+
+      if (isAlive) {
+        this.ctx.save();
+        this.ctx.translate(transform.x, transform.y);
+        const barW = physicsBody.radius * 2;
+        const barH = 4 / camera.scale;
+        const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
+        this.ctx.fillStyle = '#c0392b';
+        this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW, barH);
+        this.ctx.fillStyle = '#2ecc71';
+        this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW * hpRatio, barH);
+        this.ctx.restore();
+      }
+    }
+
+    // ДОБАВЛЕНО: 5. Отрисовка ID поверх всех существ, зон поражения и полосок здоровья
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
