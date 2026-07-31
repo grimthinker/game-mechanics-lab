@@ -24,6 +24,9 @@ interface PlacementConfig {
   mass: number;
   maxSpeed: number;
   maxTurnSpeed: number;
+  runSpeedMultiplier: number;
+  crouchSpeedMultiplier: number;
+  crouchStealthMultiplier: number;
 }
 
 export const App: React.FC = () => {
@@ -39,6 +42,9 @@ export const App: React.FC = () => {
   const [mass, setMass] = useState<number>(10);
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
   const [maxTurnSpeed, setMaxTurnSpeed] = useState<number>(270);
+  const [runSpeedMultiplier, setRunSpeedMultiplier] = useState<number>(1.5);
+  const [crouchSpeedMultiplier, setCrouchSpeedMultiplier] = useState<number>(0.5);
+  const [crouchStealthMultiplier, setCrouchStealthMultiplier] = useState<number>(1.5);
 
   const [placementConfig, setPlacementConfig] = useState<PlacementConfig | null>(null);
 
@@ -48,6 +54,9 @@ export const App: React.FC = () => {
   const [editMaxTurnSpeed, setEditMaxTurnSpeed] = useState<number>(270);
   const [editHp, setEditHp] = useState<number>(100);
   const [editMaxHp, setEditMaxHp] = useState<number>(100);
+  const [editRunSpeedMultiplier, setEditRunSpeedMultiplier] = useState<number>(1.5);
+  const [editCrouchSpeedMultiplier, setEditCrouchSpeedMultiplier] = useState<number>(0.5);
+  const [editCrouchStealthMultiplier, setEditCrouchStealthMultiplier] = useState<number>(1.5);
 
   const [selectedWeaponForEdit, setSelectedWeaponForEdit] = useState<WeaponConfig | null>(null);
   const [editWeaponName, setEditWeaponName] = useState<string>('');
@@ -127,6 +136,9 @@ export const App: React.FC = () => {
       mass,
       maxSpeed,
       maxTurnSpeed,
+      runSpeedMultiplier,
+      crouchSpeedMultiplier,
+      crouchStealthMultiplier,
     });
     closeSpawnModal();
   };
@@ -139,6 +151,9 @@ export const App: React.FC = () => {
     setEditMaxTurnSpeed(Math.round((c.maxTurnSpeed * 180) / Math.PI));
     setEditHp(c.hp);
     setEditMaxHp(c.maxHp);
+    setEditRunSpeedMultiplier(c.runSpeedMultiplier);
+    setEditCrouchSpeedMultiplier(c.crouchSpeedMultiplier);
+    setEditCrouchStealthMultiplier(c.crouchStealthMultiplier);
     setIsEditModalOpen(true);
   };
 
@@ -155,6 +170,9 @@ export const App: React.FC = () => {
       maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
       hp: editHp,
       maxHp: editMaxHp,
+      runSpeedMultiplier: editRunSpeedMultiplier,
+      crouchSpeedMultiplier: editCrouchSpeedMultiplier,
+      crouchStealthMultiplier: editCrouchStealthMultiplier,
     });
     closeEditModal();
     updateStats();
@@ -358,6 +376,8 @@ export const App: React.FC = () => {
           <ul className="control-keys">
             <li><kbd>W</kbd> Движение вперед</li>
             <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
+            <li><kbd>LShift</kbd> Бег (удержание)</li>
+            <li><kbd>LCtrl</kbd> Полуприсяд (удержание)</li>
             <li><kbd>Пробел</kbd> Атака оружием</li>
           </ul>
         </div>
@@ -417,6 +437,39 @@ export const App: React.FC = () => {
                   max={1080}
                   step={10}
                   onChange={(e) => setMaxTurnSpeed(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Множитель скорости бега:
+                <input
+                  type="number"
+                  value={runSpeedMultiplier}
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) => setRunSpeedMultiplier(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Множитель скорости присяда:
+                <input
+                  type="number"
+                  value={crouchSpeedMultiplier}
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) => setCrouchSpeedMultiplier(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Множитель скрытности присяда:
+                <input
+                  type="number"
+                  value={crouchStealthMultiplier}
+                  min={1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) => setCrouchStealthMultiplier(Number(e.target.value))}
                 />
               </label>
             </form>
@@ -493,6 +546,39 @@ export const App: React.FC = () => {
                   max={1080}
                   step={10}
                   onChange={(e) => setEditMaxTurnSpeed(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Множитель скорости бега:
+                <input
+                  type="number"
+                  value={editRunSpeedMultiplier}
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) => setEditRunSpeedMultiplier(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Множитель скорости присяда:
+                <input
+                  type="number"
+                  value={editCrouchSpeedMultiplier}
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) => setEditCrouchSpeedMultiplier(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                Множитель скрытности присяда:
+                <input
+                  type="number"
+                  value={editCrouchStealthMultiplier}
+                  min={1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) => setEditCrouchStealthMultiplier(Number(e.target.value))}
                 />
               </label>
             </form>

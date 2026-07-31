@@ -13,7 +13,7 @@ export type CreatureType = 'player' | 'ai';
 export const STANDARD_RADII = [12, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
 
-export type CreatureState = 'idle' | 'moving' | 'attacking' | 'dead';
+export type CreatureState = 'idle' | 'moving' | 'running' | 'crouching' | 'attacking' | 'dead';
 
 export type HitZoneType = 'radius' | 'angle' | 'line' | 'shrapnel' | 'forward_line' | 'offset_radius';
 
@@ -59,6 +59,9 @@ export interface CreatureConfig {
   stealth?: number;
   baseStealth?: number;
   weapons?: WeaponConfig[];
+  runSpeedMultiplier?: number;
+  crouchSpeedMultiplier?: number;
+  crouchStealthMultiplier?: number;
 }
 
 export interface IMovable {
@@ -66,4 +69,8 @@ export interface IMovable {
   stopMovingForward(): void;
   startTurning(direction: -1 | 1): void;
   stopTurning(): void;
+  startRunning(): void;
+  stopRunning(): void;
+  startCrouching(): void;
+  stopCrouching(): void;
 }

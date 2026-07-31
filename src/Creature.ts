@@ -14,6 +14,9 @@ export class Creature implements IMovable {
   public hp: number;
   public stealth: number;
   public baseStealth: number;
+  public runSpeedMultiplier: number;
+  public crouchSpeedMultiplier: number;
+  public crouchStealthMultiplier: number;
   public isAlive: boolean = true;
   public position: Point;
   public angle: number = 0;
@@ -24,6 +27,8 @@ export class Creature implements IMovable {
 
   private isMovingForward: boolean = false;
   private turningDirection: -1 | 0 | 1 = 0;
+  private isRunning: boolean = false;
+  private isCrouching: boolean = false;
 
   public body: Circle;
 
@@ -39,6 +44,9 @@ export class Creature implements IMovable {
     this.hp = Math.min(this.maxHp, config.hp ?? this.maxHp);
     this.baseStealth = config.baseStealth ?? 0;
     this.stealth = config.stealth ?? this.baseStealth;
+    this.runSpeedMultiplier = Math.max(0.1, config.runSpeedMultiplier ?? 1.5);
+    this.crouchSpeedMultiplier = Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5);
+    this.crouchStealthMultiplier = Math.max(1, config.crouchStealthMultiplier ?? 1.5);
     
     if (config.weapons && config.weapons.length > 0) {
       this.weapons = [...config.weapons];
@@ -58,6 +66,8 @@ export class Creature implements IMovable {
   public get state(): CreatureState {
     if (!this.isAlive || this.hp <= 0) return 'dead';
     if (this.activeAttacks.length > 0) return 'attacking';
+    if (this.isRunning && (this.isMovingForward || this.turningDirection !== 0)) return 'running';
+    if (this.isCrouching && (this.isMovingForward || this.turningDirection !== 0)) return 'crouching';
     if (this.isMovingForward || this.turningDirection !== 0) return 'moving';
     return 'idle';
   }
@@ -69,7 +79,13 @@ export class Creature implements IMovable {
       const mult = atk.phase === 'prep' ? atk.weapon.prepMoveSlow : atk.weapon.recoveryMoveSlow;
       if (mult < slow) slow = mult;
     }
-    return (this.isMovingForward ? this.maxSpeed : 0) * slow;
+    let speedMult = 1;
+    if (this.isRunning) {
+      speedMult = this.runSpeedMultiplier;
+    } else if (this.isCrouching) {
+      speedMult = this.crouchSpeedMultiplier;
+    }
+    return (this.isMovingForward ? this.maxSpeed * speedMult : 0) * slow;
   }
 
   public get currentTurnSpeed(): number {
@@ -102,8 +118,30 @@ export class Creature implements IMovable {
     this.turningDirection = 0;
   }
 
+  public startRunning(): void {
+    if (this.isAlive && this.hp > 0) {
+      this.isRunning = true;
+      this.isCrouching = false;
+    }
+  }
+
+  public stopRunning(): void {
+    this.isRunning = false;
+  }
+
+  public startCrouching(): void {
+    if (this.isAlive && this.hp > 0) {
+      this.isCrouching = true;
+      this.isRunning = false;
+    }
+  }
+
+  public stopCrouching(): void {
+    this.isCrouching = false;
+  }
+
   public attack(): WeaponConfig | null {
-    if (!this.isAlive || this.hp <= 0) return null;
+    if (!this.isAlive || this.hp <= 0 || this.isRunning) return null;
     const freeWeapon = this.getNextAvailableWeapon();
     if (!freeWeapon) return null;
 
@@ -122,6 +160,10 @@ export class Creature implements IMovable {
     physics?: PhysicsSystem
   ): void {
     if (!this.isAlive || this.hp <= 0) return;
+
+    this.stealth = this.isCrouching
+      ? this.baseStealth * this.crouchStealthMultiplier
+      : this.baseStealth;
 
     if (this.hitFlashTimer > 0) {
       this.hitFlashTimer--;
@@ -177,6 +219,8 @@ export class Creature implements IMovable {
       this.isAlive = false;
       this.isMovingForward = false;
       this.turningDirection = 0;
+      this.isRunning = false;
+      this.isCrouching = false;
       this.activeAttacks = [];
       this.hitFlashTimer = 0;
     }
@@ -190,6 +234,9 @@ export class Creature implements IMovable {
     maxHp?: number;
     stealth?: number;
     baseStealth?: number;
+    runSpeedMultiplier?: number;
+    crouchSpeedMultiplier?: number;
+    crouchStealthMultiplier?: number;
   }): void {
     if (params.radius !== undefined) {
       this.radius = params.radius;
@@ -212,6 +259,15 @@ export class Creature implements IMovable {
     }
     if (params.baseStealth !== undefined) {
       this.baseStealth = params.baseStealth;
+    }
+    if (params.runSpeedMultiplier !== undefined) {
+      this.runSpeedMultiplier = Math.max(0.1, params.runSpeedMultiplier);
+    }
+    if (params.crouchSpeedMultiplier !== undefined) {
+      this.crouchSpeedMultiplier = Math.max(0.1, params.crouchSpeedMultiplier);
+    }
+    if (params.crouchStealthMultiplier !== undefined) {
+      this.crouchStealthMultiplier = Math.max(1, params.crouchStealthMultiplier);
     }
     this.hp = Math.min(this.hp, this.maxHp);
     this.isAlive = this.hp > 0;

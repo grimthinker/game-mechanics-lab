@@ -29,6 +29,8 @@ export const useKeyboardControls = ({
     if (controlled && controlled !== player) {
       controlled.stopMovingForward();
       controlled.stopTurning();
+      controlled.stopRunning();
+      controlled.stopCrouching();
     }
 
     controlledCreatureRef.current = player;
@@ -41,10 +43,23 @@ export const useKeyboardControls = ({
     if (keys.has('a')) player.startTurning(-1);
     else if (keys.has('d')) player.startTurning(1);
     else player.stopTurning();
+
+    if (keys.has('shift')) player.startRunning();
+    else player.stopRunning();
+
+    if (keys.has('control')) player.startCrouching();
+    else player.stopCrouching();
   }, [appRef]);
 
   useEffect(() => {
-    const CONTROL_KEYS = new Set(['w', 'a', 'd']);
+    const CONTROL_KEYS = new Set(['w', 'a', 'd', 'shift', 'control']);
+
+    const getKeyName = (e: KeyboardEvent): string => {
+      const k = e.key.toLowerCase();
+      if (e.code === 'ShiftLeft' || k === 'shift') return 'shift';
+      if (e.code === 'ControlLeft' || k === 'control') return 'control';
+      return k;
+    };
 
     const isTextInputTarget = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) return false;
@@ -54,7 +69,7 @@ export const useKeyboardControls = ({
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
-      const key = e.key.toLowerCase();
+      const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
         const player = controlledCreatureRef.current;
         if (player && player.isAlive && player.hp > 0) {
@@ -73,7 +88,7 @@ export const useKeyboardControls = ({
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
+      const key = getKeyName(e);
       if (!CONTROL_KEYS.has(key)) return;
 
       keysPressedRef.current.delete(key);

@@ -175,6 +175,12 @@ export class Renderer {
           case 'moving':
             fillColor = '#3498db';
             break;
+          case 'running':
+            fillColor = '#2ecc71';
+            break;
+          case 'crouching':
+            fillColor = '#9b59b6';
+            break;
           case 'attacking':
             fillColor = '#e67e22';
             break;

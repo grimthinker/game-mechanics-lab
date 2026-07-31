@@ -44,9 +44,13 @@ export class GameApp {
     maxTurnSpeedDeg: number = 270,
     position?: Point,
     weapons?: WeaponConfig[],
+    runSpeedMultiplier: number = 1.5,
+    crouchSpeedMultiplier: number = 0.5,
+    crouchStealthMultiplier: number = 1.5,
   ): Creature {
+    const prefix = type === 'player' ? 'player' : 'bot';
     const config: CreatureConfig = {
-      id: `creature_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      id: `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
       type,
       position: position ? { ...position } : {
         x: 100 + Math.random() * (this.canvas.width - 200),
@@ -59,6 +63,9 @@ export class GameApp {
       maxHp: 100,
       hp: 100,
       weapons,
+      runSpeedMultiplier,
+      crouchSpeedMultiplier,
+      crouchStealthMultiplier,
     };
 
     const creature = new Creature(config);

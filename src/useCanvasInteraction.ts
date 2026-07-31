@@ -8,6 +8,9 @@ interface PlacementConfig {
   mass: number;
   maxSpeed: number;
   maxTurnSpeed: number;
+  runSpeedMultiplier: number;
+  crouchSpeedMultiplier: number;
+  crouchStealthMultiplier: number;
 }
 
 interface UseCanvasInteractionProps {
@@ -68,6 +71,10 @@ export const useCanvasInteraction = ({
         placementConfig.maxSpeed,
         placementConfig.maxTurnSpeed,
         point,
+        undefined,
+        placementConfig.runSpeedMultiplier,
+        placementConfig.crouchSpeedMultiplier,
+        placementConfig.crouchStealthMultiplier,
       );
       setPlacementConfig(null);
       app.endPan();
