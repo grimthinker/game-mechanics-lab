@@ -5,9 +5,9 @@ import { ObstacleSegment, WeaponConfig, Point } from './types';
 const PHYSICS_CONFIG = {
   A: 10,          // Коэффициент жесткости расталкивания существ
   C: 0.5,         // Максимальный коэффициент импульса за один кадр
-  B: 0.01,        // Буфер при выталкивании из стен [cite: 161]
-  d_min: 0.001,   // Минимальный порог смещения [cite: 166]
-  R_mult: Math.sin(Math.PI / 4) // ~0.707 — множитель радиуса для sub-stepping [cite: 56, 131]
+  B: 0.01,        // Буфер при выталкивании из стен
+  d_min: 0.001,   // Минимальный порог смещения
+  R_mult: Math.sin(Math.PI / 4) // ~0.707 — множитель радиуса для sub-stepping
 };
 
 const creaturesMap = new WeakMap<any, Creature>();
@@ -128,7 +128,7 @@ export class PhysicsSystem {
   public update(dt: number, creatures: Creature[]): void {
     this.system.update();
 
-    // 1. Расталкивание существ друг с другом с учетом масс (Step 1) [cite: 155]
+    // 1. Расталкивание существ друг с другом с учетом масс (Step 1)
     this.system.checkAll((response) => {
       const c1 = response.a;
       const c2 = response.b;
@@ -164,7 +164,7 @@ export class PhysicsSystem {
       }
     });
 
-    // 2. Гарантированное вторичное выталкивание всех существ из стен (Step 2) [cite: 156]
+    // 2. Гарантированное вторичное выталкивание всех существ из стен (Step 2)
     if (this.obstaclesEnabled) {
       for (const creature of creatures) {
         if (!creature.isAlive) continue;
@@ -180,6 +180,22 @@ export class PhysicsSystem {
     if (!this.obstaclesEnabled) return false;
     const rayResult = this.system.raycast(from, to);
     return rayResult ? rayResult.body instanceof Line : false;
+  }
+
+  // --- Расчет расстояния от точки до отрезка ---
+
+  private getDistanceToSegment(p: Point, a: Point, b: Point): number {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) {
+      return Math.hypot(p.x - a.x, p.y - a.y);
+    }
+    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
+    const projX = a.x + t * dx;
+    const projY = a.y + t * dy;
+    return Math.hypot(p.x - projX, p.y - projY);
   }
 
   // --- Попадания атак ---
@@ -208,7 +224,6 @@ export class PhysicsSystem {
         case 'angle': {
           const len = weapon.length ?? 120;
           const maxAngle = (weapon.angle ?? Math.PI / 6) / 2; // Половина угла сектора
-          const dist = Math.hypot(target.position.x - pos.x, target.position.y - pos.y);
           const maxDist = len + target.radius;
         
           if (dist <= maxDist) {
@@ -231,25 +246,14 @@ export class PhysicsSystem {
         }
         case 'line':
         case 'forward_line': {
-          const len = (weapon.length ?? 150);
-          // Максимальная дистанция увеличивается на радиус цели
-          const maxDist = len + target.radius;
-          const dist = Math.hypot(target.position.x - pos.x, target.position.y - pos.y);
-          
-          if (dist <= maxDist) {
-            // Проверка угла / направления с учетом углового допуска для размера цели
-            const targetAngle = Math.atan2(target.position.y - pos.y, target.position.x - pos.x);
-            let angleDiff = Math.abs(targetAngle - angle);
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-            angleDiff = Math.abs(angleDiff);
-        
-            // Допуск по углу расширяется на основе радиуса цели и расстояния
-            const angularTolerance = Math.asin(Math.min(1, target.radius / Math.max(1, dist)));
-            const maxAllowedAngle = (Math.PI / 6) + angularTolerance; // Например, для узкого луча/линии
-        
-            if (angleDiff <= maxAllowedAngle && !this.isLineOfSightBlocked(pos, target.position)) {
-              isHit = true;
-            }
+          const len = weapon.length ?? 150;
+          const endPoint = {
+            x: pos.x + Math.cos(angle) * len,
+            y: pos.y + Math.sin(angle) * len,
+          };
+          const distToLine = this.getDistanceToSegment(target.position, pos, endPoint);
+          if (distToLine <= target.radius && !this.isLineOfSightBlocked(pos, target.position)) {
+            isHit = true;
           }
           break;
         }
@@ -260,10 +264,12 @@ export class PhysicsSystem {
           for (let i = 0; i < count; i++) {
             const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
             const rayAngle = angle + fraction * (maxAngle * 2);
-            const rx = pos.x + Math.cos(rayAngle) * len;
-            const ry = pos.y + Math.sin(rayAngle) * len;
-            const res = this.system.raycast({ x: pos.x, y: pos.y }, { x: rx, y: ry });
-            if (res && res.body === target.body) {
+            const endPoint = {
+              x: pos.x + Math.cos(rayAngle) * len,
+              y: pos.y + Math.sin(rayAngle) * len,
+            };
+            const distToRay = this.getDistanceToSegment(target.position, pos, endPoint);
+            if (distToRay <= target.radius && !this.isLineOfSightBlocked(pos, target.position)) {
               isHit = true;
               break;
             }
