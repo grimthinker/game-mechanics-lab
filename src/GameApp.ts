@@ -122,7 +122,6 @@ export class EntityAdapter implements IMovable {
     if (input) input.wantsAttack = true;
   }
 
-  // ДОБАВЛЕНО: Безопасное изменение размера инвентаря (только если все ячейки пустые)
   public updateInventorySize(width: number, height: number): boolean {
     const inv = this.world.getComponent(this.id, 'inventory');
     if (!inv) return false;
@@ -220,7 +219,7 @@ export class GameApp {
 
   private lastTime: number = 0;
   private isRunning: boolean = false;
-  public isPaused: boolean = false; // ДОБАВЛЕНО: состояние паузы
+  public isPaused: boolean = false;
   private handleResize = () => this.resizeCanvas();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -369,6 +368,100 @@ export class GameApp {
     }
     this.world.removeEntity(id);
     this.selectedCreature = null;
+  }
+
+  public clearWorld(): void {
+    const entities = this.world.getEntitiesWith('physicsBody');
+    for (const [id, { physicsBody }] of entities) {
+      this.physics.unregisterBody(physicsBody.body);
+      this.world.removeEntity(id);
+    }
+    this.physics.loadObstacles([]);
+    this.selectedCreature = null;
+  }
+
+  // ДОБАВЛЕНО: Сериализация мира в JSON
+  public serializeWorld(): any {
+    const entitiesData: any[] = [];
+    const entities = this.world.getEntitiesWith('transform', 'physicsBody', 'meta', 'stats', 'inventory', 'equip');
+    for (const [id, comp] of entities) {
+      entitiesData.push({
+        id,
+        type: comp.meta.type,
+        transform: { ...comp.transform },
+        radius: comp.physicsBody.radius,
+        mass: comp.physicsBody.mass,
+        stats: {
+          hp: comp.stats.hp.current,
+          maxHp: comp.stats.maxHp.current,
+          maxSpeed: comp.stats.maxSpeed.base,
+          maxTurnSpeed: (comp.stats.maxTurnSpeed.base * 180) / Math.PI,
+          runSpeedMultiplier: comp.stats.runSpeedMultiplier.base,
+          crouchSpeedMultiplier: comp.stats.crouchSpeedMultiplier.base,
+          crouchStealthMultiplier: comp.stats.crouchStealthMultiplier.base,
+        },
+        inventory: {
+          size: { ...comp.inventory.size },
+          slots: comp.inventory.slots,
+        },
+        equip: {
+          slots: comp.equip.slots,
+        },
+      });
+    }
+
+    return {
+      obstacles: this.physics.getObstacleLines() || [],
+      entities: entitiesData,
+    };
+  }
+
+  // ДОБАВЛЕНО: Восстановление мира из JSON
+  public deserializeWorld(data: any): void {
+    if (!data) return;
+    this.clearWorld();
+
+    if (Array.isArray(data. obstacles)) {
+      this.physics.loadObstacles(data.obstacles);
+    }
+
+    if (Array.isArray(data.entities)) {
+      for (const entData of data.entities) {
+        const adapter = this.spawnCreature(
+          entData.type,
+          entData.radius,
+          entData.mass,
+          entData.stats.maxSpeed,
+          entData.stats.maxTurnSpeed,
+          entData.transform,
+          undefined,
+          entData.stats.runSpeedMultiplier,
+          entData.stats.crouchSpeedMultiplier,
+          entData.stats.crouchStealthMultiplier
+        );
+
+        adapter.updateParams({
+          hp: entData.stats.hp,
+          maxHp: entData.stats.maxHp,
+        });
+
+        // Восстанавливаем инвентарь и экипировку
+        const worldEnt = this.world.getEntity(adapter.id);
+        if (worldEnt) {
+          if (entData.inventory) {
+            worldEnt.inventory = {
+              size: { ...entData.inventory.size },
+              slots: entData.inventory.slots,
+            };
+          }
+          if (entData.equip) {
+            worldEnt.equip = {
+              slots: entData.equip.slots,
+            };
+          }
+        }
+      }
+    }
   }
 
   public start(): void {

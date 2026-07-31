@@ -46,6 +46,7 @@ interface PlacementConfig {
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const worldFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedStats, setSelectedStats] = useState<CreatureStats | null>(null);
@@ -240,18 +241,19 @@ export const App: React.FC = () => {
 
   const openWeaponEditModal = (weapon: WeaponConfig) => {
     const w = weapon as any;
+    const zone = w.zone || {};
     setSelectedWeaponForEdit(weapon);
     setEditWeaponName(w.name || '');
     setEditWeaponDamage(w.baseDamage ?? 25);
     setEditWeaponPrepTime(w.prepTime ?? 0.2);
     setEditWeaponRecoveryTime(w.recoveryTime ?? 0.3);
-    setEditWeaponRange(w.range ?? w.length ?? 0);
-    setEditWeaponRadius(w.radius ?? 0);
-    setEditWeaponNumLines(w.numLines ?? w.lines ?? w.rayCount ?? 1);
-    setEditWeaponAngle(w.angle !== undefined ? Math.round((w.angle * 180) / Math.PI) : 0);
-    setEditWeaponPierceObstacles(!!w.pierceObstacles);
-    setEditWeaponPiercePlayers(!!w.piercePlayers);
-    setEditWeaponPierceBots(!!w.pierceBots);
+    setEditWeaponRange(zone.length ?? zone.range ?? 0);
+    setEditWeaponRadius(zone.radius ?? zone.offsetDistance ?? 0);
+    setEditWeaponNumLines(zone.rayCount ?? zone.numLines ?? zone.lines ?? 1);
+    setEditWeaponAngle(zone.angle !== undefined ? Math.round((zone.angle * 180) / Math.PI) : 0);
+    setEditWeaponPierceObstacles(!!zone.pierceObstacles);
+    setEditWeaponPiercePlayers(!!zone.piercePlayers);
+    setEditWeaponPierceBots(!!zone.pierceBots);
   };
 
   const closeWeaponEditModal = () => {
@@ -261,20 +263,37 @@ export const App: React.FC = () => {
   const handleWeaponEditConfirm = () => {
     if (!selectedWeaponForEdit) return;
     const w = selectedWeaponForEdit as any;
+    if (!w.zone) w.zone = {};
+
     w.name = editWeaponName;
     w.baseDamage = editWeaponDamage;
     w.prepTime = editWeaponPrepTime;
     w.recoveryTime = editWeaponRecoveryTime;
-    if (w.range !== undefined) w.range = editWeaponRange;
-    if (w.length !== undefined) w.length = editWeaponRange;
-    if (w.radius !== undefined) w.radius = editWeaponRadius;
-    if (w.numLines !== undefined) w.numLines = editWeaponNumLines;
-    if (w.lines !== undefined) w.lines = editWeaponNumLines;
-    if (w.rayCount !== undefined) w.rayCount = editWeaponNumLines;
-    if (w.angle !== undefined) w.angle = (editWeaponAngle * Math.PI) / 180;
-    w.pierceObstacles = editWeaponPierceObstacles;
-    w.piercePlayers = editWeaponPiercePlayers;
-    w.pierceBots = editWeaponPierceBots;
+
+    if (w.zone.length !== undefined || w.zone.range !== undefined || editWeaponRange > 0) {
+      if (w.zone.length !== undefined) w.zone.length = editWeaponRange;
+      if (w.zone.range !== undefined) w.zone.range = editWeaponRange;
+      if (w.zone.length === undefined && w.zone.range === undefined) w.zone.length = editWeaponRange;
+    }
+
+    if (w.zone.radius !== undefined) {
+      w.zone.radius = editWeaponRadius;
+    } else if (w.zone.offsetDistance !== undefined && w.zone.hitZoneType === 'offset_radius') {
+      w.zone.radius = editWeaponRadius;
+    }
+
+    if (w.zone.rayCount !== undefined) w.zone.rayCount = editWeaponNumLines;
+    if (w.zone.numLines !== undefined) w.zone.numLines = editWeaponNumLines;
+    if (w.zone.lines !== undefined) w.zone.lines = editWeaponNumLines;
+
+    if (w.zone.angle !== undefined) {
+      w.zone.angle = (editWeaponAngle * Math.PI) / 180;
+    }
+
+    w.zone.pierceObstacles = editWeaponPierceObstacles;
+    w.zone.piercePlayers = editWeaponPiercePlayers;
+    w.zone.pierceBots = editWeaponPierceBots;
+
     closeWeaponEditModal();
     updateStats();
   };
@@ -495,6 +514,70 @@ export const App: React.FC = () => {
       </div>
 
       <div id="toolbar">
+        <div className="tool-group">
+          <h3>Мир</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              className="btn"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app) return;
+                app.clearWorld();
+                syncPlayerControls();
+                updateStats();
+              }}
+            >
+              Новый мир
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                const app = appRef.current;
+                if (!app) return;
+                const data = app.serializeWorld();
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `world_${Date.now()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Сохранить мир
+            </button>
+            <input
+              type="file"
+              ref={worldFileInputRef}
+              style={{ display: 'none' }}
+              accept=".json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                  try {
+                    const data = JSON.parse(evt.target?.result as string);
+                    const app = appRef.current;
+                    if (app) {
+                      app.deserializeWorld(data);
+                      syncPlayerControls();
+                      updateStats();
+                    }
+                  } catch {
+                    alert('Ошибка при чтении JSON файла мира!');
+                  }
+                };
+                reader.readAsText(file);
+                e.target.value = '';
+              }}
+            />
+            <button className="btn" onClick={() => worldFileInputRef.current?.click()}>
+              Загрузить мир
+            </button>
+          </div>
+        </div>
+
         <div className="tool-group">
           <h3>Управление спавном</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -915,7 +998,7 @@ export const App: React.FC = () => {
                   onChange={(e) => setEditWeaponRecoveryTime(Number(e.target.value))}
                 />
               </label>
-              {(((selectedWeaponForEdit as any).range !== undefined) || ((selectedWeaponForEdit as any).length !== undefined)) && (
+              {(((selectedWeaponForEdit as any).zone.range !== undefined) || ((selectedWeaponForEdit as any).zone.length !== undefined)) && (
                 <label>
                   Дальность / Длина:
                   <input
@@ -928,7 +1011,7 @@ export const App: React.FC = () => {
                   />
                 </label>
               )}
-              {((selectedWeaponForEdit as any).radius !== undefined) && (
+              {((selectedWeaponForEdit as any).zone.radius !== undefined) && (
                 <label>
                   Радиус:
                   <input
@@ -941,7 +1024,7 @@ export const App: React.FC = () => {
                   />
                 </label>
               )}
-              {(((selectedWeaponForEdit as any).numLines !== undefined) || ((selectedWeaponForEdit as any).lines !== undefined) || ((selectedWeaponForEdit as any).rayCount !== undefined)) && (
+              {(((selectedWeaponForEdit as any).zone.numLines !== undefined) || ((selectedWeaponForEdit as any).zone.lines !== undefined) || ((selectedWeaponForEdit as any).zone.rayCount !== undefined)) && (
                 <label>
                   Количество лучей / линий:
                   <input
@@ -954,7 +1037,7 @@ export const App: React.FC = () => {
                   />
                 </label>
               )}
-              {((selectedWeaponForEdit as any).angle !== undefined) && (
+              {((selectedWeaponForEdit as any).zone.angle !== undefined) && (
                 <label>
                   Угол (°):
                   <input
