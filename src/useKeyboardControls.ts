@@ -1,6 +1,5 @@
 import { useRef, useEffect, useCallback, MutableRefObject } from 'react';
-import { GameApp } from './GameApp';
-import { Creature } from './Creature';
+import { GameApp, EntityAdapter } from './GameApp';
 
 interface UseKeyboardControlsProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -32,7 +31,7 @@ export const useKeyboardControls = ({
   updateStats,
 }: UseKeyboardControlsProps) => {
   const keysPressedRef = useRef<Set<string>>(new Set());
-  const controlledCreatureRef = useRef<Creature | null>(null);
+  const controlledCreatureRef = useRef<EntityAdapter | null>(null);
 
   const syncPlayerControls = useCallback(() => {
     const app = appRef.current;
