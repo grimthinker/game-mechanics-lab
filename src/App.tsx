@@ -67,6 +67,9 @@ export const App: React.FC = () => {
   const [editWeaponRadius, setEditWeaponRadius] = useState<number>(0);
   const [editWeaponNumLines, setEditWeaponNumLines] = useState<number>(1);
   const [editWeaponAngle, setEditWeaponAngle] = useState<number>(0);
+  const [editWeaponPierceObstacles, setEditWeaponPierceObstacles] = useState<boolean>(false);
+  const [editWeaponPiercePlayers, setEditWeaponPiercePlayers] = useState<boolean>(false);
+  const [editWeaponPierceBots, setEditWeaponPierceBots] = useState<boolean>(false);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -193,6 +196,9 @@ export const App: React.FC = () => {
     setEditWeaponRadius(w.radius ?? 0);
     setEditWeaponNumLines(w.numLines ?? w.lines ?? w.rayCount ?? 1);
     setEditWeaponAngle(w.angle !== undefined ? Math.round((w.angle * 180) / Math.PI) : 0);
+    setEditWeaponPierceObstacles(!!w.pierceObstacles);
+    setEditWeaponPiercePlayers(!!w.piercePlayers);
+    setEditWeaponPierceBots(!!w.pierceBots);
   };
 
   const closeWeaponEditModal = () => {
@@ -213,6 +219,9 @@ export const App: React.FC = () => {
     if (w.lines !== undefined) w.lines = editWeaponNumLines;
     if (w.rayCount !== undefined) w.rayCount = editWeaponNumLines;
     if (w.angle !== undefined) w.angle = (editWeaponAngle * Math.PI) / 180;
+    w.pierceObstacles = editWeaponPierceObstacles;
+    w.piercePlayers = editWeaponPiercePlayers;
+    w.pierceBots = editWeaponPierceBots;
     closeWeaponEditModal();
     updateStats();
   };
@@ -713,6 +722,34 @@ export const App: React.FC = () => {
                     onChange={(e) => setEditWeaponAngle(Number(e.target.value))}
                   />
                 </label>
+              )}
+              {selectedWeaponForEdit && ['line', 'forward_line', 'shrapnel'].includes(selectedWeaponForEdit.hitZoneType) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={editWeaponPierceObstacles}
+                      onChange={(e) => setEditWeaponPierceObstacles(e.target.checked)}
+                    />
+                    Пробивать препятствия
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={editWeaponPiercePlayers}
+                      onChange={(e) => setEditWeaponPiercePlayers(e.target.checked)}
+                    />
+                    Пробивать игроков
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={editWeaponPierceBots}
+                      onChange={(e) => setEditWeaponPierceBots(e.target.checked)}
+                    />
+                    Пробивать ботов
+                  </label>
+                </div>
               )}
             </form>
             <div className="modal-actions">

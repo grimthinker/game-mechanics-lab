@@ -37,6 +37,9 @@ export interface WeaponConfig {
   length?: number;           // Для линий / дистанция атаки
   rayCount?: number;         // Для шрапнели
   offsetDistance?: number;   // Для выносной сферы
+  pierceObstacles?: boolean; // Проходят ли лучи сквозь статичные препятствия
+  piercePlayers?: boolean;   // Проходят ли лучи сквозь игроков
+  pierceBots?: boolean;      // Проходят ли лучи сквозь ботов
 }
 
 export interface ActiveAttack {

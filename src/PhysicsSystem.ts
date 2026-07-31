@@ -182,6 +182,107 @@ export class PhysicsSystem {
     return rayResult ? rayResult.body instanceof Line : false;
   }
 
+  private canRayReachTarget(
+    from: Point,
+    rayEnd: Point,
+    target: Creature,
+    weapon: WeaponConfig,
+    attacker: Creature
+  ): boolean {
+    let currStart = { x: from.x, y: from.y };
+    let currEnd = { x: rayEnd.x, y: rayEnd.y };
+
+    const dirX = rayEnd.x - from.x;
+    const dirY = rayEnd.y - from.y;
+    const len = Math.hypot(dirX, dirY);
+    if (len === 0) return true;
+    const ux = dirX / len;
+    const uy = dirY / len;
+
+    const maxSteps = 10;
+    for (let step = 0; step < maxSteps; step++) {
+      const rayResult = this.system.raycast(currStart, currEnd);
+
+      if (!rayResult) {
+        return true;
+      }
+
+      const hitBody = rayResult.body;
+      const hitPoint = rayResult.point;
+
+      const hitCreature = creaturesMap.get(hitBody);
+      // Игнорируем мертвых сущностей
+      if (hitCreature && (!hitCreature.isAlive || hitCreature.hp <= 0)) {
+        currStart = {
+          x: hitPoint.x + ux * 1,
+          y: hitPoint.y + uy * 1,
+        };
+        continue;
+      }
+
+      if (hitCreature === target) {
+        return true;
+      }
+
+      // Игнорируем тело атакующего при старте луча
+      if (hitCreature === attacker) {
+        const stepDist = attacker.radius + 1;
+        if (stepDist >= len) return false;
+        currStart = {
+          x: from.x + ux * stepDist,
+          y: from.y + uy * stepDist,
+        };
+        continue;
+      }
+
+      if (hitBody instanceof Line) {
+        if (weapon.pierceObstacles) {
+          currStart = {
+            x: hitPoint.x + ux * 1,
+            y: hitPoint.y + uy * 1,
+          };
+        } else {
+          return false;
+        }
+      } else if (hitCreature) {
+        if (hitCreature.type === 'player') {
+          if (weapon.piercePlayers) {
+            const distToCenter =
+              (hitCreature.position.x - from.x) * ux +
+              (hitCreature.position.y - from.y) * uy;
+            const stepDist = Math.max(0, distToCenter) + hitCreature.radius + 1;
+            if (stepDist >= len) return false;
+            currStart = {
+              x: from.x + ux * stepDist,
+              y: from.y + uy * stepDist,
+            };
+          } else {
+            return false;
+          }
+        } else if (hitCreature.type === 'ai') {
+          if (weapon.pierceBots) {
+            const distToCenter =
+              (hitCreature.position.x - from.x) * ux +
+              (hitCreature.position.y - from.y) * uy;
+            const stepDist = Math.max(0, distToCenter) + hitCreature.radius + 1;
+            if (stepDist >= len) return false;
+            currStart = {
+              x: from.x + ux * stepDist,
+              y: from.y + uy * stepDist,
+            };
+          } else {
+            return false;
+          }
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+    return false;
+  }
+
   // --- Расчет расстояния от точки до отрезка ---
 
   private getDistanceToSegment(p: Point, a: Point, b: Point): number {
@@ -252,8 +353,10 @@ export class PhysicsSystem {
             y: pos.y + Math.sin(angle) * len,
           };
           const distToLine = this.getDistanceToSegment(target.position, pos, endPoint);
-          if (distToLine <= target.radius && !this.isLineOfSightBlocked(pos, target.position)) {
-            isHit = true;
+          if (distToLine <= target.radius) {
+            if (this.canRayReachTarget(pos, endPoint, target, weapon, attacker)) {
+              isHit = true;
+            }
           }
           break;
         }
@@ -269,9 +372,11 @@ export class PhysicsSystem {
               y: pos.y + Math.sin(rayAngle) * len,
             };
             const distToRay = this.getDistanceToSegment(target.position, pos, endPoint);
-            if (distToRay <= target.radius && !this.isLineOfSightBlocked(pos, target.position)) {
-              isHit = true;
-              break;
+            if (distToRay <= target.radius) {
+              if (this.canRayReachTarget(pos, endPoint, target, weapon, attacker)) {
+                isHit = true;
+                break;
+              }
             }
           }
           break;
