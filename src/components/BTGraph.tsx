@@ -1,14 +1,14 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dagre from 'dagre';
 import { BTNodeDTO, NodeCategory, NodeStatus } from '../ai/core';
 
-const NODE_WIDTH = 190;
-const NODE_HEIGHT = 65;
+const NODE_WIDTH = 200;
+const NODE_HEIGHT = 80; // Увеличено, чтобы помещались таймер и параметры
 
 interface NodeLayout {
     id: string;
     name: string;
-    type: NodeCategory;
+    category: NodeCategory;
     status?: NodeStatus;
     x: number;
     y: number;
@@ -16,6 +16,7 @@ interface NodeLayout {
     height: number;
     description?: string;
     parameters?: Record<string, any>;
+    timeToNextTick?: number;
 }
 
 interface EdgeLayout {
@@ -104,9 +105,10 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                     id: nodeId,
                     name: orig.name,
                     description: orig.description,
-                    type: orig.category,
+                    category: orig.category,
                     status: orig.status,
                     parameters: orig.parameters,
+                    timeToNextTick: orig.timeToNextTick,
                     x: nodeData.x,
                     y: nodeData.y,
                     width: NODE_WIDTH,
@@ -132,29 +134,38 @@ export const BTGraph: React.FC<BTGraphProps> = ({
         };
     }, [tree]);
 
-    const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
-        if (!containerRef.current) return;
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
 
-        const rect = containerRef.current.getBoundingClientRect();
-        const isInside =
-            e.clientX >= rect.left &&
-            e.clientX <= rect.right &&
-            e.clientY >= rect.top &&
-            e.clientY <= rect.bottom;
+        const handleWheel = (e: WheelEvent) => {
+            e.preventDefault();
 
-        const cursorX = isInside ? e.clientX - rect.left : rect.width / 2;
-        const cursorY = isInside ? e.clientY - rect.top : rect.height / 2;
+            const rect = container.getBoundingClientRect();
+            const isInside =
+                e.clientX >= rect.left &&
+                e.clientX <= rect.right &&
+                e.clientY >= rect.top &&
+                e.clientY <= rect.bottom;
 
-        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
-        const newScale = Math.max(0.1, Math.min(5, scale * zoomFactor));
+            const cursorX = isInside ? e.clientX - rect.left : rect.width / 2;
+            const cursorY = isInside ? e.clientY - rect.top : rect.height / 2;
 
-        const newX = cursorX - (cursorX - position.x) * (newScale / scale);
-        const newY = cursorY - (cursorY - position.y) * (newScale / scale);
+            const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+            const newScale = Math.max(0.1, Math.min(5, scale * zoomFactor));
 
-        setScale(newScale);
-        setPosition({ x: newX, y: newY });
-    };
+            const newX = cursorX - (cursorX - position.x) * (newScale / scale);
+            const newY = cursorY - (cursorY - position.y) * (newScale / scale);
+
+            setScale(newScale);
+            setPosition({ x: newX, y: newY });
+        };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
+        return () => {
+            container.removeEventListener('wheel', handleWheel);
+        };
+    }, [scale, position]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button === 0) {
@@ -181,7 +192,6 @@ export const BTGraph: React.FC<BTGraphProps> = ({
     return (
         <div
             ref={containerRef}
-            onWheel={handleWheel}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -219,7 +229,11 @@ export const BTGraph: React.FC<BTGraphProps> = ({
 
                 {nodes.map(node => {
                     const isSelected = selectedNodeId === node.id;
-                    const nodeBgColor = showStatus && node.status
+                    const isService = node.category === 'service';
+
+                    const nodeBgColor = isService
+                        ? STATUS_COLORS.RUNNING
+                        : showStatus && node.status
                         ? (STATUS_COLORS[node.status] || STATUS_COLORS.IDLE)
                         : '#2a2a2a';
 
@@ -238,7 +252,7 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                                 width: node.width,
                                 height: node.height,
                                 backgroundColor: nodeBgColor,
-                                border: `2px solid ${TYPE_BORDERS[node.type] || '#fff'}`,
+                                border: `2px solid ${TYPE_BORDERS[node.category] || '#fff'}`,
                                 outline: isSelected ? '3px solid #00e676' : 'none',
                                 outlineOffset: '2px',
                                 borderRadius: '6px',
@@ -247,6 +261,8 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
+                                padding: '4px',
+                                boxSizing: 'border-box',
                                 boxShadow: isSelected
                                     ? '0 0 15px #00e676'
                                     : (showStatus && node.status === 'RUNNING') ? '0 0 12px #f57f17' : '0 2px 5px rgba(0,0,0,0.5)',
@@ -255,13 +271,46 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                                 userSelect: 'none'
                             }}
                         >
-                            <span style={{ fontWeight: 'bold', fontSize: '12px' }}>{node.name}</span>
-                            <span style={{ fontSize: '10px', opacity: 0.8, marginTop: '2px' }}>
-                                [{node.type.toUpperCase()}]{showStatus && node.status ? ` — ${node.status}` : ''}
+                            <span style={{ fontWeight: 'bold', fontSize: '12px', textAlign: 'center' }}>{node.name}</span>
+                            <span style={{ fontSize: '10px', opacity: 0.8, marginTop: '1px' }}>
+                                [{node.category.toUpperCase()}]
+
+                                    {showStatus && !isService && node.status && (
+                                    <span>
+                                        {` — ${node.status}`}
+                                    </span>
+                                )}
                             </span>
+
+                            
+
+                            {/* Время до следующего тика (для узлов-сервисов) */}
+                            {node.category === 'service' && node.timeToNextTick !== undefined && (
+                                <div style={{
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    color: '#00e5ff',
+                                    marginTop: '2px'
+                                }}>
+                                    ⏱️ {(node.timeToNextTick).toFixed(2)}s
+                                </div>
+                            )}
+
+                            {/* Параметры узла (для всех типов) */}
                             {node.parameters && Object.keys(node.parameters).length > 0 && (
-                                <div style={{ fontSize: '9px', background: 'rgba(0,0,0,0.3)', padding: '2px 4px', borderRadius: '3px', marginTop: '3px' }}>
-                                    {Object.entries(node.parameters).map(([k, v]) => `${k}: ${v}`).join(', ')}
+                                <div style={{
+                                    fontSize: '9px',
+                                    background: 'rgba(0,0,0,0.4)',
+                                    padding: '2px 4px',
+                                    borderRadius: '3px',
+                                    marginTop: '3px',
+                                    maxWidth: '95%',
+                                    whiteSpace: 'nowrap',
+                                    textOverflow: 'ellipsis'
+                                }}>
+                                    {Object.entries(node.parameters)
+                                        .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`)
+                                        .join(', ')}
                                 </div>
                             )}
                         </div>

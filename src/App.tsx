@@ -108,15 +108,38 @@ export const App: React.FC = () => {
   const [editBagHeight, setEditBagHeight] = useState<number>(4);
   const [editBagWeight, setEditBagWeight] = useState<number>(1);
   
-  const [showBTPanel, setShowBTPanel] = useState<boolean>(false);
-  const [btPanelWidth, setBtPanelWidth] = useState<number>(560);
+  // Состояния дерева поведения и памяти с восстановлением из localStorage
+  const [showBTPanel, setShowBTPanel] = useState<boolean>(() => {
+    const saved = localStorage.getItem('showBTPanel');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+  const [btPanelWidth, setBtPanelWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('btPanelWidth');
+    return saved !== null ? Number(saved) : 560;
+  });
   const [isResizingBT, setIsResizingBT] = useState<boolean>(false);
 
-  const [blackboardHeight, setBlackboardHeight] = useState<number>(280);
+  const [blackboardHeight, setBlackboardHeight] = useState<number>(() => {
+    const saved = localStorage.getItem('blackboardHeight');
+    return saved !== null ? Number(saved) : 280;
+  });
   const [isResizingBB, setIsResizingBB] = useState<boolean>(false);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
+
+  // Сохранение состояний в localStorage при их изменении
+  useEffect(() => {
+    localStorage.setItem('showBTPanel', JSON.stringify(showBTPanel));
+  }, [showBTPanel]);
+
+  useEffect(() => {
+    localStorage.setItem('btPanelWidth', btPanelWidth.toString());
+  }, [btPanelWidth]);
+
+  useEffect(() => {
+    localStorage.setItem('blackboardHeight', blackboardHeight.toString());
+  }, [blackboardHeight]);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -191,6 +214,7 @@ export const App: React.FC = () => {
     };
   }, [canvasRef, updateStats]);
 
+  // Логика изменения ширины панели дерева (ресайзер по правому краю)
   useEffect(() => {
     const handleMouseMoveResize = (e: MouseEvent) => {
       if (!isResizingBT) return;
@@ -216,7 +240,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleMouseMoveBBResize = (e: MouseEvent) => {
       if (!isResizingBB) return;
-      // Вычисляем высоту на основе движения мыши относительно низа экрана
       const newHeight = Math.max(120, Math.min(window.innerHeight - 150, window.innerHeight - e.clientY));
       setBlackboardHeight(newHeight);
     };
@@ -532,6 +555,14 @@ export const App: React.FC = () => {
       if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
         setShowBTPanel((prev) => !prev);
         e.preventDefault();
+      } else if (e.ctrlKey && (e.code === 'KeyB' || e.key.toLowerCase() === 'b')) {
+        setPendingSpawnType('ai');
+        setIsModalOpen(true);
+        e.preventDefault();
+      } else if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
+        setPendingSpawnType('player');
+        setIsModalOpen(true);
+        e.preventDefault();
       }
     };
 
@@ -671,7 +702,6 @@ export const App: React.FC = () => {
             )}
           </div>
 
-          {/* Регулятор высоты (верхняя полоса захвата для памяти бота) */}
           <div
             onMouseDown={() => setIsResizingBB(true)}
             style={{
@@ -733,7 +763,6 @@ export const App: React.FC = () => {
             )}
           </div>
 
-          {/* Ручка для изменения ширины панели мышкой (правый край) */}
           <div
             onMouseDown={() => setIsResizingBT(true)}
             style={{

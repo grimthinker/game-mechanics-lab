@@ -1,40 +1,73 @@
-// serializeBTNode.ts
+import { BTNode, BTNodeDTO, NodeStatus, BTService } from './core';
 
-import { NodeStatus, BTNode, BTNodeDTO } from './core';
+interface BTNodeConstructor {
+  nodeName?: string;
+  description?: string;
+}
 
-const KNOWN_PARAMS = ['interval', 'duration', 'engage_dist', 'condition'];
+// 2. Вспомогательные интерфейсы для сужения типов узлов с ветвлением
+interface NodeWithChildren extends BTNode {
+  children: BTNode[];
+}
+
+interface NodeWithChild extends BTNode {
+  child: BTNode;
+}
+
+// 3. Служебные ключи, которые не нужно помещать в параметры
+const IGNORED_PARAM_KEYS = new Set<string>([
+  'status',
+  'elapsedSinceLastTick',
+  'timeToNextTick',
+]);
 
 export function serializeBTNode(node: BTNode, path: string = 'root'): BTNodeDTO {
-    const children: BTNodeDTO[] = [];
+  const children: BTNodeDTO[] = [];
 
-    if ('children' in node && Array.isArray((node as any).children)) {
-        (node as any).children.forEach((child: BTNode, index: number) => {
-            children.push(serializeBTNode(child, `${path}_${index}`));
-        });
-    } else if ('child' in node && (node as any).child) {
-        children.push(serializeBTNode((node as any).child, `${path}_0`));
-    }
+  // Сбор дочерних узлов через Type Guard ('children' in node / 'child' in node)
+  if ('children' in node && Array.isArray(node.children)) {
+      node.children.forEach((child, index) => {
+      children.push(serializeBTNode(child, `${path}_${index}`));
+    });
+  } else if ('child' in node) {
+    children.push(serializeBTNode((node as NodeWithChild).child, `${path}_0`));
+  }
 
-    const rawStatus = (node as any).status ?? (node as any).lastStatus;
-    let status: BTNodeDTO['status'] = NodeStatus[NodeStatus.IDLE];
-    if (rawStatus === NodeStatus.RUNNING) status = NodeStatus[NodeStatus.RUNNING];
-    else if (rawStatus === NodeStatus.SUCCESS) status = NodeStatus[NodeStatus.SUCCESS];
-    else if (rawStatus === NodeStatus.FAILURE) status = NodeStatus[NodeStatus.FAILURE];
+  // Определение статуса без приведения к any
+  const lastStatus = 'lastStatus' in node ? node.lastStatus : undefined;
+  const status: NodeStatus = lastStatus && lastStatus in NodeStatus ? lastStatus : NodeStatus.IDLE;
 
-    const parameters: Record<string, any> = {};
-    for (const key of KNOWN_PARAMS) {
-        if (key in node && (node as any)[key] !== undefined) {
-            parameters[key] = (node as any)[key];
-        }
-    }
+  const nodeName = node.name || node.constructor.name || 'Node';
+  const description = node.description;
 
-    return {
-        id: (node as any).id || path,
-        name: (node.constructor as any).nodeName || (node as any).name || 'BTNode',
-        category: (node.constructor as any).category || (node as any).category || 'action',
-        status,
-        description: (node.constructor as any).description || (node as any).description,
-        parameters,
-        children
-    };
+  const parameters: Record<string, unknown> = {};
+
+  if ('params' in node && typeof node.params === 'object') {
+    Object.assign(parameters, node.params);
+  }
+
+//   const objRecord = node as unknown as Record<string, unknown>;
+//   for (const key of Object.keys(node)) {
+//     if (!IGNORED_PARAM_KEYS.has(key) && objRecord[key] !== undefined && typeof objRecord[key] !== 'function') {
+//       parameters[key] = objRecord[key];
+//     }
+//   }
+
+  let timeToNextTick: number | undefined = undefined;
+
+  if (node instanceof BTService) {
+    timeToNextTick = node.timeRemains
+    // console.log(timeToNextTick)
+  } 
+
+  return {
+    id: node.id || path,
+    name: nodeName,
+    category: node.category,
+    status: status,
+    description: description,
+    parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
+    timeToNextTick: timeToNextTick,
+    children: children,
+  };
 }

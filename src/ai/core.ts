@@ -22,14 +22,15 @@ export const ALL_NODE_CATEGORIES = [
 export type NodeCategory = typeof ALL_NODE_CATEGORIES[number];
 
 export interface BTNodeDTO {
-  id?: string;
-  name: string;
-  category: NodeCategory;
-  status?: NodeStatus;
-  description?: string;
-  parameters?: Record<string, any>;
-  children: BTNodeDTO[];
-}
+    id?: string;
+    name: string;
+    category: NodeCategory;
+    status?: NodeStatus;
+    description?: string;
+    parameters?: Record<string, any>;
+    timeToNextTick?: number; 
+    children: BTNodeDTO[];
+  }
 
 export interface BTMessage {
   type: 'BT_TICK';
@@ -181,6 +182,10 @@ export abstract class BTService extends BTDecorator {
       this.timeSinceLastTick = 0;
     }
     return this.child.tick(ctx);
+  }
+
+  public get timeRemains() {
+    return this.params.interval - this.timeSinceLastTick;
   }
 
   protected abstract tickService(ctx: EntityAdapter): void;
