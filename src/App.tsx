@@ -3,15 +3,24 @@ import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './useCanvasInteraction';
 import { useKeyboardControls } from './useKeyboardControls';
 import {
+  SpawnModal,
+  CreatureEditModal,
+  WeaponEditModal,
+  ArmorEditModal,
+  BagEditModal,
+} from './components/Modals';
+import {
   CreatureType,
   CreatureState,
   WeaponConfig,
   ArmorConfig,
   InventoryConfig,
   ItemData,
-  STANDARD_RADII,
   EquipSlot,
+  StandardRadius,
 } from './ecs/types';
+import { BTNodeDTO } from './ai/core';
+import { BTGraph } from './components/BTGraph';
 
 interface CreatureStats {
   type: CreatureType;
@@ -25,7 +34,6 @@ interface CreatureStats {
   maxHp: number;
   state: CreatureState;
   equipSlots: EquipSlot[];
-  // ДОБАВЛЕНО: данные инвентаря для отображения сетки
   inventory?: {
     size: { width: number; height: number };
     slots: { item: ItemData | null; count: number }[][];
@@ -34,7 +42,7 @@ interface CreatureStats {
 
 interface PlacementConfig {
   type: CreatureType;
-  radius: number;
+  radius: StandardRadius;
   mass: number;
   maxSpeed: number;
   maxTurnSpeed: number;
@@ -54,7 +62,7 @@ export const App: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType | null>(null);
-  const [radius, setRadius] = useState<number>(24);
+  const [radius, setRadius] = useState<StandardRadius>(24);
   const [mass, setMass] = useState<number>(10);
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
   const [maxTurnSpeed, setMaxTurnSpeed] = useState<number>(270);
@@ -65,7 +73,7 @@ export const App: React.FC = () => {
   const [placementConfig, setPlacementConfig] = useState<PlacementConfig | null>(null);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editRadius, setEditRadius] = useState<number>(24);
+  const [editRadius, setEditRadius] = useState<StandardRadius>(24);
   const [editMaxSpeed, setEditMaxSpeed] = useState<number>(150);
   const [editMaxTurnSpeed, setEditMaxTurnSpeed] = useState<number>(270);
   const [editHp, setEditHp] = useState<number>(100);
@@ -87,19 +95,20 @@ export const App: React.FC = () => {
   const [editWeaponPiercePlayers, setEditWeaponPiercePlayers] = useState<boolean>(false);
   const [editWeaponPierceBots, setEditWeaponPierceBots] = useState<boolean>(false);
 
-  // ДОБАВЛЕНО: состояния для редактирования брони
   const [selectedArmorForEdit, setSelectedArmorForEdit] = useState<ArmorConfig | null>(null);
   const [editArmorName, setEditArmorName] = useState<string>('');
   const [editArmorDefense, setEditArmorDefense] = useState<number>(15);
   const [editArmorFlatReduction, setEditArmorFlatReduction] = useState<number>(3);
   const [editArmorWeight, setEditArmorWeight] = useState<number>(3);
 
-  // ДОБАВЛЕНО: состояния для редактирования сумки
   const [selectedBagForEdit, setSelectedBagForEdit] = useState<InventoryConfig | null>(null);
   const [editBagName, setEditBagName] = useState<string>('');
   const [editBagWidth, setEditBagWidth] = useState<number>(6);
   const [editBagHeight, setEditBagHeight] = useState<number>(4);
   const [editBagWeight, setEditBagWeight] = useState<number>(1);
+  
+  const [showBTPanel, setShowBTPanel] = useState<boolean>(false);
+  const [btData, setBtData] = useState<BTNodeDTO | null>(null);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -124,7 +133,6 @@ export const App: React.FC = () => {
       maxHp: c.maxHp,
       state: c.state,
       equipSlots: eq ? eq.slots.map((s) => ({ ...s })) : [],
-      // ДОБАВЛЕНО: считываем состояние инвентаря
       inventory: inv
         ? {
             size: { ...inv.size },
@@ -132,11 +140,11 @@ export const App: React.FC = () => {
           }
         : undefined,
     });
+    setBtData(app.getSelectedCreatureBT());
   }, []);
 
   const { syncPlayerControls } = useKeyboardControls({
     appRef,
-    // ИЗМЕНЕНО: отключаем управление при открытых окнах настройки брони или сумки
     isModalOpen:
       isModalOpen ||
       !!selectedWeaponForEdit ||
@@ -298,7 +306,6 @@ export const App: React.FC = () => {
     updateStats();
   };
 
-  // ДОБАВЛЕНО: обработчики редактирования брони
   const openArmorEditModal = (armor: ArmorConfig) => {
     setSelectedArmorForEdit(armor);
     setEditArmorName(armor.name || '');
@@ -321,7 +328,6 @@ export const App: React.FC = () => {
     updateStats();
   };
 
-  // ДОБАВЛЕНО: обработчики редактирования сумки
   const openBagEditModal = (bag: InventoryConfig) => {
     setSelectedBagForEdit(bag);
     setEditBagName(bag.name || '');
@@ -339,7 +345,6 @@ export const App: React.FC = () => {
     selectedBagForEdit.name = editBagName;
     selectedBagForEdit.invWeight = editBagWeight;
 
-    // Изменение размера сумки разрешено только для пустого инвентаря
     const c = appRef.current?.selectedCreature;
     const isInventoryEmpty =
       !c?.inventory ||
@@ -360,7 +365,6 @@ export const App: React.FC = () => {
     updateStats();
   };
 
-  // ДОБАВЛЕНО: универсальное открытие модального окна предмета (с закрытием предыдущих)
   const openItemEditModal = (item: ItemData) => {
     if (!item.config) return;
     if (item.type === 'weapon') {
@@ -418,7 +422,6 @@ export const App: React.FC = () => {
           handleBagEditConfirm();
         }
       } else if (e.code === 'Space' || e.key === ' ') {
-        // Проверяем открытые модальные окна, чтобы не триггерить паузу при вводе текста
         if (
           isModalOpen ||
           isEditModalOpen ||
@@ -461,6 +464,23 @@ export const App: React.FC = () => {
     handleArmorEditConfirm,
     handleBagEditConfirm,
   ]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
+        return;
+      }
+
+      if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
+        setShowBTPanel((prev) => !prev);
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const getSlotTypeName = (type: string) => {
     switch (type) {
@@ -689,7 +709,6 @@ export const App: React.FC = () => {
                     <div
                       key={`${slot.type}_${index}`}
                       onClick={() => {
-                        // ИЗМЕНЕНО: открытие соответствующего окна настройки для любого экипированного предмета
                         if (hasEditableItem && item) {
                           openItemEditModal(item);
                         }
@@ -762,557 +781,164 @@ export const App: React.FC = () => {
           )}
         </div>
       </div>
-
-      {isModalOpen && (
+      {showBTPanel && (
         <div
-          className="modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeSpawnModal();
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            width: '440px',
+            height: 'calc(100vh - 32px)',
+            backgroundColor: 'rgba(20, 20, 20, 0.95)',
+            border: '2px solid #ffcc00', // Желтая рамка
+            borderRadius: '8px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
+            zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }}
         >
-          <div className="modal-backdrop" onClick={closeSpawnModal} />
-          <div className="modal-dialog">
-            <h3>Параметры нового существа</h3>
-            <p className="modal-subtitle">
-              Тип: {pendingSpawnType === 'player' ? 'Игрок' : 'Бот'}
-            </p>
-            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-              <label>
-                Радиус:
-                <select value={radius} onChange={(e) => setRadius(Number(e.target.value))}>
-                  {STANDARD_RADII.map((r) => (
-                    <option key={r} value={r}>
-                      {r} px
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Масса:
-                <input
-                  type="number"
-                  value={mass}
-                  min={1}
-                  max={100}
-                  onChange={(e) => setMass(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Макс. скорость:
-                <input
-                  type="number"
-                  value={maxSpeed}
-                  min={0}
-                  max={1000}
-                  step={10}
-                  onChange={(e) => setMaxSpeed(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Макс. скорость поворота (°/с):
-                <input
-                  type="number"
-                  value={maxTurnSpeed}
-                  min={0}
-                  max={1080}
-                  step={10}
-                  onChange={(e) => setMaxTurnSpeed(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Множитель скорости бега:
-                <input
-                  type="number"
-                  value={runSpeedMultiplier}
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  onChange={(e) => setRunSpeedMultiplier(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Множитель скорости присяда:
-                <input
-                  type="number"
-                  value={crouchSpeedMultiplier}
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  onChange={(e) => setCrouchSpeedMultiplier(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Множитель скрытности присяда:
-                <input
-                  type="number"
-                  value={crouchStealthMultiplier}
-                  min={1}
-                  max={10}
-                  step={0.1}
-                  onChange={(e) => setCrouchStealthMultiplier(Number(e.target.value))}
-                />
-              </label>
-            </form>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={closeSpawnModal}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleSpawnConfirm}>
-                Выбрать место
-              </button>
-            </div>
+          <div
+            style={{
+              padding: '10px 14px',
+              backgroundColor: '#1a1a1a',
+              borderBottom: '1px solid #333',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: '14px',
+            }}
+          >
+            <span>🌳 Дерево поведения (BT)</span>
+            <button
+              onClick={() => setShowBTPanel(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#aaa',
+                cursor: 'pointer',
+                fontSize: '16px',
+              }}
+            >
+              ✕
+            </button>
           </div>
-        </div>
-      )}
-
-      {isEditModalOpen && (
-        <div
-          className="modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeEditModal();
-          }}
-        >
-          <div className="modal-backdrop" onClick={closeEditModal} />
-          <div className="modal-dialog">
-            <h3>Изменить параметры существа</h3>
-            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-              <label>
-                Радиус:
-                <select value={editRadius} onChange={(e) => setEditRadius(Number(e.target.value))}>
-                  {STANDARD_RADII.map((r) => (
-                    <option key={r} value={r}>
-                      {r} px
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Текущее HP:
-                <input
-                  type="number"
-                  value={editHp}
-                  min={0}
-                  max={editMaxHp}
-                  onChange={(e) => setEditHp(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Макс. HP:
-                <input
-                  type="number"
-                  value={editMaxHp}
-                  min={1}
-                  max={10000}
-                  onChange={(e) => setEditMaxHp(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Макс. скорость:
-                <input
-                  type="number"
-                  value={editMaxSpeed}
-                  min={0}
-                  max={1000}
-                  step={10}
-                  onChange={(e) => setEditMaxSpeed(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Макс. скорость поворота (°/с):
-                <input
-                  type="number"
-                  value={editMaxTurnSpeed}
-                  min={0}
-                  max={1080}
-                  step={10}
-                  onChange={(e) => setEditMaxTurnSpeed(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Множитель скорости бега:
-                <input
-                  type="number"
-                  value={editRunSpeedMultiplier}
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  onChange={(e) => setEditRunSpeedMultiplier(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Множитель скорости присяда:
-                <input
-                  type="number"
-                  value={editCrouchSpeedMultiplier}
-                  min={0.1}
-                  max={10}
-                  step={0.1}
-                  onChange={(e) => setEditCrouchSpeedMultiplier(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Множитель скрытности присяда:
-                <input
-                  type="number"
-                  value={editCrouchStealthMultiplier}
-                  min={1}
-                  max={10}
-                  step={0.1}
-                  onChange={(e) => setEditCrouchStealthMultiplier(Number(e.target.value))}
-                />
-              </label>
-            </form>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={closeEditModal}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleEditConfirm}>
-                Применить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedWeaponForEdit && (
-        <div
-          className="modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeWeaponEditModal();
-          }}
-        >
-          <div className="modal-backdrop" onClick={closeWeaponEditModal} />
-          <div className="modal-dialog">
-            <h3>Изменить параметры оружия</h3>
-            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-              <label>
-                Название:
-                <input
-                  type="text"
-                  value={editWeaponName}
-                  onChange={(e) => setEditWeaponName(e.target.value)}
-                />
-              </label>
-              <label>
-                Базовый урон:
-                <input
-                  type="number"
-                  value={editWeaponDamage}
-                  min={0}
-                  max={500}
-                  onChange={(e) => setEditWeaponDamage(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Подготовка (сек):
-                <input
-                  type="number"
-                  value={editWeaponPrepTime}
-                  min={0.05}
-                  max={5}
-                  step={0.05}
-                  onChange={(e) => setEditWeaponPrepTime(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Восстановление (сек):
-                <input
-                  type="number"
-                  value={editWeaponRecoveryTime}
-                  min={0.05}
-                  max={5}
-                  step={0.05}
-                  onChange={(e) => setEditWeaponRecoveryTime(Number(e.target.value))}
-                />
-              </label>
-              {(((selectedWeaponForEdit as any).zone.range !== undefined) || ((selectedWeaponForEdit as any).zone.length !== undefined)) && (
-                <label>
-                  Дальность / Длина:
-                  <input
-                    type="number"
-                    value={editWeaponRange}
-                    min={0}
-                    max={2000}
-                    step={10}
-                    onChange={(e) => setEditWeaponRange(Number(e.target.value))}
-                  />
-                </label>
-              )}
-              {((selectedWeaponForEdit as any).zone.radius !== undefined) && (
-                <label>
-                  Радиус:
-                  <input
-                    type="number"
-                    value={editWeaponRadius}
-                    min={0}
-                    max={500}
-                    step={5}
-                    onChange={(e) => setEditWeaponRadius(Number(e.target.value))}
-                  />
-                </label>
-              )}
-              {(((selectedWeaponForEdit as any).zone.numLines !== undefined) || ((selectedWeaponForEdit as any).zone.lines !== undefined) || ((selectedWeaponForEdit as any).zone.rayCount !== undefined)) && (
-                <label>
-                  Количество лучей / линий:
-                  <input
-                    type="number"
-                    value={editWeaponNumLines}
-                    min={1}
-                    max={50}
-                    step={1}
-                    onChange={(e) => setEditWeaponNumLines(Number(e.target.value))}
-                  />
-                </label>
-              )}
-              {((selectedWeaponForEdit as any).zone.angle !== undefined) && (
-                <label>
-                  Угол (°):
-                  <input
-                    type="number"
-                    value={editWeaponAngle}
-                    min={0}
-                    max={360}
-                    step={1}
-                    onChange={(e) => setEditWeaponAngle(Number(e.target.value))}
-                  />
-                </label>
-              )}
-              {selectedWeaponForEdit && ['line', 'forward_line', 'shrapnel'].includes(selectedWeaponForEdit.zone.hitZoneType) && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={editWeaponPierceObstacles}
-                      onChange={(e) => setEditWeaponPierceObstacles(e.target.checked)}
-                    />
-                    Пробивать препятствия
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={editWeaponPiercePlayers}
-                      onChange={(e) => setEditWeaponPiercePlayers(e.target.checked)}
-                    />
-                    Пробивать игроков
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={editWeaponPierceBots}
-                      onChange={(e) => setEditWeaponPierceBots(e.target.checked)}
-                    />
-                    Пробивать ботов
-                  </label>
-                </div>
-              )}
-            </form>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={closeWeaponEditModal}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleWeaponEditConfirm}>
-                Применить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ДОБАВЛЕНО: Модальное окно для настройки Брони */}
-      {selectedArmorForEdit && (
-        <div
-          className="modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeArmorEditModal();
-          }}
-        >
-          <div className="modal-backdrop" onClick={closeArmorEditModal} />
-          <div className="modal-dialog">
-            <h3>Изменить параметры брони</h3>
-            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-              <label>
-                Название:
-                <input
-                  type="text"
-                  value={editArmorName}
-                  onChange={(e) => setEditArmorName(e.target.value)}
-                />
-              </label>
-              <label>
-                Защита:
-                <input
-                  type="number"
-                  value={editArmorDefense}
-                  min={0}
-                  max={100}
-                  onChange={(e) => setEditArmorDefense(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Поглощение урона:
-                <input
-                  type="number"
-                  value={editArmorFlatReduction}
-                  min={0}
-                  max={100}
-                  onChange={(e) => setEditArmorFlatReduction(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Вес:
-                <input
-                  type="number"
-                  value={editArmorWeight}
-                  min={0}
-                  max={100}
-                  onChange={(e) => setEditArmorWeight(Number(e.target.value))}
-                />
-              </label>
-            </form>
-            <div className="modal-actions">
-              <button type="button" className="btn" onClick={closeArmorEditModal}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleArmorEditConfirm}>
-                Применить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ДОБАВЛЕНО: Модальное окно для настройки Сумки с интерактивной сеткой инвентаря */}
-      {selectedBagForEdit && (
-        <div
-          className="modal"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeBagEditModal();
-          }}
-        >
-          <div className="modal-backdrop" onClick={closeBagEditModal} />
-          <div className="modal-dialog">
-            <h3>Изменить параметры сумки</h3>
-            <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-              <label>
-                Название:
-                <input
-                  type="text"
-                  value={editBagName}
-                  onChange={(e) => setEditBagName(e.target.value)}
-                />
-              </label>
-              <label>
-                Ширина инвентаря (ячейки):
-                <input
-                  type="number"
-                  value={editBagWidth}
-                  min={1}
-                  max={12}
-                  disabled={!isBagInventoryEmpty}
-                  onChange={(e) => setEditBagWidth(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                Высота инвентаря (ячейки):
-                <input
-                  type="number"
-                  value={editBagHeight}
-                  min={1}
-                  max={12}
-                  disabled={!isBagInventoryEmpty}
-                  onChange={(e) => setEditBagHeight(Number(e.target.value))}
-                />
-              </label>
-              {!isBagInventoryEmpty && (
-                <p style={{ fontSize: '12px', color: '#e74c3c', margin: '4px 0' }}>
-                  Размер инвентаря можно изменить только когда сумка пуста
-                </p>
-              )}
-              <label>
-                Вес:
-                <input
-                  type="number"
-                  value={editBagWeight}
-                  min={0}
-                  max={100}
-                  onChange={(e) => setEditBagWeight(Number(e.target.value))}
-                />
-              </label>
-            </form>
-
-            {/* Сетка инвентаря: при клике на предмет открывается его окно настройки */}
-            <div style={{ marginTop: '12px' }}>
-              <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>
-                Инвентарь сумки (нажмите на предмет для настройки):
-              </h4>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${
-                    selectedStats?.inventory?.size.width || editBagWidth
-                  }, 38px)`,
-                  gap: '4px',
-                  justifyContent: 'center',
-                  backgroundColor: '#111',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #333',
-                  maxHeight: '260px',
-                  overflowY: 'auto',
-                }}
-              >
-                {(
-                  selectedStats?.inventory?.slots ||
-                  Array.from({ length: editBagHeight }, () =>
-                    Array.from({ length: editBagWidth }, () => ({ item: null, count: 0 }))
-                  )
-                ).map((row, rIdx) =>
-                  row.map((cell, cIdx) => {
-                    const item = cell.item;
-                    return (
-                      <div
-                        key={`${rIdx}_${cIdx}`}
-                        onClick={() => {
-                          if (item) openItemEditModal(item);
-                        }}
-                        title={item ? `${item.name} (${item.type})` : 'Пустая ячейка'}
-                        style={{
-                          width: '38px',
-                          height: '38px',
-                          backgroundColor: item ? '#2980b9' : '#222',
-                          border: '1px solid #444',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: item ? 'pointer' : 'default',
-                          fontSize: '10px',
-                          color: '#fff',
-                          textAlign: 'center',
-                          padding: '2px',
-                          overflow: 'hidden',
-                          userSelect: 'none',
-                        }}
-                      >
-                        {item ? item.name.substring(0, 5) : ''}
-                      </div>
-                    );
-                  })
-                )}
+          <div style={{ flex: 1, overflow: 'auto', position: 'relative', padding: '10px' }}>
+            {btData ? (
+              <BTGraph tree={btData} showStatus={true} />
+            ) : (
+              <div style={{ color: '#aaa', padding: '20px', textAlign: 'center', fontSize: '13px' }}>
+                У выбранного существа нет дерева поведения
               </div>
-            </div>
-
-            <div className="modal-actions" style={{ marginTop: '16px' }}>
-              <button type="button" className="btn" onClick={closeBagEditModal}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn-primary" onClick={handleBagEditConfirm}>
-                Применить
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
+      <SpawnModal
+        isOpen={isModalOpen}
+        pendingSpawnType={pendingSpawnType}
+        radius={radius}
+        setRadius={setRadius}
+        mass={mass}
+        setMass={setMass}
+        maxSpeed={maxSpeed}
+        setMaxSpeed={setMaxSpeed}
+        maxTurnSpeed={maxTurnSpeed}
+        setMaxTurnSpeed={setMaxTurnSpeed}
+        runSpeedMultiplier={runSpeedMultiplier}
+        setRunSpeedMultiplier={setRunSpeedMultiplier}
+        crouchSpeedMultiplier={crouchSpeedMultiplier}
+        setCrouchSpeedMultiplier={setCrouchSpeedMultiplier}
+        crouchStealthMultiplier={crouchStealthMultiplier}
+        setCrouchStealthMultiplier={setCrouchStealthMultiplier}
+        onClose={closeSpawnModal}
+        onConfirm={handleSpawnConfirm}
+      />
+
+      <CreatureEditModal
+        isOpen={isEditModalOpen}
+        editRadius={editRadius}
+        setEditRadius={setEditRadius}
+        editHp={editHp}
+        setEditHp={setEditHp}
+        editMaxHp={editMaxHp}
+        setEditMaxHp={setEditMaxHp}
+        editMaxSpeed={editMaxSpeed}
+        setEditMaxSpeed={setEditMaxSpeed}
+        editMaxTurnSpeed={editMaxTurnSpeed}
+        setEditMaxTurnSpeed={setEditMaxTurnSpeed}
+        editRunSpeedMultiplier={editRunSpeedMultiplier}
+        setEditRunSpeedMultiplier={setEditRunSpeedMultiplier}
+        editCrouchSpeedMultiplier={editCrouchSpeedMultiplier}
+        setEditCrouchSpeedMultiplier={setEditCrouchSpeedMultiplier}
+        editCrouchStealthMultiplier={editCrouchStealthMultiplier}
+        setEditCrouchStealthMultiplier={setEditCrouchStealthMultiplier}
+        onClose={closeEditModal}
+        onConfirm={handleEditConfirm}
+      />
+
+      <WeaponEditModal
+        selectedWeaponForEdit={selectedWeaponForEdit}
+        editWeaponName={editWeaponName}
+        setEditWeaponName={setEditWeaponName}
+        editWeaponDamage={editWeaponDamage}
+        setEditWeaponDamage={setEditWeaponDamage}
+        editWeaponPrepTime={editWeaponPrepTime}
+        setEditWeaponPrepTime={setEditWeaponPrepTime}
+        editWeaponRecoveryTime={editWeaponRecoveryTime}
+        setEditWeaponRecoveryTime={setEditWeaponRecoveryTime}
+        editWeaponRange={editWeaponRange}
+        setEditWeaponRange={setEditWeaponRange}
+        editWeaponRadius={editWeaponRadius}
+        setEditWeaponRadius={setEditWeaponRadius}
+        editWeaponNumLines={editWeaponNumLines}
+        setEditWeaponNumLines={setEditWeaponNumLines}
+        editWeaponAngle={editWeaponAngle}
+        setEditWeaponAngle={setEditWeaponAngle}
+        editWeaponPierceObstacles={editWeaponPierceObstacles}
+        setEditWeaponPierceObstacles={setEditWeaponPierceObstacles}
+        editWeaponPiercePlayers={editWeaponPiercePlayers}
+        setEditWeaponPiercePlayers={setEditWeaponPiercePlayers}
+        editWeaponPierceBots={editWeaponPierceBots}
+        setEditWeaponPierceBots={setEditWeaponPierceBots}
+        onClose={closeWeaponEditModal}
+        onConfirm={handleWeaponEditConfirm}
+      />
+
+      <ArmorEditModal
+        selectedArmorForEdit={selectedArmorForEdit}
+        editArmorName={editArmorName}
+        setEditArmorName={setEditArmorName}
+        editArmorDefense={editArmorDefense}
+        setEditArmorDefense={setEditArmorDefense}
+        editArmorFlatReduction={editArmorFlatReduction}
+        setEditArmorFlatReduction={setEditArmorFlatReduction}
+        editArmorWeight={editArmorWeight}
+        setEditArmorWeight={setEditArmorWeight}
+        onClose={closeArmorEditModal}
+        onConfirm={handleArmorEditConfirm}
+      />
+
+      <BagEditModal
+        selectedBagForEdit={selectedBagForEdit}
+        editBagName={editBagName}
+        setEditBagName={setEditBagName}
+        editBagWidth={editBagWidth}
+        setEditBagWidth={setEditBagWidth}
+        editBagHeight={editBagHeight}
+        setEditBagHeight={setEditBagHeight}
+        editBagWeight={editBagWeight}
+        setEditBagWeight={setEditBagWeight}
+        isBagInventoryEmpty={isBagInventoryEmpty}
+        inventorySlots={selectedStats?.inventory?.slots}
+        inventorySize={selectedStats?.inventory?.size}
+        onItemClick={openItemEditModal}
+        onClose={closeBagEditModal}
+        onConfirm={handleBagEditConfirm}
+      />
     </div>
   );
 };

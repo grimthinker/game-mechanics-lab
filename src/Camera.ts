@@ -1,11 +1,11 @@
 import { Point } from './types';
 
 export class Camera {
-  public scale: number = 1;
+  public scale: number = 1.5;
   public offsetX: number = 0;
   public offsetY: number = 0;
-  public readonly minScale: number = 0.25;
-  public readonly maxScale: number = 4;
+  public readonly minScale: number = 0.15;
+  public readonly maxScale: number = 6;
 
   private isPanning: boolean = false;
   private panStartX: number = 0;

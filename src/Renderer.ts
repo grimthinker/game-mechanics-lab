@@ -72,7 +72,6 @@ export class Renderer {
   private renderEntities(world: World, camera: Camera, selectedId: EntityId | null): void {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
 
-    // ИЗМЕНЕНО: Метод отрисовки только тела существа (без полоски здоровья и текста ID)
     const renderBody = (
       id: EntityId,
       transform: any,
@@ -130,14 +129,12 @@ export class Renderer {
 
       this.ctx.beginPath();
       const arrowLen = phys.radius;
-      const headLen = 12;
-      const headWidth = headLen * 1;
 
       this.ctx.moveTo(arrowLen, 0);
-      this.ctx.lineTo(arrowLen - headLen, -headWidth);
+      this.ctx.lineTo(0, -arrowLen);
       this.ctx.moveTo(arrowLen, 0);
-      this.ctx.lineTo(arrowLen - headLen, headWidth);
-      this.ctx.lineTo(arrowLen - headLen, -headWidth);
+      this.ctx.lineTo(0, arrowLen);
+      this.ctx.lineTo(0, -arrowLen);
 
       this.ctx.strokeStyle = '#f1c40f';
       this.ctx.lineWidth = 2 / camera.scale;
@@ -147,7 +144,6 @@ export class Renderer {
       this.ctx.restore();
     };
 
-    // 1. Мертвые существа (нижний слой)
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -160,7 +156,6 @@ export class Renderer {
       }
     }
 
-    // 2. Живые существа (базовый слой существ)
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;

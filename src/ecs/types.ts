@@ -1,5 +1,6 @@
 import { Circle } from 'detect-collisions';
 import { Point } from '../types';
+import { BTLogicComponent } from '../ai/core';
 
 export type EntityId = string;
 
@@ -11,7 +12,7 @@ export interface TransformComponent {
 
 export interface PhysicsBodyComponent {
   body: Circle;
-  radius: number;
+  radius: StandardRadius;
   mass: number;
   isStatic: boolean;
 }
@@ -122,6 +123,7 @@ export interface EntityComponents {
   health?: HealthComponent;
   stealth?: StealthComponent;
   stats?: StatsComponent;
+  brain?: BTLogicComponent;
   inventory?: InventoryComponent;
   equip?: EquipComponent;
   activeAttacks?: ActiveAttackComponent;
@@ -131,7 +133,7 @@ export interface EntityComponents {
 
 export type CreatureType = 'player' | 'ai';
 
-export const STANDARD_RADII = [12, 16, 24, 32] as const;
+export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
 
 export type CreatureState = 'idle' | 'moving' | 'running' | 'crouching' | 'attacking' | 'dead';
@@ -222,3 +224,11 @@ export interface IMovable {
   startCrouching(): void;
   stopCrouching(): void;
 }
+
+export interface EntityController {
+    stop: () => boolean;
+    look_in_dir: (angle: number) => boolean;
+    look_at_pos: (target_pos: Point) => boolean;
+    attack: (id_target?: string) => boolean;
+    getPos: () => Point;
+  }
