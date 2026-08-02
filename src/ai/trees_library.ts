@@ -38,7 +38,7 @@ export function AttackerTree(): BTNode {
                     new BTActionPatrol(),
                     new BTWait({duration: 1})
                 ])
-            ]), { interval: 0.5 }
-        ), { interval: 0.2 }
+            ]), { interval: 1.2 }
+        ), { interval: 0.5 }
     );
 }

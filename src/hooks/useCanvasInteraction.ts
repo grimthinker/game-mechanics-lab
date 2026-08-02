@@ -1,6 +1,6 @@
 import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react';
-import { GameApp } from './GameApp';
-import { CreatureType, StandardRadius } from './ecs/types';
+import { GameApp } from '../GameApp';
+import { CreatureType, StandardRadius } from '../ecs/types';
 
 interface PlacementConfig {
   type: CreatureType;
@@ -34,6 +34,9 @@ export const useCanvasInteraction = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // Устанавливаем начальный курсор 'grab' при монтировании, если канвас в фокусе
+    canvas.style.cursor = 'grab';
+
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       appRef.current?.zoomAt(e.clientX, e.clientY, e.deltaY);
@@ -49,12 +52,30 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (e.button === 0 && app) {
       app.startPan(e.clientX, e.clientY);
+      e.currentTarget.style.cursor = 'grabbing';
     }
   };
 
   const handleMouseMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
-    if (appRef.current) {
-      appRef.current.pan(e.clientX, e.clientY);
+    const app = appRef.current;
+    if (!app) return;
+
+    app.pan(e.clientX, e.clientY);
+
+    // Если зажата левая кнопка мыши (идёт перемещение камеры / панорамирование)
+    if (e.buttons === 1) {
+      e.currentTarget.style.cursor = 'grabbing';
+      return;
+    }
+
+    // Проверяем, находится ли под курсором существо
+    const point = app.getCanvasPoint(e.clientX, e.clientY);
+    const creature = app.pickCreatureAt(point);
+
+    if (creature) {
+      e.currentTarget.style.cursor = 'pointer';
+    } else {
+      e.currentTarget.style.cursor = 'grab';
     }
   };
 
@@ -82,6 +103,11 @@ export const useCanvasInteraction = ({
         syncPlayerControls();
         updateStats();
       }
+      
+      // Корректно возвращаем курсор после отпускания мыши
+      const point = app.getCanvasPoint(e.clientX, e.clientY);
+      const creature = app.pickCreatureAt(point);
+      e.currentTarget.style.cursor = creature ? 'pointer' : 'grab';
       return;
     }
 
@@ -92,10 +118,18 @@ export const useCanvasInteraction = ({
       syncPlayerControls();
       updateStats();
     }
+
+    // Корректно возвращаем курсор после отпускания мыши
+    const point = app.getCanvasPoint(e.clientX, e.clientY);
+    const creature = app.pickCreatureAt(point);
+    e.currentTarget.style.cursor = creature ? 'pointer' : 'grab';
   };
 
   const handleMouseLeave = () => {
     appRef.current?.endPan();
+    if (canvasRef.current) {
+      canvasRef.current.style.cursor = 'default';
+    }
   };
 
   return {

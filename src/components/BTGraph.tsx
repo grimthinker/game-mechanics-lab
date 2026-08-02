@@ -17,6 +17,7 @@ interface NodeLayout {
     description?: string;
     parameters?: Record<string, any>;
     timeToNextTick?: number;
+    originalNode: BTNodeDTO;
 }
 
 interface EdgeLayout {
@@ -28,7 +29,7 @@ interface EdgeLayout {
 interface BTGraphProps {
     tree: BTNodeDTO;
     selectedNodeId?: string | null;
-    onNodeSelect?: (nodeId: string) => void;
+    onNodeSelect?: (node: BTNodeDTO) => void;
     showStatus?: boolean;
 }
 
@@ -109,6 +110,7 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                     status: orig.status,
                     parameters: orig.parameters,
                     timeToNextTick: orig.timeToNextTick,
+                    originalNode: orig,
                     x: nodeData.x,
                     y: nodeData.y,
                     width: NODE_WIDTH,
@@ -242,7 +244,7 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                             key={node.id}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (onNodeSelect) onNodeSelect(node.id);
+                                if (onNodeSelect) onNodeSelect(node.originalNode);
                             }}
                             title={node.description ? node.description : node.name}
                             style={{
@@ -281,8 +283,6 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                                     </span>
                                 )}
                             </span>
-
-                            
 
                             {/* Время до следующего тика (для узлов-сервисов) */}
                             {node.category === 'service' && node.timeToNextTick !== undefined && (

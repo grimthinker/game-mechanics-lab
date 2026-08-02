@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, MutableRefObject } from 'react';
-import { GameApp, EntityAdapter } from './GameApp';
+import { GameApp, EntityAdapter } from '../GameApp';
 
 interface UseKeyboardControlsProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -90,13 +90,15 @@ export const useKeyboardControls = ({
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
       const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
-        const player = controlledCreatureRef.current;
-        if (player && player.isAlive && player.hp > 0) {
-          player.attack();
-          updateStats();
-        }
-        e.preventDefault();
-        return;
+        if (!e.ctrlKey && !e.metaKey) {
+            const player = controlledCreatureRef.current;
+            if (player && player.isAlive && player.hp > 0) {
+              player.attack();
+              updateStats();
+            }
+            e.preventDefault();
+            return;
+          }
       }
 
       if (!CONTROL_KEYS.has(key) || keysPressedRef.current.has(key)) return;
