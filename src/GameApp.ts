@@ -357,11 +357,4 @@ export class GameApp {
   public loadObstaclesFromData(segments: ObstacleSegment[]): void {
     this.physics.loadObstacles(segments);
   }
-  public getSelectedCreatureBT(): BTNodeDTO | null {
-    if (!this.selectedCreature) return null;
-    const brain = this.world.getComponent(this.selectedCreature.id, 'brain');
-    // console.log(brain)
-    if (!brain || !brain.root_node) return null;
-    return serializeBTNode(brain.root_node);
-  }
 }

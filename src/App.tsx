@@ -21,6 +21,7 @@ import {
 } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { BTGraph } from './components/BTGraph';
+import { serializeBTNode } from './ai/serializer';
 
 interface CreatureStats {
   type: CreatureType;
@@ -108,12 +109,18 @@ export const App: React.FC = () => {
   const [editBagWeight, setEditBagWeight] = useState<number>(1);
   
   const [showBTPanel, setShowBTPanel] = useState<boolean>(false);
+  const [btPanelWidth, setBtPanelWidth] = useState<number>(560); // Увеличена начальная ширина
+  const [isResizingBT, setIsResizingBT] = useState<boolean>(false);
+
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
+  const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
     if (!app || !app.selectedCreature) {
       setSelectedStats(null);
+      setBtData(null);
+      setBtBlackboard(null);
       return;
     }
 
@@ -140,7 +147,9 @@ export const App: React.FC = () => {
           }
         : undefined,
     });
-    setBtData(app.getSelectedCreatureBT());
+
+    setBtData((!c.brain || !c.brain.root_node) ? null : serializeBTNode(c.brain.root_node));
+    setBtBlackboard((!c.brain) ? null : c.brain.blackboard);
   }, []);
 
   const { syncPlayerControls } = useKeyboardControls({
@@ -178,6 +187,28 @@ export const App: React.FC = () => {
       appRef.current = null;
     };
   }, [canvasRef, updateStats]);
+
+  useEffect(() => {
+    const handleMouseMoveResize = (e: MouseEvent) => {
+      if (!isResizingBT) return;
+      const newWidth = Math.max(350, Math.min(window.innerWidth - 300, e.clientX));
+      setBtPanelWidth(newWidth);
+    };
+
+    const handleMouseUpResize = () => {
+      setIsResizingBT(false);
+    };
+
+    if (isResizingBT) {
+      window.addEventListener('mousemove', handleMouseMoveResize);
+      window.addEventListener('mouseup', handleMouseUpResize);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMoveResize);
+      window.removeEventListener('mouseup', handleMouseUpResize);
+    };
+  }, [isResizingBT]);
 
   const togglePause = useCallback(() => {
     const app = appRef.current;
@@ -560,6 +591,113 @@ export const App: React.FC = () => {
         )}
       </div>
 
+      {showBTPanel && (
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: `${btPanelWidth}px`,
+            height: '100%',
+            backgroundColor: '#181818',
+            borderLeft: '1px solid #333',
+            borderRight: '1px solid #333',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flexShrink: 0,
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              padding: '10px 14px',
+              backgroundColor: '#1a1a1a',
+              borderBottom: '1px solid #333',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              color: '#fff',
+              fontWeight: 'bold',
+              fontSize: '14px',
+            }}
+          >
+            <span>🌳 Дерево поведения (BT)</span>
+            <button
+              onClick={() => setShowBTPanel(false)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#aaa',
+                cursor: 'pointer',
+                fontSize: '16px',
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', position: 'relative', padding: '10px' }}>
+            {btData ? (
+              <BTGraph tree={btData} showStatus={true} />
+            ) : (
+              <div style={{ color: '#aaa', padding: '20px', textAlign: 'center', fontSize: '13px' }}>
+                У выбранного существа нет дерева поведения
+              </div>
+            )}
+          </div>
+
+          <div
+            style={{
+              padding: '12px 14px',
+              backgroundColor: '#141414',
+              borderTop: '1px solid #333',
+              flex: '0 0 280px', // Увеличенная фиксированная высота окна памяти
+              overflowY: 'auto',
+              fontFamily: 'monospace',
+              fontSize: '12px',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                color: '#ffcc00',
+                marginBottom: '8px',
+                fontSize: '13px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>🧠 Память бота (Blackboard)</span>
+            </div>
+            {btBlackboard && Object.keys(btBlackboard).length > 0 ? (
+              Object.entries(btBlackboard).map(([key, value]) => (
+                <div
+                  key={key}
+                  style={{
+                    borderBottom: '1px solid #2a2a2a',
+                    padding: '4px 0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: '10px',
+                  }}
+                >
+                  <span style={{ color: '#64b5f6' }}>{key}:</span>
+                  <span style={{ color: '#a5d6a7', wordBreak: 'break-all', textAlign: 'right' }}>
+                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ color: '#777', fontStyle: 'italic', padding: '4px 0' }}>
+                Память пуста или недоступна
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div id="toolbar">
         <div className="tool-group">
           <h3>Мир</h3>
@@ -772,71 +910,18 @@ export const App: React.FC = () => {
               <li><kbd>LShift</kbd> Бег (удержание)</li>
               <li><kbd>C</kbd> Полуприсяд (удержание)</li>
               <li><kbd>Пробел</kbd> Атака оружием</li>
+              <li><kbd>U</kbd> Дерево поведения (BT)</li>
               <li><kbd>LCtrl</kbd> + <kbd>Пробел</kbd> Пауза / Возобновление</li>
             </ul>
           ) : (
             <ul className="control-keys">
+              <li><kbd>U</kbd> Дерево поведения (BT)</li>
               <li><kbd>Пробел</kbd> Пауза / Возобновление симуляции</li>
             </ul>
           )}
         </div>
       </div>
-      {showBTPanel && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            width: '440px',
-            height: 'calc(100vh - 32px)',
-            backgroundColor: 'rgba(20, 20, 20, 0.95)',
-            border: '2px solid #ffcc00', // Желтая рамка
-            borderRadius: '8px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.6)',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              padding: '10px 14px',
-              backgroundColor: '#1a1a1a',
-              borderBottom: '1px solid #333',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              color: '#fff',
-              fontWeight: 'bold',
-              fontSize: '14px',
-            }}
-          >
-            <span>🌳 Дерево поведения (BT)</span>
-            <button
-              onClick={() => setShowBTPanel(false)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#aaa',
-                cursor: 'pointer',
-                fontSize: '16px',
-              }}
-            >
-              ✕
-            </button>
-          </div>
-          <div style={{ flex: 1, overflow: 'auto', position: 'relative', padding: '10px' }}>
-            {btData ? (
-              <BTGraph tree={btData} showStatus={true} />
-            ) : (
-              <div style={{ color: '#aaa', padding: '20px', textAlign: 'center', fontSize: '13px' }}>
-                У выбранного существа нет дерева поведения
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+
       <SpawnModal
         isOpen={isModalOpen}
         pendingSpawnType={pendingSpawnType}
