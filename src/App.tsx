@@ -109,8 +109,11 @@ export const App: React.FC = () => {
   const [editBagWeight, setEditBagWeight] = useState<number>(1);
   
   const [showBTPanel, setShowBTPanel] = useState<boolean>(false);
-  const [btPanelWidth, setBtPanelWidth] = useState<number>(560); // Увеличена начальная ширина
+  const [btPanelWidth, setBtPanelWidth] = useState<number>(560);
   const [isResizingBT, setIsResizingBT] = useState<boolean>(false);
+
+  const [blackboardHeight, setBlackboardHeight] = useState<number>(280);
+  const [isResizingBB, setIsResizingBB] = useState<boolean>(false);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
@@ -149,7 +152,7 @@ export const App: React.FC = () => {
     });
 
     setBtData((!c.brain || !c.brain.root_node) ? null : serializeBTNode(c.brain.root_node));
-    setBtBlackboard((!c.brain) ? null : c.brain.blackboard);
+    setBtBlackboard((!c.brain) ? null : c.brain.blackboard.getData());
   }, []);
 
   const { syncPlayerControls } = useKeyboardControls({
@@ -209,6 +212,29 @@ export const App: React.FC = () => {
       window.removeEventListener('mouseup', handleMouseUpResize);
     };
   }, [isResizingBT]);
+
+  useEffect(() => {
+    const handleMouseMoveBBResize = (e: MouseEvent) => {
+      if (!isResizingBB) return;
+      // Вычисляем высоту на основе движения мыши относительно низа экрана
+      const newHeight = Math.max(120, Math.min(window.innerHeight - 150, window.innerHeight - e.clientY));
+      setBlackboardHeight(newHeight);
+    };
+
+    const handleMouseUpBBResize = () => {
+      setIsResizingBB(false);
+    };
+
+    if (isResizingBB) {
+      window.addEventListener('mousemove', handleMouseMoveBBResize);
+      window.addEventListener('mouseup', handleMouseUpBBResize);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMoveBBResize);
+      window.removeEventListener('mouseup', handleMouseUpBBResize);
+    };
+  }, [isResizingBB]);
 
   const togglePause = useCallback(() => {
     const app = appRef.current;
@@ -599,15 +625,13 @@ export const App: React.FC = () => {
             top: 0,
             bottom: 0,
             width: `${btPanelWidth}px`,
-            height: '100%',
             backgroundColor: '#181818',
-            borderLeft: '1px solid #333',
             borderRight: '1px solid #333',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            flexShrink: 0,
-            zIndex: 10,
+            zIndex: 100,
+            boxShadow: '4px 0 15px rgba(0,0,0,0.5)',
           }}
         >
           <div
@@ -647,12 +671,25 @@ export const App: React.FC = () => {
             )}
           </div>
 
+          {/* Регулятор высоты (верхняя полоса захвата для памяти бота) */}
+          <div
+            onMouseDown={() => setIsResizingBB(true)}
+            style={{
+              height: '6px',
+              backgroundColor: isResizingBB ? '#2196f3' : '#2a2a2a',
+              cursor: 'row-resize',
+              transition: 'background-color 0.2s',
+              borderTop: '1px solid #3a3a3a',
+              borderBottom: '1px solid #111',
+            }}
+            title="Зажмите и перетащите для изменения высоты окна памяти"
+          />
+
           <div
             style={{
               padding: '12px 14px',
               backgroundColor: '#141414',
-              borderTop: '1px solid #333',
-              flex: '0 0 280px', // Увеличенная фиксированная высота окна памяти
+              flex: `0 0 ${blackboardHeight}px`,
               overflowY: 'auto',
               fontFamily: 'monospace',
               fontSize: '12px',
@@ -677,7 +714,7 @@ export const App: React.FC = () => {
                   key={key}
                   style={{
                     borderBottom: '1px solid #2a2a2a',
-                    padding: '4px 0',
+                    padding: '6px 0',
                     display: 'flex',
                     justifyContent: 'space-between',
                     gap: '10px',
@@ -695,6 +732,22 @@ export const App: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* Ручка для изменения ширины панели мышкой (правый край) */}
+          <div
+            onMouseDown={() => setIsResizingBT(true)}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: '6px',
+              cursor: 'col-resize',
+              backgroundColor: isResizingBT ? '#2196f3' : 'transparent',
+              transition: 'background-color 0.2s',
+            }}
+            title="Зажмите и перетащите для изменения ширины"
+          />
         </div>
       )}
 
