@@ -13,7 +13,7 @@ export class BTServiceFindNearestTarget extends BTService {
   };
 
   protected override params: typeof BTServiceFindNearestTarget.defaultParams = {
-    interval: LOGIC_CONFIG.min_path_request_interval,
+    interval: LOGIC_CONFIG.findNewTargetInterval,
   };
 
   constructor(
@@ -106,12 +106,7 @@ export class BTServicePathUpdater extends BTService {
 
   public static readonly defaultParams = {
     ...BTService.defaultParams,
-    minIntervalDt: 0.2,
-    maxIntervalDt: 2.0,
-    maxDistanceCalc: 50,
-    pushedDistance: 5,
-    minTargetMoveThreshold: 1.0,
-    maxTargetMoveThreshold: 10.0,
+    ...LOGIC_CONFIG.pathUpdaterParams
   };
 
   protected override params: typeof BTServicePathUpdater.defaultParams;

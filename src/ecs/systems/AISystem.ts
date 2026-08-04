@@ -46,12 +46,10 @@ export class AISystem {
   private getAllAIEntities(): EntityAdapter[] {
     const result: EntityAdapter[] = [];
     const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'stats', 'health');
-
-    for (const [id, comp] of entities) {
-      if (comp.meta.type === 'ai') {
-        const adapter = this.getEntityAdapter(id);
-        if (adapter) result.push(adapter);
-      }
+  
+    for (const [id] of entities) {
+      const adapter = this.getEntityAdapter(id);
+      if (adapter) result.push(adapter);
     }
     return result;
   }

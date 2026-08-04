@@ -12,13 +12,15 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType | null>(null);
   
   // Параметры спавна
-  const [radius, setRadius] = useState<StandardRadius>(24);
+  const [radius, setRadius] = useState<StandardRadius>(16);
   const [mass, setMass] = useState<number>(10);
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
   const [maxTurnSpeed, setMaxTurnSpeed] = useState<number>(270);
   const [runSpeedMultiplier, setRunSpeedMultiplier] = useState<number>(1.5);
   const [crouchSpeedMultiplier, setCrouchSpeedMultiplier] = useState<number>(0.5);
   const [crouchStealthMultiplier, setCrouchStealthMultiplier] = useState<number>(1.5);
+  const [runTurnMultiplier, setRunTurnMultiplier] = useState<number>(0.8);
+  const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(1.2);
 
   // Редактирование существа
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -30,6 +32,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [editRunSpeedMultiplier, setEditRunSpeedMultiplier] = useState<number>(1.5);
   const [editCrouchSpeedMultiplier, setEditCrouchSpeedMultiplier] = useState<number>(0.5);
   const [editCrouchStealthMultiplier, setEditCrouchStealthMultiplier] = useState<number>(1.5);
+  const [editRunTurnMultiplier, setEditRunTurnMultiplier] = useState<number>(0.8);
+  const [editCrouchTurnMultiplier, setEditCrouchTurnMultiplier] = useState<number>(1.2);
 
   // Редактирование оружия
   const [selectedWeaponForEdit, setSelectedWeaponForEdit] = useState<WeaponConfig | null>(null);
@@ -241,6 +245,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     runSpeedMultiplier, setRunSpeedMultiplier,
     crouchSpeedMultiplier, setCrouchSpeedMultiplier,
     crouchStealthMultiplier, setCrouchStealthMultiplier,
+    runTurnMultiplier, setRunTurnMultiplier,
+    crouchTurnMultiplier, setCrouchTurnMultiplier,
     openSpawnModal, closeSpawnModal,
 
     isEditModalOpen,
@@ -252,6 +258,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     editRunSpeedMultiplier, setEditRunSpeedMultiplier,
     editCrouchSpeedMultiplier, setEditCrouchSpeedMultiplier,
     editCrouchStealthMultiplier, setEditCrouchStealthMultiplier,
+    editRunTurnMultiplier, setEditRunTurnMultiplier,
+    editCrouchTurnMultiplier, setEditCrouchTurnMultiplier,
     openEditModal, closeEditModal, handleEditConfirm,
 
     selectedWeaponForEdit, editWeaponName, setEditWeaponName,

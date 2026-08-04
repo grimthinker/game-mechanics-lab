@@ -44,30 +44,41 @@ export class MovementSystem {
       } else if (input.isCrouching) {
         speedMult = stats.crouchSpeedMultiplier.current;
       }
-
       velocity.currentSpeed = (input.isMovingForward ? stats.maxSpeed.current * speedMult : 0) * moveSlow;
-      velocity.currentTurnSpeed = input.turningDirection * stats.maxTurnSpeed.current * turnSlow;
 
-      // 4. Поворот
+      // 4. Множитель поворота
+      let turnMult = 1;
+      if (input.isRunning) {
+        turnMult = stats.runTurnMultiplier.current;
+      } else if (input.isCrouching) {
+        turnMult = stats.crouchTurnMultiplier.current;
+      }
+
+      // 5. Ограничение скорости поворота максимальным значением скорости поворота игрока
+      const turnSpeed = Math.min(stats.maxTurnSpeed.current, input.turnSpeed);
+
+      velocity.currentTurnSpeed = input.turnDirection * turnSpeed * turnSlow * turnMult;
+
+      // 6. Поворот
       if (velocity.currentTurnSpeed !== 0) {
         transform.angle += velocity.currentTurnSpeed * dt;
       }
 
-      // 5. Движение
+      // 7. Движение
       if (velocity.currentSpeed > 0) {
         const dx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
         const dy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
         physics.moveEntitySafe(world, id, dx, dy);
       }
 
-      // 6. Обновление состояния
+      // 8. Обновление состояния
       if (activeAttacks.attacks.length > 0) {
         meta.state = 'attacking';
-      } else if (input.isRunning && (input.isMovingForward || input.turningDirection !== 0)) {
+      } else if (input.isRunning && (input.isMovingForward || input.turnDirection !== 0)) {
         meta.state = 'running';
-      } else if (input.isCrouching && (input.isMovingForward || input.turningDirection !== 0)) {
+      } else if (input.isCrouching && (input.isMovingForward || input.turnDirection !== 0)) {
         meta.state = 'crouching';
-      } else if (input.isMovingForward || input.turningDirection !== 0) {
+      } else if (input.isMovingForward || input.turnDirection !== 0) {
         meta.state = 'moving';
       } else {
         meta.state = 'idle';

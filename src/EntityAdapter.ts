@@ -33,6 +33,14 @@ export class EntityAdapter implements IMovable, EntityController {
   public get state(): CreatureState {
     return this.world.getComponent(this.id, 'meta')!.state;
   }
+  public get pos(): Point {
+    const transform = this.world.getComponent(this.id, 'transform');
+      return transform ? {x: transform.x, y: transform.y} : {x: 0, y: 0};
+  }
+  public get angle(): number {
+    const transform = this.world.getComponent(this.id, 'transform');
+    return transform ? transform.angle : 0;
+  }
   public get radius(): StandardRadius {
     return this.world.getComponent(this.id, 'physicsBody')!.radius;
   }
@@ -102,14 +110,20 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.world.getComponent(this.id, 'input');
     if (input) input.isMovingForward = false;
   }
-  public startTurning(direction: -1 | 1): void {
+  public startTurning(direction: -1 | 1, ratio = 1): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    if (input && health?.isAlive && this.hp > 0) input.turningDirection = direction;
+    const maxTurnSpeed = this.world.getComponent(this.id, 'stats')!.maxTurnSpeed.current;
+    const turnSpeed = maxTurnSpeed * ratio;
+    if (input && health?.isAlive && this.hp > 0) {
+      input.turnDirection = direction;
+      input.turnSpeed = turnSpeed;
+    }
   }
   public stopTurning(): void {
     const input = this.world.getComponent(this.id, 'input');
-    if (input) input.turningDirection = 0;
+    if (input) input.turnDirection = 0;
+    if (input) input.turnSpeed = 0;
   }
   public startRunning(): void {
     const input = this.world.getComponent(this.id, 'input');
@@ -140,7 +154,7 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.world.getComponent(this.id, 'input');
     if (input) {
       input.isMovingForward = false;
-      input.turningDirection = 0;
+      input.turnDirection = 0;
       input.wantsAttack = false;
     }
     return true;

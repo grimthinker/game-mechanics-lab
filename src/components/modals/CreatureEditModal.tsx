@@ -19,6 +19,10 @@ export interface CreatureEditModalProps {
   setEditCrouchSpeedMultiplier: (val: number) => void;
   editCrouchStealthMultiplier: number;
   setEditCrouchStealthMultiplier: (val: number) => void;
+  editRunTurnMultiplier: number;
+  setEditRunTurnMultiplier: (val: number) => void;
+  editCrouchTurnMultiplier: number;
+  setEditCrouchTurnMultiplier: (val: number) => void;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -41,6 +45,10 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   setEditCrouchSpeedMultiplier,
   editCrouchStealthMultiplier,
   setEditCrouchStealthMultiplier,
+  editRunTurnMultiplier,
+  setEditRunTurnMultiplier,
+  editCrouchTurnMultiplier,
+  setEditCrouchTurnMultiplier,
   onClose,
   onConfirm,
 }) => {
@@ -143,6 +151,28 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
               max={10}
               step={0.1}
               onChange={(e) => setEditCrouchStealthMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости поворота при беге:
+            <input
+              type="number"
+              value={editRunTurnMultiplier}
+              min={1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setEditRunTurnMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости поворота в присяди:
+            <input
+              type="number"
+              value={editCrouchTurnMultiplier}
+              min={1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setEditCrouchTurnMultiplier(Number(e.target.value))}
             />
           </label>
         </form>

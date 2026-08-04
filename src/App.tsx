@@ -110,10 +110,17 @@ export const App: React.FC = () => {
   const togglePause = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
+    
+    // Если снимаем с паузы и в этот момент перетаскивали существо — отменяем перетаскивание
+    if (!app.isPaused && app.isDraggingCreature()) {
+      app.cancelCreatureDrag();
+      updateStats();
+    }
+
     const nextState = !app.isPaused;
     app.isPaused = nextState;
     setIsPaused(nextState);
-  }, []);
+  }, [updateStats]);
 
   const handleSpawnConfirm = () => {
     if (!modals.pendingSpawnType) return;
@@ -307,6 +314,8 @@ export const App: React.FC = () => {
         runSpeedMultiplier={modals.runSpeedMultiplier} setRunSpeedMultiplier={modals.setRunSpeedMultiplier}
         crouchSpeedMultiplier={modals.crouchSpeedMultiplier} setCrouchSpeedMultiplier={modals.setCrouchSpeedMultiplier}
         crouchStealthMultiplier={modals.crouchStealthMultiplier} setCrouchStealthMultiplier={modals.setCrouchStealthMultiplier}
+        runTurnMultiplier={modals.runTurnMultiplier} setRunTurnMultiplier={modals.setRunTurnMultiplier}
+        crouchTurnMultiplier={modals.crouchTurnMultiplier} setCrouchTurnMultiplier={modals.setCrouchTurnMultiplier}
         onClose={modals.closeSpawnModal}
         onConfirm={handleSpawnConfirm}
       />
@@ -321,6 +330,8 @@ export const App: React.FC = () => {
         editRunSpeedMultiplier={modals.editRunSpeedMultiplier} setEditRunSpeedMultiplier={modals.setEditRunSpeedMultiplier}
         editCrouchSpeedMultiplier={modals.editCrouchSpeedMultiplier} setEditCrouchSpeedMultiplier={modals.setEditCrouchSpeedMultiplier}
         editCrouchStealthMultiplier={modals.editCrouchStealthMultiplier} setEditCrouchStealthMultiplier={modals.setEditCrouchStealthMultiplier}
+        editRunTurnMultiplier={modals.editRunTurnMultiplier} setEditRunTurnMultiplier={modals.setEditRunTurnMultiplier}
+        editCrouchTurnMultiplier={modals.editCrouchTurnMultiplier} setEditCrouchTurnMultiplier={modals.setEditCrouchTurnMultiplier}
         onClose={modals.closeEditModal}
         onConfirm={modals.handleEditConfirm}
       />

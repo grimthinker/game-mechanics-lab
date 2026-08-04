@@ -22,6 +22,10 @@ export interface SpawnModalProps {
   setCrouchSpeedMultiplier: (val: number) => void;
   crouchStealthMultiplier: number;
   setCrouchStealthMultiplier: (val: number) => void;
+  runTurnMultiplier: number;
+  setRunTurnMultiplier: (val: number) => void;
+  crouchTurnMultiplier: number;
+  setCrouchTurnMultiplier: (val: number) => void;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -43,6 +47,10 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setCrouchSpeedMultiplier,
   crouchStealthMultiplier,
   setCrouchStealthMultiplier,
+  runTurnMultiplier,
+  setRunTurnMultiplier,
+  crouchTurnMultiplier,
+  setCrouchTurnMultiplier,
   onClose,
   onConfirm,
 }) => {
@@ -143,6 +151,28 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
               max={10}
               step={0.1}
               onChange={(e) => setCrouchStealthMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости поворота при беге:
+            <input
+              type="number"
+              value={runTurnMultiplier}
+              min={1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setRunTurnMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости поворота в присяди:
+            <input
+              type="number"
+              value={crouchTurnMultiplier}
+              min={1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setCrouchTurnMultiplier(Number(e.target.value))}
             />
           </label>
         </form>

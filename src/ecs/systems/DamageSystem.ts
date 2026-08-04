@@ -13,7 +13,7 @@ export class DamageSystem {
         health.isAlive = false;
         stats.hp.current = 0;
         input.isMovingForward = false;
-        input.turningDirection = 0;
+        input.turnDirection = 0;
         input.isRunning = false;
         input.isCrouching = false;
         input.wantsAttack = false;

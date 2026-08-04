@@ -125,10 +125,11 @@ export class GameApp {
     this.world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
     this.world.addComponent(id, 'input', {
       isMovingForward: false,
-      turningDirection: 0,
+      turnDirection: 0,
       isRunning: false,
       isCrouching: false,
       wantsAttack: false,
+      turnSpeed: 0
     });
     this.world.addComponent(id, 'health', { isAlive: true, hitFlashTimer: 0 });
     this.world.addComponent(id, 'stealth', { isCrouching: false });
@@ -154,6 +155,8 @@ export class GameApp {
         current: Math.max(1, crouchStealthMultiplier),
       },
       interactionRange: { base: 100, current: 100 },
+      runTurnMultiplier: { base: 0.8, current: 0.8 },  // При беге поворот медленнее
+      crouchTurnMultiplier: { base: 1.2, current: 1.2 },   // При приседании поворот быстрее
     });
 
     const emptySlots = Array.from({ length: 4 }, () =>
@@ -357,4 +360,56 @@ export class GameApp {
   public loadObstaclesFromData(segments: ObstacleSegment[]): void {
     this.physics.loadObstacles(segments);
   }
+
+  private draggedEntityId: string | null = null;
+  private draggedEntityOriginalPos: Point | null = null;
+
+  public startDraggingCreature(id: string, pos: Point): boolean {
+    if (!this.isPaused) return false;
+    const transform = this.world.getComponent(id, 'transform');
+    if (!transform) return false;
+
+    this.draggedEntityId = id;
+    this.draggedEntityOriginalPos = { x: transform.x, y: transform.y };
+    return true;
+  }
+
+  public updateDraggedCreaturePosition(worldPoint: Point): void {
+    if (!this.draggedEntityId) return;
+    const id = this.draggedEntityId;
+    
+    const transform = this.world.getComponent(id, 'transform');
+    const phys = this.world.getComponent(id, 'physicsBody');
+
+    if (transform) {
+      transform.x = worldPoint.x;
+      transform.y = worldPoint.y;
+    }
+    if (phys && phys.body) {
+      phys.body.x = worldPoint.x;
+      phys.body.y = worldPoint.y;
+    }
+  }
+
+  public cancelCreatureDrag(): void {
+    if (!this.draggedEntityId || !this.draggedEntityOriginalPos) {
+      this.draggedEntityId = null;
+      this.draggedEntityOriginalPos = null;
+      return;
+    }
+    // Возвращаем на исходную позицию
+    this.updateDraggedCreaturePosition(this.draggedEntityOriginalPos);
+    this.draggedEntityId = null;
+    this.draggedEntityOriginalPos = null;
+  }
+
+  public endCreatureDrag(): void {
+    this.draggedEntityId = null;
+    this.draggedEntityOriginalPos = null;
+  }
+
+  public isDraggingCreature(): boolean {
+    return this.draggedEntityId !== null;
+  }
+
 }

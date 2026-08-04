@@ -2,7 +2,6 @@ import { BTActionAttack, BTCommandForgetTarget, BTActionPatrol, BTActionPursue, 
 import { BTSelector, BTSequence } from "./composites";
 import { LOGIC_CONFIG } from "./config";
 import { BTNode, BTService } from "./core";
-import { BTInverter } from "./decorators";
 import { BTServiceFindNearestTarget,  BTServicePathUpdater, BTServiceSyncStats } from "./services";
 
 

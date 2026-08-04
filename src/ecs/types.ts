@@ -29,7 +29,9 @@ export interface StatsComponent {
   maxTurnSpeed: StatValue;
   stealth: StatValue;
   runSpeedMultiplier: StatValue;
+  runTurnMultiplier: StatValue;
   crouchSpeedMultiplier: StatValue;
+  crouchTurnMultiplier: StatValue;
   crouchStealthMultiplier: StatValue;
   interactionRange: StatValue;
 }
@@ -41,7 +43,8 @@ export interface VelocityComponent {
 
 export interface InputComponent {
   isMovingForward: boolean;
-  turningDirection: -1 | 0 | 1;
+  turnDirection: -1 | 0 | 1;
+  turnSpeed: number;
   isRunning: boolean;
   isCrouching: boolean;
   wantsAttack: boolean;
@@ -217,7 +220,7 @@ export interface CreatureConfig {
 export interface IMovable {
   startMovingForward(): void;
   stopMovingForward(): void;
-  startTurning(direction: -1 | 1): void;
+  startTurning(direction: -1 | 1, amount: number): void;
   stopTurning(): void;
   startRunning(): void;
   stopRunning(): void;
