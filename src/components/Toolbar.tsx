@@ -1,7 +1,7 @@
 import React from 'react';
 import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
 import { CreatureStats } from '../types';
-import { GameMode, THEME_COLORS } from '../constants';
+import { GameMode, THEME_COLORS, TOOL_GROUP_THEME_COLORS } from '../constants';
 
 interface ToolbarProps {
   mode: GameMode;
@@ -54,7 +54,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
   return (
     <div id="toolbar" style={{ backgroundColor: THEME_COLORS[mode] }}>
-      <div className="tool-group">
+      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
         <h3>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%' }}>
                 <span>Мир</span>
@@ -104,7 +104,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       {mode === GameMode.EDITOR && (
-        <div className="tool-group">
+        <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
           <h3>Управление спавном</h3>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openSpawnModal('player')}>
@@ -117,7 +117,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       )}
 
-      <div className="tool-group">
+      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
         <h3>Препятствия</h3>
         <label>
           Включить коллизии
@@ -156,7 +156,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
       </div>
 
-      <div className="tool-group">
+      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
         <h3>{mode === GameMode.GAME ? 'Игрок' : 'Выбранное существо'}</h3>
         {selectedStats ? (
           <div className="stats-list">
@@ -250,7 +250,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         )}
       </div>
 
-      <div className="tool-group">
+      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
         <h3>Управление</h3>
         {mode === GameMode.GAME ? (
           <ul className="control-keys">
