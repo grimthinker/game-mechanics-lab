@@ -30,6 +30,19 @@ export class AttackSystem {
 
         if (atk.timer <= 0) {
           if (atk.phase === 'prep') {
+            const castTime = atk.weapon.castTime ?? 0;
+            if (castTime > 0) {
+              atk.phase = 'cast';
+              atk.timer = castTime;
+              atk.totalDuration = castTime;
+            } else {
+              this.executeHit(id, atk.weapon, world, physics);
+              health.hitFlashTimer = 6;
+              atk.phase = 'recovery';
+              atk.timer = atk.weapon.recoveryTime;
+              atk.totalDuration = atk.weapon.recoveryTime;
+            }
+          } else if (atk.phase === 'cast') {
             this.executeHit(id, atk.weapon, world, physics);
             health.hitFlashTimer = 6;
             atk.phase = 'recovery';

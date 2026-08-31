@@ -179,11 +179,13 @@ export type HitZoneConfig = {
 
 export interface WeaponConfig extends ItemConfig {
   prepTime: number;
+  castTime?: number; // Задержка перед нанесением урона, в течение которой нельзя поворачиваться
   recoveryTime: number;
   prepTurnSlow: number;
   recoveryTurnSlow: number;
   prepMoveSlow: number;
   recoveryMoveSlow: number;
+  castMoveSlow?: number; // Замедление перемещения во время каста (по умолчанию равно prepMoveSlow)
   baseDamage: number;
   minMultiplier: number;
   maxMultiplier: number;
@@ -194,7 +196,7 @@ export interface WeaponConfig extends ItemConfig {
 
 export interface ActiveAttack {
   weapon: WeaponConfig;
-  phase: 'prep' | 'recovery';
+  phase: 'prep' | 'cast' | 'recovery';
   timer: number;
   totalDuration: number;
 }

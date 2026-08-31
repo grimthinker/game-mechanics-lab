@@ -31,8 +31,20 @@ export class MovementSystem {
       let moveSlow = 1;
       let turnSlow = 1;
       for (const atk of activeAttacks.attacks) {
-        const mMove = atk.phase === 'prep' ? atk.weapon.prepMoveSlow : atk.weapon.recoveryMoveSlow;
-        const mTurn = atk.phase === 'prep' ? atk.weapon.prepTurnSlow : atk.weapon.recoveryTurnSlow;
+        let mMove = 1;
+        let mTurn = 1;
+
+        if (atk.phase === 'prep') {
+          mMove = atk.weapon.prepMoveSlow;
+          mTurn = atk.weapon.prepTurnSlow;
+        } else if (atk.phase === 'cast') {
+          mMove = atk.weapon.castMoveSlow ?? atk.weapon.prepMoveSlow;
+          mTurn = 0; // Во время задержки перед ударом поворот запрещен
+        } else {
+          mMove = atk.weapon.recoveryMoveSlow;
+          mTurn = atk.weapon.recoveryTurnSlow;
+        }
+
         if (mMove < moveSlow) moveSlow = mMove;
         if (mTurn < turnSlow) turnSlow = mTurn;
       }
