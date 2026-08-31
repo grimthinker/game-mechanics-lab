@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { ArmorConfig } from '../../ecs/types';
 
 export interface ArmorEditModalProps {
   selectedArmorForEdit: ArmorConfig | null;
+  isReadOnly?: boolean;
   editArmorName: string;
   setEditArmorName: (val: string) => void;
   editArmorDefense: number;
@@ -17,6 +19,7 @@ export interface ArmorEditModalProps {
 
 export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
   selectedArmorForEdit,
+  isReadOnly,
   editArmorName,
   setEditArmorName,
   editArmorDefense,
@@ -39,11 +42,12 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры брони</h3>
+        <h3>{isReadOnly ? 'Параметры брони' : 'Изменить параметры брони'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Название:
             <input
+              disabled={isReadOnly}
               type="text"
               value={editArmorName}
               onChange={(e) => setEditArmorName(e.target.value)}
@@ -52,6 +56,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
           <label>
             Защита:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editArmorDefense}
               min={0}
@@ -62,6 +67,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
           <label>
             Поглощение урона:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editArmorFlatReduction}
               min={0}
@@ -72,6 +78,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
           <label>
             Вес:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editArmorWeight}
               min={0}
@@ -82,11 +89,13 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>

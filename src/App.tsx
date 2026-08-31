@@ -11,6 +11,8 @@ import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
 import { CreatureStats, PlacementConfig } from './types';
+import { EntityAdapter } from './EntityAdapter';
+import { GameMode } from './constants';
 
 
 export const App: React.FC = () => {
@@ -18,9 +20,28 @@ export const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
+  const [playerId, setPlayerId] = useState<string | null>(null);
+  const [snapshot, setSnapshot] = useState<any>(null);
+
+  const modeRef = useRef(mode);
+  const playerIdRef = useRef(playerId);
+
+  const setModeSync = useCallback((m: GameMode) => {
+    setMode(m);
+    modeRef.current = m;
+    if (appRef.current) appRef.current.gameMode = m;
+  }, []);
+
+  const setPlayerIdSync = useCallback((id: string | null) => {
+    setPlayerId(id);
+    playerIdRef.current = id;
+    if (appRef.current) appRef.current.playerId = id;
+  }, []);
+
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedStats, setSelectedStats] = useState<CreatureStats | null>(null);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementConfig, setPlacementConfig] = useState<PlacementConfig | null>(null);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
@@ -36,18 +57,40 @@ export const App: React.FC = () => {
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
-    if (!app || !app.selectedCreature) {
+    if (!app) return;
+
+    const currentMode = modeRef.current;
+    const currentPlayerId = playerIdRef.current;
+
+    if (currentMode === GameMode.GAME && currentPlayerId) {
+      const pStats = app.world.getComponent(currentPlayerId, 'stats');
+      const pHealth = app.world.getComponent(currentPlayerId, 'health');
+      if ((pHealth && !pHealth.isAlive) || (pStats && pStats.hp.current <= 0)) {
+        setModeSync(GameMode.SIMULATION);
+        setPlayerIdSync(null);
+        app.isPaused = true;
+        setIsPaused(true);
+      }
+    }
+
+    let targetId = app.selectedCreature?.id;
+    if (modeRef.current === GameMode.GAME && playerIdRef.current) {
+      targetId = playerIdRef.current;
+    }
+
+    if (!targetId) {
       setSelectedStats(null);
       setBtData(null);
       setBtBlackboard(null);
       return;
     }
 
-    const c = app.selectedCreature;
+    const c = new EntityAdapter(targetId, app.world);
     const eq = c.equip;
     const inv = c.inventory;
 
     setSelectedStats({
+      id: c.id,
       type: c.type,
       radius: c.radius,
       mass: c.mass,
@@ -69,7 +112,7 @@ export const App: React.FC = () => {
 
     setBtData((!c.brain || !c.brain.root_node) ? null : serializeBTNode(c.brain.root_node));
     setBtBlackboard((!c.brain) ? null : c.brain.blackboard.getData());
-  }, []);
+  }, [setModeSync, setPlayerIdSync]);
 
   const { syncPlayerControls } = useKeyboardControls({
     appRef,
@@ -81,6 +124,8 @@ export const App: React.FC = () => {
       isPaused,
     isEditModalOpen: modals.isEditModalOpen,
     updateStats,
+    mode,
+    playerId,
   });
 
   const { canvasRef, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave } =
@@ -90,12 +135,19 @@ export const App: React.FC = () => {
       setPlacementConfig,
       syncPlayerControls,
       updateStats,
+      mode,
     });
 
   useEffect(() => {
     if (!canvasRef.current) return;
     const app = new GameApp(canvasRef.current);
     appRef.current = app;
+
+    app.gameMode = modeRef.current;
+    app.playerId = playerIdRef.current;
+    app.isPaused = true;
+    setIsPaused(true);
+
     app.start();
     app.onFrame = updateStats;
     app.spawnCreature('player');
@@ -111,7 +163,10 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
     
-    // Если снимаем с паузы и в этот момент перетаскивали существо — отменяем перетаскивание
+    if (modeRef.current === GameMode.EDITOR || modeRef.current === GameMode.GAME) {
+      return; 
+    }
+
     if (!app.isPaused && app.isDraggingCreature()) {
       app.cancelCreatureDrag();
       updateStats();
@@ -121,6 +176,47 @@ export const App: React.FC = () => {
     app.isPaused = nextState;
     setIsPaused(nextState);
   }, [updateStats]);
+
+  const goToEditor = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (snapshot) {
+      app.deserializeWorld(snapshot);
+    }
+    setModeSync(GameMode.EDITOR);
+    setPlayerIdSync(null);
+    app.isPaused = true;
+    setIsPaused(true);
+    updateStats();
+  }, [snapshot, updateStats, setModeSync, setPlayerIdSync]);
+
+  const goToSimulation = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (modeRef.current === GameMode.EDITOR) {
+      setSnapshot(app.serializeWorld());
+    }
+    setModeSync(GameMode.SIMULATION);
+    setPlayerIdSync(null);
+    app.isPaused = false;
+    setIsPaused(false);
+    updateStats();
+  }, [updateStats, setModeSync, setPlayerIdSync]);
+
+  const goToGame = useCallback((id: string) => {
+    const app = appRef.current;
+    if (!app) return;
+    if (modeRef.current === GameMode.EDITOR) {
+      setSnapshot(app.serializeWorld());
+    }
+    setModeSync(GameMode.GAME);
+    setPlayerIdSync(id);
+    app.isPaused = false;
+    setIsPaused(false);
+    setShowBTPanel(false);
+    updateStats();
+  }, [updateStats, setShowBTPanel, setModeSync, setPlayerIdSync]);
+
 
   const handleSpawnConfirm = () => {
     if (!modals.pendingSpawnType) return;
@@ -170,12 +266,18 @@ export const App: React.FC = () => {
           return;
         }
 
-        const app = appRef.current;
-        const hasSelected = !!app?.selectedCreature;
-
-        if (!hasSelected || e.ctrlKey || e.metaKey) {
+        if (modeRef.current === GameMode.EDITOR) {
           e.preventDefault();
-          togglePause();
+          return;
+        } else if (modeRef.current === GameMode.GAME) {
+          return;
+        } else {
+          const app = appRef.current;
+          const hasSelected = !!app?.selectedCreature;
+          if (!hasSelected || e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            togglePause();
+          }
         }
       }
     };
@@ -191,15 +293,21 @@ export const App: React.FC = () => {
       }
 
       if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
-        setShowBTPanel((prev) => !prev);
+        if (modeRef.current !== GameMode.GAME) {
+          setShowBTPanel((prev) => !prev);
+        }
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyB' || e.key.toLowerCase() === 'b')) {
-        modals.setPendingSpawnType('ai');
-        modals.openSpawnModal('ai');
+        if (modeRef.current === GameMode.EDITOR) {
+          modals.setPendingSpawnType('ai');
+          modals.openSpawnModal('ai');
+        }
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
-        modals.setPendingSpawnType('player');
-        modals.openSpawnModal('player');
+        if (modeRef.current === GameMode.EDITOR) {
+          modals.setPendingSpawnType('player');
+          modals.openSpawnModal('player');
+        }
         e.preventDefault();
       }
     };
@@ -211,6 +319,8 @@ export const App: React.FC = () => {
   const isBagInventoryEmpty =
     !selectedStats?.inventory ||
     selectedStats.inventory.slots.every((row) => row.every((cell) => !cell.item));
+
+  const isReadOnly = mode !== GameMode.EDITOR;
 
   return (
     <div id="app">
@@ -254,6 +364,10 @@ export const App: React.FC = () => {
       )}
 
       <Toolbar
+        mode={mode}
+        goToEditor={goToEditor}
+        goToSimulation={goToSimulation}
+        goToGame={goToGame}
         obstaclesEnabled={obstaclesEnabled}
         setObstaclesEnabled={(val) => {
           setObstaclesEnabled(val);
@@ -301,7 +415,7 @@ export const App: React.FC = () => {
         openEditModal={modals.openEditModal}
         handleDeleteCreature={handleDeleteCreature}
         openItemEditModal={modals.openItemEditModal}
-        isPaused={isPaused} // <--- Передаем состояние паузы в Toolbar
+        isPaused={isPaused} 
       />
 
       <SpawnModal
@@ -322,6 +436,7 @@ export const App: React.FC = () => {
 
       <CreatureEditModal
         isOpen={modals.isEditModalOpen}
+        isReadOnly={isReadOnly}
         editRadius={modals.editRadius} setEditRadius={modals.setEditRadius}
         editHp={modals.editHp} setEditHp={modals.setEditHp}
         editMaxHp={modals.editMaxHp} setEditMaxHp={modals.setEditMaxHp}
@@ -338,6 +453,7 @@ export const App: React.FC = () => {
 
       <WeaponEditModal
         selectedWeaponForEdit={modals.selectedWeaponForEdit}
+        isReadOnly={isReadOnly}
         editWeaponName={modals.editWeaponName} setEditWeaponName={modals.setEditWeaponName}
         editWeaponDamage={modals.editWeaponDamage} setEditWeaponDamage={modals.setEditWeaponDamage}
         editWeaponPrepTime={modals.editWeaponPrepTime} setEditWeaponPrepTime={modals.setEditWeaponPrepTime}
@@ -355,6 +471,7 @@ export const App: React.FC = () => {
 
       <ArmorEditModal
         selectedArmorForEdit={modals.selectedArmorForEdit}
+        isReadOnly={isReadOnly}
         editArmorName={modals.editArmorName} setEditArmorName={modals.setEditArmorName}
         editArmorDefense={modals.editArmorDefense} setEditArmorDefense={modals.setEditArmorDefense}
         editArmorFlatReduction={modals.editArmorFlatReduction} setEditArmorFlatReduction={modals.setEditArmorFlatReduction}
@@ -365,6 +482,7 @@ export const App: React.FC = () => {
 
       <BagEditModal
         selectedBagForEdit={modals.selectedBagForEdit}
+        isReadOnly={isReadOnly}
         editBagName={modals.editBagName} setEditBagName={modals.setEditBagName}
         editBagWidth={modals.editBagWidth} setEditBagWidth={modals.setEditBagWidth}
         editBagHeight={modals.editBagHeight} setEditBagHeight={modals.setEditBagHeight}

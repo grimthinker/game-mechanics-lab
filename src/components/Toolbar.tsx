@@ -1,8 +1,13 @@
 import React from 'react';
 import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
 import { CreatureStats } from '../types';
+import { GameMode, THEME_COLORS } from '../constants';
 
 interface ToolbarProps {
+  mode: GameMode;
+  goToEditor: () => void;
+  goToSimulation: () => void;
+  goToGame: (id: string) => void;
   obstaclesEnabled: boolean;
   setObstaclesEnabled: (val: boolean) => void;
   setObstaclesData: (data: any[]) => void;
@@ -16,10 +21,14 @@ interface ToolbarProps {
   openEditModal: () => void;
   handleDeleteCreature: () => void;
   openItemEditModal: (item: ItemData) => void;
-  isPaused: boolean; // <--- Добавляем в пропсы
+  isPaused: boolean; 
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
+  mode,
+  goToEditor,
+  goToSimulation,
+  goToGame,
   obstaclesEnabled,
   setObstaclesEnabled,
   selectedStats,
@@ -44,12 +53,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   return (
-    <div id="toolbar">
+    <div id="toolbar" style={{ backgroundColor: THEME_COLORS[mode] }}>
       <div className="tool-group">
         <h3>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%' }}>
                 <span>Мир</span>
-                {isPaused && (
+                {isPaused && mode !== GameMode.GAME && (
                     <span style={{ 
                         color: '#e74c3c', 
                         fontWeight: 'bold', 
@@ -67,34 +76,46 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </div>
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <button className="btn" onClick={onNewWorld}>Новый мир</button>
-          <button className="btn" onClick={onSaveWorld}>Сохранить мир</button>
-          <input
-            type="file"
-            ref={worldFileInputRef}
-            style={{ display: 'none' }}
-            accept=".json"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onLoadWorldFile(file);
-              e.target.value = '';
-            }}
-          />
-          <button className="btn" onClick={() => worldFileInputRef.current?.click()}>Загрузить мир</button>
+          {mode === GameMode.EDITOR && (
+            <>
+              <button className="btn" onClick={onNewWorld}>Новый мир</button>
+              <button className="btn" onClick={onSaveWorld}>Сохранить мир</button>
+              <input
+                type="file"
+                ref={worldFileInputRef}
+                style={{ display: 'none' }}
+                accept=".json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onLoadWorldFile(file);
+                  e.target.value = '';
+                }}
+              />
+              <button className="btn" onClick={() => worldFileInputRef.current?.click()}>Загрузить мир</button>
+            </>
+          )}
+          {mode !== GameMode.EDITOR && (
+            <button className="btn" style={{ backgroundColor: '#2980b9', color: '#fff' }} onClick={goToEditor}>Редактор</button>
+          )}
+          {mode !== GameMode.SIMULATION && (
+            <button className="btn" style={{ backgroundColor: '#27ae60', color: '#fff' }} onClick={goToSimulation}>Симуляция</button>
+          )}
         </div>
       </div>
 
-      <div className="tool-group">
-        <h3>Управление спавном</h3>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openSpawnModal('player')}>
-            Добавить Игрока
-          </button>
-          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSpawnModal('ai')}>
-            Добавить Бота
-          </button>
+      {mode === GameMode.EDITOR && (
+        <div className="tool-group">
+          <h3>Управление спавном</h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openSpawnModal('player')}>
+              Добавить Игрока
+            </button>
+            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSpawnModal('ai')}>
+              Добавить Бота
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="tool-group">
         <h3>Препятствия</h3>
@@ -106,33 +127,37 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onChange={(e) => setObstaclesEnabled(e.target.checked)}
           />
         </label>
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          accept=".json"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-              try {
-                const data = JSON.parse(evt.target?.result as string);
-                if (Array.isArray(data)) {
-                  // запуск загрузки препятствий через родителя или пропс
-                }
-              } catch {
-                alert('Ошибка при чтении JSON файла!');
-              }
-            };
-            reader.readAsText(file);
-          }}
-        />
-        <button className="btn" onClick={() => fileInputRef.current?.click()}>Загрузить JSON препятствий</button>
+        {mode === GameMode.EDITOR && (
+          <>
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              accept=".json"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (evt) => {
+                  try {
+                    const data = JSON.parse(evt.target?.result as string);
+                    if (Array.isArray(data)) {
+                      // запуск загрузки препятствий
+                    }
+                  } catch {
+                    alert('Ошибка при чтении JSON файла!');
+                  }
+                };
+                reader.readAsText(file);
+              }}
+            />
+            <button className="btn" onClick={() => fileInputRef.current?.click()}>Загрузить JSON препятствий</button>
+          </>
+        )}
       </div>
 
       <div className="tool-group">
-        <h3>Выбранное существо</h3>
+        <h3>{mode === GameMode.GAME ? 'Игрок' : 'Выбранное существо'}</h3>
         {selectedStats ? (
           <div className="stats-list">
             <dl className="stats-list">
@@ -148,7 +173,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </dl>
 
             <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
-              Экипировка (клик по предмету для настройки):
+              Экипировка:
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
               {selectedStats.equipSlots.map((slot: { item: any; type: string; }, index: any) => {
@@ -199,9 +224,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>Изменить</button>
-              <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteCreature}>Удалить</button>
+              {mode === GameMode.EDITOR && (
+                <>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>Изменить</button>
+                  <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteCreature}>Удалить</button>
+                </>
+              )}
+              {mode === GameMode.SIMULATION && (
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>Осмотреть</button>
+              )}
             </div>
+
+            {(mode === GameMode.EDITOR || mode === GameMode.SIMULATION) && selectedStats.type === 'player' && (
+              <button 
+                className="btn" 
+                style={{ width: '100%', marginTop: '8px', backgroundColor: '#8e44ad', color: '#fff' }} 
+                onClick={() => goToGame(selectedStats.id)}
+              >
+                Играть
+              </button>
+            )}
           </div>
         ) : (
           <p className="selection-hint">Существо не выбрано</p>
@@ -210,20 +252,24 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       <div className="tool-group">
         <h3>Управление</h3>
-        {selectedStats ? (
+        {mode === GameMode.GAME ? (
           <ul className="control-keys">
             <li><kbd>W</kbd> Движение вперед</li>
             <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
             <li><kbd>LShift</kbd> Бег (удержание)</li>
             <li><kbd>C</kbd> Полуприсяд (удержание)</li>
             <li><kbd>Пробел</kbd> Атака оружием</li>
+          </ul>
+        ) : mode === GameMode.SIMULATION ? (
+          <ul className="control-keys">
+            <li><kbd>Пробел</kbd> Пауза / Возобновление симуляции</li>
             <li><kbd>U</kbd> Дерево поведения (BT)</li>
-            <li><kbd>LCtrl</kbd> + <kbd>Пробел</kbd> Пауза / Возобновление</li>
           </ul>
         ) : (
           <ul className="control-keys">
             <li><kbd>U</kbd> Дерево поведения (BT)</li>
-            <li><kbd>Пробел</kbd> Пауза / Возобновление симуляции</li>
+            <li><kbd>Ctrl+B</kbd> Быстрый спавн бота</li>
+            <li><kbd>Ctrl+P</kbd> Быстрый спавн игрока</li>
           </ul>
         )}
       </div>

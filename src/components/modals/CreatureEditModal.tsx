@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
 
 export interface CreatureEditModalProps {
   isOpen: boolean;
+  isReadOnly?: boolean;
   editRadius: number;
   setEditRadius: (val: StandardRadius) => void;
   editHp: number;
@@ -29,6 +31,7 @@ export interface CreatureEditModalProps {
 
 export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   isOpen,
+  isReadOnly,
   editRadius,
   setEditRadius,
   editHp,
@@ -63,11 +66,12 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры существа</h3>
+        <h3>{isReadOnly ? 'Параметры существа' : 'Изменить параметры существа'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Радиус:
             <select
+              disabled={isReadOnly}
               value={editRadius}
               onChange={(e) => setEditRadius(Number(e.target.value) as StandardRadius)}
             >
@@ -81,6 +85,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Текущее HP:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editHp}
               min={0}
@@ -91,6 +96,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Макс. HP:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editMaxHp}
               min={1}
@@ -101,6 +107,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Макс. скорость:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editMaxSpeed}
               min={0}
@@ -112,6 +119,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Макс. скорость поворота (°/с):
             <input
+              disabled={isReadOnly}
               type="number"
               value={editMaxTurnSpeed}
               min={0}
@@ -123,6 +131,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скорости бега:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editRunSpeedMultiplier}
               min={0.1}
@@ -134,6 +143,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скорости присяда:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editCrouchSpeedMultiplier}
               min={0.1}
@@ -145,6 +155,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скрытности присяда:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editCrouchStealthMultiplier}
               min={1}
@@ -156,6 +167,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скорости поворота при беге:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editRunTurnMultiplier}
               min={1}
@@ -167,6 +179,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скорости поворота в присяди:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editCrouchTurnMultiplier}
               min={1}
@@ -178,11 +191,13 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>

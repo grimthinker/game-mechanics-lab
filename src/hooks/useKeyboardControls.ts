@@ -1,11 +1,15 @@
+
 import { useRef, useEffect, useCallback, MutableRefObject } from 'react';
 import { GameApp, EntityAdapter } from '../GameApp';
+import { GameMode } from '../constants';
 
 interface UseKeyboardControlsProps {
   appRef: MutableRefObject<GameApp | null>;
   isModalOpen: boolean;
   isEditModalOpen: boolean;
   updateStats: () => void;
+  mode: GameMode;
+  playerId: string | null;
 }
 
 const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c']);
@@ -29,6 +33,8 @@ export const useKeyboardControls = ({
   isModalOpen,
   isEditModalOpen,
   updateStats,
+  mode,
+  playerId
 }: UseKeyboardControlsProps) => {
   const keysPressedRef = useRef<Set<string>>(new Set());
   const controlledCreatureRef = useRef<EntityAdapter | null>(null);
@@ -37,8 +43,14 @@ export const useKeyboardControls = ({
     const app = appRef.current;
     if (!app) return;
 
-    const candidate = app.selectedCreature?.type === 'player' ? app.selectedCreature : null;
-    const player = candidate && candidate.isAlive && candidate.hp > 0 ? candidate : null;
+    let player: EntityAdapter | null = null;
+    if (mode === GameMode.GAME && playerId) {
+      const candidate = new EntityAdapter(playerId, app.world);
+      if (candidate.isAlive && candidate.hp > 0) {
+        player = candidate;
+      }
+    }
+
     const controlled = controlledCreatureRef.current;
 
     if (controlled && controlled !== player) {
@@ -77,7 +89,7 @@ export const useKeyboardControls = ({
     } else {
       player.stopCrouching();
     }
-  }, [appRef]);
+  }, [appRef, mode, playerId]);
 
   useEffect(() => {
     const isTextInputTarget = (target: EventTarget | null): boolean => {
@@ -90,7 +102,7 @@ export const useKeyboardControls = ({
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
       const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
-        if (!e.ctrlKey && !e.metaKey) {
+        if (!e.ctrlKey && !e.metaKey && mode === GameMode.GAME) {
             const player = controlledCreatureRef.current;
             if (player && player.isAlive && player.hp > 0) {
               player.attack();
@@ -130,7 +142,7 @@ export const useKeyboardControls = ({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [isModalOpen, isEditModalOpen, syncPlayerControls, updateStats]);
+  }, [isModalOpen, isEditModalOpen, syncPlayerControls, updateStats, mode]);
 
   return { syncPlayerControls };
 };

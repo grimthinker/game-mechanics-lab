@@ -1,6 +1,8 @@
+
 import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react';
 import { GameApp } from '../GameApp';
 import { CreatureType, StandardRadius } from '../ecs/types';
+import { GameMode } from '../constants';
 
 interface PlacementConfig {
   type: CreatureType;
@@ -19,6 +21,7 @@ interface UseCanvasInteractionProps {
   setPlacementConfig: Dispatch<SetStateAction<PlacementConfig | null>>;
   syncPlayerControls: () => void;
   updateStats: () => void;
+  mode: GameMode;
 }
 
 export const useCanvasInteraction = ({
@@ -27,10 +30,10 @@ export const useCanvasInteraction = ({
   setPlacementConfig,
   syncPlayerControls,
   updateStats,
+  mode,
 }: UseCanvasInteractionProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   
-  // Рефы для отслеживания потенциального перетаскивания существа на паузе
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const clickedCreatureIdRef = useRef<string | null>(null);
 
@@ -56,16 +59,13 @@ export const useCanvasInteraction = ({
     if (e.button === 0 && app) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
       
-      // Если игра на паузе, проверяем клик по существу
-      if (app.isPaused) {
+      if (app.isPaused && mode === GameMode.EDITOR) {
         const creature = app.pickCreatureAt(point);
         if (creature) {
-          // 1. Сразу выбираем существо (чтобы открывались его статы/инвентарь)
           app.selectCreature(creature);
           syncPlayerControls();
           updateStats();
 
-          // 2. Запоминаем для возможного старта перетаскивания при движении мыши
           clickedCreatureIdRef.current = creature.id;
           dragStartPosRef.current = { x: e.clientX, y: e.clientY };
           e.currentTarget.style.cursor = 'grabbing';
@@ -84,16 +84,14 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app) return;
 
-    // Если перетаскивание уже активировано
-    if (app.isDraggingCreature()) {
+    if (app.isDraggingCreature() && mode === GameMode.EDITOR) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
       app.updateDraggedCreaturePosition(point);
       e.currentTarget.style.cursor = 'grabbing';
       return;
     }
 
-    // Если на паузе зажали кнопку на существе и сдвинули мышь больше чем на 5 пикселей — начинаем перетаскивание
-    if (app.isPaused && clickedCreatureIdRef.current && dragStartPosRef.current) {
+    if (app.isPaused && mode === GameMode.EDITOR && clickedCreatureIdRef.current && dragStartPosRef.current) {
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
       if (Math.hypot(dx, dy) > 5) {
@@ -119,8 +117,7 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (e.button !== 0 || !app) return;
 
-    // Если процесс перетаскивания был активен и мы отпустили кнопку мыши
-    if (app.isDraggingCreature()) {
+    if (app.isDraggingCreature() && mode === GameMode.EDITOR) {
       app.endCreatureDrag();
       updateStats();
       clickedCreatureIdRef.current = null;
@@ -132,11 +129,10 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Очищаем временные рефы клика
     clickedCreatureIdRef.current = null;
     dragStartPosRef.current = null;
 
-    if (placementConfig) {
+    if (placementConfig && mode === GameMode.EDITOR) {
       const wasDragging = app.endPan();
       if (!wasDragging) {
         const point = app.getCanvasPoint(e.clientX, e.clientY);
@@ -164,8 +160,12 @@ export const useCanvasInteraction = ({
     }
 
     const wasDragging = app.endPan();
-    // В обычном режиме клик выбирает существо. В режиме паузы существо уже выбрано в момент mouseDown.
     if (!wasDragging && !app.isPaused) {
+      const point = app.getCanvasPoint(e.clientX, e.clientY);
+      app.selectCreature(app.pickCreatureAt(point));
+      syncPlayerControls();
+      updateStats();
+    } else if (!wasDragging && app.isPaused && mode !== GameMode.EDITOR) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
       app.selectCreature(app.pickCreatureAt(point));
       syncPlayerControls();

@@ -19,6 +19,7 @@ import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { BTNodeDTO } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
+import { GameMode } from './constants';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -39,6 +40,10 @@ export class GameApp {
   private lastTime: number = 0;
   private isRunning: boolean = false;
   public isPaused: boolean = false;
+  
+  public gameMode: GameMode = GameMode.EDITOR;
+  public playerId: string | null = null;
+
   private handleResize = () => this.resizeCanvas();
 
   constructor(canvas: HTMLCanvasElement) {
@@ -74,10 +79,11 @@ export class GameApp {
     _weapons?: WeaponConfig[],
     runSpeedMultiplier: number = 2.5,
     crouchSpeedMultiplier: number = 0.3,
-    crouchStealthMultiplier: number = 2.5
+    crouchStealthMultiplier: number = 2.5,
+    forcedId?: string
   ): EntityAdapter {
     const prefix = type === 'player' ? 'player' : 'bot';
-    const id = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+    const id = forcedId || `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
     const pos = position
       ? { ...position }
       : {
@@ -155,8 +161,8 @@ export class GameApp {
         current: Math.max(1, crouchStealthMultiplier),
       },
       interactionRange: { base: 100, current: 100 },
-      runTurnMultiplier: { base: 0.8, current: 0.8 },  // При беге поворот медленнее
-      crouchTurnMultiplier: { base: 1.2, current: 1.2 },   // При приседании поворот быстрее
+      runTurnMultiplier: { base: 0.8, current: 0.8 },  
+      crouchTurnMultiplier: { base: 1.2, current: 1.2 },   
     });
 
     const emptySlots = Array.from({ length: 4 }, () =>
@@ -262,7 +268,8 @@ export class GameApp {
           undefined,
           entData.stats.runSpeedMultiplier,
           entData.stats.crouchSpeedMultiplier,
-          entData.stats.crouchStealthMultiplier
+          entData.stats.crouchStealthMultiplier,
+          entData.id
         );
 
         adapter.updateParams({
@@ -318,7 +325,9 @@ export class GameApp {
       this.camera,
       this.world,
       this.physics,
-      this.selectedCreature ? this.selectedCreature.id : null
+      this.selectedCreature ? this.selectedCreature.id : null,
+      this.gameMode,
+      this.playerId
     );
 
     if (this.onFrame) this.onFrame();
@@ -397,7 +406,6 @@ export class GameApp {
       this.draggedEntityOriginalPos = null;
       return;
     }
-    // Возвращаем на исходную позицию
     this.updateDraggedCreaturePosition(this.draggedEntityOriginalPos);
     this.draggedEntityId = null;
     this.draggedEntityOriginalPos = null;

@@ -12,6 +12,7 @@ export interface ObstacleSegment {
 
 
 export interface CreatureStats {
+  id: string;
   type: CreatureType;
   radius: number;
   mass: number;

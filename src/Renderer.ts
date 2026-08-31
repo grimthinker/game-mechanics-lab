@@ -1,3 +1,4 @@
+
 import { World } from './ecs/World';
 import { Camera } from './Camera';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
@@ -16,7 +17,9 @@ export class Renderer {
     camera: Camera,
     world: World,
     physics: PhysicsSystem,
-    selectedId: EntityId | null
+    selectedId: EntityId | null,
+    gameMode: string = 'editor',
+    playerId: EntityId | null = null
   ): void {
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -26,7 +29,7 @@ export class Renderer {
 
     this.renderGrid(camera);
     this.renderObstacles(camera, physics);
-    this.renderEntities(world, camera, selectedId);
+    this.renderEntities(world, camera, selectedId, gameMode, playerId);
 
     this.ctx.restore();
   }
@@ -69,7 +72,7 @@ export class Renderer {
     this.ctx.stroke();
   }
 
-  private renderEntities(world: World, camera: Camera, selectedId: EntityId | null): void {
+  private renderEntities(world: World, camera: Camera, selectedId: EntityId | null, gameMode: string, playerId: EntityId | null): void {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
 
     const renderBody = (
@@ -116,12 +119,21 @@ export class Renderer {
       this.ctx.fillStyle = fillColor;
       this.ctx.fill();
 
-      const borderColor = meta.type === 'player' ? '#2980b9' : '#c0392b';
+      const isPlayerInGame = gameMode === 'game' && id === playerId;
+      
+      let borderColor = meta.type === 'player' ? '#2980b9' : '#c0392b';
+      let lineWidth = 2 / camera.scale;
+
+      if (isPlayerInGame) {
+        borderColor = '#e67e22'; 
+        lineWidth = 3 / camera.scale;
+      }
+
       this.ctx.strokeStyle = borderColor;
-      this.ctx.lineWidth = 2 / camera.scale;
+      this.ctx.lineWidth = lineWidth;
       this.ctx.stroke();
 
-      if (id === selectedId) {
+      if (id === selectedId && !isPlayerInGame) {
         this.ctx.strokeStyle = '#f1c40f';
         this.ctx.lineWidth = 3 / camera.scale;
         this.ctx.stroke();
@@ -168,7 +180,6 @@ export class Renderer {
       }
     }
 
-    // ИЗМЕНЕНО: 3. Зоны поражения поверх всех существ, после чего атакующее существо перерисовывается поверх своей зоны
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -292,7 +303,6 @@ export class Renderer {
       }
       this.ctx.restore();
 
-      // Повторная отрисовка самого атакующего существа поверх его зоны поражения
       renderBody(id, transform, physicsBody, isAlive, meta);
     }
 
@@ -318,7 +328,6 @@ export class Renderer {
       }
     }
 
-    // ДОБАВЛЕНО: 5. Отрисовка ID поверх всех существ, зон поражения и полосок здоровья
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;

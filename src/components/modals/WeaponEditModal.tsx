@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { WeaponConfig } from '../../ecs/types';
 
 export interface WeaponEditModalProps {
   selectedWeaponForEdit: WeaponConfig | null;
+  isReadOnly?: boolean;
   editWeaponName: string;
   setEditWeaponName: (val: string) => void;
   editWeaponDamage: number;
@@ -31,6 +33,7 @@ export interface WeaponEditModalProps {
 
 export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
   selectedWeaponForEdit,
+  isReadOnly,
   editWeaponName,
   setEditWeaponName,
   editWeaponDamage,
@@ -67,11 +70,12 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры оружия</h3>
+        <h3>{isReadOnly ? 'Параметры оружия' : 'Изменить параметры оружия'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Название:
             <input
+              disabled={isReadOnly}
               type="text"
               value={editWeaponName}
               onChange={(e) => setEditWeaponName(e.target.value)}
@@ -80,6 +84,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
           <label>
             Базовый урон:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editWeaponDamage}
               min={0}
@@ -90,6 +95,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
           <label>
             Подготовка (сек):
             <input
+              disabled={isReadOnly}
               type="number"
               value={editWeaponPrepTime}
               min={0.05}
@@ -101,6 +107,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
           <label>
             Восстановление (сек):
             <input
+              disabled={isReadOnly}
               type="number"
               value={editWeaponRecoveryTime}
               min={0.05}
@@ -114,6 +121,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Дальность / Длина:
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponRange}
                 min={0}
@@ -127,6 +135,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Радиус:
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponRadius}
                 min={0}
@@ -142,6 +151,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Количество лучей / линий:
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponNumLines}
                 min={1}
@@ -155,6 +165,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Угол (°):
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponAngle}
                 min={0}
@@ -168,6 +179,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
+                  disabled={isReadOnly}
                   type="checkbox"
                   checked={editWeaponPierceObstacles}
                   onChange={(e) => setEditWeaponPierceObstacles(e.target.checked)}
@@ -176,6 +188,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
+                  disabled={isReadOnly}
                   type="checkbox"
                   checked={editWeaponPiercePlayers}
                   onChange={(e) => setEditWeaponPiercePlayers(e.target.checked)}
@@ -184,6 +197,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
+                  disabled={isReadOnly}
                   type="checkbox"
                   checked={editWeaponPierceBots}
                   onChange={(e) => setEditWeaponPierceBots(e.target.checked)}
@@ -195,11 +209,13 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>

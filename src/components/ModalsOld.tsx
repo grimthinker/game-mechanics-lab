@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
   CreatureType,
@@ -163,6 +164,7 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
 
 export interface CreatureEditModalProps {
   isOpen: boolean;
+  isReadOnly?: boolean;
   editRadius: number;
   setEditRadius: (val: StandardRadius) => void;
   editHp: number;
@@ -185,6 +187,7 @@ export interface CreatureEditModalProps {
 
 export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   isOpen,
+  isReadOnly,
   editRadius,
   setEditRadius,
   editHp,
@@ -215,11 +218,11 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры существа</h3>
+        <h3>{isReadOnly ? 'Параметры существа' : 'Изменить параметры существа'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Радиус:
-            <select value={editRadius} onChange={(e) => setEditRadius(Number(e.target.value) as StandardRadius)}>
+            <select disabled={isReadOnly} value={editRadius} onChange={(e) => setEditRadius(Number(e.target.value) as StandardRadius)}>
               {STANDARD_RADII.map((r) => (
                 <option key={r} value={r}>
                   {r} px
@@ -230,6 +233,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Текущее HP:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editHp}
               min={0}
@@ -240,6 +244,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Макс. HP:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editMaxHp}
               min={1}
@@ -250,6 +255,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Макс. скорость:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editMaxSpeed}
               min={0}
@@ -261,6 +267,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Макс. скорость поворота (°/с):
             <input
+              disabled={isReadOnly}
               type="number"
               value={editMaxTurnSpeed}
               min={0}
@@ -272,6 +279,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скорости бега:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editRunSpeedMultiplier}
               min={0.1}
@@ -283,6 +291,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скорости присяда:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editCrouchSpeedMultiplier}
               min={0.1}
@@ -294,6 +303,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
           <label>
             Множитель скрытности присяда:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editCrouchStealthMultiplier}
               min={1}
@@ -305,11 +315,13 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -318,6 +330,7 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
 
 export interface WeaponEditModalProps {
   selectedWeaponForEdit: WeaponConfig | null;
+  isReadOnly?: boolean;
   editWeaponName: string;
   setEditWeaponName: (val: string) => void;
   editWeaponDamage: number;
@@ -346,6 +359,7 @@ export interface WeaponEditModalProps {
 
 export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
   selectedWeaponForEdit,
+  isReadOnly,
   editWeaponName,
   setEditWeaponName,
   editWeaponDamage,
@@ -382,11 +396,12 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры оружия</h3>
+        <h3>{isReadOnly ? 'Параметры оружия' : 'Изменить параметры оружия'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Название:
             <input
+              disabled={isReadOnly}
               type="text"
               value={editWeaponName}
               onChange={(e) => setEditWeaponName(e.target.value)}
@@ -395,6 +410,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
           <label>
             Базовый урон:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editWeaponDamage}
               min={0}
@@ -405,6 +421,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
           <label>
             Подготовка (сек):
             <input
+              disabled={isReadOnly}
               type="number"
               value={editWeaponPrepTime}
               min={0.05}
@@ -416,6 +433,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
           <label>
             Восстановление (сек):
             <input
+              disabled={isReadOnly}
               type="number"
               value={editWeaponRecoveryTime}
               min={0.05}
@@ -429,6 +447,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Дальность / Длина:
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponRange}
                 min={0}
@@ -442,6 +461,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Радиус:
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponRadius}
                 min={0}
@@ -457,6 +477,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Количество лучей / линий:
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponNumLines}
                 min={1}
@@ -470,6 +491,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <label>
               Угол (°):
               <input
+                disabled={isReadOnly}
                 type="number"
                 value={editWeaponAngle}
                 min={0}
@@ -483,6 +505,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
+                  disabled={isReadOnly}
                   type="checkbox"
                   checked={editWeaponPierceObstacles}
                   onChange={(e) => setEditWeaponPierceObstacles(e.target.checked)}
@@ -491,6 +514,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
+                  disabled={isReadOnly}
                   type="checkbox"
                   checked={editWeaponPiercePlayers}
                   onChange={(e) => setEditWeaponPiercePlayers(e.target.checked)}
@@ -499,6 +523,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                 <input
+                  disabled={isReadOnly}
                   type="checkbox"
                   checked={editWeaponPierceBots}
                   onChange={(e) => setEditWeaponPierceBots(e.target.checked)}
@@ -510,11 +535,13 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -523,6 +550,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
 
 export interface ArmorEditModalProps {
   selectedArmorForEdit: ArmorConfig | null;
+  isReadOnly?: boolean;
   editArmorName: string;
   setEditArmorName: (val: string) => void;
   editArmorDefense: number;
@@ -537,6 +565,7 @@ export interface ArmorEditModalProps {
 
 export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
   selectedArmorForEdit,
+  isReadOnly,
   editArmorName,
   setEditArmorName,
   editArmorDefense,
@@ -559,11 +588,12 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры брони</h3>
+        <h3>{isReadOnly ? 'Параметры брони' : 'Изменить параметры брони'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Название:
             <input
+              disabled={isReadOnly}
               type="text"
               value={editArmorName}
               onChange={(e) => setEditArmorName(e.target.value)}
@@ -572,6 +602,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
           <label>
             Защита:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editArmorDefense}
               min={0}
@@ -582,6 +613,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
           <label>
             Поглощение урона:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editArmorFlatReduction}
               min={0}
@@ -592,6 +624,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
           <label>
             Вес:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editArmorWeight}
               min={0}
@@ -602,11 +635,13 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -615,6 +650,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
 
 export interface BagEditModalProps {
   selectedBagForEdit: InventoryConfig | null;
+  isReadOnly?: boolean;
   editBagName: string;
   setEditBagName: (val: string) => void;
   editBagWidth: number;
@@ -633,6 +669,7 @@ export interface BagEditModalProps {
 
 export const BagEditModal: React.FC<BagEditModalProps> = ({
   selectedBagForEdit,
+  isReadOnly,
   editBagName,
   setEditBagName,
   editBagWidth,
@@ -667,11 +704,12 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры сумки</h3>
+        <h3>{isReadOnly ? 'Параметры сумки' : 'Изменить параметры сумки'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Название:
             <input
+              disabled={isReadOnly}
               type="text"
               value={editBagName}
               onChange={(e) => setEditBagName(e.target.value)}
@@ -680,26 +718,26 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
           <label>
             Ширина инвентаря (ячейки):
             <input
+              disabled={!isBagInventoryEmpty || isReadOnly}
               type="number"
               value={editBagWidth}
               min={1}
               max={12}
-              disabled={!isBagInventoryEmpty}
               onChange={(e) => setEditBagWidth(Number(e.target.value))}
             />
           </label>
           <label>
             Высота инвентаря (ячейки):
             <input
+              disabled={!isBagInventoryEmpty || isReadOnly}
               type="number"
               value={editBagHeight}
               min={1}
               max={12}
-              disabled={!isBagInventoryEmpty}
               onChange={(e) => setEditBagHeight(Number(e.target.value))}
             />
           </label>
-          {!isBagInventoryEmpty && (
+          {!isBagInventoryEmpty && !isReadOnly && (
             <p style={{ fontSize: '12px', color: '#e74c3c', margin: '4px 0' }}>
               Размер инвентаря можно изменить только когда сумка пуста
             </p>
@@ -707,6 +745,7 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
           <label>
             Вес:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editBagWeight}
               min={0}
@@ -772,11 +811,13 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
 
         <div className="modal-actions" style={{ marginTop: '16px' }}>
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>

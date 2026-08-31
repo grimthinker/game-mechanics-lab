@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { InventoryConfig, ItemData } from '../../ecs/types';
 
 export interface BagEditModalProps {
   selectedBagForEdit: InventoryConfig | null;
+  isReadOnly?: boolean;
   editBagName: string;
   setEditBagName: (val: string) => void;
   editBagWidth: number;
@@ -21,6 +23,7 @@ export interface BagEditModalProps {
 
 export const BagEditModal: React.FC<BagEditModalProps> = ({
   selectedBagForEdit,
+  isReadOnly,
   editBagName,
   setEditBagName,
   editBagWidth,
@@ -55,11 +58,12 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
     >
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
-        <h3>Изменить параметры сумки</h3>
+        <h3>{isReadOnly ? 'Параметры сумки' : 'Изменить параметры сумки'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Название:
             <input
+              disabled={isReadOnly}
               type="text"
               value={editBagName}
               onChange={(e) => setEditBagName(e.target.value)}
@@ -68,26 +72,26 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
           <label>
             Ширина инвентаря (ячейки):
             <input
+              disabled={!isBagInventoryEmpty || isReadOnly}
               type="number"
               value={editBagWidth}
               min={1}
               max={12}
-              disabled={!isBagInventoryEmpty}
               onChange={(e) => setEditBagWidth(Number(e.target.value))}
             />
           </label>
           <label>
             Высота инвентаря (ячейки):
             <input
+              disabled={!isBagInventoryEmpty || isReadOnly}
               type="number"
               value={editBagHeight}
               min={1}
               max={12}
-              disabled={!isBagInventoryEmpty}
               onChange={(e) => setEditBagHeight(Number(e.target.value))}
             />
           </label>
-          {!isBagInventoryEmpty && (
+          {!isBagInventoryEmpty && !isReadOnly && (
             <p style={{ fontSize: '12px', color: '#e74c3c', margin: '4px 0' }}>
               Размер инвентаря можно изменить только когда сумка пуста
             </p>
@@ -95,6 +99,7 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
           <label>
             Вес:
             <input
+              disabled={isReadOnly}
               type="number"
               value={editBagWeight}
               min={0}
@@ -160,11 +165,13 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
 
         <div className="modal-actions" style={{ marginTop: '16px' }}>
           <button type="button" className="btn" onClick={onClose}>
-            Отмена
+            {isReadOnly ? 'Закрыть' : 'Отмена'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={onConfirm}>
-            Применить
-          </button>
+          {!isReadOnly && (
+            <button type="button" className="btn btn-primary" onClick={onConfirm}>
+              Применить
+            </button>
+          )}
         </div>
       </div>
     </div>
