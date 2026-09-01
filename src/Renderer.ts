@@ -1,4 +1,3 @@
-
 import { World } from './ecs/World';
 import { Camera } from './Camera';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
@@ -19,7 +18,8 @@ export class Renderer {
     physics: PhysicsSystem,
     selectedId: EntityId | null,
     gameMode: string = 'editor',
-    playerId: EntityId | null = null
+    playerId: EntityId | null = null,
+    hoveredId: EntityId | null = null
   ): void {
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -29,7 +29,7 @@ export class Renderer {
 
     this.renderGrid(camera);
     this.renderObstacles(camera, physics);
-    this.renderEntities(world, camera, selectedId, gameMode, playerId);
+    this.renderEntities(world, camera, selectedId, gameMode, playerId, hoveredId);
 
     this.ctx.restore();
   }
@@ -72,7 +72,14 @@ export class Renderer {
     this.ctx.stroke();
   }
 
-  private renderEntities(world: World, camera: Camera, selectedId: EntityId | null, gameMode: string, playerId: EntityId | null): void {
+  private renderEntities(
+    world: World,
+    camera: Camera,
+    selectedId: EntityId | null,
+    gameMode: string,
+    playerId: EntityId | null,
+    hoveredId: EntityId | null
+  ): void {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
 
     const renderBody = (
@@ -135,6 +142,10 @@ export class Renderer {
 
       if (id === selectedId && !isPlayerInGame) {
         this.ctx.strokeStyle = '#f1c40f';
+        this.ctx.lineWidth = 3 / camera.scale;
+        this.ctx.stroke();
+      } else if (id === hoveredId && !isPlayerInGame) {
+        this.ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)';
         this.ctx.lineWidth = 3 / camera.scale;
         this.ctx.stroke();
       }

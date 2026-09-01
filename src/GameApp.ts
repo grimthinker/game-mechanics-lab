@@ -19,7 +19,7 @@ import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { BTNodeDTO } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
-import { GameMode } from './constants';
+import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -35,6 +35,7 @@ export class GameApp {
   public camera: Camera;
 
   public selectedCreature: EntityAdapter | null = null;
+  public hoveredCreature: EntityAdapter | null = null;
   public onFrame: (() => void) | null = null;
 
   private lastTime: number = 0;
@@ -200,6 +201,9 @@ export class GameApp {
       this.physics.unregisterBody(phys.body);
     }
     this.world.removeEntity(id);
+    if (this.hoveredCreature?.id === id) {
+      this.hoveredCreature = null;
+    }
     this.selectedCreature = null;
   }
 
@@ -211,6 +215,7 @@ export class GameApp {
     }
     this.physics.loadObstacles([]);
     this.selectedCreature = null;
+    this.hoveredCreature = null;
   }
 
   public serializeWorld(): any {
@@ -327,7 +332,8 @@ export class GameApp {
       this.physics,
       this.selectedCreature ? this.selectedCreature.id : null,
       this.gameMode,
-      this.playerId
+      this.playerId,
+      this.hoveredCreature ? this.hoveredCreature.id : null
     );
 
     if (this.onFrame) this.onFrame();
@@ -337,6 +343,10 @@ export class GameApp {
 
   public selectCreature(creature: EntityAdapter | null): void {
     this.selectedCreature = creature;
+  }
+
+  public hoverCreature(creature: EntityAdapter | null): void {
+    this.hoveredCreature = creature;
   }
 
   public pickCreatureAt(worldPoint: Point): EntityAdapter | null {
@@ -349,6 +359,32 @@ export class GameApp {
       }
     }
     return null;
+  }
+
+  public pickNearestCreature(
+    worldPoint: Point,
+    maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO
+  ): EntityAdapter | null {
+    const entities = this.world.getEntitiesWith('transform', 'physicsBody', 'meta');
+    const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
+    const maxWorldDist = maxScreenDistancePx / this.camera.scale;
+    let nearest: EntityAdapter | null = null;
+    let minDistance = Infinity;
+
+    for (let i = entities.length - 1; i >= 0; i--) {
+      const [id, { transform, physicsBody }] = entities[i];
+      const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+      const distToBoundary = distToCenter - physicsBody.radius;
+
+      if (distToBoundary <= maxWorldDist) {
+        if (distToBoundary < minDistance) {
+          minDistance = distToBoundary;
+          nearest = new EntityAdapter(id, this.world);
+        }
+      }
+    }
+
+    return nearest;
   }
 
   public startPan(clientX: number, clientY: number): void {
@@ -372,14 +408,19 @@ export class GameApp {
 
   private draggedEntityId: string | null = null;
   private draggedEntityOriginalPos: Point | null = null;
+  private dragOffset: Point = { x: 0, y: 0 };
 
-  public startDraggingCreature(id: string, pos: Point): boolean {
+  public startDraggingCreature(id: string, clickWorldPoint: Point): boolean {
     if (!this.isPaused) return false;
     const transform = this.world.getComponent(id, 'transform');
     if (!transform) return false;
 
     this.draggedEntityId = id;
     this.draggedEntityOriginalPos = { x: transform.x, y: transform.y };
+    this.dragOffset = {
+      x: transform.x - clickWorldPoint.x,
+      y: transform.y - clickWorldPoint.y,
+    };
     return true;
   }
 
@@ -390,13 +431,16 @@ export class GameApp {
     const transform = this.world.getComponent(id, 'transform');
     const phys = this.world.getComponent(id, 'physicsBody');
 
+    const newX = worldPoint.x + this.dragOffset.x;
+    const newY = worldPoint.y + this.dragOffset.y;
+
     if (transform) {
-      transform.x = worldPoint.x;
-      transform.y = worldPoint.y;
+      transform.x = newX;
+      transform.y = newY;
     }
     if (phys && phys.body) {
-      phys.body.x = worldPoint.x;
-      phys.body.y = worldPoint.y;
+      phys.body.x = newX;
+      phys.body.y = newY;
     }
   }
 
@@ -406,7 +450,17 @@ export class GameApp {
       this.draggedEntityOriginalPos = null;
       return;
     }
-    this.updateDraggedCreaturePosition(this.draggedEntityOriginalPos);
+    const id = this.draggedEntityId;
+    const transform = this.world.getComponent(id, 'transform');
+    const phys = this.world.getComponent(id, 'physicsBody');
+    if (transform) {
+      transform.x = this.draggedEntityOriginalPos.x;
+      transform.y = this.draggedEntityOriginalPos.y;
+    }
+    if (phys && phys.body) {
+      phys.body.x = this.draggedEntityOriginalPos.x;
+      phys.body.y = this.draggedEntityOriginalPos.y;
+    }
     this.draggedEntityId = null;
     this.draggedEntityOriginalPos = null;
   }
@@ -419,5 +473,4 @@ export class GameApp {
   public isDraggingCreature(): boolean {
     return this.draggedEntityId !== null;
   }
-
 }

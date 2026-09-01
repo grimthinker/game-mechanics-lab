@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react';
 import { GameApp } from '../GameApp';
 import { CreatureType, StandardRadius } from '../ecs/types';
@@ -59,13 +58,9 @@ export const useCanvasInteraction = ({
     if (e.button === 0 && app) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
       
-      if (app.isPaused && mode === GameMode.EDITOR) {
+      if (!placementConfig && app.isPaused && mode === GameMode.EDITOR) {
         const creature = app.pickCreatureAt(point);
         if (creature) {
-          app.selectCreature(creature);
-          syncPlayerControls();
-          updateStats();
-
           clickedCreatureIdRef.current = creature.id;
           dragStartPosRef.current = { x: e.clientX, y: e.clientY };
           e.currentTarget.style.cursor = 'grabbing';
@@ -84,8 +79,16 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app) return;
 
+    const point = app.getCanvasPoint(e.clientX, e.clientY);
+
+    if (placementConfig) {
+      app.hoverCreature(null);
+    } else {
+      const nearest = app.pickNearestCreature(point);
+      app.hoverCreature(nearest);
+    }
+
     if (app.isDraggingCreature() && mode === GameMode.EDITOR) {
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
       app.updateDraggedCreaturePosition(point);
       e.currentTarget.style.cursor = 'grabbing';
       return;
@@ -95,8 +98,10 @@ export const useCanvasInteraction = ({
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
       if (Math.hypot(dx, dy) > 5) {
-        const worldPoint = app.getCanvasPoint(dragStartPosRef.current.x, dragStartPosRef.current.y);
-        app.startDraggingCreature(clickedCreatureIdRef.current, worldPoint);
+        const clickWorldPoint = app.getCanvasPoint(dragStartPosRef.current.x, dragStartPosRef.current.y);
+        app.startDraggingCreature(clickedCreatureIdRef.current, clickWorldPoint);
+        app.updateDraggedCreaturePosition(point);
+        e.currentTarget.style.cursor = 'grabbing';
         return;
       }
     }
@@ -105,12 +110,9 @@ export const useCanvasInteraction = ({
 
     if (e.buttons === 1) {
       e.currentTarget.style.cursor = 'grabbing';
-      return;
+    } else {
+      e.currentTarget.style.cursor = 'grab';
     }
-
-    const point = app.getCanvasPoint(e.clientX, e.clientY);
-    const creature = app.pickCreatureAt(point);
-    e.currentTarget.style.cursor = creature ? 'pointer' : 'grab';
   };
 
   const handleMouseUp = (e: ReactMouseEvent<HTMLCanvasElement>) => {
@@ -119,16 +121,15 @@ export const useCanvasInteraction = ({
 
     if (app.isDraggingCreature() && mode === GameMode.EDITOR) {
       app.endCreatureDrag();
+      app.endPan();
       updateStats();
       clickedCreatureIdRef.current = null;
       dragStartPosRef.current = null;
-
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
-      const creature = app.pickCreatureAt(point);
-      e.currentTarget.style.cursor = creature ? 'pointer' : 'grab';
+      e.currentTarget.style.cursor = 'grab';
       return;
     }
 
+    const hadClickedCreature = clickedCreatureIdRef.current;
     clickedCreatureIdRef.current = null;
     dragStartPosRef.current = null;
 
@@ -152,41 +153,44 @@ export const useCanvasInteraction = ({
         syncPlayerControls();
         updateStats();
       }
-      
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
-      const creature = app.pickCreatureAt(point);
-      e.currentTarget.style.cursor = creature ? 'pointer' : 'grab';
+      e.currentTarget.style.cursor = 'grab';
+      return;
+    }
+
+    if (hadClickedCreature && mode === GameMode.EDITOR && app.isPaused) {
+      const creature = app.pickCreatureAt(app.getCanvasPoint(e.clientX, e.clientY));
+      app.selectCreature(creature);
+      syncPlayerControls();
+      updateStats();
+      e.currentTarget.style.cursor = 'grab';
       return;
     }
 
     const wasDragging = app.endPan();
-    if (!wasDragging && !app.isPaused) {
+    if (!wasDragging) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
-      app.selectCreature(app.pickCreatureAt(point));
-      syncPlayerControls();
-      updateStats();
-    } else if (!wasDragging && app.isPaused && mode !== GameMode.EDITOR) {
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
-      app.selectCreature(app.pickCreatureAt(point));
+      const targetCreature = app.pickNearestCreature(point);
+      app.selectCreature(targetCreature);
       syncPlayerControls();
       updateStats();
     }
 
-    const point = app.getCanvasPoint(e.clientX, e.clientY);
-    const creature = app.pickCreatureAt(point);
-    e.currentTarget.style.cursor = creature ? 'pointer' : 'grab';
+    e.currentTarget.style.cursor = 'grab';
   };
 
   const handleMouseLeave = () => {
     const app = appRef.current;
-    if (app?.isDraggingCreature()) {
-      app.cancelCreatureDrag();
+    if (app) {
+      if (app.isDraggingCreature()) {
+        app.cancelCreatureDrag();
+      }
+      app.endPan();
+      app.hoverCreature(null);
     }
-    appRef.current?.endPan();
     clickedCreatureIdRef.current = null;
     dragStartPosRef.current = null;
     if (canvasRef.current) {
-      canvasRef.current.style.cursor = 'default';
+      canvasRef.current.style.cursor = 'grab';
     }
   };
 

@@ -15,3 +15,5 @@ export const TOOL_GROUP_THEME_COLORS = {
     [GameMode.SIMULATION]: '#1e3b25',
     [GameMode.GAME]: '#352047',
 };
+
+export const CREATURE_HOVER_SCREEN_RATIO = 0.08;
