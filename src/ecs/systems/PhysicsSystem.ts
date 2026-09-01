@@ -116,48 +116,46 @@ export class PhysicsSystem {
     });
   }
 
-  public getNearestEntity(worldPoint: Point, maxWorldDist: number): EntityId | null {
-    const searchBody = new Circle(worldPoint, maxWorldDist);
+  public getNearestEntity(
+    worldPoint: Point,
+    maxWorldDist: number,
+    world?: World
+  ): EntityId | null {
+    if (!world) {
+      return null;
+    }
+
     let nearestId: EntityId | null = null;
     let minDistance = Infinity;
 
-    this.system.checkOne(searchBody, (response) => {
-      const other = response.b === searchBody ? response.a : response.b;
-      if (other instanceof Circle) {
-        const entityId = this.bodyToEntityMap.get(other);
-        if (entityId) {
-          const distToCenter = Math.hypot(other.x - worldPoint.x, other.y - worldPoint.y);
-          const distToBoundary = distToCenter - other.r;
+    const entities = world.getEntitiesWith('transform', 'physicsBody');
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+      const distToBoundary = Math.max(0, distToCenter - physicsBody.radius);
 
-          if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
-            minDistance = distToBoundary;
-            nearestId = entityId;
-          }
-        }
+      if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
+        minDistance = distToBoundary;
+        nearestId = entityId;
       }
-    });
+    }
 
     return nearestId;
   }
 
-  public getEntityAt(worldPoint: Point): EntityId | null {
-    const searchPoint = new Circle(worldPoint, 0.5);
-    let foundId: EntityId | null = null;
+  public getEntityAt(worldPoint: Point, world?: World): EntityId | null {
+    if (!world) {
+      return null;
+    }
 
-    this.system.checkOne(searchPoint, (response) => {
-      const other = response.b === searchPoint ? response.a : response.b;
-      if (other instanceof Circle) {
-        const entityId = this.bodyToEntityMap.get(other);
-        if (entityId) {
-          const dist = Math.hypot(other.x - worldPoint.x, other.y - worldPoint.y);
-          if (dist <= other.r) {
-            foundId = entityId;
-          }
-        }
+    const entities = world.getEntitiesWith('transform', 'physicsBody');
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+      if (dist <= physicsBody.radius) {
+        return entityId;
       }
-    });
+    }
 
-    return foundId;
+    return null;
   }
 
   public update(dt: number, world: World): void {

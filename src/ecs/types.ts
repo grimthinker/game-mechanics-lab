@@ -111,12 +111,7 @@ export interface CreatureMetaComponent {
   state: CreatureState;
 }
 
-export interface ItemComponent {
-  id: string;
-  name: string;
-  type: ItemType;
-  config?: WeaponConfig | ItemConfig | ArmorConfig | InventoryConfig;
-}
+export type ItemComponent = ItemData;
 
 export interface EntityComponents {
   transform?: TransformComponent;

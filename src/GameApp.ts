@@ -350,7 +350,7 @@ export class GameApp {
   }
 
   public pickCreatureAt(worldPoint: Point): EntityAdapter | null {
-    const id = this.physics.getEntityAt(worldPoint);
+    const id = this.physics.getEntityAt(worldPoint, this.world);
     return id ? new EntityAdapter(id, this.world) : null;
   }
 
@@ -361,7 +361,7 @@ export class GameApp {
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
 
-    const nearestId = this.physics.getNearestEntity(worldPoint, maxWorldDist);
+    const nearestId = this.physics.getNearestEntity(worldPoint, maxWorldDist, this.world);
     return nearestId ? new EntityAdapter(nearestId, this.world) : null;
   }
 
