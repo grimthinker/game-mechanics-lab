@@ -100,10 +100,10 @@ export class PhysicsSystem {
 
   private resolveObstaclesForBody(body: Circle): void {
     if (!this.obstaclesEnabled) return;
-    const potentials = this.system.getPotentials(body);
-    for (const wall of potentials) {
-      if (wall instanceof Line && this.system.checkCollision(body, wall)) {
-        const response = this.system.response;
+
+    this.system.checkOne(body, (response) => {
+      const wall = response.b === body ? response.a : response.b;
+      if (wall instanceof Line) {
         const pushX =
           response.overlap * response.overlapV.x +
           PHYSICS_CONFIG.B * Math.sign(response.overlapV.x);
@@ -113,7 +113,51 @@ export class PhysicsSystem {
 
         body.setPosition(body.x - pushX, body.y - pushY);
       }
-    }
+    });
+  }
+
+  public getNearestEntity(worldPoint: Point, maxWorldDist: number): EntityId | null {
+    const searchBody = new Circle(worldPoint, maxWorldDist);
+    let nearestId: EntityId | null = null;
+    let minDistance = Infinity;
+
+    this.system.checkOne(searchBody, (response) => {
+      const other = response.b === searchBody ? response.a : response.b;
+      if (other instanceof Circle) {
+        const entityId = this.bodyToEntityMap.get(other);
+        if (entityId) {
+          const distToCenter = Math.hypot(other.x - worldPoint.x, other.y - worldPoint.y);
+          const distToBoundary = distToCenter - other.r;
+
+          if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
+            minDistance = distToBoundary;
+            nearestId = entityId;
+          }
+        }
+      }
+    });
+
+    return nearestId;
+  }
+
+  public getEntityAt(worldPoint: Point): EntityId | null {
+    const searchPoint = new Circle(worldPoint, 0.5);
+    let foundId: EntityId | null = null;
+
+    this.system.checkOne(searchPoint, (response) => {
+      const other = response.b === searchPoint ? response.a : response.b;
+      if (other instanceof Circle) {
+        const entityId = this.bodyToEntityMap.get(other);
+        if (entityId) {
+          const dist = Math.hypot(other.x - worldPoint.x, other.y - worldPoint.y);
+          if (dist <= other.r) {
+            foundId = entityId;
+          }
+        }
+      }
+    });
+
+    return foundId;
   }
 
   public update(dt: number, world: World): void {

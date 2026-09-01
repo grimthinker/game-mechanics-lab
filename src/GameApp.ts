@@ -350,41 +350,19 @@ export class GameApp {
   }
 
   public pickCreatureAt(worldPoint: Point): EntityAdapter | null {
-    const entities = this.world.getEntitiesWith('transform', 'physicsBody', 'meta');
-    for (let i = entities.length - 1; i >= 0; i--) {
-      const [id, { transform, physicsBody }] = entities[i];
-      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      if (dist <= physicsBody.radius) {
-        return new EntityAdapter(id, this.world);
-      }
-    }
-    return null;
+    const id = this.physics.getEntityAt(worldPoint);
+    return id ? new EntityAdapter(id, this.world) : null;
   }
 
   public pickNearestCreature(
     worldPoint: Point,
     maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO
   ): EntityAdapter | null {
-    const entities = this.world.getEntitiesWith('transform', 'physicsBody', 'meta');
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
-    let nearest: EntityAdapter | null = null;
-    let minDistance = Infinity;
 
-    for (let i = entities.length - 1; i >= 0; i--) {
-      const [id, { transform, physicsBody }] = entities[i];
-      const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      const distToBoundary = distToCenter - physicsBody.radius;
-
-      if (distToBoundary <= maxWorldDist) {
-        if (distToBoundary < minDistance) {
-          minDistance = distToBoundary;
-          nearest = new EntityAdapter(id, this.world);
-        }
-      }
-    }
-
-    return nearest;
+    const nearestId = this.physics.getNearestEntity(worldPoint, maxWorldDist);
+    return nearestId ? new EntityAdapter(nearestId, this.world) : null;
   }
 
   public startPan(clientX: number, clientY: number): void {
