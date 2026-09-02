@@ -315,7 +315,6 @@ export class Renderer {
             this.ctx.stroke();
             break;
           }
-          case 'line':
           case 'forward_line': {
             const len = zone.length ?? zone.range ?? 150;
             this.ctx.beginPath();
@@ -336,15 +335,6 @@ export class Renderer {
               this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
               this.ctx.stroke();
             }
-            break;
-          }
-          case 'offset_radius': {
-            const offset = zone.offsetDistance ?? 70;
-            const r = zone.radius ?? 35;
-            this.ctx.beginPath();
-            this.ctx.arc(offset, 0, r, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.stroke();
             break;
           }
         }

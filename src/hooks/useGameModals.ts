@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { CreatureType, StandardRadius, InventoryConfig, ItemData } from '../ecs/types';
+import { CreatureType, StandardRadius, InventoryConfig, ItemData, WeaponConfig } from '../ecs/types';
 import { GameApp } from '../GameApp';
 import { Circle } from 'detect-collisions';
+import { lastAddedWeaponConfigState } from '../Weapon';
 
 interface UseGameModalsProps {
   appRef: React.RefObject<GameApp | null>;
@@ -112,50 +113,54 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     const itemComp = app.world.getComponent(entityId, 'item');
     
     if (itemComp) {
-        Object.assign(itemComp, updatedItem);
-        if (app.selectedItem && app.selectedItem.id === entityId) {
-            app.selectedItem.data = itemComp;
+      Object.assign(itemComp, updatedItem);
+      if (app.selectedItem && app.selectedItem.id === entityId) {
+        app.selectedItem.data = itemComp;
+      }
+      
+      const phys = app.world.getComponent(entityId, 'physicsBody');
+      const wasSolid = !!phys;
+      const isSolidNow = !!updatedItem.config?.isSolid;
+      
+      if (!wasSolid && isSolidNow) {
+        const rad = updatedItem.config?.radius ?? 16;
+        const mass = updatedItem.config?.invWeight || 1;
+        const transform = app.world.getComponent(entityId, 'transform');
+        if (transform) {
+          const body = new Circle({ x: transform.x, y: transform.y }, rad);
+          body.isStatic = false;
+          app.world.addComponent(entityId, 'physicsBody', { body, radius: rad, mass, isStatic: false });
+          app.physics.registerBody(entityId, body);
         }
-        
-        const phys = app.world.getComponent(entityId, 'physicsBody');
-        const wasSolid = !!phys;
-        const isSolidNow = !!updatedItem.config?.isSolid;
-        
-        if (!wasSolid && isSolidNow) {
-            const radius = updatedItem.config?.radius ?? 16;
-            const mass = updatedItem.config?.invWeight || 1;
-            const transform = app.world.getComponent(entityId, 'transform');
-            if (transform) {
-                const body = new Circle({ x: transform.x, y: transform.y }, radius);
-                body.isStatic = false;
-                app.world.addComponent(entityId, 'physicsBody', { body, radius, mass, isStatic: false });
-                app.physics.registerBody(entityId, body);
-            }
-        } else if (wasSolid && !isSolidNow) {
-            app.physics.unregisterBody(phys!.body);
-            app.world.removeComponent(entityId, 'physicsBody');
-        } else if (wasSolid && isSolidNow) {
-            const newRadius = updatedItem.config?.radius ?? 16;
-            if (phys!.radius !== newRadius) {
-                phys!.radius = newRadius;
-                phys!.body.r = newRadius;
-            }
+      } else if (wasSolid && !isSolidNow) {
+        app.physics.unregisterBody(phys!.body);
+        app.world.removeComponent(entityId, 'physicsBody');
+      } else if (wasSolid && isSolidNow) {
+        const newRadius = updatedItem.config?.radius ?? 16;
+        if (phys!.radius !== newRadius) {
+          phys!.radius = newRadius;
+          phys!.body.r = newRadius;
         }
+      }
     }
 
     if (selectedItemForEdit) {
-        Object.assign(selectedItemForEdit, updatedItem);
+      Object.assign(selectedItemForEdit, updatedItem);
     }
     
+    if (updatedItem.type === 'weapon') {
+      lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(updatedItem.config as WeaponConfig));
+    }
+
     const c = app.selectedCreature;
     if (c && updatedItem.type === 'bag') {
-        const isInventoryEmpty = !c.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.item));
-        const bagCfg = updatedItem.config as InventoryConfig;
-        if (isInventoryEmpty) {
-            if (c.equip?.slots.find(s => s.type === 'bag')?.item === selectedItemForEdit) {
-                c.updateInventorySize(bagCfg.size.width, bagCfg.size.height);
-            }
+      const isInventoryEmpty = !c.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.item));
+      const bagCfg = updatedItem.config as InventoryConfig;
+      if (isInventoryEmpty) {
+        if (c.equip?.slots.find((s) => s.type === 'bag')?.item === selectedItemForEdit) {
+          c.updateInventorySize(bagCfg.size.width, bagCfg.size.height);
         }
+      }
     }
 
     setSelectedItemForEdit(null);
@@ -163,23 +168,61 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   };
 
   return {
-    isModalOpen, pendingSpawnType, setPendingSpawnType,
-    radius, setRadius, mass, setMass,
-    maxSpeed, setMaxSpeed, maxTurnSpeed, setMaxTurnSpeed,
-    runSpeedMultiplier, setRunSpeedMultiplier, crouchSpeedMultiplier, setCrouchSpeedMultiplier,
-    crouchStealthMultiplier, setCrouchStealthMultiplier,
-    runTurnMultiplier, setRunTurnMultiplier, crouchTurnMultiplier, setCrouchTurnMultiplier,
-    openSpawnModal, closeSpawnModal,
-    isItemSpawnModalOpen, openItemSpawnModal, closeItemSpawnModal,
-    isEditModalOpen, editType, setEditType,
-    editRadius, setEditRadius, editMaxSpeed, setEditMaxSpeed,
-    editMaxTurnSpeed, setEditMaxTurnSpeed, editHp, setEditHp,
-    editMaxHp, setEditMaxHp, editRunSpeedMultiplier, setEditRunSpeedMultiplier,
-    editCrouchSpeedMultiplier, setEditCrouchSpeedMultiplier,
-    editCrouchStealthMultiplier, setEditCrouchStealthMultiplier,
-    editRunTurnMultiplier, setEditRunTurnMultiplier,
-    editCrouchTurnMultiplier, setEditCrouchTurnMultiplier,
-    openEditModal, closeEditModal, handleEditConfirm,
-    selectedItemForEdit, openItemEditModal, closeItemEditModal, handleItemEditConfirm
+    isModalOpen,
+    pendingSpawnType,
+    setPendingSpawnType,
+    radius,
+    setRadius,
+    mass,
+    setMass,
+    maxSpeed,
+    setMaxSpeed,
+    maxTurnSpeed,
+    setMaxTurnSpeed,
+    runSpeedMultiplier,
+    setRunSpeedMultiplier,
+    crouchSpeedMultiplier,
+    setCrouchSpeedMultiplier,
+    crouchStealthMultiplier,
+    setCrouchStealthMultiplier,
+    runTurnMultiplier,
+    setRunTurnMultiplier,
+    crouchTurnMultiplier,
+    setCrouchTurnMultiplier,
+    openSpawnModal,
+    closeSpawnModal,
+    isItemSpawnModalOpen,
+    openItemSpawnModal,
+    closeItemSpawnModal,
+    isEditModalOpen,
+    editType,
+    setEditType,
+    editRadius,
+    setEditRadius,
+    editMaxSpeed,
+    setEditMaxSpeed,
+    editMaxTurnSpeed,
+    setEditMaxTurnSpeed,
+    editHp,
+    setEditHp,
+    editMaxHp,
+    setEditMaxHp,
+    editRunSpeedMultiplier,
+    setEditRunSpeedMultiplier,
+    editCrouchSpeedMultiplier,
+    setEditCrouchSpeedMultiplier,
+    editCrouchStealthMultiplier,
+    setEditCrouchStealthMultiplier,
+    editRunTurnMultiplier,
+    setEditRunTurnMultiplier,
+    editCrouchTurnMultiplier,
+    setEditCrouchTurnMultiplier,
+    openEditModal,
+    closeEditModal,
+    handleEditConfirm,
+    selectedItemForEdit,
+    openItemEditModal,
+    closeItemEditModal,
+    handleItemEditConfirm,
   };
 }

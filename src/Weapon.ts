@@ -1,10 +1,80 @@
-import { WeaponConfig, ItemData } from './ecs/types';
+import { WeaponConfig, ItemData, HitZoneType } from './ecs/types';
+
+export const HIT_ZONE_LABELS: Record<HitZoneType, string> = {
+  angle: 'Сектор',
+  radius: 'Аура',
+  forward_line: 'Прямая линия',
+  shrapnel: 'Шрапнель',
+};
+
+export interface ZoneTypeParams {
+  range: number;
+  radius: number;
+  angle: number;
+  numLines: number;
+  pierceObstacles: boolean;
+  piercePlayers: boolean;
+  pierceBots: boolean;
+}
+
+export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
+  angle: {
+    range: 100,
+    radius: 50,
+    angle: 30,
+    numLines: 5,
+    pierceObstacles: false,
+    piercePlayers: false,
+    pierceBots: false,
+  },
+  radius: {
+    range: 100,
+    radius: 50,
+    angle: 30,
+    numLines: 5,
+    pierceObstacles: false,
+    piercePlayers: false,
+    pierceBots: false,
+  },
+  forward_line: {
+    range: 150,
+    radius: 50,
+    angle: 30,
+    numLines: 5,
+    pierceObstacles: false,
+    piercePlayers: false,
+    pierceBots: false,
+  },
+  shrapnel: {
+    range: 120,
+    radius: 50,
+    angle: 60,
+    numLines: 5,
+    pierceObstacles: false,
+    piercePlayers: false,
+    pierceBots: false,
+  },
+};
+
+// Глобальное состояние последнего добавленного оружия и параметров для каждого типа зоны
+export const lastAddedWeaponConfigState: {
+  config: WeaponConfig | null;
+  zoneParamsMap: Record<HitZoneType, ZoneTypeParams>;
+} = {
+  config: null,
+  zoneParamsMap: {
+    angle: { ...DEFAULT_ZONE_PARAMS.angle },
+    radius: { ...DEFAULT_ZONE_PARAMS.radius },
+    forward_line: { ...DEFAULT_ZONE_PARAMS.forward_line },
+    shrapnel: { ...DEFAULT_ZONE_PARAMS.shrapnel },
+  },
+};
 
 export function createDefaultWeapons(): WeaponConfig[] {
   const weapons: WeaponConfig[] = [
     {
-      id: `weapon_line_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Прямой удар (Линия)',
+      id: `weapon_forward_line_${Math.random().toString(36).substring(2, 6)}`,
+      name: 'Прямая линия',
       prepTime: 0.2,
       recoveryTime: 0.3,
       prepTurnSlow: 0.5,
@@ -22,11 +92,11 @@ export function createDefaultWeapons(): WeaponConfig[] {
       },
       invWeight: 1,
       radius: 16,
-      isSolid: true
+      isSolid: true,
     },
     {
       id: `weapon_angle_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Угловой взмах',
+      name: 'Сектор',
       prepTime: 0.25,
       recoveryTime: 0.35,
       prepTurnSlow: 0.4,
@@ -45,11 +115,11 @@ export function createDefaultWeapons(): WeaponConfig[] {
       },
       invWeight: 1,
       radius: 16,
-      isSolid: true
+      isSolid: true,
     },
     {
       id: `weapon_radius_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Радиусная аура',
+      name: 'Аура',
       prepTime: 0.3,
       recoveryTime: 0.4,
       prepTurnSlow: 0.6,
@@ -67,11 +137,11 @@ export function createDefaultWeapons(): WeaponConfig[] {
       },
       invWeight: 1,
       radius: 16,
-      isSolid: true
+      isSolid: true,
     },
     {
       id: `weapon_shrapnel_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Шрапнель (Веер)',
+      name: 'Шрапнель',
       prepTime: 0.4,
       recoveryTime: 0.5,
       prepTurnSlow: 0.3,
@@ -91,30 +161,7 @@ export function createDefaultWeapons(): WeaponConfig[] {
       },
       invWeight: 1,
       radius: 16,
-      isSolid: true
-    },
-    {
-      id: `weapon_offset_radius_${Math.random().toString(36).substring(2, 6)}`,
-      name: 'Выносная сфера',
-      prepTime: 0.2,
-      recoveryTime: 0.3,
-      prepTurnSlow: 0.5,
-      recoveryTurnSlow: 0.8,
-      prepMoveSlow: 0.5,
-      recoveryMoveSlow: 0.8,
-      baseDamage: 22,
-      minMultiplier: 0.85,
-      maxMultiplier: 1.15,
-      critChance: 0.15,
-      critMultiplier: 2.0,
-      zone: {
-        hitZoneType: 'offset_radius',
-        offsetDistance: 70,
-        radius: 35,
-      },
-      invWeight: 1,
-      radius: 16,
-      isSolid: true
+      isSolid: true,
     },
   ];
 

@@ -135,24 +135,24 @@ export type StandardRadius = (typeof STANDARD_RADII)[number];
 
 export type CreatureState = 'idle' | 'moving' | 'running' | 'crouching' | 'attacking' | 'dead';
 
-export type HitZoneType = 'radius' | 'angle' | 'line' | 'shrapnel' | 'forward_line' | 'offset_radius';
+export type HitZoneType = 'radius' | 'angle' | 'forward_line' | 'shrapnel';
 
 export type InventorySize = {
   width: number;
   height: number;
-}
+};
 
 export interface ItemConfig {
-    id: string;
-    name: string;
-    invWeight: number;
-    radius: StandardRadius;
-    isSolid?: boolean;
-    maxStack?: number;
+  id: string;
+  name: string;
+  invWeight: number;
+  radius: StandardRadius;
+  isSolid?: boolean;
+  maxStack?: number;
 }
 
 export interface InventoryConfig extends ItemConfig {
-  size: InventorySize
+  size: InventorySize;
 }
 
 export interface ArmorConfig extends ItemConfig {
@@ -166,11 +166,10 @@ export type HitZoneConfig = {
   angle?: number;
   length?: number;
   rayCount?: number;
-  offsetDistance?: number;
   pierceObstacles?: boolean;
   piercePlayers?: boolean;
   pierceBots?: boolean;
-}
+};
 
 export interface WeaponConfig extends ItemConfig {
   prepTime: number;
@@ -226,9 +225,9 @@ export interface IMovable {
 }
 
 export interface EntityController {
-    stop: () => boolean;
-    look_in_dir: (angle: number) => boolean;
-    look_at_pos: (target_pos: Point) => boolean;
-    attack: (id_target?: string) => boolean;
-    getPos: () => Point;
+  stop: () => boolean;
+  look_in_dir: (angle: number) => boolean;
+  look_at_pos: (target_pos: Point) => boolean;
+  attack: (id_target?: string) => boolean;
+  getPos: () => Point;
 }

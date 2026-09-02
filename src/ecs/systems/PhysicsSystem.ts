@@ -1,9 +1,7 @@
-
 import { System, Line, Circle } from 'detect-collisions';
 import { World } from '../World';
 import { EntityId, WeaponConfig } from '../types';
 import { ObstacleSegment, Point } from '../../types';
-import { vec2_distance_to } from '../../utils';
 
 const PHYSICS_CONFIG = {
   A: 10,
@@ -423,7 +421,6 @@ export class PhysicsSystem {
           }
           break;
         }
-        case 'line':
         case 'forward_line': {
           const len = weapon.zone.length ?? 150;
           const endPoint = {
@@ -456,22 +453,6 @@ export class PhysicsSystem {
                 break;
               }
             }
-          }
-          break;
-        }
-        case 'offset_radius': {
-          const maxOffset = weapon.zone.offsetDistance ?? 70;
-          const r = weapon.zone.radius ?? 35;
-          
-          const distToTarget = vec2_distance_to(targetPos, pos);
-          const offset = Math.min(distToTarget, maxOffset);
-        
-          const centerX = pos.x + Math.cos(angle) * offset;
-          const centerY = pos.y + Math.sin(angle) * offset;
-          const dCenter = vec2_distance_to(targetPos, {x: centerX, y: centerY});
-          
-          if (dCenter <= r + physicsBody.radius) {
-            isHit = !this.isLineOfSightBlocked(pos, targetPos);
           }
           break;
         }
