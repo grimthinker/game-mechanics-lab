@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { CreatureType, StandardRadius, WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
+import { CreatureType, StandardRadius, InventoryConfig, ItemData } from '../ecs/types';
 import { GameApp } from '../GameApp';
+import { Circle } from 'detect-collisions';
 
 interface UseGameModalsProps {
   appRef: React.RefObject<GameApp | null>;
@@ -34,35 +35,11 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [editRunTurnMultiplier, setEditRunTurnMultiplier] = useState<number>(0.8);
   const [editCrouchTurnMultiplier, setEditCrouchTurnMultiplier] = useState<number>(1.2);
 
-  const [selectedWeaponForEdit, setSelectedWeaponForEdit] = useState<WeaponConfig | null>(null);
-  const [editWeaponName, setEditWeaponName] = useState<string>('');
-  const [editWeaponWeight, setEditWeaponWeight] = useState<number>(1);
-  const [editWeaponDamage, setEditWeaponDamage] = useState<number>(25);
-  const [editWeaponPrepTime, setEditWeaponPrepTime] = useState<number>(0.2);
-  const [editWeaponRecoveryTime, setEditWeaponRecoveryTime] = useState<number>(0.3);
-  const [editWeaponRange, setEditWeaponRange] = useState<number>(0);
-  const [editWeaponRadius, setEditWeaponRadius] = useState<number>(0);
-  const [editWeaponNumLines, setEditWeaponNumLines] = useState<number>(1);
-  const [editWeaponAngle, setEditWeaponAngle] = useState<number>(0);
-  const [editWeaponPierceObstacles, setEditWeaponPierceObstacles] = useState<boolean>(false);
-  const [editWeaponPiercePlayers, setEditWeaponPiercePlayers] = useState<boolean>(false);
-  const [editWeaponPierceBots, setEditWeaponPierceBots] = useState<boolean>(false);
-
-  const [selectedArmorForEdit, setSelectedArmorForEdit] = useState<ArmorConfig | null>(null);
-  const [editArmorName, setEditArmorName] = useState<string>('');
-  const [editArmorDefense, setEditArmorDefense] = useState<number>(15);
-  const [editArmorFlatReduction, setEditArmorFlatReduction] = useState<number>(3);
-  const [editArmorWeight, setEditArmorWeight] = useState<number>(3);
-
-  const [selectedBagForEdit, setSelectedBagForEdit] = useState<InventoryConfig | null>(null);
-  const [editBagName, setEditBagName] = useState<string>('');
-  const [editBagWidth, setEditBagWidth] = useState<number>(6);
-  const [editBagHeight, setEditBagHeight] = useState<number>(4);
-  const [editBagWeight, setEditBagWeight] = useState<number>(1);
-
   const [isItemSpawnModalOpen, setIsItemSpawnModalOpen] = useState(false);
   const openItemSpawnModal = () => setIsItemSpawnModalOpen(true);
   const closeItemSpawnModal = () => setIsItemSpawnModalOpen(false);
+
+  const [selectedItemForEdit, setSelectedItemForEdit] = useState<ItemData | null>(null);
 
   const openSpawnModal = (type?: CreatureType) => {
     if (type) {
@@ -119,187 +96,90 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     updateStats();
   };
 
-  const openWeaponEditModal = (weapon: WeaponConfig) => {
-    const w = weapon as any;
-    const zone = w.zone || {};
-    setSelectedWeaponForEdit(weapon);
-    setEditWeaponName(w.name || '');
-    setEditWeaponWeight(w.invWeight ?? 1);
-    setEditWeaponDamage(w.baseDamage ?? 25);
-    setEditWeaponPrepTime(w.prepTime ?? 0.2);
-    setEditWeaponRecoveryTime(w.recoveryTime ?? 0.3);
-    setEditWeaponRange(zone.length ?? zone.range ?? 0);
-    setEditWeaponRadius(zone.radius ?? zone.offsetDistance ?? 0);
-    setEditWeaponNumLines(zone.rayCount ?? zone.numLines ?? zone.lines ?? 1);
-    setEditWeaponAngle(zone.angle !== undefined ? Math.round((zone.angle * 180) / Math.PI) : 0);
-    setEditWeaponPierceObstacles(!!zone.pierceObstacles);
-    setEditWeaponPiercePlayers(!!zone.piercePlayers);
-    setEditWeaponPierceBots(!!zone.pierceBots);
-  };
-
-  const closeWeaponEditModal = () => setSelectedWeaponForEdit(null);
-
-  const handleWeaponEditConfirm = () => {
-    if (!selectedWeaponForEdit) return;
-    const w = selectedWeaponForEdit as any;
-    if (!w.zone) w.zone = {};
-
-    w.name = editWeaponName;
-    w.invWeight = editWeaponWeight;
-    w.baseDamage = editWeaponDamage;
-    w.prepTime = editWeaponPrepTime;
-    w.recoveryTime = editWeaponRecoveryTime;
-
-    if (w.zone.length !== undefined || w.zone.range !== undefined || editWeaponRange > 0) {
-      if (w.zone.length !== undefined) w.zone.length = editWeaponRange;
-      if (w.zone.range !== undefined) w.zone.range = editWeaponRange;
-      if (w.zone.length === undefined && w.zone.range === undefined) w.zone.length = editWeaponRange;
-    }
-
-    if (w.zone.radius !== undefined) {
-      w.zone.radius = editWeaponRadius;
-    } else if (w.zone.offsetDistance !== undefined && w.zone.hitZoneType === 'offset_radius') {
-      w.zone.radius = editWeaponRadius;
-    }
-
-    if (w.zone.rayCount !== undefined) w.zone.rayCount = editWeaponNumLines;
-    if (w.zone.numLines !== undefined) w.zone.numLines = editWeaponNumLines;
-    if (w.zone.lines !== undefined) w.zone.lines = editWeaponNumLines;
-
-    if (w.zone.angle !== undefined) {
-      w.zone.angle = (editWeaponAngle * Math.PI) / 180;
-    }
-
-    w.zone.pierceObstacles = editWeaponPierceObstacles;
-    w.zone.piercePlayers = editWeaponPiercePlayers;
-    w.zone.pierceBots = editWeaponPierceBots;
-
-    closeWeaponEditModal();
-    updateStats();
-  };
-
-  const openArmorEditModal = (armor: ArmorConfig) => {
-    setSelectedArmorForEdit(armor);
-    setEditArmorName(armor.name || '');
-    setEditArmorDefense(armor.defense ?? 15);
-    setEditArmorFlatReduction(armor.flat_reduction ?? 3);
-    setEditArmorWeight(armor.invWeight ?? 3);
-  };
-
-  const closeArmorEditModal = () => setSelectedArmorForEdit(null);
-
-  const handleArmorEditConfirm = () => {
-    if (!selectedArmorForEdit) return;
-    selectedArmorForEdit.name = editArmorName;
-    selectedArmorForEdit.defense = editArmorDefense;
-    selectedArmorForEdit.flat_reduction = editArmorFlatReduction;
-    selectedArmorForEdit.invWeight = editArmorWeight;
-    closeArmorEditModal();
-    updateStats();
-  };
-
-  const openBagEditModal = (bag: InventoryConfig) => {
-    setSelectedBagForEdit(bag);
-    setEditBagName(bag.name || '');
-    setEditBagWidth(bag.size?.width ?? 6);
-    setEditBagHeight(bag.size?.height ?? 4);
-    setEditBagWeight(bag.invWeight ?? 1);
-  };
-
-  const closeBagEditModal = () => setSelectedBagForEdit(null);
-
-  const handleBagEditConfirm = () => {
-    if (!selectedBagForEdit) return;
-    selectedBagForEdit.name = editBagName;
-    selectedBagForEdit.invWeight = editBagWeight;
-
-    const c = appRef.current?.selectedCreature;
-    const isInventoryEmpty =
-      !c?.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.item));
-
-    if (
-      isInventoryEmpty &&
-      (selectedBagForEdit.size.width !== editBagWidth ||
-        selectedBagForEdit.size.height !== editBagHeight)
-    ) {
-      selectedBagForEdit.size = { width: editBagWidth, height: editBagHeight };
-      if (c) {
-        c.updateInventorySize(editBagWidth, editBagHeight);
-      }
-    }
-
-    closeBagEditModal();
-    updateStats();
-  };
-
   const openItemEditModal = (item: ItemData) => {
-    if (!item.config) return;
-    if (item.type === 'weapon') {
-      closeArmorEditModal();
-      closeBagEditModal();
-      openWeaponEditModal(item.config as WeaponConfig);
-    } else if (item.type === 'armor') {
-      closeWeaponEditModal();
-      closeBagEditModal();
-      openArmorEditModal(item.config as ArmorConfig);
-    } else if (item.type === 'bag') {
-      closeWeaponEditModal();
-      closeArmorEditModal();
-      openBagEditModal(item.config as InventoryConfig);
+    setSelectedItemForEdit(item);
+  };
+
+  const closeItemEditModal = () => {
+    setSelectedItemForEdit(null);
+  };
+
+  const handleItemEditConfirm = (updatedItem: ItemData) => {
+    const app = appRef.current;
+    if (!app) return;
+
+    const entityId = updatedItem.id;
+    const itemComp = app.world.getComponent(entityId, 'item');
+    
+    if (itemComp) {
+        Object.assign(itemComp, updatedItem);
+        if (app.selectedItem && app.selectedItem.id === entityId) {
+            app.selectedItem.data = itemComp;
+        }
+        
+        const phys = app.world.getComponent(entityId, 'physicsBody');
+        const wasSolid = !!phys;
+        const isSolidNow = !!updatedItem.config?.isSolid;
+        
+        if (!wasSolid && isSolidNow) {
+            const radius = updatedItem.config?.radius ?? 16;
+            const mass = updatedItem.config?.invWeight || 1;
+            const transform = app.world.getComponent(entityId, 'transform');
+            if (transform) {
+                const body = new Circle({ x: transform.x, y: transform.y }, radius);
+                body.isStatic = false;
+                app.world.addComponent(entityId, 'physicsBody', { body, radius, mass, isStatic: false });
+                app.physics.registerBody(entityId, body);
+            }
+        } else if (wasSolid && !isSolidNow) {
+            app.physics.unregisterBody(phys!.body);
+            app.world.removeComponent(entityId, 'physicsBody');
+        } else if (wasSolid && isSolidNow) {
+            const newRadius = updatedItem.config?.radius ?? 16;
+            if (phys!.radius !== newRadius) {
+                phys!.radius = newRadius;
+                phys!.body.r = newRadius;
+            }
+        }
     }
+
+    if (selectedItemForEdit) {
+        Object.assign(selectedItemForEdit, updatedItem);
+    }
+    
+    const c = app.selectedCreature;
+    if (c && updatedItem.type === 'bag') {
+        const isInventoryEmpty = !c.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.item));
+        const bagCfg = updatedItem.config as InventoryConfig;
+        if (isInventoryEmpty) {
+            if (c.equip?.slots.find(s => s.type === 'bag')?.item === selectedItemForEdit) {
+                c.updateInventorySize(bagCfg.size.width, bagCfg.size.height);
+            }
+        }
+    }
+
+    setSelectedItemForEdit(null);
+    updateStats();
   };
 
   return {
-    isModalOpen,
-    pendingSpawnType,
-    setPendingSpawnType,
-    radius, setRadius,
-    mass, setMass,
-    maxSpeed, setMaxSpeed,
-    maxTurnSpeed, setMaxTurnSpeed,
-    runSpeedMultiplier, setRunSpeedMultiplier,
-    crouchSpeedMultiplier, setCrouchSpeedMultiplier,
+    isModalOpen, pendingSpawnType, setPendingSpawnType,
+    radius, setRadius, mass, setMass,
+    maxSpeed, setMaxSpeed, maxTurnSpeed, setMaxTurnSpeed,
+    runSpeedMultiplier, setRunSpeedMultiplier, crouchSpeedMultiplier, setCrouchSpeedMultiplier,
     crouchStealthMultiplier, setCrouchStealthMultiplier,
-    runTurnMultiplier, setRunTurnMultiplier,
-    crouchTurnMultiplier, setCrouchTurnMultiplier,
+    runTurnMultiplier, setRunTurnMultiplier, crouchTurnMultiplier, setCrouchTurnMultiplier,
     openSpawnModal, closeSpawnModal,
-
-    isItemSpawnModalOpen,
-    openItemSpawnModal, closeItemSpawnModal,
-
-    isEditModalOpen,
-    editType, setEditType,
-    editRadius, setEditRadius,
-    editMaxSpeed, setEditMaxSpeed,
-    editMaxTurnSpeed, setEditMaxTurnSpeed,
-    editHp, setEditHp,
-    editMaxHp, setEditMaxHp,
-    editRunSpeedMultiplier, setEditRunSpeedMultiplier,
+    isItemSpawnModalOpen, openItemSpawnModal, closeItemSpawnModal,
+    isEditModalOpen, editType, setEditType,
+    editRadius, setEditRadius, editMaxSpeed, setEditMaxSpeed,
+    editMaxTurnSpeed, setEditMaxTurnSpeed, editHp, setEditHp,
+    editMaxHp, setEditMaxHp, editRunSpeedMultiplier, setEditRunSpeedMultiplier,
     editCrouchSpeedMultiplier, setEditCrouchSpeedMultiplier,
     editCrouchStealthMultiplier, setEditCrouchStealthMultiplier,
     editRunTurnMultiplier, setEditRunTurnMultiplier,
     editCrouchTurnMultiplier, setEditCrouchTurnMultiplier,
     openEditModal, closeEditModal, handleEditConfirm,
-
-    selectedWeaponForEdit, editWeaponName, setEditWeaponName,
-    editWeaponWeight, setEditWeaponWeight,
-    editWeaponDamage, setEditWeaponDamage, editWeaponPrepTime, setEditWeaponPrepTime,
-    editWeaponRecoveryTime, setEditWeaponRecoveryTime, editWeaponRange, setEditWeaponRange,
-    editWeaponRadius, setEditWeaponRadius, editWeaponNumLines, setEditWeaponNumLines,
-    editWeaponAngle, setEditWeaponAngle, editWeaponPierceObstacles, setEditWeaponPierceObstacles,
-    editWeaponPiercePlayers, setEditWeaponPiercePlayers, editWeaponPierceBots, setEditWeaponPierceBots,
-    closeWeaponEditModal, handleWeaponEditConfirm,
-
-    selectedArmorForEdit, editArmorName, setEditArmorName,
-    editArmorDefense, setEditArmorDefense, editArmorFlatReduction, setEditArmorFlatReduction,
-    editArmorWeight, setEditArmorWeight,
-    closeArmorEditModal, handleArmorEditConfirm,
-
-    selectedBagForEdit, editBagName, setEditBagName,
-    editBagWidth, setEditBagWidth, editBagHeight, setEditBagHeight,
-    editBagWeight, setEditBagWeight,
-    closeBagEditModal, handleBagEditConfirm,
-
-    openItemEditModal,
+    selectedItemForEdit, openItemEditModal, closeItemEditModal, handleItemEditConfirm
   };
 }

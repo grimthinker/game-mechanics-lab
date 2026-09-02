@@ -5,7 +5,7 @@ import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { ItemData, StandardRadius } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
-import { SpawnModal, CreatureEditModal, WeaponEditModal, ArmorEditModal, BagEditModal, ItemSpawnModal } from './components/modals';
+import { SpawnModal, CreatureEditModal, ItemSpawnModal, ItemEditModal } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
@@ -129,9 +129,7 @@ export const App: React.FC = () => {
     isModalOpen:
       modals.isModalOpen ||
       modals.isItemSpawnModalOpen ||
-      !!modals.selectedWeaponForEdit ||
-      !!modals.selectedArmorForEdit ||
-      !!modals.selectedBagForEdit ||
+      !!modals.selectedItemForEdit ||
       isPaused,
     isEditModalOpen: modals.isEditModalOpen,
     updateStats,
@@ -274,9 +272,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.code === 'Escape') {
-        if (modals.selectedWeaponForEdit) modals.closeWeaponEditModal();
-        else if (modals.selectedArmorForEdit) modals.closeArmorEditModal();
-        else if (modals.selectedBagForEdit) modals.closeBagEditModal();
+        if (modals.selectedItemForEdit) modals.closeItemEditModal();
         else if (modals.isEditModalOpen) modals.closeEditModal();
         else if (modals.isModalOpen) modals.closeSpawnModal();
         else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
@@ -287,24 +283,13 @@ export const App: React.FC = () => {
         } else if (modals.isEditModalOpen) {
           e.preventDefault();
           modals.handleEditConfirm();
-        } else if (modals.selectedWeaponForEdit) {
-          e.preventDefault();
-          modals.handleWeaponEditConfirm();
-        } else if (modals.selectedArmorForEdit) {
-          e.preventDefault();
-          modals.handleArmorEditConfirm();
-        } else if (modals.selectedBagForEdit) {
-          e.preventDefault();
-          modals.handleBagEditConfirm();
         }
       } else if (e.code === 'Space' || e.key === ' ') {
         if (
           modals.isModalOpen ||
           modals.isItemSpawnModalOpen ||
           modals.isEditModalOpen ||
-          modals.selectedWeaponForEdit ||
-          modals.selectedArmorForEdit ||
-          modals.selectedBagForEdit
+          modals.selectedItemForEdit
         ) {
           return;
         }
@@ -536,69 +521,15 @@ export const App: React.FC = () => {
         onConfirm={modals.handleEditConfirm}
       />
 
-      <WeaponEditModal
-        selectedWeaponForEdit={modals.selectedWeaponForEdit}
+      <ItemEditModal
+        item={modals.selectedItemForEdit}
         isReadOnly={isReadOnly}
-        editWeaponName={modals.editWeaponName}
-        setEditWeaponName={modals.setEditWeaponName}
-        editWeaponWeight={modals.editWeaponWeight}
-        setEditWeaponWeight={modals.setEditWeaponWeight}
-        editWeaponDamage={modals.editWeaponDamage}
-        setEditWeaponDamage={modals.setEditWeaponDamage}
-        editWeaponPrepTime={modals.editWeaponPrepTime}
-        setEditWeaponPrepTime={modals.setEditWeaponPrepTime}
-        editWeaponRecoveryTime={modals.editWeaponRecoveryTime}
-        setEditWeaponRecoveryTime={modals.setEditWeaponRecoveryTime}
-        editWeaponRange={modals.editWeaponRange}
-        setEditWeaponRange={modals.setEditWeaponRange}
-        editWeaponRadius={modals.editWeaponRadius}
-        setEditWeaponRadius={modals.setEditWeaponRadius}
-        editWeaponNumLines={modals.editWeaponNumLines}
-        setEditWeaponNumLines={modals.setEditWeaponNumLines}
-        editWeaponAngle={modals.editWeaponAngle}
-        setEditWeaponAngle={modals.setEditWeaponAngle}
-        editWeaponPierceObstacles={modals.editWeaponPierceObstacles}
-        setEditWeaponPierceObstacles={modals.setEditWeaponPierceObstacles}
-        editWeaponPiercePlayers={modals.editWeaponPiercePlayers}
-        setEditWeaponPiercePlayers={modals.setEditWeaponPiercePlayers}
-        editWeaponPierceBots={modals.editWeaponPierceBots}
-        setEditWeaponPierceBots={modals.setEditWeaponPierceBots}
-        onClose={modals.closeWeaponEditModal}
-        onConfirm={modals.handleWeaponEditConfirm}
-      />
-
-      <ArmorEditModal
-        selectedArmorForEdit={modals.selectedArmorForEdit}
-        isReadOnly={isReadOnly}
-        editArmorName={modals.editArmorName}
-        setEditArmorName={modals.setEditArmorName}
-        editArmorDefense={modals.editArmorDefense}
-        setEditArmorDefense={modals.setEditArmorDefense}
-        editArmorFlatReduction={modals.editArmorFlatReduction}
-        setEditArmorFlatReduction={modals.setEditArmorFlatReduction}
-        editArmorWeight={modals.editArmorWeight}
-        setEditArmorWeight={modals.setEditArmorWeight}
-        onClose={modals.closeArmorEditModal}
-        onConfirm={modals.handleArmorEditConfirm}
-      />
-
-      <BagEditModal
-        selectedBagForEdit={modals.selectedBagForEdit}
-        isReadOnly={isReadOnly}
-        editBagName={modals.editBagName}
-        setEditBagName={modals.setEditBagName}
-        editBagWidth={modals.editBagWidth}
-        setEditBagWidth={modals.setEditBagWidth}
-        editBagHeight={modals.editBagHeight}
-        setEditBagHeight={modals.setEditBagHeight}
-        editBagWeight={modals.editBagWeight}
-        setEditBagWeight={modals.setEditBagWeight}
         isBagInventoryEmpty={isBagInventoryEmpty}
         inventorySlots={selectedStats?.inventory?.slots}
         inventorySize={selectedStats?.inventory?.size}
         onItemClick={modals.openItemEditModal}
-        onClose={modals.closeBagEditModal}
-        onConfirm={modals.handleBagEditConfirm}
+        onClose={modals.closeItemEditModal}
+        onConfirm={modals.handleItemEditConfirm}
       />
     </div>
   );

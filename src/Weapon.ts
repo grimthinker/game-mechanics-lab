@@ -19,9 +19,10 @@ export function createDefaultWeapons(): WeaponConfig[] {
       zone: {
         hitZoneType: 'forward_line',
         length: 150,
-    },
-    invWeight: 1,
-    radius: 10
+      },
+      invWeight: 1,
+      radius: 16,
+      isSolid: true
     },
     {
       id: `weapon_angle_${Math.random().toString(36).substring(2, 6)}`,
@@ -41,9 +42,10 @@ export function createDefaultWeapons(): WeaponConfig[] {
         hitZoneType: 'angle',
         length: 100,
         angle: Math.PI / 6,
-    },
+      },
       invWeight: 1,
-      radius: 10
+      radius: 16,
+      isSolid: true
     },
     {
       id: `weapon_radius_${Math.random().toString(36).substring(2, 6)}`,
@@ -62,9 +64,10 @@ export function createDefaultWeapons(): WeaponConfig[] {
       zone: {
         hitZoneType: 'radius',
         radius: 50,
-    },
-    invWeight: 1,
-    radius: 10
+      },
+      invWeight: 1,
+      radius: 16,
+      isSolid: true
     },
     {
       id: `weapon_shrapnel_${Math.random().toString(36).substring(2, 6)}`,
@@ -87,7 +90,8 @@ export function createDefaultWeapons(): WeaponConfig[] {
         rayCount: 5,
       },
       invWeight: 1,
-      radius: 10
+      radius: 16,
+      isSolid: true
     },
     {
       id: `weapon_offset_radius_${Math.random().toString(36).substring(2, 6)}`,
@@ -107,9 +111,10 @@ export function createDefaultWeapons(): WeaponConfig[] {
         hitZoneType: 'offset_radius',
         offsetDistance: 70,
         radius: 35,
-    },
-    invWeight: 1,
-    radius: 10
+      },
+      invWeight: 1,
+      radius: 16,
+      isSolid: true
     },
   ];
 

@@ -36,7 +36,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
   const [radius, setRadius] = useState<StandardRadius>(16);
 
   const [initialWeapon] = useState(createInitialWeaponState);
-  const [weaponDraft, setWeaponDraft] = useState<ItemData>(initialWeapon.draft);
+  const [weaponDraft] = useState<ItemData>(initialWeapon.draft);
   const [weaponValues, setWeaponValues] = useState<WeaponFormValues>(initialWeapon.values);
 
   const [armorValues, setArmorValues] = useState<ArmorFormValues>({
@@ -67,6 +67,8 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
       wcfg.baseDamage = weaponValues.baseDamage;
       wcfg.prepTime = weaponValues.prepTime;
       wcfg.recoveryTime = weaponValues.recoveryTime;
+      wcfg.isSolid = isSolid;
+      wcfg.radius = radius;
 
       if (wcfg.zone.length !== undefined || wcfg.zone.range !== undefined) {
         if (wcfg.zone.length !== undefined) wcfg.zone.length = weaponValues.range;
@@ -97,7 +99,8 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
           id: `armor_cfg_${Math.random().toString(36).substring(2, 5)}`,
           name: armorValues.name,
           invWeight: armorValues.weight,
-          radius: 12,
+          radius,
+          isSolid,
           defense: armorValues.defense,
           flat_reduction: armorValues.flatReduction,
         },
@@ -112,7 +115,8 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
           id: `bag_cfg_${Math.random().toString(36).substring(2, 5)}`,
           name: bagValues.name,
           invWeight: bagValues.weight,
-          radius: 15,
+          radius,
+          isSolid,
           size: { width: bagValues.width, height: bagValues.height },
         },
       } as ItemData;

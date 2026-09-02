@@ -14,6 +14,7 @@ import { AISystem } from './ecs/systems/AISystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
 import { createRandomWeaponItem } from './Weapon';
+import { createDefaultArmorItem, createDefaultBagItem } from './DefaultItems';
 import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
@@ -96,35 +97,8 @@ export class GameApp {
     body.isStatic = false;
 
     const initialWeaponItem: ItemData = createRandomWeaponItem();
-
-    const initialArmorItem: ItemData = {
-      id: `armor_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: 'Стандартный бронежилет',
-      type: 'armor',
-      maxStack: 1,
-      config: {
-        id: `armor_cfg_${Math.random().toString(36).substring(2, 5)}`,
-        name: 'Стандартный бронежилет',
-        invWeight: 3,
-        radius: 12,
-        defense: 15,
-        flat_reduction: 3,
-      },
-    };
-
-    const initialBagItem: ItemData = {
-      id: `bag_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
-      name: 'Походный рюкзак',
-      type: 'bag',
-      maxStack: 1,
-      config: {
-        id: `bag_cfg_${Math.random().toString(36).substring(2, 5)}`,
-        name: 'Походный рюкзак',
-        invWeight: 1,
-        radius: 15,
-        size: { width: 6, height: 4 },
-      },
-    };
+    const initialArmorItem: ItemData = createDefaultArmorItem();
+    const initialBagItem: ItemData = createDefaultBagItem();
 
     this.world.createEntity(id);
     this.world.addComponent(id, 'transform', { x: pos.x, y: pos.y, angle: 0 });
@@ -193,16 +167,20 @@ export class GameApp {
     return new EntityAdapter(id, this.world);
   }
 
-  public spawnWorldItem(itemData: ItemData, position: Point, isSolid: boolean = true, radius: StandardRadius = 16): string {
+  public spawnWorldItem(itemData: ItemData, position: Point, isSolid?: boolean, radius?: StandardRadius): string {
     const id = itemData.id;
     this.world.createEntity(id);
     this.world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
     this.world.addComponent(id, 'item', itemData);
-    if (isSolid) {
+    
+    const actualIsSolid = isSolid ?? itemData.config?.isSolid ?? true;
+    const actualRadius = radius ?? itemData.config?.radius ?? 16;
+    
+    if (actualIsSolid) {
       const mass = itemData.config?.invWeight || 1;
-      const body = new Circle({ x: position.x, y: position.y }, radius);
+      const body = new Circle({ x: position.x, y: position.y }, actualRadius);
       body.isStatic = false;
-      this.world.addComponent(id, 'physicsBody', { body, radius, mass, isStatic: false });
+      this.world.addComponent(id, 'physicsBody', { body, radius: actualRadius, mass, isStatic: false });
       this.physics.registerBody(id, body);
     }
     return id;

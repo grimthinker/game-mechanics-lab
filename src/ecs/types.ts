@@ -1,4 +1,3 @@
-
 import { Circle } from 'detect-collisions';
 import { Point } from '../types';
 import { BTLogicComponent } from '../ai/core';
@@ -147,7 +146,8 @@ export interface ItemConfig {
     id: string;
     name: string;
     invWeight: number;
-    radius: number;
+    radius: StandardRadius;
+    isSolid?: boolean;
     maxStack?: number;
 }
 

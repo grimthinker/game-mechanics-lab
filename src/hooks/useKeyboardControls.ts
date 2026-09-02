@@ -1,4 +1,3 @@
-
 import { useRef, useEffect, useCallback, MutableRefObject } from 'react';
 import { GameApp, EntityAdapter } from '../GameApp';
 import { GameMode } from '../constants';
