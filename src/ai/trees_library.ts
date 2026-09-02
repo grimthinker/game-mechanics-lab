@@ -1,4 +1,4 @@
-import { BTActionAttack, BTCommandForgetTarget, BTActionPatrol, BTActionPursue, BTConditionValidTarget, BTCommandAcceptCandidate, BTConditionEngaged, BTSucceedImmediately, BTActionLookAtTarget, BTWait } from "./actions";
+import { BTActionAttack, BTCommandForgetTarget, BTActionPatrol, BTActionPursue, BTConditionValidTarget, BTCommandAcceptCandidate, BTConditionEngaged, BTWait, BTActionRotateToPos } from "./actions";
 import { BTSelector, BTSequence } from "./composites";
 import { LOGIC_CONFIG } from "./config";
 import { BTNode, BTService } from "./core";
@@ -11,7 +11,7 @@ export function CombatTree(): BTNode {
         new BTSelector([
             new BTSequence([
                 new BTConditionEngaged(), 
-                new BTActionLookAtTarget(), // <- Разворачиваемся перед атакой
+                new BTActionRotateToPos(), // <- Разворачиваемся перед атакой
                 new BTActionAttack() 
             ]),
 

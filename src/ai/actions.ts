@@ -60,52 +60,8 @@ export class BTConditionEngaged extends BTSimpleAction {
   protected onAbort() {}
 }
 
-export class BTActionFollowPath extends BTAction {
-  public static readonly nodeName = 'Двигаться по пути';
-  public static readonly description =
-    'Двигаться по пути current_path, если он есть';
-
-  constructor(private path_key: PathKeys = 'current_path') {
-    super();
-  }
-
-  protected onTick(entity: EntityAdapter): NodeStatus {
-    const bb = entity.brain!.blackboard;
-    const path = bb.get(this.path_key) || [];
-
-    if (path.length === 0) {
-      entity.stop();
-      return NodeStatus.SUCCESS;
-    }
-
-    const e_pos = entity.getPos();
-    while (path.length > 0 && this.getDist(e_pos, path[0]) <= LOGIC_CONFIG.in_pos_dist) {
-      path.shift();
-    }
-
-    if (path.length === 0) {
-      entity.stop();
-      bb.remove(this.path_key);
-      return NodeStatus.SUCCESS;
-    }
-
-    entity.look_at_pos(path[0]);
-    entity.startMovingForward();
-
-    return NodeStatus.RUNNING;
-  }
-
-  private getDist(p1: Point, p2: Point): number {
-    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
-  }
-
-  protected stopAction(entity: EntityAdapter): void {
-    entity.stop();
-  }
-}
-
 export class BTActionPursue extends BTAction {
-  private movementNode: BTActionFollowPath = new BTActionFollowPath('current_path');
+  private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('current_path');
   private readonly stopDistSq: number = LOGIC_CONFIG.follow_stop_dist ** 2;
   public static readonly nodeName = 'Преследовать цель';
   public static readonly description =
@@ -127,7 +83,7 @@ export class BTActionPursue extends BTAction {
 
     if (dx * dx + dy * dy <= this.stopDistSq) {
       entity.stop();
-      entity.look_at_pos(t_pos);
+      entity.stopTurning();
       return NodeStatus.SUCCESS;
     }
 
@@ -141,7 +97,7 @@ export class BTActionPursue extends BTAction {
 }
 
 export class BTActionPatrol extends BTAction {
-  private movementNode = new BTActionFollowPath('patrol_route_tmp');
+  private movementNode = new BTActionFollowPathSmooth('patrol_route_tmp');
   public static readonly nodeName = 'Патруль';
   public static readonly description =
     'Двигаться вдоль пути patrol_points, если они есть, иначе возвращает FAILURE';
@@ -403,8 +359,7 @@ export class BTActionFollowPathSmooth extends BTAction {
     diff = Math.atan2(Math.sin(diff), Math.cos(diff));
 
     // Управляем поворотом во время движения
-    const tolerance = 0.05;
-    if (Math.abs(diff) > tolerance) {
+    if (Math.abs(diff) > LOGIC_CONFIG.angleDiffTolerance) {
       const direction: -1 | 1 = diff > 0 ? 1 : -1;
       // Если угол большой (> 45°), можно снизить линейную скорость/замедлить поворот, 
       // либо просто передать ratio для поворота:
