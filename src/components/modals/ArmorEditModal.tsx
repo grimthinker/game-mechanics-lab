@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { ArmorConfig } from '../../ecs/types';
+import { ArmorFormFields, ArmorFormValues } from './forms/FormFields';
 
 export interface ArmorEditModalProps {
   selectedArmorForEdit: ArmorConfig | null;
@@ -33,6 +33,20 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
 }) => {
   if (!selectedArmorForEdit) return null;
 
+  const values: ArmorFormValues = {
+    name: editArmorName,
+    weight: editArmorWeight,
+    defense: editArmorDefense,
+    flatReduction: editArmorFlatReduction,
+  };
+
+  const handleChange = (v: Partial<ArmorFormValues>) => {
+    if (v.name !== undefined) setEditArmorName(v.name);
+    if (v.weight !== undefined) setEditArmorWeight(v.weight);
+    if (v.defense !== undefined) setEditArmorDefense(v.defense);
+    if (v.flatReduction !== undefined) setEditArmorFlatReduction(v.flatReduction);
+  };
+
   return (
     <div
       className="modal"
@@ -44,48 +58,7 @@ export const ArmorEditModal: React.FC<ArmorEditModalProps> = ({
       <div className="modal-dialog">
         <h3>{isReadOnly ? 'Параметры брони' : 'Изменить параметры брони'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-          <label>
-            Название:
-            <input
-              disabled={isReadOnly}
-              type="text"
-              value={editArmorName}
-              onChange={(e) => setEditArmorName(e.target.value)}
-            />
-          </label>
-          <label>
-            Защита:
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editArmorDefense}
-              min={0}
-              max={100}
-              onChange={(e) => setEditArmorDefense(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Поглощение урона:
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editArmorFlatReduction}
-              min={0}
-              max={100}
-              onChange={(e) => setEditArmorFlatReduction(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Вес:
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editArmorWeight}
-              min={0}
-              max={100}
-              onChange={(e) => setEditArmorWeight(Number(e.target.value))}
-            />
-          </label>
+          <ArmorFormFields values={values} onChange={handleChange} isReadOnly={isReadOnly} />
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>

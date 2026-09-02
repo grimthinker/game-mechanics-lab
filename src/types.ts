@@ -1,3 +1,4 @@
+
 import { CreatureType, CreatureState, EquipSlot, ItemData, StandardRadius } from "./ecs/types";
 
 export interface Point {
@@ -40,3 +41,7 @@ export interface PlacementConfig {
   crouchSpeedMultiplier: number;
   crouchStealthMultiplier: number;
 }
+
+export type PlacementMode = 
+  | { kind: 'creature'; config: PlacementConfig }
+  | { kind: 'item'; itemData: ItemData; isSolid: boolean; radius: StandardRadius };

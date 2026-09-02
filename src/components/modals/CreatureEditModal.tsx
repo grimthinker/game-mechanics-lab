@@ -1,10 +1,11 @@
-
 import React from 'react';
-import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
+import { CreatureType, STANDARD_RADII, StandardRadius } from '../../ecs/types';
 
 export interface CreatureEditModalProps {
   isOpen: boolean;
   isReadOnly?: boolean;
+  editType: CreatureType;
+  setEditType: (val: CreatureType) => void;
   editRadius: number;
   setEditRadius: (val: StandardRadius) => void;
   editHp: number;
@@ -32,6 +33,8 @@ export interface CreatureEditModalProps {
 export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   isOpen,
   isReadOnly,
+  editType,
+  setEditType,
   editRadius,
   setEditRadius,
   editHp,
@@ -68,6 +71,17 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
       <div className="modal-dialog">
         <h3>{isReadOnly ? 'Параметры существа' : 'Изменить параметры существа'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
+          <label>
+            Тип существа:
+            <select
+              disabled={isReadOnly}
+              value={editType}
+              onChange={(e) => setEditType(e.target.value as CreatureType)}
+            >
+              <option value="player">Игрок</option>
+              <option value="ai">Бот</option>
+            </select>
+          </label>
           <label>
             Радиус:
             <select

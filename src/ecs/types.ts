@@ -1,3 +1,4 @@
+
 import { Circle } from 'detect-collisions';
 import { Point } from '../types';
 import { BTLogicComponent } from '../ai/core';
@@ -61,7 +62,6 @@ export interface StealthComponent {
 
 export type ItemType = 'weapon' | 'armor' | 'bag' | 'resource' | 'other';
 
-// Карта соответствия типа предмета и его интерфейса конфига
 type ItemConfigMap = {
   weapon: WeaponConfig;
   armor: ArmorConfig;
@@ -76,7 +76,7 @@ export type ItemData<T extends ItemType = ItemType> = {
     name: string;
     type: K;
     maxStack: number;
-    config?: ItemConfigMap[K]; // Конфиг автоматически подстроится под тип K
+    config: ItemConfigMap[K];
   };
 }[T];
 
@@ -174,13 +174,13 @@ export type HitZoneConfig = {
 
 export interface WeaponConfig extends ItemConfig {
   prepTime: number;
-  castTime?: number; // Задержка перед нанесением урона, в течение которой нельзя поворачиваться
+  castTime?: number;
   recoveryTime: number;
   prepTurnSlow: number;
   recoveryTurnSlow: number;
   prepMoveSlow: number;
   recoveryMoveSlow: number;
-  castMoveSlow?: number; // Замедление перемещения во время каста (по умолчанию равно prepMoveSlow)
+  castMoveSlow?: number;
   baseDamage: number;
   minMultiplier: number;
   maxMultiplier: number;
@@ -231,4 +231,4 @@ export interface EntityController {
     look_at_pos: (target_pos: Point) => boolean;
     attack: (id_target?: string) => boolean;
     getPos: () => Point;
-  }
+}

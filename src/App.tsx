@@ -2,18 +2,17 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
-import { CreatureType, CreatureState, EquipSlot, ItemData, StandardRadius } from './ecs/types';
+import { ItemData, StandardRadius } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
-import { SpawnModal, CreatureEditModal, WeaponEditModal, ArmorEditModal, BagEditModal } from './components/modals';
+import { SpawnModal, CreatureEditModal, WeaponEditModal, ArmorEditModal, BagEditModal, ItemSpawnModal } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
-import { CreatureStats, PlacementConfig } from './types';
+import { CreatureStats, PlacementMode } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { GameMode } from './constants';
-
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -41,16 +40,22 @@ export const App: React.FC = () => {
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedStats, setSelectedStats] = useState<CreatureStats | null>(null);
+  const [selectedItemData, setSelectedItemData] = useState<{ id: string; data: ItemData } | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(true);
-  const [placementConfig, setPlacementConfig] = useState<PlacementConfig | null>(null);
+  const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
 
   const {
-    showBTPanel, setShowBTPanel,
-    btPanelWidth, isResizingBT, setIsResizingBT,
-    blackboardHeight, isResizingBB, setIsResizingBB,
+    showBTPanel,
+    setShowBTPanel,
+    btPanelWidth,
+    isResizingBT,
+    setIsResizingBT,
+    blackboardHeight,
+    isResizingBB,
+    setIsResizingBB,
   } = useBTPanelState();
 
   const modals = useGameModals({ appRef, updateStats: () => updateStats() });
@@ -78,46 +83,52 @@ export const App: React.FC = () => {
       targetId = playerIdRef.current;
     }
 
-    if (!targetId) {
+    if (targetId) {
+      const c = new EntityAdapter(targetId, app.world);
+      const eq = c.equip;
+      const inv = c.inventory;
+
+      setSelectedStats({
+        id: c.id,
+        type: c.type,
+        radius: c.radius,
+        mass: c.mass,
+        currentSpeed: c.currentSpeed,
+        currentTurnSpeed: (c.currentTurnSpeed * 180) / Math.PI,
+        maxSpeed: c.maxSpeed,
+        maxTurnSpeed: (c.maxTurnSpeed * 180) / Math.PI,
+        hp: c.hp,
+        maxHp: c.maxHp,
+        state: c.state,
+        equipSlots: eq ? eq.slots.map((s) => ({ ...s })) : [],
+        inventory: inv
+          ? {
+              size: { ...inv.size },
+              slots: inv.slots.map((row) => row.map((cell) => ({ ...cell }))),
+            }
+          : undefined,
+      });
+      setSelectedItemData(null);
+      setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
+      setBtBlackboard(!c.brain ? null : c.brain.blackboard.getData());
+    } else if (app.selectedItem) {
+      setSelectedItemData({ id: app.selectedItem.id, data: JSON.parse(JSON.stringify(app.selectedItem.data)) });
       setSelectedStats(null);
       setBtData(null);
       setBtBlackboard(null);
-      return;
+    } else {
+      setSelectedStats(null);
+      setSelectedItemData(null);
+      setBtData(null);
+      setBtBlackboard(null);
     }
-
-    const c = new EntityAdapter(targetId, app.world);
-    const eq = c.equip;
-    const inv = c.inventory;
-
-    setSelectedStats({
-      id: c.id,
-      type: c.type,
-      radius: c.radius,
-      mass: c.mass,
-      currentSpeed: c.currentSpeed,
-      currentTurnSpeed: (c.currentTurnSpeed * 180) / Math.PI,
-      maxSpeed: c.maxSpeed,
-      maxTurnSpeed: (c.maxTurnSpeed * 180) / Math.PI,
-      hp: c.hp,
-      maxHp: c.maxHp,
-      state: c.state,
-      equipSlots: eq ? eq.slots.map((s) => ({ ...s })) : [],
-      inventory: inv
-        ? {
-            size: { ...inv.size },
-            slots: inv.slots.map((row) => row.map((cell) => ({ ...cell }))),
-          }
-        : undefined,
-    });
-
-    setBtData((!c.brain || !c.brain.root_node) ? null : serializeBTNode(c.brain.root_node));
-    setBtBlackboard((!c.brain) ? null : c.brain.blackboard.getData());
   }, [setModeSync, setPlayerIdSync]);
 
   const { syncPlayerControls } = useKeyboardControls({
     appRef,
     isModalOpen:
       modals.isModalOpen ||
+      modals.isItemSpawnModalOpen ||
       !!modals.selectedWeaponForEdit ||
       !!modals.selectedArmorForEdit ||
       !!modals.selectedBagForEdit ||
@@ -131,8 +142,8 @@ export const App: React.FC = () => {
   const { canvasRef, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave } =
     useCanvasInteraction({
       appRef,
-      placementConfig,
-      setPlacementConfig,
+      placementMode,
+      setPlacementMode,
       syncPlayerControls,
       updateStats,
       mode,
@@ -162,13 +173,13 @@ export const App: React.FC = () => {
   const togglePause = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
-    
+
     if (modeRef.current === GameMode.EDITOR || modeRef.current === GameMode.GAME) {
-      return; 
+      return;
     }
 
-    if (!app.isPaused && app.isDraggingCreature()) {
-      app.cancelCreatureDrag();
+    if (!app.isPaused && app.isDraggingEntity()) {
+      app.cancelEntityDrag();
       updateStats();
     }
 
@@ -187,6 +198,8 @@ export const App: React.FC = () => {
     setPlayerIdSync(null);
     app.isPaused = true;
     setIsPaused(true);
+    app.selectEntity(null);
+    app.hoverEntity(null);
     updateStats();
   }, [snapshot, updateStats, setModeSync, setPlayerIdSync]);
 
@@ -200,43 +213,60 @@ export const App: React.FC = () => {
     setPlayerIdSync(null);
     app.isPaused = false;
     setIsPaused(false);
+    app.selectEntity(null);
+    app.hoverEntity(null);
     updateStats();
   }, [updateStats, setModeSync, setPlayerIdSync]);
 
-  const goToGame = useCallback((id: string) => {
-    const app = appRef.current;
-    if (!app) return;
-    if (modeRef.current === GameMode.EDITOR) {
-      setSnapshot(app.serializeWorld());
-    }
-    setModeSync(GameMode.GAME);
-    setPlayerIdSync(id);
-    app.isPaused = false;
-    setIsPaused(false);
-    setShowBTPanel(false);
-    updateStats();
-  }, [updateStats, setShowBTPanel, setModeSync, setPlayerIdSync]);
-
+  const goToGame = useCallback(
+    (id: string) => {
+      const app = appRef.current;
+      if (!app) return;
+      if (modeRef.current === GameMode.EDITOR) {
+        setSnapshot(app.serializeWorld());
+      }
+      setModeSync(GameMode.GAME);
+      setPlayerIdSync(id);
+      app.isPaused = false;
+      setIsPaused(false);
+      setShowBTPanel(false);
+      updateStats();
+    },
+    [updateStats, setShowBTPanel, setModeSync, setPlayerIdSync]
+  );
 
   const handleSpawnConfirm = () => {
     if (!modals.pendingSpawnType) return;
-    setPlacementConfig({
-      type: modals.pendingSpawnType,
-      radius: modals.radius,
-      mass: modals.mass,
-      maxSpeed: modals.maxSpeed,
-      maxTurnSpeed: modals.maxTurnSpeed,
-      runSpeedMultiplier: modals.runSpeedMultiplier,
-      crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
-      crouchStealthMultiplier: modals.crouchStealthMultiplier,
+    setPlacementMode({
+      kind: 'creature',
+      config: {
+        type: modals.pendingSpawnType,
+        radius: modals.radius,
+        mass: modals.mass,
+        maxSpeed: modals.maxSpeed,
+        maxTurnSpeed: modals.maxTurnSpeed,
+        runSpeedMultiplier: modals.runSpeedMultiplier,
+        crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
+        crouchStealthMultiplier: modals.crouchStealthMultiplier,
+      },
     });
     modals.closeSpawnModal();
   };
 
-  const handleDeleteCreature = () => {
+  const handleItemSpawnConfirm = (itemData: ItemData, isSolid: boolean, radius: StandardRadius) => {
+    setPlacementMode({
+      kind: 'item',
+      itemData,
+      isSolid,
+      radius,
+    });
+    modals.closeItemSpawnModal();
+  };
+
+  const handleDeleteEntity = () => {
     const app = appRef.current;
     if (!app) return;
-    app.deleteSelectedCreature();
+    app.deleteSelectedEntity();
     syncPlayerControls();
     updateStats();
   };
@@ -249,15 +279,28 @@ export const App: React.FC = () => {
         else if (modals.selectedBagForEdit) modals.closeBagEditModal();
         else if (modals.isEditModalOpen) modals.closeEditModal();
         else if (modals.isModalOpen) modals.closeSpawnModal();
+        else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
       } else if (e.key === 'Enter' || e.code === 'Enter') {
-        if (modals.isModalOpen) { e.preventDefault(); handleSpawnConfirm(); }
-        else if (modals.isEditModalOpen) { e.preventDefault(); modals.handleEditConfirm(); }
-        else if (modals.selectedWeaponForEdit) { e.preventDefault(); modals.handleWeaponEditConfirm(); }
-        else if (modals.selectedArmorForEdit) { e.preventDefault(); modals.handleArmorEditConfirm(); }
-        else if (modals.selectedBagForEdit) { e.preventDefault(); modals.handleBagEditConfirm(); }
+        if (modals.isModalOpen) {
+          e.preventDefault();
+          handleSpawnConfirm();
+        } else if (modals.isEditModalOpen) {
+          e.preventDefault();
+          modals.handleEditConfirm();
+        } else if (modals.selectedWeaponForEdit) {
+          e.preventDefault();
+          modals.handleWeaponEditConfirm();
+        } else if (modals.selectedArmorForEdit) {
+          e.preventDefault();
+          modals.handleArmorEditConfirm();
+        } else if (modals.selectedBagForEdit) {
+          e.preventDefault();
+          modals.handleBagEditConfirm();
+        }
       } else if (e.code === 'Space' || e.key === ' ') {
         if (
           modals.isModalOpen ||
+          modals.isItemSpawnModalOpen ||
           modals.isEditModalOpen ||
           modals.selectedWeaponForEdit ||
           modals.selectedArmorForEdit ||
@@ -273,7 +316,7 @@ export const App: React.FC = () => {
           return;
         } else {
           const app = appRef.current;
-          const hasSelected = !!app?.selectedCreature;
+          const hasSelected = !!app?.selectedCreature || !!app?.selectedItem;
           if (!hasSelected || e.ctrlKey || e.metaKey) {
             e.preventDefault();
             togglePause();
@@ -299,14 +342,17 @@ export const App: React.FC = () => {
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyB' || e.key.toLowerCase() === 'b')) {
         if (modeRef.current === GameMode.EDITOR) {
-          modals.setPendingSpawnType('ai');
           modals.openSpawnModal('ai');
         }
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
         if (modeRef.current === GameMode.EDITOR) {
-          modals.setPendingSpawnType('player');
           modals.openSpawnModal('player');
+        }
+        e.preventDefault();
+      } else if (e.ctrlKey && (e.code === 'KeyI' || e.key.toLowerCase() === 'i')) {
+        if (modeRef.current === GameMode.EDITOR) {
+          modals.openItemSpawnModal();
         }
         e.preventDefault();
       }
@@ -333,16 +379,25 @@ export const App: React.FC = () => {
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         />
-        {placementConfig && (
+        {placementMode && (
           <div
             style={{
-              position: 'absolute', top: 20, left: '50%', transform: 'translateX(-50%)',
-              backgroundColor: 'rgba(41, 128, 185, 0.9)', padding: '10px 20px', borderRadius: '8px',
-              display: 'flex', gap: '15px', alignItems: 'center', zIndex: 50, boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              position: 'absolute',
+              top: 20,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(41, 128, 185, 0.9)',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              display: 'flex',
+              gap: '15px',
+              alignItems: 'center',
+              zIndex: 50,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             }}
           >
             <span>Выберите место для спавна на поле</span>
-            <button className="btn btn-sm" style={{ backgroundColor: '#c0392b' }} onClick={() => setPlacementConfig(null)}>
+            <button className="btn btn-sm" style={{ backgroundColor: '#c0392b' }} onClick={() => setPlacementMode(null)}>
               Отмена
             </button>
           </div>
@@ -375,6 +430,7 @@ export const App: React.FC = () => {
         }}
         setObstaclesData={(data) => appRef.current?.loadObstaclesFromData(data)}
         selectedStats={selectedStats}
+        selectedItemData={selectedItemData}
         fileInputRef={fileInputRef}
         worldFileInputRef={worldFileInputRef}
         onNewWorld={() => {
@@ -412,41 +468,70 @@ export const App: React.FC = () => {
           reader.readAsText(file);
         }}
         openSpawnModal={modals.openSpawnModal}
+        openItemSpawnModal={modals.openItemSpawnModal}
         openEditModal={modals.openEditModal}
-        handleDeleteCreature={handleDeleteCreature}
+        handleDeleteEntity={handleDeleteEntity}
         openItemEditModal={modals.openItemEditModal}
-        isPaused={isPaused} 
+        isPaused={isPaused}
       />
 
       <SpawnModal
         isOpen={modals.isModalOpen}
         pendingSpawnType={modals.pendingSpawnType}
-        radius={modals.radius} setRadius={modals.setRadius}
-        mass={modals.mass} setMass={modals.setMass}
-        maxSpeed={modals.maxSpeed} setMaxSpeed={modals.setMaxSpeed}
-        maxTurnSpeed={modals.maxTurnSpeed} setMaxTurnSpeed={modals.setMaxTurnSpeed}
-        runSpeedMultiplier={modals.runSpeedMultiplier} setRunSpeedMultiplier={modals.setRunSpeedMultiplier}
-        crouchSpeedMultiplier={modals.crouchSpeedMultiplier} setCrouchSpeedMultiplier={modals.setCrouchSpeedMultiplier}
-        crouchStealthMultiplier={modals.crouchStealthMultiplier} setCrouchStealthMultiplier={modals.setCrouchStealthMultiplier}
-        runTurnMultiplier={modals.runTurnMultiplier} setRunTurnMultiplier={modals.setRunTurnMultiplier}
-        crouchTurnMultiplier={modals.crouchTurnMultiplier} setCrouchTurnMultiplier={modals.setCrouchTurnMultiplier}
+        setPendingSpawnType={modals.setPendingSpawnType}
+        radius={modals.radius}
+        setRadius={modals.setRadius}
+        mass={modals.mass}
+        setMass={modals.setMass}
+        maxSpeed={modals.maxSpeed}
+        setMaxSpeed={modals.setMaxSpeed}
+        maxTurnSpeed={modals.maxTurnSpeed}
+        setMaxTurnSpeed={modals.setMaxTurnSpeed}
+        runSpeedMultiplier={modals.runSpeedMultiplier}
+        setRunSpeedMultiplier={modals.setRunSpeedMultiplier}
+        crouchSpeedMultiplier={modals.crouchSpeedMultiplier}
+        setCrouchSpeedMultiplier={modals.setCrouchSpeedMultiplier}
+        crouchStealthMultiplier={modals.crouchStealthMultiplier}
+        setCrouchStealthMultiplier={modals.setCrouchStealthMultiplier}
+        runTurnMultiplier={modals.runTurnMultiplier}
+        setRunTurnMultiplier={modals.setRunTurnMultiplier}
+        crouchTurnMultiplier={modals.crouchTurnMultiplier}
+        setCrouchTurnMultiplier={modals.setCrouchTurnMultiplier}
         onClose={modals.closeSpawnModal}
         onConfirm={handleSpawnConfirm}
+      />
+
+      <ItemSpawnModal
+        isOpen={modals.isItemSpawnModalOpen}
+        onClose={modals.closeItemSpawnModal}
+        onConfirm={handleItemSpawnConfirm}
       />
 
       <CreatureEditModal
         isOpen={modals.isEditModalOpen}
         isReadOnly={isReadOnly}
-        editRadius={modals.editRadius} setEditRadius={modals.setEditRadius}
-        editHp={modals.editHp} setEditHp={modals.setEditHp}
-        editMaxHp={modals.editMaxHp} setEditMaxHp={modals.setEditMaxHp}
-        editMaxSpeed={modals.editMaxSpeed} setEditMaxSpeed={modals.setEditMaxSpeed}
-        editMaxTurnSpeed={modals.editMaxTurnSpeed} setEditMaxTurnSpeed={modals.setEditMaxTurnSpeed}
-        editRunSpeedMultiplier={modals.editRunSpeedMultiplier} setEditRunSpeedMultiplier={modals.setEditRunSpeedMultiplier}
-        editCrouchSpeedMultiplier={modals.editCrouchSpeedMultiplier} setEditCrouchSpeedMultiplier={modals.setEditCrouchSpeedMultiplier}
-        editCrouchStealthMultiplier={modals.editCrouchStealthMultiplier} setEditCrouchStealthMultiplier={modals.setEditCrouchStealthMultiplier}
-        editRunTurnMultiplier={modals.editRunTurnMultiplier} setEditRunTurnMultiplier={modals.setEditRunTurnMultiplier}
-        editCrouchTurnMultiplier={modals.editCrouchTurnMultiplier} setEditCrouchTurnMultiplier={modals.setEditCrouchTurnMultiplier}
+        editType={modals.editType}
+        setEditType={modals.setEditType}
+        editRadius={modals.editRadius}
+        setEditRadius={modals.setEditRadius}
+        editHp={modals.editHp}
+        setEditHp={modals.setEditHp}
+        editMaxHp={modals.editMaxHp}
+        setEditMaxHp={modals.setEditMaxHp}
+        editMaxSpeed={modals.editMaxSpeed}
+        setEditMaxSpeed={modals.setEditMaxSpeed}
+        editMaxTurnSpeed={modals.editMaxTurnSpeed}
+        setEditMaxTurnSpeed={modals.setEditMaxTurnSpeed}
+        editRunSpeedMultiplier={modals.editRunSpeedMultiplier}
+        setEditRunSpeedMultiplier={modals.setEditRunSpeedMultiplier}
+        editCrouchSpeedMultiplier={modals.editCrouchSpeedMultiplier}
+        setEditCrouchSpeedMultiplier={modals.setEditCrouchSpeedMultiplier}
+        editCrouchStealthMultiplier={modals.editCrouchStealthMultiplier}
+        setEditCrouchStealthMultiplier={modals.setEditCrouchStealthMultiplier}
+        editRunTurnMultiplier={modals.editRunTurnMultiplier}
+        setEditRunTurnMultiplier={modals.setEditRunTurnMultiplier}
+        editCrouchTurnMultiplier={modals.editCrouchTurnMultiplier}
+        setEditCrouchTurnMultiplier={modals.setEditCrouchTurnMultiplier}
         onClose={modals.closeEditModal}
         onConfirm={modals.handleEditConfirm}
       />
@@ -454,17 +539,30 @@ export const App: React.FC = () => {
       <WeaponEditModal
         selectedWeaponForEdit={modals.selectedWeaponForEdit}
         isReadOnly={isReadOnly}
-        editWeaponName={modals.editWeaponName} setEditWeaponName={modals.setEditWeaponName}
-        editWeaponDamage={modals.editWeaponDamage} setEditWeaponDamage={modals.setEditWeaponDamage}
-        editWeaponPrepTime={modals.editWeaponPrepTime} setEditWeaponPrepTime={modals.setEditWeaponPrepTime}
-        editWeaponRecoveryTime={modals.editWeaponRecoveryTime} setEditWeaponRecoveryTime={modals.setEditWeaponRecoveryTime}
-        editWeaponRange={modals.editWeaponRange} setEditWeaponRange={modals.setEditWeaponRange}
-        editWeaponRadius={modals.editWeaponRadius} setEditWeaponRadius={modals.setEditWeaponRadius}
-        editWeaponNumLines={modals.editWeaponNumLines} setEditWeaponNumLines={modals.setEditWeaponNumLines}
-        editWeaponAngle={modals.editWeaponAngle} setEditWeaponAngle={modals.setEditWeaponAngle}
-        editWeaponPierceObstacles={modals.editWeaponPierceObstacles} setEditWeaponPierceObstacles={modals.setEditWeaponPierceObstacles}
-        editWeaponPiercePlayers={modals.editWeaponPiercePlayers} setEditWeaponPiercePlayers={modals.setEditWeaponPiercePlayers}
-        editWeaponPierceBots={modals.editWeaponPierceBots} setEditWeaponPierceBots={modals.setEditWeaponPierceBots}
+        editWeaponName={modals.editWeaponName}
+        setEditWeaponName={modals.setEditWeaponName}
+        editWeaponWeight={modals.editWeaponWeight}
+        setEditWeaponWeight={modals.setEditWeaponWeight}
+        editWeaponDamage={modals.editWeaponDamage}
+        setEditWeaponDamage={modals.setEditWeaponDamage}
+        editWeaponPrepTime={modals.editWeaponPrepTime}
+        setEditWeaponPrepTime={modals.setEditWeaponPrepTime}
+        editWeaponRecoveryTime={modals.editWeaponRecoveryTime}
+        setEditWeaponRecoveryTime={modals.setEditWeaponRecoveryTime}
+        editWeaponRange={modals.editWeaponRange}
+        setEditWeaponRange={modals.setEditWeaponRange}
+        editWeaponRadius={modals.editWeaponRadius}
+        setEditWeaponRadius={modals.setEditWeaponRadius}
+        editWeaponNumLines={modals.editWeaponNumLines}
+        setEditWeaponNumLines={modals.setEditWeaponNumLines}
+        editWeaponAngle={modals.editWeaponAngle}
+        setEditWeaponAngle={modals.setEditWeaponAngle}
+        editWeaponPierceObstacles={modals.editWeaponPierceObstacles}
+        setEditWeaponPierceObstacles={modals.setEditWeaponPierceObstacles}
+        editWeaponPiercePlayers={modals.editWeaponPiercePlayers}
+        setEditWeaponPiercePlayers={modals.setEditWeaponPiercePlayers}
+        editWeaponPierceBots={modals.editWeaponPierceBots}
+        setEditWeaponPierceBots={modals.setEditWeaponPierceBots}
         onClose={modals.closeWeaponEditModal}
         onConfirm={modals.handleWeaponEditConfirm}
       />
@@ -472,10 +570,14 @@ export const App: React.FC = () => {
       <ArmorEditModal
         selectedArmorForEdit={modals.selectedArmorForEdit}
         isReadOnly={isReadOnly}
-        editArmorName={modals.editArmorName} setEditArmorName={modals.setEditArmorName}
-        editArmorDefense={modals.editArmorDefense} setEditArmorDefense={modals.setEditArmorDefense}
-        editArmorFlatReduction={modals.editArmorFlatReduction} setEditArmorFlatReduction={modals.setEditArmorFlatReduction}
-        editArmorWeight={modals.editArmorWeight} setEditArmorWeight={modals.setEditArmorWeight}
+        editArmorName={modals.editArmorName}
+        setEditArmorName={modals.setEditArmorName}
+        editArmorDefense={modals.editArmorDefense}
+        setEditArmorDefense={modals.setEditArmorDefense}
+        editArmorFlatReduction={modals.editArmorFlatReduction}
+        setEditArmorFlatReduction={modals.setEditArmorFlatReduction}
+        editArmorWeight={modals.editArmorWeight}
+        setEditArmorWeight={modals.setEditArmorWeight}
         onClose={modals.closeArmorEditModal}
         onConfirm={modals.handleArmorEditConfirm}
       />
@@ -483,10 +585,14 @@ export const App: React.FC = () => {
       <BagEditModal
         selectedBagForEdit={modals.selectedBagForEdit}
         isReadOnly={isReadOnly}
-        editBagName={modals.editBagName} setEditBagName={modals.setEditBagName}
-        editBagWidth={modals.editBagWidth} setEditBagWidth={modals.setEditBagWidth}
-        editBagHeight={modals.editBagHeight} setEditBagHeight={modals.setEditBagHeight}
-        editBagWeight={modals.editBagWeight} setEditBagWeight={modals.setEditBagWeight}
+        editBagName={modals.editBagName}
+        setEditBagName={modals.setEditBagName}
+        editBagWidth={modals.editBagWidth}
+        setEditBagWidth={modals.setEditBagWidth}
+        editBagHeight={modals.editBagHeight}
+        setEditBagHeight={modals.setEditBagHeight}
+        editBagWeight={modals.editBagWeight}
+        setEditBagWeight={modals.setEditBagWeight}
         isBagInventoryEmpty={isBagInventoryEmpty}
         inventorySlots={selectedStats?.inventory?.slots}
         inventorySize={selectedStats?.inventory?.size}

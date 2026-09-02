@@ -1,3 +1,4 @@
+
 import { System, Line, Circle } from 'detect-collisions';
 import { World } from '../World';
 import { EntityId, WeaponConfig } from '../types';
@@ -128,10 +129,13 @@ export class PhysicsSystem {
     let nearestId: EntityId | null = null;
     let minDistance = Infinity;
 
-    const entities = world.getEntitiesWith('transform', 'physicsBody');
-    for (const [entityId, { transform, physicsBody }] of entities) {
+    const entities = world.getEntitiesWith('transform');
+    for (const [entityId, { transform, physicsBody, meta, item }] of entities) {
+      if (!meta && !item) continue;
+      
+      const radius = physicsBody ? physicsBody.radius : 16;
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      const distToBoundary = Math.max(0, distToCenter - physicsBody.radius);
+      const distToBoundary = Math.max(0, distToCenter - radius);
 
       if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
         minDistance = distToBoundary;
@@ -147,10 +151,13 @@ export class PhysicsSystem {
       return null;
     }
 
-    const entities = world.getEntitiesWith('transform', 'physicsBody');
-    for (const [entityId, { transform, physicsBody }] of entities) {
+    const entities = world.getEntitiesWith('transform');
+    for (const [entityId, { transform, physicsBody, meta, item }] of entities) {
+      if (!meta && !item) continue;
+      
+      const radius = physicsBody ? physicsBody.radius : 16;
       const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      if (dist <= physicsBody.radius) {
+      if (dist <= radius) {
         return entityId;
       }
     }
@@ -170,13 +177,17 @@ export class PhysicsSystem {
       const id2 = this.bodyToEntityMap.get(c2);
       if (!id1 || !id2) return;
 
-      const h1 = world.getComponent(id1, 'health');
-      const s1 = world.getComponent(id1, 'stats');
-      const h2 = world.getComponent(id2, 'health');
-      const s2 = world.getComponent(id2, 'stats');
-      if (!h1 || !h1.isAlive || !s1 || s1.hp.current <= 0 || !h2 || !h2.isAlive || !s2 || s2.hp.current <= 0) {
-        return;
-      }
+      const meta1 = world.getComponent(id1, 'meta');
+      const health1 = world.getComponent(id1, 'health');
+      const stats1 = world.getComponent(id1, 'stats');
+      const valid1 = meta1 ? (health1?.isAlive && stats1 && stats1.hp.current > 0) : true;
+
+      const meta2 = world.getComponent(id2, 'meta');
+      const health2 = world.getComponent(id2, 'health');
+      const stats2 = world.getComponent(id2, 'stats');
+      const valid2 = meta2 ? (health2?.isAlive && stats2 && stats2.hp.current > 0) : true;
+
+      if (!valid1 || !valid2) return;
 
       const p1 = world.getComponent(id1, 'physicsBody');
       const p2 = world.getComponent(id2, 'physicsBody');
@@ -214,9 +225,11 @@ export class PhysicsSystem {
     });
 
     if (this.obstaclesEnabled) {
-      const entities = world.getEntitiesWith('physicsBody', 'transform', 'health');
-      for (const [, { physicsBody, transform, health }] of entities) {
-        if (!health.isAlive) continue;
+      const entities = world.getEntitiesWith('physicsBody', 'transform');
+      for (const [id, { physicsBody, transform }] of entities) {
+        const meta = world.getComponent(id, 'meta');
+        if (meta && !world.getComponent(id, 'health')?.isAlive) continue;
+        
         this.resolveObstaclesForBody(physicsBody.body);
         transform.x = physicsBody.body.x;
         transform.y = physicsBody.body.y;

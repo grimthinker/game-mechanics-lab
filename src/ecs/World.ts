@@ -23,6 +23,16 @@ export class World {
     }
   }
 
+  public removeComponent<K extends keyof EntityComponents>(
+    id: EntityId,
+    key: K
+  ): void {
+    const entity = this.entities.get(id);
+    if (entity) {
+      delete entity[key];
+    }
+  }
+
   public getComponent<K extends keyof EntityComponents>(
     id: EntityId,
     key: K

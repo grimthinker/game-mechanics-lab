@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { InventoryConfig, ItemData } from '../../ecs/types';
+import { BagFormFields, BagFormValues } from './forms/FormFields';
 
 export interface BagEditModalProps {
   selectedBagForEdit: InventoryConfig | null;
@@ -49,6 +49,20 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
 
   const gridWidth = inventorySize?.width || editBagWidth;
 
+  const values: BagFormValues = {
+    name: editBagName,
+    weight: editBagWeight,
+    width: editBagWidth,
+    height: editBagHeight,
+  };
+
+  const handleChange = (v: Partial<BagFormValues>) => {
+    if (v.name !== undefined) setEditBagName(v.name);
+    if (v.weight !== undefined) setEditBagWeight(v.weight);
+    if (v.width !== undefined) setEditBagWidth(v.width);
+    if (v.height !== undefined) setEditBagHeight(v.height);
+  };
+
   return (
     <div
       className="modal"
@@ -60,53 +74,7 @@ export const BagEditModal: React.FC<BagEditModalProps> = ({
       <div className="modal-dialog">
         <h3>{isReadOnly ? 'Параметры сумки' : 'Изменить параметры сумки'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-          <label>
-            Название:
-            <input
-              disabled={isReadOnly}
-              type="text"
-              value={editBagName}
-              onChange={(e) => setEditBagName(e.target.value)}
-            />
-          </label>
-          <label>
-            Ширина инвентаря (ячейки):
-            <input
-              disabled={!isBagInventoryEmpty || isReadOnly}
-              type="number"
-              value={editBagWidth}
-              min={1}
-              max={12}
-              onChange={(e) => setEditBagWidth(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Высота инвентаря (ячейки):
-            <input
-              disabled={!isBagInventoryEmpty || isReadOnly}
-              type="number"
-              value={editBagHeight}
-              min={1}
-              max={12}
-              onChange={(e) => setEditBagHeight(Number(e.target.value))}
-            />
-          </label>
-          {!isBagInventoryEmpty && !isReadOnly && (
-            <p style={{ fontSize: '12px', color: '#e74c3c', margin: '4px 0' }}>
-              Размер инвентаря можно изменить только когда сумка пуста
-            </p>
-          )}
-          <label>
-            Вес:
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editBagWeight}
-              min={0}
-              max={100}
-              onChange={(e) => setEditBagWeight(Number(e.target.value))}
-            />
-          </label>
+          <BagFormFields values={values} onChange={handleChange} isReadOnly={isReadOnly} isBagInventoryEmpty={isBagInventoryEmpty} />
         </form>
 
         <div style={{ marginTop: '12px' }}>

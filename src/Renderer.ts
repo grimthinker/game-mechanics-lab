@@ -81,6 +81,7 @@ export class Renderer {
     hoveredId: EntityId | null
   ): void {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
+    const items = world.getEntitiesWith('transform', 'item');
 
     const renderBody = (
       id: EntityId,
@@ -167,6 +168,7 @@ export class Renderer {
       this.ctx.restore();
     };
 
+    // Отрисовка мертвых существ
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -179,6 +181,40 @@ export class Renderer {
       }
     }
 
+    // Отрисовка предметов на земле
+    for (const [id, { transform, physicsBody, item }] of items) {
+      this.ctx.save();
+      this.ctx.translate(transform.x, transform.y);
+      this.ctx.rotate(transform.angle);
+      
+      const radius = physicsBody ? physicsBody.radius : 16;
+      const size = radius * 1.6;
+      
+      let color = '#7f8c8d';
+      if (item.type === 'weapon') color = '#f1c40f';
+      else if (item.type === 'armor') color = '#3498db';
+      else if (item.type === 'bag') color = '#2ecc71';
+      
+      this.ctx.fillStyle = color;
+      this.ctx.fillRect(-size/2, -size/2, size, size);
+      
+      const isSelected = selectedId === id;
+      const isHovered = hoveredId === id;
+      
+      if (isSelected) {
+         this.ctx.strokeStyle = '#e74c3c';
+         this.ctx.lineWidth = 3 / camera.scale;
+         this.ctx.strokeRect(-size/2, -size/2, size, size);
+      } else if (isHovered) {
+         this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)';
+         this.ctx.lineWidth = 3 / camera.scale;
+         this.ctx.strokeRect(-size/2, -size/2, size, size);
+      }
+      
+      this.ctx.restore();
+    }
+
+    // Отрисовка живых существ
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -191,6 +227,7 @@ export class Renderer {
       }
     }
 
+    // Отрисовка атак оружия
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -317,6 +354,7 @@ export class Renderer {
       renderBody(id, transform, physicsBody, isAlive, meta);
     }
 
+    // Healthbars
     for (const [id, { transform, physicsBody }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -339,6 +377,7 @@ export class Renderer {
       }
     }
 
+    // Creature ID texts
     for (const [id, { transform, physicsBody, meta }] of entities) {
       const healthComp = world.getComponent(id, 'health');
       const statsComp = world.getComponent(id, 'stats' as any) as any;
@@ -354,6 +393,27 @@ export class Renderer {
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'bottom';
         this.ctx.fillText(meta.id, 0, -physicsBody.radius - 20 / camera.scale);
+        this.ctx.restore();
+      }
+    }
+
+    // Item Hover texts
+    if (hoveredId) {
+      const hoverComp = world.getEntity(hoveredId);
+      if (hoverComp && hoverComp.transform && hoverComp.item && !hoverComp.meta) {
+        this.ctx.save();
+        this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
+        const radius = hoverComp.physicsBody ? hoverComp.physicsBody.radius : 16;
+        
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.shadowColor = "black";
+        this.ctx.shadowBlur = 4;
+        this.ctx.shadowOffsetX = 1;
+        this.ctx.shadowOffsetY = 1;
+        this.ctx.fillText(hoverComp.item.name, 0, -radius - 15 / camera.scale);
         this.ctx.restore();
       }
     }

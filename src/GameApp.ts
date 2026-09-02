@@ -2,7 +2,6 @@ import { Circle } from 'detect-collisions';
 import { World } from './ecs/World';
 import {
   CreatureType,
-  EntityId,
   WeaponConfig,
   ItemData,
   StandardRadius,
@@ -17,8 +16,6 @@ import { Renderer } from './Renderer';
 import { createRandomWeaponItem } from './Weapon';
 import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
-import { BTNodeDTO } from './ai/core';
-import { serializeBTNode } from './ai/serializer';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
 
 export { EntityAdapter } from './EntityAdapter';
@@ -35,7 +32,10 @@ export class GameApp {
   public camera: Camera;
 
   public selectedCreature: EntityAdapter | null = null;
+  public selectedItem: { id: string, data: ItemData } | null = null;
   public hoveredCreature: EntityAdapter | null = null;
+  public hoveredItem: { id: string, data: ItemData } | null = null;
+
   public onFrame: (() => void) | null = null;
 
   private lastTime: number = 0;
@@ -193,63 +193,97 @@ export class GameApp {
     return new EntityAdapter(id, this.world);
   }
 
-  public deleteSelectedCreature(): void {
-    if (!this.selectedCreature) return;
-    const id = this.selectedCreature.id;
-    const phys = this.world.getComponent(id, 'physicsBody');
-    if (phys) {
-      this.physics.unregisterBody(phys.body);
+  public spawnWorldItem(itemData: ItemData, position: Point, isSolid: boolean = true, radius: StandardRadius = 16): string {
+    const id = itemData.id;
+    this.world.createEntity(id);
+    this.world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
+    this.world.addComponent(id, 'item', itemData);
+    if (isSolid) {
+      const mass = itemData.config?.invWeight || 1;
+      const body = new Circle({ x: position.x, y: position.y }, radius);
+      body.isStatic = false;
+      this.world.addComponent(id, 'physicsBody', { body, radius, mass, isStatic: false });
+      this.physics.registerBody(id, body);
     }
-    this.world.removeEntity(id);
-    if (this.hoveredCreature?.id === id) {
-      this.hoveredCreature = null;
+    return id;
+  }
+
+  public deleteSelectedEntity(): void {
+    if (this.selectedCreature) {
+      const id = this.selectedCreature.id;
+      const phys = this.world.getComponent(id, 'physicsBody');
+      if (phys) this.physics.unregisterBody(phys.body);
+      this.world.removeEntity(id);
+      if (this.hoveredCreature?.id === id) this.hoveredCreature = null;
+      this.selectedCreature = null;
+    } else if (this.selectedItem) {
+      const id = this.selectedItem.id;
+      const phys = this.world.getComponent(id, 'physicsBody');
+      if (phys) this.physics.unregisterBody(phys.body);
+      this.world.removeEntity(id);
+      if (this.hoveredItem?.id === id) this.hoveredItem = null;
+      this.selectedItem = null;
     }
-    this.selectedCreature = null;
   }
 
   public clearWorld(): void {
-    const entities = this.world.getEntitiesWith('physicsBody');
+    const entities = this.world.getEntitiesWith('transform');
     for (const [id, { physicsBody }] of entities) {
-      this.physics.unregisterBody(physicsBody.body);
+      if (physicsBody) {
+        this.physics.unregisterBody(physicsBody.body);
+      }
       this.world.removeEntity(id);
     }
     this.physics.loadObstacles([]);
-    this.selectedCreature = null;
-    this.hoveredCreature = null;
+    this.selectEntity(null);
+    this.hoverEntity(null);
   }
 
   public serializeWorld(): any {
     const entitiesData: any[] = [];
-    const entities = this.world.getEntitiesWith('transform', 'physicsBody', 'meta', 'stats', 'inventory', 'equip');
+    const itemsData: any[] = [];
+    
+    const entities = this.world.getEntitiesWith('transform');
     for (const [id, comp] of entities) {
-      entitiesData.push({
-        id,
-        type: comp.meta.type,
-        transform: { ...comp.transform },
-        radius: comp.physicsBody.radius,
-        mass: comp.physicsBody.mass,
-        stats: {
-          hp: comp.stats.hp.current,
-          maxHp: comp.stats.maxHp.current,
-          maxSpeed: comp.stats.maxSpeed.base,
-          maxTurnSpeed: (comp.stats.maxTurnSpeed.base * 180) / Math.PI,
-          runSpeedMultiplier: comp.stats.runSpeedMultiplier.base,
-          crouchSpeedMultiplier: comp.stats.crouchSpeedMultiplier.base,
-          crouchStealthMultiplier: comp.stats.crouchStealthMultiplier.base,
-        },
-        inventory: {
-          size: { ...comp.inventory.size },
-          slots: comp.inventory.slots,
-        },
-        equip: {
-          slots: comp.equip.slots,
-        },
-      });
+      if (comp.meta && comp.stats && comp.inventory && comp.equip && comp.physicsBody) {
+        entitiesData.push({
+          id,
+          type: comp.meta.type,
+          transform: { ...comp.transform },
+          radius: comp.physicsBody.radius,
+          mass: comp.physicsBody.mass,
+          stats: {
+            hp: comp.stats.hp.current,
+            maxHp: comp.stats.maxHp.current,
+            maxSpeed: comp.stats.maxSpeed.base,
+            maxTurnSpeed: (comp.stats.maxTurnSpeed.base * 180) / Math.PI,
+            runSpeedMultiplier: comp.stats.runSpeedMultiplier.base,
+            crouchSpeedMultiplier: comp.stats.crouchSpeedMultiplier.base,
+            crouchStealthMultiplier: comp.stats.crouchStealthMultiplier.base,
+          },
+          inventory: {
+            size: { ...comp.inventory.size },
+            slots: comp.inventory.slots,
+          },
+          equip: {
+            slots: comp.equip.slots,
+          },
+        });
+      } else if (comp.item) {
+        itemsData.push({
+          id,
+          transform: { ...comp.transform },
+          isSolid: !!comp.physicsBody,
+          radius: comp.physicsBody ? comp.physicsBody.radius : 16,
+          itemData: comp.item
+        });
+      }
     }
 
     return {
       obstacles: this.physics.getObstacleLines() || [],
       entities: entitiesData,
+      items: itemsData,
     };
   }
 
@@ -298,6 +332,12 @@ export class GameApp {
         }
       }
     }
+
+    if (Array.isArray(data.items)) {
+      for (const itemData of data.items) {
+         this.spawnWorldItem(itemData.itemData, itemData.transform, itemData.isSolid, itemData.radius);
+      }
+    }
   }
 
   public start(): void {
@@ -330,10 +370,10 @@ export class GameApp {
       this.camera,
       this.world,
       this.physics,
-      this.selectedCreature ? this.selectedCreature.id : null,
+      this.selectedCreature?.id || this.selectedItem?.id || null,
       this.gameMode,
       this.playerId,
-      this.hoveredCreature ? this.hoveredCreature.id : null
+      this.hoveredCreature?.id || this.hoveredItem?.id || null
     );
 
     if (this.onFrame) this.onFrame();
@@ -341,28 +381,51 @@ export class GameApp {
     requestAnimationFrame((t) => this.loop(t));
   }
 
-  public selectCreature(creature: EntityAdapter | null): void {
-    this.selectedCreature = creature;
+  public selectEntity(id: string | null): void {
+    if (!id) {
+      this.selectedCreature = null;
+      this.selectedItem = null;
+      return;
+    }
+    const meta = this.world.getComponent(id, 'meta');
+    const item = this.world.getComponent(id, 'item');
+    if (meta) {
+      this.selectedCreature = new EntityAdapter(id, this.world);
+      this.selectedItem = null;
+    } else if (item) {
+      this.selectedCreature = null;
+      this.selectedItem = { id, data: item };
+    }
   }
 
-  public hoverCreature(creature: EntityAdapter | null): void {
-    this.hoveredCreature = creature;
+  public hoverEntity(id: string | null): void {
+    if (!id) {
+      this.hoveredCreature = null;
+      this.hoveredItem = null;
+      return;
+    }
+    const meta = this.world.getComponent(id, 'meta');
+    const item = this.world.getComponent(id, 'item');
+    if (meta) {
+      this.hoveredCreature = new EntityAdapter(id, this.world);
+      this.hoveredItem = null;
+    } else if (item) {
+      this.hoveredCreature = null;
+      this.hoveredItem = { id, data: item };
+    }
   }
 
-  public pickCreatureAt(worldPoint: Point): EntityAdapter | null {
-    const id = this.physics.getEntityAt(worldPoint, this.world);
-    return id ? new EntityAdapter(id, this.world) : null;
+  public pickEntityAt(worldPoint: Point): string | null {
+    return this.physics.getEntityAt(worldPoint, this.world);
   }
 
-  public pickNearestCreature(
+  public pickNearestEntity(
     worldPoint: Point,
     maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO
-  ): EntityAdapter | null {
+  ): string | null {
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
-
-    const nearestId = this.physics.getNearestEntity(worldPoint, maxWorldDist, this.world);
-    return nearestId ? new EntityAdapter(nearestId, this.world) : null;
+    return this.physics.getNearestEntity(worldPoint, maxWorldDist, this.world);
   }
 
   public startPan(clientX: number, clientY: number): void {
@@ -388,7 +451,7 @@ export class GameApp {
   private draggedEntityOriginalPos: Point | null = null;
   private dragOffset: Point = { x: 0, y: 0 };
 
-  public startDraggingCreature(id: string, clickWorldPoint: Point): boolean {
+  public startDraggingEntity(id: string, clickWorldPoint: Point): boolean {
     if (!this.isPaused) return false;
     const transform = this.world.getComponent(id, 'transform');
     if (!transform) return false;
@@ -402,7 +465,7 @@ export class GameApp {
     return true;
   }
 
-  public updateDraggedCreaturePosition(worldPoint: Point): void {
+  public updateDraggedEntityPosition(worldPoint: Point): void {
     if (!this.draggedEntityId) return;
     const id = this.draggedEntityId;
     
@@ -422,7 +485,7 @@ export class GameApp {
     }
   }
 
-  public cancelCreatureDrag(): void {
+  public cancelEntityDrag(): void {
     if (!this.draggedEntityId || !this.draggedEntityOriginalPos) {
       this.draggedEntityId = null;
       this.draggedEntityOriginalPos = null;
@@ -443,12 +506,12 @@ export class GameApp {
     this.draggedEntityOriginalPos = null;
   }
 
-  public endCreatureDrag(): void {
+  public endEntityDrag(): void {
     this.draggedEntityId = null;
     this.draggedEntityOriginalPos = null;
   }
 
-  public isDraggingCreature(): boolean {
+  public isDraggingEntity(): boolean {
     return this.draggedEntityId !== null;
   }
 }

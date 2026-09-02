@@ -15,6 +15,7 @@ import {
   AttackStatus,
   BehaviorStatsConfig,
 } from './ai/core';
+import { AISystem } from './ecs/systems/AISystem';
 import { Point } from './types';
 
 export class EntityAdapter implements IMovable, EntityController {
@@ -23,8 +24,7 @@ export class EntityAdapter implements IMovable, EntityController {
 
   constructor(
     public readonly id: EntityId,
-    private world: World,
-    // private physics: PhysicsSystem
+    private world: World
   ) {}
 
   public get type(): CreatureType {
@@ -35,7 +35,7 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get pos(): Point {
     const transform = this.world.getComponent(this.id, 'transform');
-      return transform ? {x: transform.x, y: transform.y} : {x: 0, y: 0};
+    return transform ? { x: transform.x, y: transform.y } : { x: 0, y: 0 };
   }
   public get angle(): number {
     const transform = this.world.getComponent(this.id, 'transform');
@@ -76,6 +76,12 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get crouchStealthMultiplier(): number {
     return this.world.getComponent(this.id, 'stats')!.crouchStealthMultiplier.current;
+  }
+  public get runTurnMultiplier(): number {
+    return this.world.getComponent(this.id, 'stats')?.runTurnMultiplier?.current ?? 0.8;
+  }
+  public get crouchTurnMultiplier(): number {
+    return this.world.getComponent(this.id, 'stats')?.crouchTurnMultiplier?.current ?? 1.2;
   }
   public get equip(): EquipComponent | undefined {
     return this.world.getComponent(this.id, 'equip');
@@ -155,6 +161,7 @@ export class EntityAdapter implements IMovable, EntityController {
     if (input) {
       input.isMovingForward = false;
       input.turnDirection = 0;
+      input.turnSpeed = 0;
       input.wantsAttack = false;
     }
     return true;
@@ -196,16 +203,46 @@ export class EntityAdapter implements IMovable, EntityController {
     return true;
   }
 
-  public updateParams(params: {
-    radius?: StandardRadius;
-    maxSpeed?: number;
-    maxTurnSpeed?: number;
-    hp?: number;
-    maxHp?: number;
-    runSpeedMultiplier?: number;
-    crouchSpeedMultiplier?: number;
-    crouchStealthMultiplier?: number;
-  }): void {
+  public setType(newType: CreatureType, aiSystem: AISystem): void {
+    const meta = this.world.getComponent(this.id, 'meta');
+    if (!meta || meta.type === newType) return;
+
+    meta.type = newType;
+
+    if (newType === 'ai') {
+      aiSystem.initBotBrain(this.world, this.id);
+    } else {
+      this.world.removeComponent(this.id, 'brain');
+    }
+
+    this.stop();
+    const input = this.world.getComponent(this.id, 'input');
+    if (input) {
+      input.isRunning = false;
+      input.isCrouching = false;
+    }
+  }
+
+  public updateParams(
+    params: {
+      type?: CreatureType;
+      radius?: StandardRadius;
+      maxSpeed?: number;
+      maxTurnSpeed?: number;
+      hp?: number;
+      maxHp?: number;
+      runSpeedMultiplier?: number;
+      crouchSpeedMultiplier?: number;
+      crouchStealthMultiplier?: number;
+      runTurnMultiplier?: number;
+      crouchTurnMultiplier?: number;
+    },
+    aiSystem?: AISystem
+  ): void {
+    if (params.type !== undefined && aiSystem) {
+      this.setType(params.type, aiSystem);
+    }
+
     const phys = this.world.getComponent(this.id, 'physicsBody');
     const stats = this.world.getComponent(this.id, 'stats');
     const health = this.world.getComponent(this.id, 'health');
@@ -250,6 +287,16 @@ export class EntityAdapter implements IMovable, EntityController {
         const val = Math.max(1, params.crouchStealthMultiplier);
         stats.crouchStealthMultiplier.base = val;
         stats.crouchStealthMultiplier.current = val;
+      }
+      if (params.runTurnMultiplier !== undefined) {
+        const val = Math.max(0.1, params.runTurnMultiplier);
+        stats.runTurnMultiplier.base = val;
+        stats.runTurnMultiplier.current = val;
+      }
+      if (params.crouchTurnMultiplier !== undefined) {
+        const val = Math.max(0.1, params.crouchTurnMultiplier);
+        stats.crouchTurnMultiplier.base = val;
+        stats.crouchTurnMultiplier.current = val;
       }
     }
   }

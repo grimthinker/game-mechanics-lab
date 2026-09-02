@@ -1,5 +1,5 @@
 import React from 'react';
-import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
+import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData, CreatureType } from '../ecs/types';
 import { CreatureStats } from '../types';
 import { GameMode, THEME_COLORS, TOOL_GROUP_THEME_COLORS } from '../constants';
 
@@ -12,16 +12,18 @@ interface ToolbarProps {
   setObstaclesEnabled: (val: boolean) => void;
   setObstaclesData: (data: any[]) => void;
   selectedStats: CreatureStats | null;
+  selectedItemData: { id: string; data: ItemData } | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   worldFileInputRef: React.RefObject<HTMLInputElement | null>;
   onNewWorld: () => void;
   onSaveWorld: () => void;
   onLoadWorldFile: (file: File) => void;
-  openSpawnModal: (type: 'player' | 'ai') => void;
+  openSpawnModal: (type?: CreatureType) => void;
+  openItemSpawnModal: () => void;
   openEditModal: () => void;
-  handleDeleteCreature: () => void;
+  handleDeleteEntity: () => void;
   openItemEditModal: (item: ItemData) => void;
-  isPaused: boolean; 
+  isPaused: boolean;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -32,23 +34,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   obstaclesEnabled,
   setObstaclesEnabled,
   selectedStats,
+  selectedItemData,
   fileInputRef,
   worldFileInputRef,
   onNewWorld,
   onSaveWorld,
   onLoadWorldFile,
   openSpawnModal,
+  openItemSpawnModal,
   openEditModal,
-  handleDeleteCreature,
+  handleDeleteEntity,
   openItemEditModal,
-  isPaused
+  isPaused,
 }) => {
   const getSlotTypeName = (type: string) => {
     switch (type) {
-      case 'armor': return 'Броня';
-      case 'bag': return 'Сумка';
-      case 'weapon': return 'Оружие';
-      default: return type;
+      case 'armor':
+        return 'Броня';
+      case 'bag':
+        return 'Сумка';
+      case 'weapon':
+        return 'Оружие';
+      default:
+        return type;
     }
   };
 
@@ -56,30 +64,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     <div id="toolbar" style={{ backgroundColor: THEME_COLORS[mode] }}>
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
         <h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%' }}>
-                <span>Мир</span>
-                {isPaused && mode !== GameMode.GAME && (
-                    <span style={{ 
-                        color: '#e74c3c', 
-                        fontWeight: 'bold', 
-                        fontSize: '14px',
-                        padding: '2px 8px',
-                        border: '1px solid #e74c3c',
-                        borderRadius: '4px',
-                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                        position: 'absolute',
-                        right: 0
-                    }}>
-                        ПАУЗА
-                    </span>
-                )}
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%' }}>
+            <span>Мир</span>
+            {isPaused && mode !== GameMode.GAME && (
+              <span
+                style={{
+                  color: '#e74c3c',
+                  fontWeight: 'bold',
+                  fontSize: '14px',
+                  padding: '2px 8px',
+                  border: '1px solid #e74c3c',
+                  borderRadius: '4px',
+                  backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                  position: 'absolute',
+                  right: 0,
+                }}
+              >
+                ПАУЗА
+              </span>
+            )}
+          </div>
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {mode === GameMode.EDITOR && (
             <>
-              <button className="btn" onClick={onNewWorld}>Новый мир</button>
-              <button className="btn" onClick={onSaveWorld}>Сохранить мир</button>
+              <button className="btn" onClick={onNewWorld}>
+                Новый мир
+              </button>
+              <button className="btn" onClick={onSaveWorld}>
+                Сохранить мир
+              </button>
               <input
                 type="file"
                 ref={worldFileInputRef}
@@ -91,14 +105,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   e.target.value = '';
                 }}
               />
-              <button className="btn" onClick={() => worldFileInputRef.current?.click()}>Загрузить мир</button>
+              <button className="btn" onClick={() => worldFileInputRef.current?.click()}>
+                Загрузить мир
+              </button>
             </>
           )}
           {mode !== GameMode.EDITOR && (
-            <button className="btn" style={{ backgroundColor: '#2980b9', color: '#fff' }} onClick={goToEditor}>Редактор</button>
+            <button className="btn" style={{ backgroundColor: '#2980b9', color: '#fff' }} onClick={goToEditor}>
+              Редактор
+            </button>
           )}
           {mode !== GameMode.SIMULATION && (
-            <button className="btn" style={{ backgroundColor: '#27ae60', color: '#fff' }} onClick={goToSimulation}>Симуляция</button>
+            <button className="btn" style={{ backgroundColor: '#27ae60', color: '#fff' }} onClick={goToSimulation}>
+              Симуляция
+            </button>
           )}
         </div>
       </div>
@@ -106,12 +126,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       {mode === GameMode.EDITOR && (
         <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
           <h3>Управление спавном</h3>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openSpawnModal('player')}>
-              Добавить Игрока
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => openSpawnModal()}>
+              Добавить Существо
             </button>
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => openSpawnModal('ai')}>
-              Добавить Бота
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={openItemSpawnModal}>
+              Добавить Предмет
             </button>
           </div>
         </div>
@@ -151,32 +171,134 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 reader.readAsText(file);
               }}
             />
-            <button className="btn" onClick={() => fileInputRef.current?.click()}>Загрузить JSON препятствий</button>
+            <button className="btn" onClick={() => fileInputRef.current?.click()}>
+              Загрузить JSON препятствий
+            </button>
           </>
         )}
       </div>
 
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>{mode === GameMode.GAME ? 'Игрок' : 'Выбранное существо'}</h3>
-        {selectedStats ? (
+        <h3>{mode === GameMode.GAME ? 'Игрок' : selectedItemData ? 'Выбранный предмет' : 'Выбранное существо'}</h3>
+        {selectedItemData ? (
           <div className="stats-list">
             <dl className="stats-list">
-              <div className="stat-row"><dt>Тип:</dt><dd>{selectedStats.type === 'player' ? 'Игрок' : 'Бот'}</dd></div>
-              <div className="stat-row"><dt>Состояние:</dt><dd>{selectedStats.state}</dd></div>
-              <div className="stat-row"><dt>Радиус:</dt><dd>{selectedStats.radius} px</dd></div>
-              <div className="stat-row"><dt>Масса:</dt><dd>{selectedStats.mass}</dd></div>
-              <div className="stat-row"><dt>Здоровье (HP):</dt><dd>{selectedStats.hp} / {selectedStats.maxHp}</dd></div>
-              <div className="stat-row"><dt>Текущая скорость:</dt><dd>{selectedStats.currentSpeed.toFixed(0)} px/с</dd></div>
-              <div className="stat-row"><dt>Текущий поворот:</dt><dd>{selectedStats.currentTurnSpeed.toFixed(0)} °/с</dd></div>
-              <div className="stat-row"><dt>Макс. скорость:</dt><dd>{selectedStats.maxSpeed} px/с</dd></div>
-              <div className="stat-row"><dt>Макс. поворот:</dt><dd>{selectedStats.maxTurnSpeed} °/с</dd></div>
+              <div className="stat-row">
+                <dt>Тип:</dt>
+                <dd>Предмет ({getSlotTypeName(selectedItemData.data.type)})</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Название:</dt>
+                <dd>{selectedItemData.data.name}</dd>
+              </div>
+              {selectedItemData.data.type === 'weapon' && selectedItemData.data.config && (
+                <>
+                  <div className="stat-row">
+                    <dt>Урон:</dt>
+                    <dd>{(selectedItemData.data.config as WeaponConfig).baseDamage}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Вес:</dt>
+                    <dd>{(selectedItemData.data.config as WeaponConfig).invWeight}</dd>
+                  </div>
+                </>
+              )}
+              {selectedItemData.data.type === 'armor' && selectedItemData.data.config && (
+                <>
+                  <div className="stat-row">
+                    <dt>Защита:</dt>
+                    <dd>{(selectedItemData.data.config as ArmorConfig).defense}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Поглощение:</dt>
+                    <dd>{(selectedItemData.data.config as ArmorConfig).flat_reduction}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Вес:</dt>
+                    <dd>{(selectedItemData.data.config as ArmorConfig).invWeight}</dd>
+                  </div>
+                </>
+              )}
+              {selectedItemData.data.type === 'bag' && selectedItemData.data.config && (
+                <>
+                  <div className="stat-row">
+                    <dt>Размер:</dt>
+                    <dd>
+                      {(selectedItemData.data.config as InventoryConfig).size.width}x
+                      {(selectedItemData.data.config as InventoryConfig).size.height}
+                    </dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Вес:</dt>
+                    <dd>{(selectedItemData.data.config as InventoryConfig).invWeight}</dd>
+                  </div>
+                </>
+              )}
+            </dl>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+              {mode === GameMode.EDITOR && (
+                <>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedItemData.data)}>
+                    Изменить
+                  </button>
+                  <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteEntity}>
+                    Удалить
+                  </button>
+                </>
+              )}
+              {mode === GameMode.SIMULATION && (
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedItemData.data)}>
+                  Осмотреть
+                </button>
+              )}
+            </div>
+          </div>
+        ) : selectedStats ? (
+          <div className="stats-list">
+            <dl className="stats-list">
+              <div className="stat-row">
+                <dt>Тип:</dt>
+                <dd>{selectedStats.type === 'player' ? 'Игрок' : 'Бот'}</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Состояние:</dt>
+                <dd>{selectedStats.state}</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Радиус:</dt>
+                <dd>{selectedStats.radius} px</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Масса:</dt>
+                <dd>{selectedStats.mass}</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Здоровье (HP):</dt>
+                <dd>
+                  {selectedStats.hp} / {selectedStats.maxHp}
+                </dd>
+              </div>
+              <div className="stat-row">
+                <dt>Текущая скорость:</dt>
+                <dd>{selectedStats.currentSpeed.toFixed(0)} px/с</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Текущий поворот:</dt>
+                <dd>{selectedStats.currentTurnSpeed.toFixed(0)} °/с</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Макс. скорость:</dt>
+                <dd>{selectedStats.maxSpeed} px/с</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Макс. поворот:</dt>
+                <dd>{selectedStats.maxTurnSpeed} °/с</dd>
+              </div>
             </dl>
 
-            <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
-              Экипировка:
-            </h4>
+            <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-              {selectedStats.equipSlots.map((slot: { item: any; type: string; }, index: any) => {
+              {selectedStats.equipSlots.map((slot: { item: any; type: string }, index: any) => {
                 const item = slot.item;
                 const hasEditableItem = item && ['weapon', 'armor', 'bag'].includes(item.type) && !!item.config;
                 const isWeapon = item?.type === 'weapon';
@@ -186,7 +308,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 return (
                   <div
                     key={`${slot.type}_${index}`}
-                    onClick={() => { if (hasEditableItem && item) openItemEditModal(item); }}
+                    onClick={() => {
+                      if (hasEditableItem && item) openItemEditModal(item);
+                    }}
                     style={{
                       backgroundColor: '#1e1e1e',
                       padding: '6px 8px',
@@ -226,19 +350,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               {mode === GameMode.EDITOR && (
                 <>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>Изменить</button>
-                  <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteCreature}>Удалить</button>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
+                    Изменить
+                  </button>
+                  <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteEntity}>
+                    Удалить
+                  </button>
                 </>
               )}
               {mode === GameMode.SIMULATION && (
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>Осмотреть</button>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
+                  Осмотреть
+                </button>
               )}
             </div>
 
             {(mode === GameMode.EDITOR || mode === GameMode.SIMULATION) && selectedStats.type === 'player' && (
-              <button 
-                className="btn" 
-                style={{ width: '100%', marginTop: '8px', backgroundColor: '#8e44ad', color: '#fff' }} 
+              <button
+                className="btn"
+                style={{ width: '100%', marginTop: '8px', backgroundColor: '#8e44ad', color: '#fff' }}
                 onClick={() => goToGame(selectedStats.id)}
               >
                 Играть
@@ -246,7 +376,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             )}
           </div>
         ) : (
-          <p className="selection-hint">Существо не выбрано</p>
+          <p className="selection-hint">Ничего не выбрано</p>
         )}
       </div>
 
@@ -268,8 +398,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         ) : (
           <ul className="control-keys">
             <li><kbd>U</kbd> Дерево поведения (BT)</li>
-            <li><kbd>Ctrl+B</kbd> Быстрый спавн бота</li>
             <li><kbd>Ctrl+P</kbd> Быстрый спавн игрока</li>
+            <li><kbd>Ctrl+B</kbd> Быстрый спавн бота</li>
+            <li><kbd>Ctrl+I</kbd> Добавить предмет</li>
           </ul>
         )}
       </div>

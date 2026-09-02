@@ -7,7 +7,8 @@ import {
 
 export interface SpawnModalProps {
   isOpen: boolean;
-  pendingSpawnType: CreatureType | null;
+  pendingSpawnType: CreatureType;
+  setPendingSpawnType: (type: CreatureType) => void;
   radius: number;
   setRadius: (val: StandardRadius) => void;
   mass: number;
@@ -33,6 +34,7 @@ export interface SpawnModalProps {
 export const SpawnModal: React.FC<SpawnModalProps> = ({
   isOpen,
   pendingSpawnType,
+  setPendingSpawnType,
   radius,
   setRadius,
   mass,
@@ -66,10 +68,17 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
       <div className="modal-backdrop" onClick={onClose} />
       <div className="modal-dialog">
         <h3>Параметры нового существа</h3>
-        <p className="modal-subtitle">
-          Тип: {pendingSpawnType === 'player' ? 'Игрок' : 'Бот'}
-        </p>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
+          <label>
+            Тип существа:
+            <select
+              value={pendingSpawnType}
+              onChange={(e) => setPendingSpawnType(e.target.value as CreatureType)}
+            >
+              <option value="player">Игрок</option>
+              <option value="ai">Бот</option>
+            </select>
+          </label>
           <label>
             Радиус:
             <select

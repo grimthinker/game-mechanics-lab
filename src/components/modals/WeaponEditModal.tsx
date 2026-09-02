@@ -1,12 +1,14 @@
-
 import React from 'react';
 import { WeaponConfig } from '../../ecs/types';
+import { WeaponFormFields, WeaponFormValues } from './forms/FormFields';
 
 export interface WeaponEditModalProps {
   selectedWeaponForEdit: WeaponConfig | null;
   isReadOnly?: boolean;
   editWeaponName: string;
   setEditWeaponName: (val: string) => void;
+  editWeaponWeight: number;
+  setEditWeaponWeight: (val: number) => void;
   editWeaponDamage: number;
   setEditWeaponDamage: (val: number) => void;
   editWeaponPrepTime: number;
@@ -36,6 +38,8 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
   isReadOnly,
   editWeaponName,
   setEditWeaponName,
+  editWeaponWeight,
+  setEditWeaponWeight,
   editWeaponDamage,
   setEditWeaponDamage,
   editWeaponPrepTime,
@@ -61,6 +65,37 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
 }) => {
   if (!selectedWeaponForEdit) return null;
 
+  const values: WeaponFormValues = {
+    name: editWeaponName,
+    weight: editWeaponWeight,
+    baseDamage: editWeaponDamage,
+    prepTime: editWeaponPrepTime,
+    recoveryTime: editWeaponRecoveryTime,
+    range: editWeaponRange,
+    radius: editWeaponRadius,
+    numLines: editWeaponNumLines,
+    angle: editWeaponAngle,
+    pierceObstacles: editWeaponPierceObstacles,
+    piercePlayers: editWeaponPiercePlayers,
+    pierceBots: editWeaponPierceBots,
+    hitZoneType: selectedWeaponForEdit.zone.hitZoneType,
+  };
+
+  const handleChange = (v: Partial<WeaponFormValues>) => {
+    if (v.name !== undefined) setEditWeaponName(v.name);
+    if (v.weight !== undefined) setEditWeaponWeight(v.weight);
+    if (v.baseDamage !== undefined) setEditWeaponDamage(v.baseDamage);
+    if (v.prepTime !== undefined) setEditWeaponPrepTime(v.prepTime);
+    if (v.recoveryTime !== undefined) setEditWeaponRecoveryTime(v.recoveryTime);
+    if (v.range !== undefined) setEditWeaponRange(v.range);
+    if (v.radius !== undefined) setEditWeaponRadius(v.radius);
+    if (v.numLines !== undefined) setEditWeaponNumLines(v.numLines);
+    if (v.angle !== undefined) setEditWeaponAngle(v.angle);
+    if (v.pierceObstacles !== undefined) setEditWeaponPierceObstacles(v.pierceObstacles);
+    if (v.piercePlayers !== undefined) setEditWeaponPiercePlayers(v.piercePlayers);
+    if (v.pierceBots !== undefined) setEditWeaponPierceBots(v.pierceBots);
+  };
+
   return (
     <div
       className="modal"
@@ -72,140 +107,7 @@ export const WeaponEditModal: React.FC<WeaponEditModalProps> = ({
       <div className="modal-dialog">
         <h3>{isReadOnly ? 'Параметры оружия' : 'Изменить параметры оружия'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-          <label>
-            Название:
-            <input
-              disabled={isReadOnly}
-              type="text"
-              value={editWeaponName}
-              onChange={(e) => setEditWeaponName(e.target.value)}
-            />
-          </label>
-          <label>
-            Базовый урон:
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editWeaponDamage}
-              min={0}
-              max={500}
-              onChange={(e) => setEditWeaponDamage(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Подготовка (сек):
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editWeaponPrepTime}
-              min={0.05}
-              max={5}
-              step={0.05}
-              onChange={(e) => setEditWeaponPrepTime(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Восстановление (сек):
-            <input
-              disabled={isReadOnly}
-              type="number"
-              value={editWeaponRecoveryTime}
-              min={0.05}
-              max={5}
-              step={0.05}
-              onChange={(e) => setEditWeaponRecoveryTime(Number(e.target.value))}
-            />
-          </label>
-          {(((selectedWeaponForEdit as any).zone.range !== undefined) ||
-            ((selectedWeaponForEdit as any).zone.length !== undefined)) && (
-            <label>
-              Дальность / Длина:
-              <input
-                disabled={isReadOnly}
-                type="number"
-                value={editWeaponRange}
-                min={0}
-                max={2000}
-                step={10}
-                onChange={(e) => setEditWeaponRange(Number(e.target.value))}
-              />
-            </label>
-          )}
-          {((selectedWeaponForEdit as any).zone.radius !== undefined) && (
-            <label>
-              Радиус:
-              <input
-                disabled={isReadOnly}
-                type="number"
-                value={editWeaponRadius}
-                min={0}
-                max={500}
-                step={5}
-                onChange={(e) => setEditWeaponRadius(Number(e.target.value))}
-              />
-            </label>
-          )}
-          {(((selectedWeaponForEdit as any).zone.numLines !== undefined) ||
-            ((selectedWeaponForEdit as any).zone.lines !== undefined) ||
-            ((selectedWeaponForEdit as any).zone.rayCount !== undefined)) && (
-            <label>
-              Количество лучей / линий:
-              <input
-                disabled={isReadOnly}
-                type="number"
-                value={editWeaponNumLines}
-                min={1}
-                max={50}
-                step={1}
-                onChange={(e) => setEditWeaponNumLines(Number(e.target.value))}
-              />
-            </label>
-          )}
-          {((selectedWeaponForEdit as any).zone.angle !== undefined) && (
-            <label>
-              Угол (°):
-              <input
-                disabled={isReadOnly}
-                type="number"
-                value={editWeaponAngle}
-                min={0}
-                max={360}
-                step={1}
-                onChange={(e) => setEditWeaponAngle(Number(e.target.value))}
-              />
-            </label>
-          )}
-          {['line', 'forward_line', 'shrapnel'].includes(selectedWeaponForEdit.zone.hitZoneType) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  disabled={isReadOnly}
-                  type="checkbox"
-                  checked={editWeaponPierceObstacles}
-                  onChange={(e) => setEditWeaponPierceObstacles(e.target.checked)}
-                />
-                Пробивать препятствия
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  disabled={isReadOnly}
-                  type="checkbox"
-                  checked={editWeaponPiercePlayers}
-                  onChange={(e) => setEditWeaponPiercePlayers(e.target.checked)}
-                />
-                Пробивать игроков
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  disabled={isReadOnly}
-                  type="checkbox"
-                  checked={editWeaponPierceBots}
-                  onChange={(e) => setEditWeaponPierceBots(e.target.checked)}
-                />
-                Пробивать ботов
-              </label>
-            </div>
-          )}
+          <WeaponFormFields values={values} onChange={handleChange} isReadOnly={isReadOnly} />
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>

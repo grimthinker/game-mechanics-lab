@@ -9,9 +9,8 @@ interface UseGameModalsProps {
 
 export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType | null>(null);
-  
-  // Параметры спавна
+  const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType>('player');
+
   const [radius, setRadius] = useState<StandardRadius>(16);
   const [mass, setMass] = useState<number>(10);
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
@@ -22,8 +21,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [runTurnMultiplier, setRunTurnMultiplier] = useState<number>(0.8);
   const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(1.2);
 
-  // Редактирование существа
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editType, setEditType] = useState<CreatureType>('player');
   const [editRadius, setEditRadius] = useState<StandardRadius>(24);
   const [editMaxSpeed, setEditMaxSpeed] = useState<number>(150);
   const [editMaxTurnSpeed, setEditMaxTurnSpeed] = useState<number>(270);
@@ -35,9 +34,9 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [editRunTurnMultiplier, setEditRunTurnMultiplier] = useState<number>(0.8);
   const [editCrouchTurnMultiplier, setEditCrouchTurnMultiplier] = useState<number>(1.2);
 
-  // Редактирование оружия
   const [selectedWeaponForEdit, setSelectedWeaponForEdit] = useState<WeaponConfig | null>(null);
   const [editWeaponName, setEditWeaponName] = useState<string>('');
+  const [editWeaponWeight, setEditWeaponWeight] = useState<number>(1);
   const [editWeaponDamage, setEditWeaponDamage] = useState<number>(25);
   const [editWeaponPrepTime, setEditWeaponPrepTime] = useState<number>(0.2);
   const [editWeaponRecoveryTime, setEditWeaponRecoveryTime] = useState<number>(0.3);
@@ -49,33 +48,37 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [editWeaponPiercePlayers, setEditWeaponPiercePlayers] = useState<boolean>(false);
   const [editWeaponPierceBots, setEditWeaponPierceBots] = useState<boolean>(false);
 
-  // Редактирование брони
   const [selectedArmorForEdit, setSelectedArmorForEdit] = useState<ArmorConfig | null>(null);
   const [editArmorName, setEditArmorName] = useState<string>('');
   const [editArmorDefense, setEditArmorDefense] = useState<number>(15);
   const [editArmorFlatReduction, setEditArmorFlatReduction] = useState<number>(3);
   const [editArmorWeight, setEditArmorWeight] = useState<number>(3);
 
-  // Редактирование сумки
   const [selectedBagForEdit, setSelectedBagForEdit] = useState<InventoryConfig | null>(null);
   const [editBagName, setEditBagName] = useState<string>('');
   const [editBagWidth, setEditBagWidth] = useState<number>(6);
   const [editBagHeight, setEditBagHeight] = useState<number>(4);
   const [editBagWeight, setEditBagWeight] = useState<number>(1);
 
-  const openSpawnModal = (type: CreatureType) => {
-    setPendingSpawnType(type);
+  const [isItemSpawnModalOpen, setIsItemSpawnModalOpen] = useState(false);
+  const openItemSpawnModal = () => setIsItemSpawnModalOpen(true);
+  const closeItemSpawnModal = () => setIsItemSpawnModalOpen(false);
+
+  const openSpawnModal = (type?: CreatureType) => {
+    if (type) {
+      setPendingSpawnType(type);
+    }
     setIsModalOpen(true);
   };
 
   const closeSpawnModal = () => {
-    setPendingSpawnType(null);
     setIsModalOpen(false);
   };
 
   const openEditModal = () => {
     const c = appRef.current?.selectedCreature;
     if (!c) return;
+    setEditType(c.type);
     setEditRadius(c.radius);
     setEditMaxSpeed(c.maxSpeed);
     setEditMaxTurnSpeed(Math.round((c.maxTurnSpeed * 180) / Math.PI));
@@ -84,24 +87,34 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setEditRunSpeedMultiplier(c.runSpeedMultiplier);
     setEditCrouchSpeedMultiplier(c.crouchSpeedMultiplier);
     setEditCrouchStealthMultiplier(c.crouchStealthMultiplier);
+    setEditRunTurnMultiplier(c.runTurnMultiplier);
+    setEditCrouchTurnMultiplier(c.crouchTurnMultiplier);
     setIsEditModalOpen(true);
   };
 
   const closeEditModal = () => setIsEditModalOpen(false);
 
   const handleEditConfirm = () => {
-    const c = appRef.current?.selectedCreature;
-    if (!c) return;
-    c.updateParams({
-      radius: editRadius,
-      maxSpeed: editMaxSpeed,
-      maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
-      hp: editHp,
-      maxHp: editMaxHp,
-      runSpeedMultiplier: editRunSpeedMultiplier,
-      crouchSpeedMultiplier: editCrouchSpeedMultiplier,
-      crouchStealthMultiplier: editCrouchStealthMultiplier,
-    });
+    const app = appRef.current;
+    const c = app?.selectedCreature;
+    if (!c || !app) return;
+
+    c.updateParams(
+      {
+        type: editType,
+        radius: editRadius,
+        maxSpeed: editMaxSpeed,
+        maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
+        hp: editHp,
+        maxHp: editMaxHp,
+        runSpeedMultiplier: editRunSpeedMultiplier,
+        crouchSpeedMultiplier: editCrouchSpeedMultiplier,
+        crouchStealthMultiplier: editCrouchStealthMultiplier,
+        runTurnMultiplier: editRunTurnMultiplier,
+        crouchTurnMultiplier: editCrouchTurnMultiplier,
+      },
+      (app as any).aiSystem
+    );
     closeEditModal();
     updateStats();
   };
@@ -111,6 +124,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     const zone = w.zone || {};
     setSelectedWeaponForEdit(weapon);
     setEditWeaponName(w.name || '');
+    setEditWeaponWeight(w.invWeight ?? 1);
     setEditWeaponDamage(w.baseDamage ?? 25);
     setEditWeaponPrepTime(w.prepTime ?? 0.2);
     setEditWeaponRecoveryTime(w.recoveryTime ?? 0.3);
@@ -131,6 +145,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     if (!w.zone) w.zone = {};
 
     w.name = editWeaponName;
+    w.invWeight = editWeaponWeight;
     w.baseDamage = editWeaponDamage;
     w.prepTime = editWeaponPrepTime;
     w.recoveryTime = editWeaponRecoveryTime;
@@ -249,7 +264,11 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     crouchTurnMultiplier, setCrouchTurnMultiplier,
     openSpawnModal, closeSpawnModal,
 
+    isItemSpawnModalOpen,
+    openItemSpawnModal, closeItemSpawnModal,
+
     isEditModalOpen,
+    editType, setEditType,
     editRadius, setEditRadius,
     editMaxSpeed, setEditMaxSpeed,
     editMaxTurnSpeed, setEditMaxTurnSpeed,
@@ -263,6 +282,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     openEditModal, closeEditModal, handleEditConfirm,
 
     selectedWeaponForEdit, editWeaponName, setEditWeaponName,
+    editWeaponWeight, setEditWeaponWeight,
     editWeaponDamage, setEditWeaponDamage, editWeaponPrepTime, setEditWeaponPrepTime,
     editWeaponRecoveryTime, setEditWeaponRecoveryTime, editWeaponRange, setEditWeaponRange,
     editWeaponRadius, setEditWeaponRadius, editWeaponNumLines, setEditWeaponNumLines,

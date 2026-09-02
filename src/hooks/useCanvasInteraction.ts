@@ -1,23 +1,12 @@
 import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react';
 import { GameApp } from '../GameApp';
-import { CreatureType, StandardRadius } from '../ecs/types';
 import { GameMode } from '../constants';
-
-interface PlacementConfig {
-  type: CreatureType;
-  radius: StandardRadius;
-  mass: number;
-  maxSpeed: number;
-  maxTurnSpeed: number;
-  runSpeedMultiplier: number;
-  crouchSpeedMultiplier: number;
-  crouchStealthMultiplier: number;
-}
+import { PlacementMode } from '../types';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
-  placementConfig: PlacementConfig | null;
-  setPlacementConfig: Dispatch<SetStateAction<PlacementConfig | null>>;
+  placementMode: PlacementMode | null;
+  setPlacementMode: Dispatch<SetStateAction<PlacementMode | null>>;
   syncPlayerControls: () => void;
   updateStats: () => void;
   mode: GameMode;
@@ -25,22 +14,22 @@ interface UseCanvasInteractionProps {
 
 export const useCanvasInteraction = ({
   appRef,
-  placementConfig,
-  setPlacementConfig,
+  placementMode,
+  setPlacementMode,
   syncPlayerControls,
   updateStats,
   mode,
 }: UseCanvasInteractionProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  
+
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
-  const clickedCreatureIdRef = useRef<string | null>(null);
+  const clickedEntityIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.style.cursor = 'grab';
+    canvas.style.cursor = placementMode ? 'pointer' : 'grab';
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -51,24 +40,24 @@ export const useCanvasInteraction = ({
     return () => {
       canvas.removeEventListener('wheel', onWheel);
     };
-  }, []);
+  }, [placementMode]);
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (e.button === 0 && app) {
       const point = app.getCanvasPoint(e.clientX, e.clientY);
-      
-      if (!placementConfig && app.isPaused && mode === GameMode.EDITOR) {
-        const creature = app.pickCreatureAt(point);
-        if (creature) {
-          clickedCreatureIdRef.current = creature.id;
+
+      if (!placementMode && app.isPaused && mode === GameMode.EDITOR) {
+        const entityId = app.pickEntityAt(point);
+        if (entityId) {
+          clickedEntityIdRef.current = entityId;
           dragStartPosRef.current = { x: e.clientX, y: e.clientY };
           e.currentTarget.style.cursor = 'grabbing';
           return;
         }
       }
 
-      clickedCreatureIdRef.current = null;
+      clickedEntityIdRef.current = null;
       dragStartPosRef.current = null;
       app.startPan(e.clientX, e.clientY);
       e.currentTarget.style.cursor = 'grabbing';
@@ -81,26 +70,28 @@ export const useCanvasInteraction = ({
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
-    if (placementConfig) {
-      app.hoverCreature(null);
+    let isHoveringEntity = false;
+    if (placementMode) {
+      app.hoverEntity(null);
     } else {
-      const nearest = app.pickNearestCreature(point);
-      app.hoverCreature(nearest);
+      const nearestId = app.pickNearestEntity(point);
+      app.hoverEntity(nearestId);
+      isHoveringEntity = nearestId !== null;
     }
 
-    if (app.isDraggingCreature() && mode === GameMode.EDITOR) {
-      app.updateDraggedCreaturePosition(point);
+    if (app.isDraggingEntity() && mode === GameMode.EDITOR) {
+      app.updateDraggedEntityPosition(point);
       e.currentTarget.style.cursor = 'grabbing';
       return;
     }
 
-    if (app.isPaused && mode === GameMode.EDITOR && clickedCreatureIdRef.current && dragStartPosRef.current) {
+    if (app.isPaused && mode === GameMode.EDITOR && clickedEntityIdRef.current && dragStartPosRef.current) {
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
       if (Math.hypot(dx, dy) > 5) {
         const clickWorldPoint = app.getCanvasPoint(dragStartPosRef.current.x, dragStartPosRef.current.y);
-        app.startDraggingCreature(clickedCreatureIdRef.current, clickWorldPoint);
-        app.updateDraggedCreaturePosition(point);
+        app.startDraggingEntity(clickedEntityIdRef.current, clickWorldPoint);
+        app.updateDraggedEntityPosition(point);
         e.currentTarget.style.cursor = 'grabbing';
         return;
       }
@@ -110,6 +101,8 @@ export const useCanvasInteraction = ({
 
     if (e.buttons === 1) {
       e.currentTarget.style.cursor = 'grabbing';
+    } else if (placementMode || isHoveringEntity) {
+      e.currentTarget.style.cursor = 'pointer';
     } else {
       e.currentTarget.style.cursor = 'grab';
     }
@@ -119,78 +112,90 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (e.button !== 0 || !app) return;
 
-    if (app.isDraggingCreature() && mode === GameMode.EDITOR) {
-      app.endCreatureDrag();
+    const point = app.getCanvasPoint(e.clientX, e.clientY);
+
+    if (app.isDraggingEntity() && mode === GameMode.EDITOR) {
+      app.endEntityDrag();
       app.endPan();
       updateStats();
-      clickedCreatureIdRef.current = null;
+      clickedEntityIdRef.current = null;
       dragStartPosRef.current = null;
-      e.currentTarget.style.cursor = 'grab';
+
+      const nearestId = app.pickNearestEntity(point);
+      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'grab';
       return;
     }
 
-    const hadClickedCreature = clickedCreatureIdRef.current;
-    clickedCreatureIdRef.current = null;
+    const hadClickedEntity = clickedEntityIdRef.current;
+    clickedEntityIdRef.current = null;
     dragStartPosRef.current = null;
 
-    if (placementConfig && mode === GameMode.EDITOR) {
+    if (placementMode && mode === GameMode.EDITOR) {
       const wasDragging = app.endPan();
       if (!wasDragging) {
-        const point = app.getCanvasPoint(e.clientX, e.clientY);
-        app.spawnCreature(
-          placementConfig.type,
-          placementConfig.radius,
-          placementConfig.mass,
-          placementConfig.maxSpeed,
-          placementConfig.maxTurnSpeed,
-          point,
-          undefined,
-          placementConfig.runSpeedMultiplier,
-          placementConfig.crouchSpeedMultiplier,
-          placementConfig.crouchStealthMultiplier,
-        );
-        setPlacementConfig(null);
+        if (placementMode.kind === 'creature') {
+          const config = placementMode.config;
+          app.spawnCreature(
+            config.type,
+            config.radius,
+            config.mass,
+            config.maxSpeed,
+            config.maxTurnSpeed,
+            point,
+            undefined,
+            config.runSpeedMultiplier,
+            config.crouchSpeedMultiplier,
+            config.crouchStealthMultiplier
+          );
+        } else if (placementMode.kind === 'item') {
+          app.spawnWorldItem(placementMode.itemData, point, placementMode.isSolid, placementMode.radius);
+        }
+        setPlacementMode(null);
         syncPlayerControls();
         updateStats();
       }
-      e.currentTarget.style.cursor = 'grab';
+
+      const nearestId = app.pickNearestEntity(point);
+      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'grab';
       return;
     }
 
-    if (hadClickedCreature && mode === GameMode.EDITOR && app.isPaused) {
-      const creature = app.pickCreatureAt(app.getCanvasPoint(e.clientX, e.clientY));
-      app.selectCreature(creature);
+    if (hadClickedEntity && mode === GameMode.EDITOR && app.isPaused) {
+      const entityId = app.pickEntityAt(point);
+      app.selectEntity(entityId);
       syncPlayerControls();
       updateStats();
-      e.currentTarget.style.cursor = 'grab';
+
+      const nearestId = app.pickNearestEntity(point);
+      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'grab';
       return;
     }
 
     const wasDragging = app.endPan();
     if (!wasDragging) {
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
-      const targetCreature = app.pickNearestCreature(point);
-      app.selectCreature(targetCreature);
+      const targetEntityId = app.pickNearestEntity(point);
+      app.selectEntity(targetEntityId);
       syncPlayerControls();
       updateStats();
     }
 
-    e.currentTarget.style.cursor = 'grab';
+    const nearestId = app.pickNearestEntity(point);
+    e.currentTarget.style.cursor = placementMode || nearestId ? 'pointer' : 'grab';
   };
 
   const handleMouseLeave = () => {
     const app = appRef.current;
     if (app) {
-      if (app.isDraggingCreature()) {
-        app.cancelCreatureDrag();
+      if (app.isDraggingEntity()) {
+        app.cancelEntityDrag();
       }
       app.endPan();
-      app.hoverCreature(null);
+      app.hoverEntity(null);
     }
-    clickedCreatureIdRef.current = null;
+    clickedEntityIdRef.current = null;
     dragStartPosRef.current = null;
     if (canvasRef.current) {
-      canvasRef.current.style.cursor = 'grab';
+      canvasRef.current.style.cursor = placementMode ? 'pointer' : 'grab';
     }
   };
 
