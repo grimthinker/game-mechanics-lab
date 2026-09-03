@@ -499,6 +499,8 @@ export const App: React.FC = () => {
         setEditType={modals.setEditType}
         editRadius={modals.editRadius}
         setEditRadius={modals.setEditRadius}
+        editBaseRadius={modals.editBaseRadius}
+        setEditBaseRadius={modals.setEditBaseRadius}
         editHp={modals.editHp}
         setEditHp={modals.setEditHp}
         editMaxHp={modals.editMaxHp}

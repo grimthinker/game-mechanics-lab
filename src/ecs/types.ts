@@ -17,14 +17,15 @@ export interface PhysicsBodyComponent {
   isStatic: boolean;
 }
 
-export interface StatValue {
-  base: number;
-  current: number;
+export interface StatValue<T = number> {
+  base: T;
+  current: T;
 }
 
 export interface StatsComponent {
   hp: StatValue;
   maxHp: StatValue;
+  radius: StatValue<StandardRadius>;
   maxSpeed: StatValue;
   maxTurnSpeed: StatValue;
   stealth: StatValue;

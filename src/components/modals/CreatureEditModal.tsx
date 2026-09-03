@@ -8,6 +8,8 @@ export interface CreatureEditModalProps {
   setEditType: (val: CreatureType) => void;
   editRadius: number;
   setEditRadius: (val: StandardRadius) => void;
+  editBaseRadius: number;
+  setEditBaseRadius: (val: StandardRadius) => void;
   editHp: number;
   setEditHp: (val: number) => void;
   editMaxHp: number;
@@ -37,6 +39,8 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   setEditType,
   editRadius,
   setEditRadius,
+  editBaseRadius,
+  setEditBaseRadius,
   editHp,
   setEditHp,
   editMaxHp,
@@ -82,8 +86,10 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
               <option value="ai">Бот</option>
             </select>
           </label>
+
+          {/* Текущий радиус существа (применяется к коллизии физического тела) */}
           <label>
-            Радиус:
+            Текущий радиус:
             <select
               disabled={isReadOnly}
               value={editRadius}
@@ -96,6 +102,23 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
               ))}
             </select>
           </label>
+
+          {/* Базовый/дефолтный радиус существа */}
+          <label>
+            Базовый радиус:
+            <select
+              disabled={isReadOnly}
+              value={editBaseRadius}
+              onChange={(e) => setEditBaseRadius(Number(e.target.value) as StandardRadius)}
+            >
+              {STANDARD_RADII.map((r) => (
+                <option key={r} value={r}>
+                  {r} px
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label>
             Текущее HP:
             <input

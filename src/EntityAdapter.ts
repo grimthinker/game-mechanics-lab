@@ -42,7 +42,12 @@ export class EntityAdapter implements IMovable, EntityController {
     return transform ? transform.angle : 0;
   }
   public get radius(): StandardRadius {
-    return this.world.getComponent(this.id, 'physicsBody')!.radius;
+    return this.world.getComponent(this.id, 'stats')?.radius.current 
+        ?? this.world.getComponent(this.id, 'physicsBody')?.radius 
+        ?? 16;
+  }
+  public get baseRadius(): number {
+    return this.world.getComponent(this.id, 'stats')?.radius.base ?? this.radius;
   }
   public get mass(): number {
     return this.world.getComponent(this.id, 'physicsBody')!.mass;
@@ -227,6 +232,7 @@ export class EntityAdapter implements IMovable, EntityController {
     params: {
       type?: CreatureType;
       radius?: StandardRadius;
+      baseRadius?: StandardRadius;
       maxSpeed?: number;
       maxTurnSpeed?: number;
       hp?: number;
@@ -247,11 +253,13 @@ export class EntityAdapter implements IMovable, EntityController {
     const stats = this.world.getComponent(this.id, 'stats');
     const health = this.world.getComponent(this.id, 'health');
 
-    if (params.radius !== undefined && phys) {
-      phys.radius = params.radius;
-      phys.body.r = params.radius;
-    }
     if (stats) {
+      if (params.baseRadius !== undefined) {
+        stats.radius.base = params.baseRadius;
+      }
+      if (params.radius !== undefined) {
+        stats.radius.current = params.radius;
+      }
       if (params.maxSpeed !== undefined) {
         const val = Math.max(0, params.maxSpeed);
         stats.maxSpeed.base = val;
@@ -297,6 +305,10 @@ export class EntityAdapter implements IMovable, EntityController {
         const val = Math.max(0.1, params.crouchTurnMultiplier);
         stats.crouchTurnMultiplier.base = val;
         stats.crouchTurnMultiplier.current = val;
+      }
+      if (phys) {
+        phys.radius = stats.radius.current as StandardRadius;
+        phys.body.r = stats.radius.current;
       }
     }
   }

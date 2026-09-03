@@ -117,6 +117,7 @@ export class GameApp {
     this.world.addComponent(id, 'stats', {
       hp: { base: 100, current: 100 },
       maxHp: { base: 100, current: 100 },
+      radius: { base: radius, current: radius },
       maxSpeed: { base: Math.max(0, maxSpeed), current: Math.max(0, maxSpeed) },
       maxTurnSpeed: {
         base: (Math.max(0, maxTurnSpeedDeg) * Math.PI) / 180,

@@ -26,6 +26,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editType, setEditType] = useState<CreatureType>('player');
   const [editRadius, setEditRadius] = useState<StandardRadius>(24);
+  const [editBaseRadius, setEditBaseRadius] = useState<StandardRadius>(24);
   const [editMaxSpeed, setEditMaxSpeed] = useState<number>(150);
   const [editMaxTurnSpeed, setEditMaxTurnSpeed] = useState<number>(270);
   const [editHp, setEditHp] = useState<number>(100);
@@ -58,6 +59,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     if (!c) return;
     setEditType(c.type);
     setEditRadius(c.radius);
+    setEditBaseRadius((c as any).baseRadius ?? c.radius);
     setEditMaxSpeed(c.maxSpeed);
     setEditMaxTurnSpeed(Math.round((c.maxTurnSpeed * 180) / Math.PI));
     setEditHp(c.hp);
@@ -81,6 +83,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       {
         type: editType,
         radius: editRadius,
+        baseRadius: editBaseRadius,
         maxSpeed: editMaxSpeed,
         maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
         hp: editHp,
@@ -199,6 +202,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setEditType,
     editRadius,
     setEditRadius,
+    editBaseRadius,
+    setEditBaseRadius,
     editMaxSpeed,
     setEditMaxSpeed,
     editMaxTurnSpeed,
