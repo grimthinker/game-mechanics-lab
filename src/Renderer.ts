@@ -246,14 +246,17 @@ export class Renderer {
       const weaponSlot = slots.find(
         (s: any) =>
           (s.type === 'weapon' || s.slotType === 'weapon') &&
-          s.item !== null &&
-          s.item !== undefined
+          s.itemId !== null &&
+          s.itemId !== undefined
       );
 
-      const weaponToDraw: any =
-        weaponSlot?.item?.config ||
-        weaponSlot?.item?.data ||
-        weaponSlot?.item;
+      let weaponToDraw: any = null;
+      if (weaponSlot && weaponSlot.itemId) {
+         const wItem = world.getComponent(weaponSlot.itemId, 'item');
+         if (wItem) {
+             weaponToDraw = wItem.config || wItem;
+         }
+      }
 
       if (!weaponToDraw || !weaponToDraw.zone) {
         continue;

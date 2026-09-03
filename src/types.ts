@@ -1,5 +1,4 @@
-
-import { CreatureType, CreatureState, EquipSlot, ItemData, StandardRadius } from "./ecs/types";
+import { CreatureType, CreatureState, ItemData, StandardRadius } from "./ecs/types";
 
 export interface Point {
   x: number;
@@ -24,7 +23,7 @@ export interface CreatureStats {
   hp: number;
   maxHp: number;
   state: CreatureState;
-  equipSlots: EquipSlot[];
+  equipSlots: { type: string; item: ItemData | null }[];
   inventory?: {
     size: { width: number; height: number };
     slots: { item: ItemData | null; count: number }[][];

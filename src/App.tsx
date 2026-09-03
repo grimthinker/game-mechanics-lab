@@ -100,11 +100,17 @@ export const App: React.FC = () => {
         hp: c.hp,
         maxHp: c.maxHp,
         state: c.state,
-        equipSlots: eq ? eq.slots.map((s) => ({ ...s })) : [],
+        equipSlots: eq ? eq.slots.map((s) => ({
+             type: s.type,
+             item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
+        })) : [],
         inventory: inv
           ? {
               size: { ...inv.size },
-              slots: inv.slots.map((row) => row.map((cell) => ({ ...cell }))),
+              slots: inv.slots.map((row) => row.map((cell) => ({
+                 count: cell.count,
+                 item: cell.itemId ? (app.world.getComponent(cell.itemId, 'item') ?? null) : null
+              }))),
             }
           : undefined,
       });

@@ -198,12 +198,12 @@ export class EntityAdapter implements IMovable, EntityController {
   public updateInventorySize(width: number, height: number): boolean {
     const inv = this.world.getComponent(this.id, 'inventory');
     if (!inv) return false;
-    const isEmpty = inv.slots.every((row) => row.every((cell) => !cell.item));
+    const isEmpty = inv.slots.every((row) => row.every((cell) => !cell.itemId));
     if (!isEmpty) return false;
 
     inv.size = { width, height };
     inv.slots = Array.from({ length: height }, () =>
-      Array.from({ length: width }, () => ({ item: null, count: 0 }))
+      Array.from({ length: width }, () => ({ itemId: null, count: 0 }))
     );
     return true;
   }

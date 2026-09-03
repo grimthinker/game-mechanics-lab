@@ -157,11 +157,15 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
     const c = app.selectedCreature;
     if (c && updatedItem.type === 'bag') {
-      const isInventoryEmpty = !c.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.item));
+      const isInventoryEmpty = !c.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.itemId));
       const bagCfg = updatedItem.config as InventoryConfig;
       if (isInventoryEmpty) {
-        if (c.equip?.slots.find((s) => s.type === 'bag')?.item === selectedItemForEdit) {
-          c.updateInventorySize(bagCfg.size.width, bagCfg.size.height);
+        const bagSlot = c.equip?.slots.find((s) => s.type === 'bag');
+        if (bagSlot && bagSlot.itemId) {
+           const bItem = app.world.getComponent(bagSlot.itemId, 'item');
+           if (bItem === selectedItemForEdit) {
+               c.updateInventorySize(bagCfg.size.width, bagCfg.size.height);
+           }
         }
       }
     }

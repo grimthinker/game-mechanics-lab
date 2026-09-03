@@ -10,8 +10,14 @@ export class AttackSystem {
       if (!health.isAlive || stats.hp.current <= 0) continue;
 
       if (input.wantsAttack && !input.isRunning) {
-        const weaponSlot = equip.slots.find((s) => s.type === 'weapon' && s.item !== null);
-        const weaponConfig: WeaponConfig | undefined = (weaponSlot?.item?.type === 'weapon') ? weaponSlot.item.config : undefined;
+        const weaponSlot = equip.slots.find((s) => s.type === 'weapon' && s.itemId !== null);
+        let weaponConfig: WeaponConfig | undefined = undefined;
+        if (weaponSlot && weaponSlot.itemId) {
+           const wItem = world.getComponent(weaponSlot.itemId, 'item');
+           if (wItem && wItem.type === 'weapon') {
+               weaponConfig = wItem.config as WeaponConfig;
+           }
+        }
 
         if (weaponConfig && !activeAttacks.attacks.some((a) => a.weapon === weaponConfig)) {
           activeAttacks.attacks.push({

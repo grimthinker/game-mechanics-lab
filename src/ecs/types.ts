@@ -81,7 +81,7 @@ export type ItemData<T extends ItemType = ItemType> = {
 }[T];
 
 export interface InventorySlot {
-  item: ItemData | null;
+  itemId: EntityId | null;
   count: number;
 }
 
@@ -94,7 +94,7 @@ export type EquipSlotType = 'armor' | 'bag' | 'weapon';
 
 export interface EquipSlot {
   type: EquipSlotType;
-  item: ItemData | null;
+  itemId: EntityId | null;
 }
 
 export interface EquipComponent {
@@ -113,6 +113,11 @@ export interface CreatureMetaComponent {
 
 export type ItemComponent = ItemData;
 
+export interface OwnershipComponent {
+  ownerId: EntityId;
+  status: 'equipped' | 'inventory';
+}
+
 export interface EntityComponents {
   transform?: TransformComponent;
   physicsBody?: PhysicsBodyComponent;
@@ -127,6 +132,7 @@ export interface EntityComponents {
   activeAttacks?: ActiveAttackComponent;
   item?: ItemComponent;
   meta?: CreatureMetaComponent;
+  ownership?: OwnershipComponent;
 }
 
 export type CreatureType = 'player' | 'ai';

@@ -71,6 +71,13 @@ export class GameApp {
     }
   }
 
+  public spawnItemEntity(itemData: ItemData): string {
+    const id = itemData.id;
+    this.world.createEntity(id);
+    this.world.addComponent(id, 'item', itemData);
+    return id;
+  }
+
   public spawnCreature(
     type: CreatureType,
     radius: StandardRadius = 8,
@@ -99,6 +106,15 @@ export class GameApp {
     const initialWeaponItem: ItemData = createRandomWeaponItem();
     const initialArmorItem: ItemData = createDefaultArmorItem();
     const initialBagItem: ItemData = createDefaultBagItem();
+
+    const weaponId = this.spawnItemEntity(initialWeaponItem);
+    this.world.addComponent(weaponId, 'ownership', { ownerId: id, status: 'equipped' });
+    
+    const armorId = this.spawnItemEntity(initialArmorItem);
+    this.world.addComponent(armorId, 'ownership', { ownerId: id, status: 'equipped' });
+    
+    const bagId = this.spawnItemEntity(initialBagItem);
+    this.world.addComponent(bagId, 'ownership', { ownerId: id, status: 'equipped' });
 
     this.world.createEntity(id);
     this.world.addComponent(id, 'transform', { x: pos.x, y: pos.y, angle: 0 });
@@ -142,7 +158,7 @@ export class GameApp {
     });
 
     const emptySlots = Array.from({ length: 4 }, () =>
-      Array.from({ length: 6 }, () => ({ item: null, count: 0 }))
+      Array.from({ length: 6 }, () => ({ itemId: null, count: 0 }))
     );
     this.world.addComponent(id, 'inventory', {
       size: { width: 6, height: 4 },
@@ -151,9 +167,9 @@ export class GameApp {
 
     this.world.addComponent(id, 'equip', {
       slots: [
-        { type: 'armor', item: initialArmorItem },
-        { type: 'bag', item: initialBagItem },
-        { type: 'weapon', item: initialWeaponItem },
+        { type: 'armor', itemId: armorId },
+        { type: 'bag', itemId: bagId },
+        { type: 'weapon', itemId: weaponId },
       ],
     });
     this.world.addComponent(id, 'activeAttacks', { attacks: [] });
@@ -169,10 +185,8 @@ export class GameApp {
   }
 
   public spawnWorldItem(itemData: ItemData, position: Point, isSolid?: boolean, radius?: StandardRadius): string {
-    const id = itemData.id;
-    this.world.createEntity(id);
+    const id = this.spawnItemEntity(itemData);
     this.world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
-    this.world.addComponent(id, 'item', itemData);
     
     const actualIsSolid = isSolid ?? itemData.config?.isSolid ?? true;
     const actualRadius = radius ?? itemData.config?.radius ?? 16;
@@ -190,6 +204,30 @@ export class GameApp {
   public deleteSelectedEntity(): void {
     if (this.selectedCreature) {
       const id = this.selectedCreature.id;
+      
+      const inv = this.world.getComponent(id, 'inventory');
+      if (inv) {
+         for (const row of inv.slots) {
+            for (const cell of row) {
+               if (cell.itemId) {
+                   const phys = this.world.getComponent(cell.itemId, 'physicsBody');
+                   if (phys) this.physics.unregisterBody(phys.body);
+                   this.world.removeEntity(cell.itemId);
+               }
+            }
+         }
+      }
+      const eq = this.world.getComponent(id, 'equip');
+      if (eq) {
+         for (const slot of eq.slots) {
+            if (slot.itemId) {
+               const phys = this.world.getComponent(slot.itemId, 'physicsBody');
+               if (phys) this.physics.unregisterBody(phys.body);
+               this.world.removeEntity(slot.itemId);
+            }
+         }
+      }
+
       const phys = this.world.getComponent(id, 'physicsBody');
       if (phys) this.physics.unregisterBody(phys.body);
       this.world.removeEntity(id);
@@ -206,10 +244,10 @@ export class GameApp {
   }
 
   public clearWorld(): void {
-    const entities = this.world.getEntitiesWith('transform');
-    for (const [id, { physicsBody }] of entities) {
-      if (physicsBody) {
-        this.physics.unregisterBody(physicsBody.body);
+    const entities = this.world.getAllEntities();
+    for (const [id, comp] of entities) {
+      if (comp.physicsBody) {
+        this.physics.unregisterBody(comp.physicsBody.body);
       }
       this.world.removeEntity(id);
     }
@@ -222,9 +260,9 @@ export class GameApp {
     const entitiesData: any[] = [];
     const itemsData: any[] = [];
     
-    const entities = this.world.getEntitiesWith('transform');
-    for (const [id, comp] of entities) {
-      if (comp.meta && comp.stats && comp.inventory && comp.equip && comp.physicsBody) {
+    const allEntities = this.world.getAllEntities();
+    for (const [id, comp] of allEntities) {
+      if (comp.meta && comp.stats && comp.inventory && comp.equip && comp.physicsBody && comp.transform) {
         entitiesData.push({
           id,
           type: comp.meta.type,
@@ -251,10 +289,11 @@ export class GameApp {
       } else if (comp.item) {
         itemsData.push({
           id,
-          transform: { ...comp.transform },
+          transform: comp.transform ? { ...comp.transform } : undefined,
           isSolid: !!comp.physicsBody,
           radius: comp.physicsBody ? comp.physicsBody.radius : 16,
-          itemData: comp.item
+          itemData: comp.item,
+          ownership: comp.ownership ? { ...comp.ownership } : undefined
         });
       }
     }
@@ -314,7 +353,14 @@ export class GameApp {
 
     if (Array.isArray(data.items)) {
       for (const itemData of data.items) {
-         this.spawnWorldItem(itemData.itemData, itemData.transform, itemData.isSolid, itemData.radius);
+         if (itemData.transform) {
+             this.spawnWorldItem(itemData.itemData, itemData.transform, itemData.isSolid, itemData.radius);
+         } else {
+             const iId = this.spawnItemEntity(itemData.itemData);
+             if (itemData.ownership) {
+                 this.world.addComponent(iId, 'ownership', itemData.ownership);
+             }
+         }
       }
     }
   }
