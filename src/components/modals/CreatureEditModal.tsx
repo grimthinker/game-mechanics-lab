@@ -1,11 +1,12 @@
 import React from 'react';
-import { CreatureType, STANDARD_RADII, StandardRadius } from '../../ecs/types';
+import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
+import { BEHAVIOR_TREE_NAMES } from '../../ai/trees_library';
 
 export interface CreatureEditModalProps {
   isOpen: boolean;
   isReadOnly?: boolean;
-  editType: CreatureType;
-  setEditType: (val: CreatureType) => void;
+  editBehavior: string;
+  setEditBehavior: (val: string) => void;
   editRadius: number;
   setEditRadius: (val: StandardRadius) => void;
   editBaseRadius: number;
@@ -35,8 +36,8 @@ export interface CreatureEditModalProps {
 export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   isOpen,
   isReadOnly,
-  editType,
-  setEditType,
+  editBehavior,
+  setEditBehavior,
   editRadius,
   setEditRadius,
   editBaseRadius,
@@ -76,14 +77,15 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
         <h3>{isReadOnly ? 'Параметры существа' : 'Изменить параметры существа'}</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
-            Тип существа:
+            Поведение:
             <select
               disabled={isReadOnly}
-              value={editType}
-              onChange={(e) => setEditType(e.target.value as CreatureType)}
+              value={editBehavior}
+              onChange={(e) => setEditBehavior(e.target.value)}
             >
-              <option value="player">Игрок</option>
-              <option value="ai">Бот</option>
+              {Object.entries(BEHAVIOR_TREE_NAMES).map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
             </select>
           </label>
 

@@ -1,7 +1,6 @@
 import { Circle } from 'detect-collisions';
 import { World } from './ecs/World';
 import {
-  CreatureType,
   WeaponConfig,
   ItemData,
   StandardRadius,
@@ -52,7 +51,6 @@ export class GameApp {
   public isPaused: boolean = false;
   
   public gameMode: GameMode = GameMode.EDITOR;
-  public playerId: string | null = null;
 
   private handleResize = () => this.resizeCanvas();
 
@@ -241,7 +239,6 @@ export class GameApp {
       this.physics,
       this.selectedCreature?.id || this.selectedItem?.id || null,
       this.gameMode,
-      this.playerId,
       this.hoveredCreature?.id || this.hoveredItem?.id || null
     );
 

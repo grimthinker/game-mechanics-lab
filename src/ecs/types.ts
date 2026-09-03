@@ -107,7 +107,7 @@ export interface ActiveAttackComponent {
 
 export interface CreatureMetaComponent {
   id: string;
-  type: CreatureType;
+  behavior: string;
   state: CreatureState;
   config: CreatureConfig;
 }
@@ -135,8 +135,6 @@ export interface EntityComponents {
   meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
 }
-
-export type CreatureType = 'player' | 'ai';
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
@@ -200,7 +198,7 @@ export interface WeaponConfig extends ItemConfig {
 }
 
 export interface CreatureConfig extends CoreStatsConfig {
-  type: CreatureType;
+  behavior: string;
   maxSpeed: number;
   maxTurnSpeed: number;
   maxHp?: number;

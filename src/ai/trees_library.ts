@@ -2,9 +2,29 @@ import { BTActionAttack, BTCommandForgetTarget, BTActionPatrol, BTActionPursue, 
 import { BTSelector, BTSequence } from "./composites";
 import { LOGIC_CONFIG } from "./config";
 import { BTNode, BTService } from "./core";
-import { BTServiceFindNearestTarget,  BTServicePathUpdater, BTServiceSyncStats } from "./services";
+import { BTServiceFindNearestTarget,  BTServicePathUpdater, BTServiceSyncStats, BTServiceInputListener, BTServiceInputController } from "./services";
 
+export const BEHAVIOR_TREES: Record<string, () => BTNode> = {
+    PlayerTree: () => PlayerTree(),
+    AttackerTree: () => AttackerTree(),
+    CombatTree: () => CombatTree(),
+    IdleTree: () => new BTWait({ duration: 1 })
+};
 
+export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
+    PlayerTree: "Игрок (Управление с клавиатуры)",
+    AttackerTree: "Бот-атакующий",
+    CombatTree: "Боевое поведение",
+    IdleTree: "Бездействие"
+};
+
+export function PlayerTree(): BTNode {
+    return new BTServiceInputListener(
+        new BTServiceInputController(
+            new BTWait({ duration: 1 })
+        )
+    );
+}
 
 export function CombatTree(): BTNode {
     return new BTServicePathUpdater(

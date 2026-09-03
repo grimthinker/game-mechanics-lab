@@ -1,14 +1,11 @@
-import { useRef, useEffect, useCallback, MutableRefObject } from 'react';
-import { GameApp, EntityAdapter } from '../GameApp';
+import { useEffect, useCallback } from 'react';
 import { GameMode } from '../constants';
+import { GlobalInput } from '../input/GlobalInput';
 
 interface UseKeyboardControlsProps {
-  appRef: MutableRefObject<GameApp | null>;
   isModalOpen: boolean;
   isEditModalOpen: boolean;
-  updateStats: () => void;
   mode: GameMode;
-  playerId: string | null;
 }
 
 const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c']);
@@ -28,67 +25,16 @@ const getKeyName = (e: KeyboardEvent): string => {
 };
 
 export const useKeyboardControls = ({
-  appRef,
   isModalOpen,
   isEditModalOpen,
-  updateStats,
   mode,
-  playerId
 }: UseKeyboardControlsProps) => {
-  const keysPressedRef = useRef<Set<string>>(new Set());
-  const controlledCreatureRef = useRef<EntityAdapter | null>(null);
 
   const syncPlayerControls = useCallback(() => {
-    const app = appRef.current;
-    if (!app) return;
-
-    let player: EntityAdapter | null = null;
-    if (mode === GameMode.GAME && playerId) {
-      const candidate = new EntityAdapter(playerId, app.world);
-      if (candidate.isAlive && candidate.hp > 0) {
-        player = candidate;
-      }
+    if (isModalOpen || isEditModalOpen) {
+       GlobalInput.keys.clear();
     }
-
-    const controlled = controlledCreatureRef.current;
-
-    if (controlled && controlled !== player) {
-      controlled.stopMovingForward();
-      controlled.stopTurning();
-      controlled.stopRunning();
-      controlled.stopCrouching();
-    }
-
-    controlledCreatureRef.current = player;
-    if (!player) return;
-
-    const keys = keysPressedRef.current;
-    if (keys.has('w')) {
-      player.startMovingForward();
-    } else {
-      player.stopMovingForward();
-    }
-
-    if (keys.has('a') && !keys.has('d')) {
-      player.startTurning(-1);
-    } else if (keys.has('d') && !keys.has('a')) {
-      player.startTurning(1);
-    } else {
-      player.stopTurning();
-    }
-
-    if (keys.has('shift')) {
-      player.startRunning();
-    } else {
-      player.stopRunning();
-    }
-
-    if (keys.has('c')) {
-      player.startCrouching();
-    } else {
-      player.stopCrouching();
-    }
-  }, [appRef, mode, playerId]);
+  }, [isModalOpen, isEditModalOpen]);
 
   useEffect(() => {
     const isTextInputTarget = (target: EventTarget | null): boolean => {
@@ -102,20 +48,15 @@ export const useKeyboardControls = ({
       const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
         if (!e.ctrlKey && !e.metaKey && mode === GameMode.GAME) {
-            const player = controlledCreatureRef.current;
-            if (player && player.isAlive && player.hp > 0) {
-              player.attack();
-              updateStats();
-            }
+            GlobalInput.keys.add(' ');
             e.preventDefault();
             return;
-          }
+        }
       }
 
-      if (!CONTROL_KEYS.has(key) || keysPressedRef.current.has(key)) return;
+      if (!CONTROL_KEYS.has(key) || GlobalInput.keys.has(key)) return;
 
-      keysPressedRef.current.add(key);
-      syncPlayerControls();
+      GlobalInput.keys.add(key);
       e.preventDefault();
     };
 
@@ -123,13 +64,11 @@ export const useKeyboardControls = ({
       const key = getKeyName(e);
       if (!CONTROL_KEYS.has(key)) return;
 
-      keysPressedRef.current.delete(key);
-      syncPlayerControls();
+      GlobalInput.keys.delete(key);
     };
 
     const onBlur = () => {
-      keysPressedRef.current.clear();
-      syncPlayerControls();
+      GlobalInput.keys.clear();
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -141,7 +80,7 @@ export const useKeyboardControls = ({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [isModalOpen, isEditModalOpen, syncPlayerControls, updateStats, mode]);
+  }, [isModalOpen, isEditModalOpen, mode]);
 
   return { syncPlayerControls };
 };

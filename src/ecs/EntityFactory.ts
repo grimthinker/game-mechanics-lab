@@ -76,7 +76,7 @@ export class EntityFactory {
     config: CreatureConfig,
     forcedId?: string
   ): EntityId {
-    const prefix = config.type === 'player' ? 'player' : 'bot';
+    const prefix = 'bot';
     const id = forcedId || `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
     const radius = config.radius || 16;
 
@@ -113,27 +113,24 @@ export class EntityFactory {
     });
 
     world.addComponent(id, 'equip', {
-      slots: [
-        { type: 'armor', itemId: null },
-        { type: 'bag', itemId: null },
-        { type: 'weapon', itemId: null },
-      ],
-    });
-    world.addComponent(id, 'activeAttacks', { attacks: [] });
-    world.addComponent(id, 'meta', {
-      id,
-      type: config.type,
-      state: 'idle',
-      config: JSON.parse(JSON.stringify(config)),
-    });
-
-    // Инициализация мозга бота (без transform и input он автоматически изолирован от AISystem)
-    if (config.type === 'ai') {
-      aiSystem.initBotBrain(world, id);
+        slots: [
+          { type: 'armor', itemId: null },
+          { type: 'bag', itemId: null },
+          { type: 'weapon', itemId: null },
+        ],
+      });
+      world.addComponent(id, 'activeAttacks', { attacks: [] });
+      world.addComponent(id, 'meta', {
+        id,
+        behavior: config.behavior,
+        state: 'idle',
+        config: JSON.parse(JSON.stringify(config)),
+      });
+  
+      aiSystem.initBotBrain(world, id, config.behavior);
+  
+      return id;
     }
-
-    return id;
-  }
 
   private createLogicalItem(
     world: World,

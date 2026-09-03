@@ -231,7 +231,7 @@ export class Blackboard {
 }
 
 export type PathKeys = {
-  [K in keyof BBData]: BBData[K] extends Point[] ? K : never;
+  [K in keyof BBData]-?: BBData[K] extends Point[] ? K : never;
 }[keyof BBData];
 
 type SquaredStats = {
@@ -239,6 +239,7 @@ type SquaredStats = {
 };
 
 export interface BBData extends BehaviorStatsConfig, SquaredStats {
+  pressed_keys?: string[];
   target_id: string;
   best_candidate_id: string | undefined;
   is_engaged: boolean;

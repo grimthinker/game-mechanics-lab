@@ -1,4 +1,4 @@
-import { CreatureType, CreatureState, ItemData, StandardRadius, CreatureConfig } from "./ecs/types";
+import { CreatureState, ItemData, StandardRadius, CreatureConfig } from "./ecs/types";
 
 export interface Point {
   x: number;
@@ -12,7 +12,7 @@ export interface ObstacleSegment {
 
 export interface CreatureStats {
   id: string;
-  type: CreatureType;
+  behavior: string;
   radius: number;
   weight: number;
   currentSpeed: number;
@@ -26,7 +26,7 @@ export interface CreatureStats {
 }
 
 export interface PlacementConfig {
-  type: CreatureType;
+  behavior: string;
   radius: StandardRadius;
   mass: number;
   maxSpeed: number;

@@ -2,6 +2,7 @@ import { BTService, BTNode, NodeStatus } from './core';
 import { LOGIC_CONFIG } from './config';
 import { Point } from '../types';
 import { EntityAdapter } from '../EntityAdapter';
+import { GlobalInput } from '../input/GlobalInput';
 
 export class BTServiceFindNearestTarget extends BTService {
   public static readonly nodeName = 'Поиск ближайшей цели';
@@ -251,5 +252,78 @@ export class BTServiceSyncStats extends BTService {
 
     bb.set('follow_stop_dist', stopDist);
     bb.set('follow_up_dist', stopDist + 10);
+  }
+}
+
+export class BTServiceInputListener extends BTService {
+  public static readonly nodeName = 'Слушатель ввода';
+  public static readonly description = 'Слушает глобальный ввод и пишет нажатые клавиши в память';
+  
+  public static readonly defaultParams = { interval: 0 };
+  protected override params: typeof BTServiceInputListener.defaultParams = { interval: 0 };
+
+  constructor(
+    child: BTNode,
+    params?: Partial<typeof BTServiceInputListener.defaultParams>
+  ) {
+    super(child, params);
+    this.params = { ...BTServiceInputListener.defaultParams, ...params };
+  }
+
+  protected tickService(entity: EntityAdapter): void {
+    const bb = entity.brain!.blackboard;
+    bb.set('pressed_keys', Array.from(GlobalInput.keys));
+  }
+}
+
+export class BTServiceInputController extends BTService {
+  public static readonly nodeName = 'Контроллер ввода';
+  public static readonly description = 'Читает нажатые клавиши из памяти и управляет input компонентом';
+  
+  public static readonly defaultParams = { interval: 0 };
+  protected override params: typeof BTServiceInputController.defaultParams = { interval: 0 };
+
+  constructor(
+    child: BTNode,
+    params?: Partial<typeof BTServiceInputController.defaultParams>
+  ) {
+    super(child, params);
+    this.params = { ...BTServiceInputController.defaultParams, ...params };
+  }
+
+  protected tickService(entity: EntityAdapter): void {
+    const bb = entity.brain!.blackboard;
+    const keys = bb.get('pressed_keys') || [];
+    const keysSet = new Set(keys);
+
+    if (keysSet.has('w')) {
+      entity.startMovingForward();
+    } else {
+      entity.stopMovingForward();
+    }
+
+    if (keysSet.has('a') && !keysSet.has('d')) {
+      entity.startTurning(-1);
+    } else if (keysSet.has('d') && !keysSet.has('a')) {
+      entity.startTurning(1);
+    } else {
+      entity.stopTurning();
+    }
+
+    if (keysSet.has('shift')) {
+      entity.startRunning();
+    } else {
+      entity.stopRunning();
+    }
+
+    if (keysSet.has('c')) {
+      entity.startCrouching();
+    } else {
+      entity.stopCrouching();
+    }
+    
+    if (keysSet.has(' ')) {
+      entity.attack();
+    }
   }
 }

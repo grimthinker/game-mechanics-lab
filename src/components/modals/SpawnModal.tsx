@@ -1,14 +1,14 @@
 import React from 'react';
 import {
-  CreatureType,
   STANDARD_RADII,
   StandardRadius,
 } from '../../ecs/types';
+import { BEHAVIOR_TREE_NAMES } from '../../ai/trees_library';
 
 export interface SpawnModalProps {
   isOpen: boolean;
-  pendingSpawnType: CreatureType;
-  setPendingSpawnType: (type: CreatureType) => void;
+  pendingSpawnBehavior: string;
+  setPendingSpawnBehavior: (behavior: string) => void;
   radius: number;
   setRadius: (val: StandardRadius) => void;
   weight: number;
@@ -33,8 +33,8 @@ export interface SpawnModalProps {
 
 export const SpawnModal: React.FC<SpawnModalProps> = ({
   isOpen,
-  pendingSpawnType,
-  setPendingSpawnType,
+  pendingSpawnBehavior,
+  setPendingSpawnBehavior,
   radius,
   setRadius,
   weight,
@@ -70,13 +70,14 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
         <h3>Параметры нового существа</h3>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
-            Тип существа:
+            Поведение:
             <select
-              value={pendingSpawnType}
-              onChange={(e) => setPendingSpawnType(e.target.value as CreatureType)}
+              value={pendingSpawnBehavior}
+              onChange={(e) => setPendingSpawnBehavior(e.target.value)}
             >
-              <option value="player">Игрок</option>
-              <option value="ai">Бот</option>
+              {Object.entries(BEHAVIOR_TREE_NAMES).map(([id, name]) => (
+                <option key={id} value={id}>{name}</option>
+              ))}
             </select>
           </label>
           <label>

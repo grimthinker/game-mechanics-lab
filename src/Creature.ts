@@ -1,8 +1,8 @@
-import { CreatureConfig, CreatureType, StandardRadius } from './ecs/types';
+import { CreatureConfig, StandardRadius } from './ecs/types';
 
-export function createDefaultCreatureConfig(type: CreatureType): CreatureConfig {
+export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): CreatureConfig {
   return {
-    type,
+    behavior,
     radius: 16 as StandardRadius,
     weight: 10,
     isSolid: true,

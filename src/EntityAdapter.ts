@@ -1,7 +1,6 @@
 import { World } from './ecs/World';
 import {
   CreatureState,
-  CreatureType,
   EntityId,
   IMovable,
   EquipComponent,
@@ -27,8 +26,8 @@ export class EntityAdapter implements IMovable, EntityController {
     private world: World
   ) {}
 
-  public get type(): CreatureType {
-    return this.world.getComponent(this.id, 'meta')?.type ?? 'player';
+  public get behavior(): string {
+    return this.world.getComponent(this.id, 'meta')?.behavior ?? 'IdleTree';
   }
   public get state(): CreatureState {
     return this.world.getComponent(this.id, 'meta')?.state ?? 'idle';
@@ -180,17 +179,12 @@ export class EntityAdapter implements IMovable, EntityController {
     return transform ? { x: transform.x, y: transform.y } : { x: 0, y: 0 };
   }
 
-  public setType(newType: CreatureType, aiSystem: AISystem): void {
+  public setBehavior(newBehavior: string, aiSystem: AISystem): void {
     const meta = this.world.getComponent(this.id, 'meta');
-    if (!meta || meta.type === newType) return;
+    if (!meta || meta.behavior === newBehavior) return;
 
-    meta.type = newType;
-
-    if (newType === 'ai') {
-      aiSystem.initBotBrain(this.world, this.id);
-    } else {
-      this.world.removeComponent(this.id, 'brain');
-    }
+    meta.behavior = newBehavior;
+    aiSystem.initBotBrain(this.world, this.id, newBehavior);
 
     this.stop();
     const input = this.world.getComponent(this.id, 'input');
@@ -202,7 +196,7 @@ export class EntityAdapter implements IMovable, EntityController {
 
   public updateParams(
     params: {
-      type?: CreatureType;
+      behavior?: string;
       radius?: StandardRadius;
       baseRadius?: StandardRadius;
       maxSpeed?: number;
@@ -217,8 +211,8 @@ export class EntityAdapter implements IMovable, EntityController {
     },
     aiSystem?: AISystem
   ): void {
-    if (params.type !== undefined && aiSystem) {
-      this.setType(params.type, aiSystem);
+    if (params.behavior !== undefined && aiSystem) {
+      this.setBehavior(params.behavior, aiSystem);
     }
 
     const meta = this.world.getComponent(this.id, 'meta');

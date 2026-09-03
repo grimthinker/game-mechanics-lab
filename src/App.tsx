@@ -22,22 +22,14 @@ export const App: React.FC = () => {
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
-  const [playerId, setPlayerId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<any>(null);
 
   const modeRef = useRef(mode);
-  const playerIdRef = useRef(playerId);
 
   const setModeSync = useCallback((m: GameMode) => {
     setMode(m);
     modeRef.current = m;
     if (appRef.current) appRef.current.gameMode = m;
-  }, []);
-
-  const setPlayerIdSync = useCallback((id: string | null) => {
-    setPlayerId(id);
-    playerIdRef.current = id;
-    if (appRef.current) appRef.current.playerId = id;
   }, []);
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
@@ -67,23 +59,19 @@ export const App: React.FC = () => {
     if (!app) return;
 
     const currentMode = modeRef.current;
-    const currentPlayerId = playerIdRef.current;
 
-    if (currentMode === GameMode.GAME && currentPlayerId) {
-      const pStats = app.world.getComponent(currentPlayerId, 'stats');
-      const pHealth = app.world.getComponent(currentPlayerId, 'health');
-      if ((pHealth && !pHealth.isAlive) || (pStats && pStats.hp.current <= 0)) {
+    if (currentMode === GameMode.GAME) {
+      const isAnyPlayerAlive = app.world.getAllEntities().some(([_, comp]) => 
+        comp.meta?.behavior === 'PlayerTree' && comp.health?.isAlive
+      );
+      if (!isAnyPlayerAlive) {
         setModeSync(GameMode.SIMULATION);
-        setPlayerIdSync(null);
         app.isPaused = true;
         setIsPaused(true);
       }
     }
 
     let targetId = app.selectedCreature?.id;
-    if (modeRef.current === GameMode.GAME && playerIdRef.current) {
-      targetId = playerIdRef.current;
-    }
 
     if (targetId) {
       const c = new EntityAdapter(targetId, app.world);
@@ -91,7 +79,7 @@ export const App: React.FC = () => {
 
       setSelectedStats({
         id: c.id,
-        type: c.type,
+        behavior: c.behavior,
         radius: c.radius,
         weight: c.weight,
         currentSpeed: c.currentSpeed,
@@ -120,19 +108,16 @@ export const App: React.FC = () => {
       setBtData(null);
       setBtBlackboard(null);
     }
-  }, [setModeSync, setPlayerIdSync]);
+  }, [setModeSync]);
 
   const { syncPlayerControls } = useKeyboardControls({
-    appRef,
     isModalOpen:
       modals.isModalOpen ||
       modals.isItemSpawnModalOpen ||
       !!modals.selectedItemForEdit ||
       isPaused,
     isEditModalOpen: modals.isEditModalOpen,
-    updateStats,
     mode,
-    playerId,
   });
 
   const { canvasRef, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave } =
@@ -151,13 +136,12 @@ export const App: React.FC = () => {
     appRef.current = app;
 
     app.gameMode = modeRef.current;
-    app.playerId = playerIdRef.current;
     app.isPaused = true;
     setIsPaused(true);
 
     app.start();
     app.onFrame = updateStats;
-    app.spawnCreature(createDefaultCreatureConfig('player'));
+    app.spawnCreature(createDefaultCreatureConfig('PlayerTree'));
     updateStats();
 
     return () => {
@@ -191,13 +175,12 @@ export const App: React.FC = () => {
       app.deserializeWorld(snapshot);
     }
     setModeSync(GameMode.EDITOR);
-    setPlayerIdSync(null);
     app.isPaused = true;
     setIsPaused(true);
     app.selectEntity(null);
     app.hoverEntity(null);
     updateStats();
-  }, [snapshot, updateStats, setModeSync, setPlayerIdSync]);
+  }, [snapshot, updateStats, setModeSync]);
 
   const goToSimulation = useCallback(() => {
     const app = appRef.current;
@@ -206,37 +189,35 @@ export const App: React.FC = () => {
       setSnapshot(app.serializeWorld());
     }
     setModeSync(GameMode.SIMULATION);
-    setPlayerIdSync(null);
     app.isPaused = false;
     setIsPaused(false);
     app.selectEntity(null);
     app.hoverEntity(null);
     updateStats();
-  }, [updateStats, setModeSync, setPlayerIdSync]);
+  }, [updateStats, setModeSync]);
 
   const goToGame = useCallback(
-    (id: string) => {
+    () => {
       const app = appRef.current;
       if (!app) return;
       if (modeRef.current === GameMode.EDITOR) {
         setSnapshot(app.serializeWorld());
       }
       setModeSync(GameMode.GAME);
-      setPlayerIdSync(id);
       app.isPaused = false;
       setIsPaused(false);
       setShowBTPanel(false);
       updateStats();
     },
-    [updateStats, setShowBTPanel, setModeSync, setPlayerIdSync]
+    [updateStats, setShowBTPanel, setModeSync]
   );
 
   const handleSpawnConfirm = () => {
-    if (!modals.pendingSpawnType) return;
+    if (!modals.pendingSpawnBehavior) return;
     setPlacementMode({
       kind: 'creature',
       config: {
-        type: modals.pendingSpawnType,
+        behavior: modals.pendingSpawnBehavior,
         radius: modals.radius,
         weight: modals.weight,
         isSolid: true,
@@ -397,10 +378,10 @@ export const App: React.FC = () => {
         isPaused={isPaused}
       />
 
-      <SpawnModal
+<SpawnModal
         isOpen={modals.isModalOpen}
-        pendingSpawnType={modals.pendingSpawnType}
-        setPendingSpawnType={modals.setPendingSpawnType}
+        pendingSpawnBehavior={modals.pendingSpawnBehavior}
+        setPendingSpawnBehavior={modals.setPendingSpawnBehavior}
         radius={modals.radius}
         setRadius={modals.setRadius}
         weight={modals.weight}
@@ -429,11 +410,11 @@ export const App: React.FC = () => {
         onConfirm={handleItemSpawnConfirm}
       />
 
-      <CreatureEditModal
+<CreatureEditModal
         isOpen={modals.isEditModalOpen}
         isReadOnly={isReadOnly}
-        editType={modals.editType}
-        setEditType={modals.setEditType}
+        editBehavior={modals.editBehavior}
+        setEditBehavior={modals.setEditBehavior}
         editRadius={modals.editRadius}
         setEditRadius={modals.setEditRadius}
         editBaseRadius={modals.editBaseRadius}

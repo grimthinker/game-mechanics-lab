@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CreatureType, StandardRadius, InventoryConfig, ItemData, WeaponConfig } from '../ecs/types';
+import { StandardRadius, InventoryConfig, ItemData, WeaponConfig } from '../ecs/types';
 import { GameApp } from '../GameApp';
 import { Circle } from 'detect-collisions';
 import { lastAddedWeaponConfigState } from '../Weapon';
@@ -11,7 +11,7 @@ interface UseGameModalsProps {
 
 export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType>('player');
+  const [pendingSpawnBehavior, setPendingSpawnBehavior] = useState<string>('PlayerTree');
 
   const [radius, setRadius] = useState<StandardRadius>(16);
   const [weight, setWeight] = useState<number>(10);
@@ -24,7 +24,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(1.2);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editType, setEditType] = useState<CreatureType>('player');
+  const [editBehavior, setEditBehavior] = useState<string>('PlayerTree');
   const [editRadius, setEditRadius] = useState<StandardRadius>(24);
   const [editBaseRadius, setEditBaseRadius] = useState<StandardRadius>(24);
   const [editMaxSpeed, setEditMaxSpeed] = useState<number>(150);
@@ -43,9 +43,9 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
   const [selectedItemForEdit, setSelectedItemForEdit] = useState<ItemData | null>(null);
 
-  const openSpawnModal = (type?: CreatureType) => {
-    if (type) {
-      setPendingSpawnType(type);
+  const openSpawnModal = (behavior?: string) => {
+    if (behavior) {
+      setPendingSpawnBehavior(behavior);
     }
     setIsModalOpen(true);
   };
@@ -57,7 +57,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const openEditModal = () => {
     const c = appRef.current?.selectedCreature;
     if (!c) return;
-    setEditType(c.type);
+    setEditBehavior(c.behavior);
     setEditRadius(c.radius);
     setEditBaseRadius((c as any).baseRadius ?? c.radius);
     setEditMaxSpeed(c.maxSpeed);
@@ -81,7 +81,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
     c.updateParams(
       {
-        type: editType,
+        behavior: editBehavior,
         radius: editRadius,
         baseRadius: editBaseRadius,
         maxSpeed: editMaxSpeed,
@@ -173,8 +173,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
   return {
     isModalOpen,
-    pendingSpawnType,
-    setPendingSpawnType,
+    pendingSpawnBehavior,
+    setPendingSpawnBehavior,
     radius,
     setRadius,
     weight,
@@ -199,8 +199,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     openItemSpawnModal,
     closeItemSpawnModal,
     isEditModalOpen,
-    editType,
-    setEditType,
+    editBehavior,
+    setEditBehavior,
     editRadius,
     setEditRadius,
     editBaseRadius,

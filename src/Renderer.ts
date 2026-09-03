@@ -18,7 +18,6 @@ export class Renderer {
     physics: PhysicsSystem,
     selectedId: EntityId | null,
     gameMode: string = 'editor',
-    playerId: EntityId | null = null,
     hoveredId: EntityId | null = null
   ): void {
     this.ctx.save();
@@ -29,7 +28,7 @@ export class Renderer {
 
     this.renderGrid(camera);
     this.renderObstacles(camera, physics);
-    this.renderEntities(world, camera, selectedId, gameMode, playerId, hoveredId);
+    this.renderEntities(world, camera, selectedId, gameMode, hoveredId);
 
     this.ctx.restore();
   }
@@ -77,7 +76,6 @@ export class Renderer {
     camera: Camera,
     selectedId: EntityId | null,
     gameMode: string,
-    playerId: EntityId | null,
     hoveredId: EntityId | null
   ): void {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
@@ -89,7 +87,7 @@ export class Renderer {
     // 2. Отрисовка мертвых существ
     for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) {
-        this.renderCreatureBody(id, entity.transform, entity.physicsBody, false, entity.meta, camera, selectedId, gameMode, playerId, hoveredId);
+        this.renderCreatureBody(id, entity.transform, entity.physicsBody, false, entity.meta, camera, selectedId, gameMode, hoveredId);
       }
     }
 
@@ -99,7 +97,7 @@ export class Renderer {
     // 4. Отрисовка живых существ
     for (const [id, entity] of entities) {
       if (this.isEntityAlive(world, id)) {
-        this.renderCreatureBody(id, entity.transform, entity.physicsBody, true, entity.meta, camera, selectedId, gameMode, playerId, hoveredId);
+        this.renderCreatureBody(id, entity.transform, entity.physicsBody, true, entity.meta, camera, selectedId, gameMode, hoveredId);
       }
     }
 
@@ -128,7 +126,6 @@ export class Renderer {
     camera: Camera,
     selectedId: EntityId | null,
     gameMode: string,
-    playerId: EntityId | null,
     hoveredId: EntityId | null
   ): void {
     this.ctx.save();
@@ -168,25 +165,18 @@ export class Renderer {
     this.ctx.fillStyle = fillColor;
     this.ctx.fill();
 
-    const isPlayerInGame = gameMode === 'game' && id === playerId;
-    
-    let borderColor = meta.type === 'player' ? '#2980b9' : '#c0392b';
+    let borderColor = meta.behavior === 'PlayerTree' ? '#2980b9' : '#c0392b';
     let lineWidth = 2 / camera.scale;
-
-    if (isPlayerInGame) {
-      borderColor = '#e67e22'; 
-      lineWidth = 3 / camera.scale;
-    }
 
     this.ctx.strokeStyle = borderColor;
     this.ctx.lineWidth = lineWidth;
     this.ctx.stroke();
 
-    if (id === selectedId && !isPlayerInGame) {
+    if (id === selectedId) {
       this.ctx.strokeStyle = '#f1c40f';
       this.ctx.lineWidth = 3 / camera.scale;
       this.ctx.stroke();
-    } else if (id === hoveredId && !isPlayerInGame) {
+    } else if (id === hoveredId) {
       this.ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)';
       this.ctx.lineWidth = 3 / camera.scale;
       this.ctx.stroke();

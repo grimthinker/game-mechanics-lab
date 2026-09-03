@@ -10,11 +10,11 @@ export class WorldSerializer {
     
     const allEntities = this.app.world.getAllEntities();
     for (const [id, comp] of allEntities) {
-      if (comp.meta && comp.stats && comp.equip) {
-        entitiesData.push({
-          id,
-          type: comp.meta.type,
-          config: comp.meta.config,
+        if (comp.meta && comp.stats && comp.equip) {
+            entitiesData.push({
+              id,
+              behavior: comp.meta.behavior,
+              config: comp.meta.config,
           transform: comp.transform ? { ...comp.transform } : undefined,
           stats: {
             hp: comp.stats.hp.current,
@@ -54,10 +54,10 @@ export class WorldSerializer {
       this.app.physics.loadObstacles(data.obstacles);
     }
 
-    if (Array.isArray(data.entities)) {
-      for (const entData of data.entities) {
+if (Array.isArray(data.entities)) {
+    for (const entData of data.entities) {
         let config: CreatureConfig = entData.config || {
-            type: entData.type,
+            behavior: entData.behavior || 'PlayerTree',
             radius: entData.radius,
             weight: entData.mass || 10,
             isSolid: true,

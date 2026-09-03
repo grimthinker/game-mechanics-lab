@@ -6,7 +6,7 @@ import {
   BTLogicComponent,
 } from '../../ai/core';
 import { createBTAISystem } from '../../ai/system';
-import { AttackerTree } from '../../ai/trees_library';
+import { BEHAVIOR_TREES } from '../../ai/trees_library';
 import { EntityAdapter } from '../../EntityAdapter';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 
@@ -24,12 +24,14 @@ export class AISystem {
     this.aiSystem = createBTAISystem(utils);
   }
 
-  public initBotBrain(world: World, id: EntityId): void {
+  public initBotBrain(world: World, id: EntityId, behaviorId: string): void {
     const entity = world.getEntity(id);
     if (!entity) return;
 
+    const treeFactory = BEHAVIOR_TREES[behaviorId] || BEHAVIOR_TREES['IdleTree'];
+
     const brain: BTLogicComponent = {
-      root_node: AttackerTree(),
+      root_node: treeFactory(),
       blackboard: new Blackboard(),
       event_queue: [],
       relations: {},
@@ -45,7 +47,7 @@ export class AISystem {
 
   private getAllAIEntities(): EntityAdapter[] {
     const result: EntityAdapter[] = [];
-    const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'stats', 'health');
+    const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'stats', 'health', 'brain');
   
     for (const [id] of entities) {
       const adapter = this.getEntityAdapter(id);

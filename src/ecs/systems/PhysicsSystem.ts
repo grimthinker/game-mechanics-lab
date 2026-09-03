@@ -312,7 +312,7 @@ export class PhysicsSystem {
         const r = hitPhys ? hitPhys.radius : 24;
 
         if (hitMeta && hitTransform) {
-          if (hitMeta.type === 'player') {
+          if (hitMeta.behavior === 'PlayerTree') {
             if (weapon.zone.piercePlayers) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +
@@ -326,7 +326,7 @@ export class PhysicsSystem {
             } else {
               return false;
             }
-          } else if (hitMeta.type === 'ai') {
+          } else {
             if (weapon.zone.pierceBots) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +
@@ -340,8 +340,6 @@ export class PhysicsSystem {
             } else {
               return false;
             }
-          } else {
-            return false;
           }
         } else {
           return false;

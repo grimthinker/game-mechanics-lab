@@ -66,10 +66,10 @@ export const useGlobalShortcuts = ({
         }
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyB' || e.key.toLowerCase() === 'b')) {
-        if (mode === GameMode.EDITOR) modals.openSpawnModal('ai');
+        if (mode === GameMode.EDITOR) modals.openSpawnModal('AttackerTree');
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
-        if (mode === GameMode.EDITOR) modals.openSpawnModal('player');
+        if (mode === GameMode.EDITOR) modals.openSpawnModal('PlayerTree');
         e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyI' || e.key.toLowerCase() === 'i')) {
         if (mode === GameMode.EDITOR) modals.openItemSpawnModal();

@@ -1,13 +1,14 @@
 import React from 'react';
-import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData, CreatureType } from '../ecs/types';
+import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
 import { CreatureStats } from '../types';
 import { GameMode, THEME_COLORS, TOOL_GROUP_THEME_COLORS } from '../constants';
+import { BEHAVIOR_TREE_NAMES } from '../ai/trees_library';
 
 interface ToolbarProps {
   mode: GameMode;
   goToEditor: () => void;
   goToSimulation: () => void;
-  goToGame: (id: string) => void;
+  goToGame: () => void;
   obstaclesEnabled: boolean;
   setObstaclesEnabled: (val: boolean) => void;
   setObstaclesData: (data: any[]) => void;
@@ -18,7 +19,7 @@ interface ToolbarProps {
   onNewWorld: () => void;
   onSaveWorld: () => void;
   onLoadWorldFile: (file: File) => void;
-  openSpawnModal: (type?: CreatureType) => void;
+  openSpawnModal: (behavior?: string) => void;
   openItemSpawnModal: () => void;
   openEditModal: () => void;
   handleDeleteEntity: () => void;
@@ -120,6 +121,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               Симуляция
             </button>
           )}
+          {mode !== GameMode.GAME && (
+            <button className="btn" style={{ backgroundColor: '#8e44ad', color: '#fff' }} onClick={goToGame}>
+              Играть
+            </button>
+          )}
         </div>
       </div>
 
@@ -179,7 +185,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>{mode === GameMode.GAME ? 'Игрок' : selectedItemData ? 'Выбранный предмет' : 'Выбранное существо'}</h3>
+        <h3>{selectedItemData ? 'Выбранный предмет' : 'Выбранное существо'}</h3>
         {selectedItemData ? (
           <div className="stats-list">
             <dl className="stats-list">
@@ -257,8 +263,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <div className="stats-list">
             <dl className="stats-list">
               <div className="stat-row">
-                <dt>Тип:</dt>
-                <dd>{selectedStats.type === 'player' ? 'Игрок' : 'Бот'}</dd>
+                <dt>Поведение:</dt>
+                <dd>{BEHAVIOR_TREE_NAMES[selectedStats.behavior] || selectedStats.behavior}</dd>
               </div>
               <div className="stat-row">
                 <dt>Состояние:</dt>
@@ -357,25 +363,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     Удалить
                   </button>
                 </>
-              )}
-              {mode === GameMode.SIMULATION && (
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
-                  Осмотреть
-                </button>
-              )}
-            </div>
-
-            {(mode === GameMode.EDITOR || mode === GameMode.SIMULATION) && selectedStats.type === 'player' && (
-              <button
-                className="btn"
-                style={{ width: '100%', marginTop: '8px', backgroundColor: '#8e44ad', color: '#fff' }}
-                onClick={() => goToGame(selectedStats.id)}
-              >
-                Играть
-              </button>
-            )}
-          </div>
-        ) : (
+               )}
+               {mode === GameMode.SIMULATION && (
+                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
+                   Осмотреть
+                 </button>
+               )}
+             </div>
+           </div>
+         ) : (
           <p className="selection-hint">Ничего не выбрано</p>
         )}
       </div>
