@@ -13,6 +13,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pendingSpawnBehavior, setPendingSpawnBehavior] = useState<string>('PlayerTree');
 
+  const [isSolid, setIsSolid] = useState<boolean>(true);
   const [radius, setRadius] = useState<StandardRadius>(16);
   const [weight, setWeight] = useState<number>(10);
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
@@ -25,8 +26,11 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editBehavior, setEditBehavior] = useState<string>('PlayerTree');
+  const [editIsSolid, setEditIsSolid] = useState<boolean>(true);
   const [editRadius, setEditRadius] = useState<StandardRadius>(24);
   const [editBaseRadius, setEditBaseRadius] = useState<StandardRadius>(24);
+  const [editWeight, setEditWeight] = useState<number>(10);
+  const [editBaseWeight, setEditBaseWeight] = useState<number>(10);
   const [editMaxSpeed, setEditMaxSpeed] = useState<number>(150);
   const [editMaxTurnSpeed, setEditMaxTurnSpeed] = useState<number>(270);
   const [editHp, setEditHp] = useState<number>(100);
@@ -58,8 +62,11 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     const c = appRef.current?.selectedCreature;
     if (!c) return;
     setEditBehavior(c.behavior);
+    setEditIsSolid(c.isSolid);
     setEditRadius(c.radius);
-    setEditBaseRadius((c as any).baseRadius ?? c.radius);
+    setEditBaseRadius(c.baseRadius ?? c.radius);
+    setEditWeight(c.weight);
+    setEditBaseWeight(c.baseWeight ?? c.weight);
     setEditMaxSpeed(c.maxSpeed);
     setEditMaxTurnSpeed(Math.round((c.maxTurnSpeed * 180) / Math.PI));
     setEditHp(c.hp);
@@ -82,8 +89,11 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     c.updateParams(
       {
         behavior: editBehavior,
+        isSolid: editIsSolid,
         radius: editRadius,
         baseRadius: editBaseRadius,
+        weight: editWeight,
+        baseWeight: editBaseWeight,
         maxSpeed: editMaxSpeed,
         maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
         hp: editHp,
@@ -176,6 +186,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     isModalOpen,
     pendingSpawnBehavior,
     setPendingSpawnBehavior,
+    isSolid,
+    setIsSolid,
     radius,
     setRadius,
     weight,
@@ -202,10 +214,16 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     isEditModalOpen,
     editBehavior,
     setEditBehavior,
+    editIsSolid,
+    setEditIsSolid,
     editRadius,
     setEditRadius,
     editBaseRadius,
     setEditBaseRadius,
+    editWeight,
+    setEditWeight,
+    editBaseWeight,
+    setEditBaseWeight,
     editMaxSpeed,
     setEditMaxSpeed,
     editMaxTurnSpeed,

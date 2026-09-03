@@ -189,7 +189,7 @@ export interface CreatureConfig extends CoreStatsConfig {
   behavior: string;
   maxSpeed: number;
   maxTurnSpeed: number;
-  maxHp?: number;
+  maxHp: number;
   hp?: number;
   stealth?: number;
   runSpeedMultiplier?: number;

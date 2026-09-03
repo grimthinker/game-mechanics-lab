@@ -382,6 +382,8 @@ export const App: React.FC = () => {
         isOpen={modals.isModalOpen}
         pendingSpawnBehavior={modals.pendingSpawnBehavior}
         setPendingSpawnBehavior={modals.setPendingSpawnBehavior}
+        isSolid={modals.isSolid}
+        setIsSolid={modals.setIsSolid}
         radius={modals.radius}
         setRadius={modals.setRadius}
         weight={modals.weight}
@@ -415,10 +417,16 @@ export const App: React.FC = () => {
         isReadOnly={isReadOnly}
         editBehavior={modals.editBehavior}
         setEditBehavior={modals.setEditBehavior}
+        editIsSolid={modals.editIsSolid}
+        setEditIsSolid={modals.setEditIsSolid}
         editRadius={modals.editRadius}
         setEditRadius={modals.setEditRadius}
         editBaseRadius={modals.editBaseRadius}
         setEditBaseRadius={modals.setEditBaseRadius}
+        editWeight={modals.editWeight}
+        setEditWeight={modals.setEditWeight}
+        editBaseWeight={modals.editBaseWeight}
+        setEditBaseWeight={modals.setEditBaseWeight}
         editHp={modals.editHp}
         setEditHp={modals.setEditHp}
         editMaxHp={modals.editMaxHp}

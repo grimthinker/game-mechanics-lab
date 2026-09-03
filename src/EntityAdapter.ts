@@ -48,7 +48,7 @@ export class EntityAdapter implements IMovable, EntityController {
         ?? this.world.getComponent(this.id, 'physicsBody')?.radius 
         ?? 16;
   }
-  public get baseRadius(): number {
+  public get baseRadius(): StandardRadius {
     return this.world.getComponent(this.id, 'stats')?.radius.base ?? this.radius;
   }
   public get weight(): number {
@@ -56,6 +56,12 @@ export class EntityAdapter implements IMovable, EntityController {
         ?? this.world.getComponent(this.id, 'physicsBody')?.weight 
         ?? this.world.getComponent(this.id, 'meta')?.config?.weight 
         ?? 10;
+  }
+  public get baseWeight(): number {
+    return this.world.getComponent(this.id, 'stats')?.weight.base ?? this.weight;
+  }
+  public get isSolid(): boolean {
+    return this.world.getComponent(this.id, 'stats')?.isSolid.current ?? true;
   }
   public get hp(): number {
     return this.world.getComponent(this.id, 'stats')?.hp.current ?? 0;
@@ -206,6 +212,7 @@ export class EntityAdapter implements IMovable, EntityController {
       radius?: StandardRadius;
       baseRadius?: StandardRadius;
       weight?: number;
+      baseWeight?: number;
       isSolid?: boolean;
       maxSpeed?: number;
       maxTurnSpeed?: number;
@@ -237,11 +244,14 @@ export class EntityAdapter implements IMovable, EntityController {
       if (params.radius !== undefined) {
         stats.radius.current = params.radius;
       }
+      if (params.baseWeight !== undefined) {
+        const val = Math.max(0.1, params.baseWeight);
+        stats.weight.base = val;
+        if (meta?.config) meta.config.weight = val;
+      }
       if (params.weight !== undefined) {
         const val = Math.max(0.1, params.weight);
-        stats.weight.base = val;
         stats.weight.current = val;
-        if (meta?.config) meta.config.weight = val;
       }
       if (params.isSolid !== undefined) {
         stats.isSolid.base = params.isSolid;

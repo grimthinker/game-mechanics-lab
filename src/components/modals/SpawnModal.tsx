@@ -9,6 +9,8 @@ export interface SpawnModalProps {
   isOpen: boolean;
   pendingSpawnBehavior: string;
   setPendingSpawnBehavior: (behavior: string) => void;
+  isSolid: boolean;
+  setIsSolid: (val: boolean) => void;
   radius: number;
   setRadius: (val: StandardRadius) => void;
   weight: number;
@@ -35,6 +37,8 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   isOpen,
   pendingSpawnBehavior,
   setPendingSpawnBehavior,
+  isSolid,
+  setIsSolid,
   radius,
   setRadius,
   weight,
@@ -79,6 +83,10 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
                 <option key={id} value={id}>{name}</option>
               ))}
             </select>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: '8px 0' }}>
+            <input type="checkbox" checked={isSolid} onChange={(e) => setIsSolid(e.target.checked)} />
+            Участвует в коллизии
           </label>
           <label>
             Радиус:

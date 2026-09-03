@@ -78,7 +78,6 @@ export class EntityFactory {
   ): EntityId {
     const prefix = 'bot';
     const id = forcedId || `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-    const radius = config.radius || 16;
 
     world.createEntity(id);
 
@@ -89,9 +88,15 @@ export class EntityFactory {
         behavior: { base: config.behavior, current: config.behavior },
         weight: { base: config.weight, current: config.weight },
         isSolid: { base: config.isSolid ?? true, current: config.isSolid ?? true },
-        hp: { base: config.maxHp ?? 100, current: config.hp ?? 100 },
-        maxHp: { base: config.maxHp ?? 100, current: config.maxHp ?? 100 },
-        radius: { base: radius, current: radius },
+        hp: { 
+            base: config.hp ?? config.maxHp, 
+            current: config.hp ?? config.maxHp 
+        },
+        maxHp: { 
+            base: config.maxHp, 
+            current: config.maxHp 
+        },
+        radius: { base: config.radius, current: config.radius },
         maxSpeed: { base: Math.max(0, config.maxSpeed), current: Math.max(0, config.maxSpeed) },
         maxTurnSpeed: {
           base: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,

@@ -7,10 +7,16 @@ export interface CreatureEditModalProps {
   isReadOnly?: boolean;
   editBehavior: string;
   setEditBehavior: (val: string) => void;
+  editIsSolid: boolean;
+  setEditIsSolid: (val: boolean) => void;
   editRadius: number;
   setEditRadius: (val: StandardRadius) => void;
   editBaseRadius: number;
   setEditBaseRadius: (val: StandardRadius) => void;
+  editWeight: number;
+  setEditWeight: (val: number) => void;
+  editBaseWeight: number;
+  setEditBaseWeight: (val: number) => void;
   editHp: number;
   setEditHp: (val: number) => void;
   editMaxHp: number;
@@ -38,10 +44,16 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   isReadOnly,
   editBehavior,
   setEditBehavior,
+  editIsSolid,
+  setEditIsSolid,
   editRadius,
   setEditRadius,
   editBaseRadius,
   setEditBaseRadius,
+  editWeight,
+  setEditWeight,
+  editBaseWeight,
+  setEditBaseWeight,
   editHp,
   setEditHp,
   editMaxHp,
@@ -89,6 +101,16 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
             </select>
           </label>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isReadOnly ? 'default' : 'pointer', margin: '8px 0' }}>
+            <input
+              type="checkbox"
+              disabled={isReadOnly}
+              checked={editIsSolid}
+              onChange={(e) => setEditIsSolid(e.target.checked)}
+            />
+            Участвует в коллизии
+          </label>
+
           {/* Текущий радиус существа (применяется к коллизии физического тела) */}
           <label>
             Текущий радиус:
@@ -119,6 +141,30 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label>
+            Текущая масса:
+            <input
+              disabled={isReadOnly}
+              type="number"
+              value={editWeight}
+              min={1}
+              max={100}
+              onChange={(e) => setEditWeight(Number(e.target.value))}
+            />
+          </label>
+
+          <label>
+            Базовая масса:
+            <input
+              disabled={isReadOnly}
+              type="number"
+              value={editBaseWeight}
+              min={1}
+              max={100}
+              onChange={(e) => setEditBaseWeight(Number(e.target.value))}
+            />
           </label>
 
           <label>
