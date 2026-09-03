@@ -78,7 +78,7 @@ export class Renderer {
     gameMode: string,
     hoveredId: EntityId | null
   ): void {
-    const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
+    const entities = world.getEntitiesWith('transform', 'meta');
     const items = world.getEntitiesWith('transform', 'item');
 
     // 1. Отрисовка предметов на земле
@@ -87,7 +87,10 @@ export class Renderer {
     // 2. Отрисовка мертвых существ
     for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) {
-        this.renderCreatureBody(id, entity.transform, entity.physicsBody, false, entity.meta, camera, selectedId, gameMode, hoveredId);
+        const stats = world.getComponent(id, 'stats');
+        const phys = world.getComponent(id, 'physicsBody');
+        const radius = phys?.radius ?? stats?.radius.current ?? entity.meta.config.radius ?? 16;
+        this.renderCreatureBody(id, entity.transform, radius, false, entity.meta, stats, camera, selectedId, gameMode, hoveredId);
       }
     }
 
@@ -97,7 +100,10 @@ export class Renderer {
     // 4. Отрисовка живых существ
     for (const [id, entity] of entities) {
       if (this.isEntityAlive(world, id)) {
-        this.renderCreatureBody(id, entity.transform, entity.physicsBody, true, entity.meta, camera, selectedId, gameMode, hoveredId);
+        const stats = world.getComponent(id, 'stats');
+        const phys = world.getComponent(id, 'physicsBody');
+        const radius = phys?.radius ?? stats?.radius.current ?? entity.meta.config.radius ?? 16;
+        this.renderCreatureBody(id, entity.transform, radius, true, entity.meta, stats, camera, selectedId, gameMode, hoveredId);
       }
     }
 
@@ -120,9 +126,10 @@ export class Renderer {
   private renderCreatureBody(
     id: EntityId,
     transform: any,
-    phys: any,
+    radius: number,
     isAlive: boolean,
     meta: any,
+    stats: any,
     camera: Camera,
     selectedId: EntityId | null,
     gameMode: string,
@@ -161,11 +168,11 @@ export class Renderer {
     }
 
     this.ctx.beginPath();
-    this.ctx.arc(0, 0, phys.radius, 0, Math.PI * 2);
+    this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
     this.ctx.fillStyle = fillColor;
     this.ctx.fill();
 
-    let borderColor = meta.behavior === 'PlayerTree' ? '#2980b9' : '#c0392b';
+    let borderColor = (stats?.behavior?.current ?? meta.config.behavior) === 'PlayerTree' ? '#2980b9' : '#c0392b';
     let lineWidth = 2 / camera.scale;
 
     this.ctx.strokeStyle = borderColor;
@@ -183,7 +190,7 @@ export class Renderer {
     }
 
     this.ctx.beginPath();
-    const arrowLen = phys.radius;
+    const arrowLen = radius;
 
     this.ctx.moveTo(arrowLen, 0);
     this.ctx.lineTo(0, -arrowLen);
@@ -363,23 +370,28 @@ export class Renderer {
     camera: Camera
   ): void {
     // Healthbars & ID texts
-    for (const [id, { transform, physicsBody, meta }] of entities) {
+    for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) continue;
 
+      const transform = entity.transform;
+      const meta = entity.meta;
       const statsComp = world.getComponent(id, 'stats' as any) as any;
       const hp = statsComp?.hp?.current ?? 0;
       const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
+      
+      const phys = world.getComponent(id, 'physicsBody');
+      const radius = phys?.radius ?? statsComp?.radius?.current ?? meta.config.radius ?? 16;
 
       // Healthbar
       this.ctx.save();
       this.ctx.translate(transform.x, transform.y);
-      const barW = physicsBody.radius * 2;
+      const barW = radius * 2;
       const barH = 4 / camera.scale;
       const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
       this.ctx.fillStyle = '#c0392b';
-      this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW, barH);
+      this.ctx.fillRect(-barW / 2, -radius - 16 / camera.scale, barW, barH);
       this.ctx.fillStyle = '#2ecc71';
-      this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW * hpRatio, barH);
+      this.ctx.fillRect(-barW / 2, -radius - 16 / camera.scale, barW * hpRatio, barH);
       this.ctx.restore();
 
       // ID Text
@@ -389,7 +401,7 @@ export class Renderer {
       this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
-      this.ctx.fillText(meta.id, 0, -physicsBody.radius - 20 / camera.scale);
+      this.ctx.fillText(meta.id, 0, -radius - 20 / camera.scale);
       this.ctx.restore();
     }
   }

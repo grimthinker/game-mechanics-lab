@@ -86,46 +86,47 @@ export class EntityFactory {
     world.addComponent(id, 'health', { isAlive: true, hitFlashTimer: 0 });
     world.addComponent(id, 'stealth', { isCrouching: false });
     world.addComponent(id, 'stats', {
-      hp: { base: config.maxHp ?? 100, current: config.hp ?? 100 },
-      maxHp: { base: config.maxHp ?? 100, current: config.maxHp ?? 100 },
-      radius: { base: radius, current: radius },
-      maxSpeed: { base: Math.max(0, config.maxSpeed), current: Math.max(0, config.maxSpeed) },
-      maxTurnSpeed: {
-        base: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
-        current: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
-      },
-      stealth: { base: config.stealth ?? 0, current: config.stealth ?? 0 },
-      runSpeedMultiplier: {
-        base: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
-        current: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
-      },
-      crouchSpeedMultiplier: {
-        base: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
-        current: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
-      },
-      crouchStealthMultiplier: {
-        base: Math.max(1, config.crouchStealthMultiplier ?? 1.5),
-        current: Math.max(1, config.crouchStealthMultiplier ?? 1.5),
-      },
-      interactionRange: { base: 100, current: 100 },
-      runTurnMultiplier: { base: config.runTurnMultiplier ?? 0.8, current: config.runTurnMultiplier ?? 0.8 },
-      crouchTurnMultiplier: { base: config.crouchTurnMultiplier ?? 1.2, current: config.crouchTurnMultiplier ?? 1.2 },
-    });
-
-    world.addComponent(id, 'equip', {
-        slots: [
-          { type: 'armor', itemId: null },
-          { type: 'bag', itemId: null },
-          { type: 'weapon', itemId: null },
-        ],
+        behavior: { base: config.behavior, current: config.behavior },
+        weight: { base: config.weight, current: config.weight },
+        isSolid: { base: config.isSolid ?? true, current: config.isSolid ?? true },
+        hp: { base: config.maxHp ?? 100, current: config.hp ?? 100 },
+        maxHp: { base: config.maxHp ?? 100, current: config.maxHp ?? 100 },
+        radius: { base: radius, current: radius },
+        maxSpeed: { base: Math.max(0, config.maxSpeed), current: Math.max(0, config.maxSpeed) },
+        maxTurnSpeed: {
+          base: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
+          current: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
+        },
+        stealth: { base: config.stealth ?? 0, current: config.stealth ?? 0 },
+        runSpeedMultiplier: {
+          base: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
+          current: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
+        },
+        crouchSpeedMultiplier: {
+          base: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
+          current: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
+        },
+        crouchStealthMultiplier: {
+          base: Math.max(1, config.crouchStealthMultiplier ?? 1.5),
+          current: Math.max(1, config.crouchStealthMultiplier ?? 1.5),
+        },
+        runTurnMultiplier: { base: config.runTurnMultiplier ?? 0.8, current: config.runTurnMultiplier ?? 0.8 },
+        crouchTurnMultiplier: { base: config.crouchTurnMultiplier ?? 1.2, current: config.crouchTurnMultiplier ?? 1.2 },
       });
-      world.addComponent(id, 'activeAttacks', { attacks: [] });
-      world.addComponent(id, 'meta', {
-        id,
-        behavior: config.behavior,
-        state: 'idle',
-        config: JSON.parse(JSON.stringify(config)),
-      });
+  
+      world.addComponent(id, 'equip', {
+          slots: [
+            { type: 'armor', itemId: null },
+            { type: 'bag', itemId: null },
+            { type: 'weapon', itemId: null },
+          ],
+        });
+        world.addComponent(id, 'activeAttacks', { attacks: [] });
+        world.addComponent(id, 'meta', {
+          id,
+          state: 'idle',
+          config: JSON.parse(JSON.stringify(config)),
+        });
   
       aiSystem.initBotBrain(world, id, config.behavior);
   
@@ -173,13 +174,18 @@ export class EntityFactory {
     if (meta) {
       // Существо: добавляем физическое тело, скорость и ввод
       const stats = world.getComponent(id, 'stats');
+      const isSolid = options?.isSolid ?? stats?.isSolid.current ?? meta.config.isSolid ?? true;
       const radius = options?.radius ?? stats?.radius.current ?? meta.config.radius ?? 16;
-      const weight = options?.weight ?? Math.max(0.1, meta.config.weight);
+      const weight = options?.weight ?? stats?.weight.current ?? Math.max(0.1, meta.config.weight);
 
-      const body = new Circle({ x: position.x, y: position.y }, radius);
-      body.isStatic = false;
+      if (isSolid) {
+        const body = new Circle({ x: position.x, y: position.y }, radius);
+        body.isStatic = false;
 
-      world.addComponent(id, 'physicsBody', { body, radius, weight, isStatic: false });
+        world.addComponent(id, 'physicsBody', { body, radius, weight, isStatic: false });
+        physics.registerBody(id, body);
+      }
+
       world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
       world.addComponent(id, 'input', {
         isMovingForward: false,
@@ -189,8 +195,6 @@ export class EntityFactory {
         wantsAttack: false,
         turnSpeed: 0,
       });
-
-      physics.registerBody(id, body);
     } else if (item) {
       // Предмет: добавляем физическое тело при необходимости
       const isSolid = options?.isSolid ?? item.config?.isSolid ?? true;

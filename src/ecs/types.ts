@@ -22,20 +22,9 @@ export interface StatValue<T = number> {
   current: T;
 }
 
-export interface StatsComponent {
-  hp: StatValue;
-  maxHp: StatValue;
-  radius: StatValue<StandardRadius>;
-  maxSpeed: StatValue;
-  maxTurnSpeed: StatValue;
-  stealth: StatValue;
-  runSpeedMultiplier: StatValue;
-  runTurnMultiplier: StatValue;
-  crouchSpeedMultiplier: StatValue;
-  crouchTurnMultiplier: StatValue;
-  crouchStealthMultiplier: StatValue;
-  interactionRange: StatValue;
-}
+export type StatsComponent = {
+  [K in keyof Required<CreatureConfig>]: StatValue<Required<CreatureConfig>[K]>;
+};
 
 export interface VelocityComponent {
   currentSpeed: number;
@@ -107,7 +96,6 @@ export interface ActiveAttackComponent {
 
 export interface CreatureMetaComponent {
   id: string;
-  behavior: string;
   state: CreatureState;
   config: CreatureConfig;
 }

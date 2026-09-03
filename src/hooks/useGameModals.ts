@@ -94,7 +94,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
         runTurnMultiplier: editRunTurnMultiplier,
         crouchTurnMultiplier: editCrouchTurnMultiplier,
       },
-      (app as any).aiSystem
+      (app as any).aiSystem,
+      app.physics
     );
     closeEditModal();
     updateStats();

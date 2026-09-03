@@ -8,7 +8,6 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): Cr
     isSolid: true,
     maxSpeed: 150,
     maxTurnSpeed: 270,
-    hp: 100,
     maxHp: 100,
     runSpeedMultiplier: 1.5,
     crouchSpeedMultiplier: 0.5,

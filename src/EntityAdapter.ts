@@ -7,6 +7,7 @@ import {
   InventoryComponent,
   EntityController,
   StandardRadius,
+  CreatureConfig,
 } from './ecs/types';
 import {
   EntityUtils,
@@ -15,6 +16,8 @@ import {
   BehaviorStatsConfig,
 } from './ai/core';
 import { AISystem } from './ecs/systems/AISystem';
+import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
+import { Circle } from 'detect-collisions';
 import { Point } from './types';
 
 export class EntityAdapter implements IMovable, EntityController {
@@ -27,7 +30,7 @@ export class EntityAdapter implements IMovable, EntityController {
   ) {}
 
   public get behavior(): string {
-    return this.world.getComponent(this.id, 'meta')?.behavior ?? 'IdleTree';
+    return this.world.getComponent(this.id, 'stats')?.behavior.current ?? this.world.getComponent(this.id, 'meta')?.config?.behavior ?? 'IdleTree';
   }
   public get state(): CreatureState {
     return this.world.getComponent(this.id, 'meta')?.state ?? 'idle';
@@ -49,7 +52,8 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.world.getComponent(this.id, 'stats')?.radius.base ?? this.radius;
   }
   public get weight(): number {
-    return this.world.getComponent(this.id, 'physicsBody')?.weight 
+    return this.world.getComponent(this.id, 'stats')?.weight.current
+        ?? this.world.getComponent(this.id, 'physicsBody')?.weight 
         ?? this.world.getComponent(this.id, 'meta')?.config?.weight 
         ?? 10;
   }
@@ -180,10 +184,12 @@ export class EntityAdapter implements IMovable, EntityController {
   }
 
   public setBehavior(newBehavior: string, aiSystem: AISystem): void {
+    const stats = this.world.getComponent(this.id, 'stats');
     const meta = this.world.getComponent(this.id, 'meta');
-    if (!meta || meta.behavior === newBehavior) return;
+    if (!stats || !meta || stats.behavior.current === newBehavior) return;
 
-    meta.behavior = newBehavior;
+    stats.behavior.current = newBehavior;
+    if (meta.config) meta.config.behavior = newBehavior;
     aiSystem.initBotBrain(this.world, this.id, newBehavior);
 
     this.stop();
@@ -199,6 +205,8 @@ export class EntityAdapter implements IMovable, EntityController {
       behavior?: string;
       radius?: StandardRadius;
       baseRadius?: StandardRadius;
+      weight?: number;
+      isSolid?: boolean;
       maxSpeed?: number;
       maxTurnSpeed?: number;
       hp?: number;
@@ -209,7 +217,8 @@ export class EntityAdapter implements IMovable, EntityController {
       runTurnMultiplier?: number;
       crouchTurnMultiplier?: number;
     },
-    aiSystem?: AISystem
+    aiSystem?: AISystem,
+    physicsSystem?: PhysicsSystem
   ): void {
     if (params.behavior !== undefined && aiSystem) {
       this.setBehavior(params.behavior, aiSystem);
@@ -227,6 +236,17 @@ export class EntityAdapter implements IMovable, EntityController {
       }
       if (params.radius !== undefined) {
         stats.radius.current = params.radius;
+      }
+      if (params.weight !== undefined) {
+        const val = Math.max(0.1, params.weight);
+        stats.weight.base = val;
+        stats.weight.current = val;
+        if (meta?.config) meta.config.weight = val;
+      }
+      if (params.isSolid !== undefined) {
+        stats.isSolid.base = params.isSolid;
+        stats.isSolid.current = params.isSolid;
+        if (meta?.config) meta.config.isSolid = params.isSolid;
       }
       if (params.maxSpeed !== undefined) {
         const val = Math.max(0, params.maxSpeed);
@@ -283,20 +303,29 @@ export class EntityAdapter implements IMovable, EntityController {
         stats.crouchTurnMultiplier.current = val;
         if (meta?.config) meta.config.crouchTurnMultiplier = val;
       }
+      
       if (phys) {
         phys.radius = stats.radius.current as StandardRadius;
         phys.body.r = stats.radius.current;
+        phys.weight = stats.weight.current;
+      }
+
+      if (physicsSystem) {
+        const wasSolid = !!phys;
+        const isSolidNow = stats.isSolid.current;
+        if (!wasSolid && isSolidNow) {
+          const transform = this.world.getComponent(this.id, 'transform');
+          if (transform) {
+            const body = new Circle({ x: transform.x, y: transform.y }, stats.radius.current as StandardRadius);
+            body.isStatic = false;
+            this.world.addComponent(this.id, 'physicsBody', { body, radius: stats.radius.current as StandardRadius, weight: stats.weight.current, isStatic: false });
+            physicsSystem.registerBody(this.id, body);
+          }
+        } else if (wasSolid && !isSolidNow) {
+          physicsSystem.unregisterBody(phys!.body);
+          this.world.removeComponent(this.id, 'physicsBody');
+        }
       }
     }
-  }
-
-  public canInteractWith(targetId: EntityId): boolean {
-    const transform = this.world.getComponent(this.id, 'transform');
-    const targetTransform = this.world.getComponent(targetId, 'transform');
-    const stats = this.world.getComponent(this.id, 'stats');
-    if (!transform || !targetTransform || !stats) return false;
-
-    const dist = Math.hypot(transform.x - targetTransform.x, transform.y - targetTransform.y);
-    return dist <= stats.interactionRange.current;
   }
 }

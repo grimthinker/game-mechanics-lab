@@ -62,7 +62,7 @@ export const App: React.FC = () => {
 
     if (currentMode === GameMode.GAME) {
       const isAnyPlayerAlive = app.world.getAllEntities().some(([_, comp]) => 
-        comp.meta?.behavior === 'PlayerTree' && comp.health?.isAlive
+        (comp.stats?.behavior?.current ?? comp.meta?.config?.behavior) === 'PlayerTree' && comp.health?.isAlive
       );
       if (!isAnyPlayerAlive) {
         setModeSync(GameMode.SIMULATION);

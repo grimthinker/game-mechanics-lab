@@ -312,7 +312,9 @@ export class PhysicsSystem {
         const r = hitPhys ? hitPhys.radius : 24;
 
         if (hitMeta && hitTransform) {
-          if (hitMeta.behavior === 'PlayerTree') {
+          const hitStats = world.getComponent(hitEntityId, 'stats');
+          const hitBehavior = hitStats?.behavior?.current ?? hitMeta.config.behavior;
+          if (hitBehavior === 'PlayerTree') {
             if (weapon.zone.piercePlayers) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +

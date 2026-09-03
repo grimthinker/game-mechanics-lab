@@ -13,7 +13,7 @@ export class WorldSerializer {
         if (comp.meta && comp.stats && comp.equip) {
             entitiesData.push({
               id,
-              behavior: comp.meta.behavior,
+              behavior: comp.stats.behavior?.current ?? comp.meta.config.behavior,
               config: comp.meta.config,
           transform: comp.transform ? { ...comp.transform } : undefined,
           stats: {
@@ -68,7 +68,6 @@ if (Array.isArray(data.entities)) {
             crouchStealthMultiplier: entData.stats.crouchStealthMultiplier,
             runTurnMultiplier: 0.8,
             crouchTurnMultiplier: 1.2,
-            hp: entData.stats.hp,
             maxHp: entData.stats.maxHp,
         };
 
