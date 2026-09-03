@@ -5,6 +5,8 @@ import {
   WeaponConfig,
   ItemData,
   StandardRadius,
+  CreatureConfig,
+  InventoryConfig,
 } from './ecs/types';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { MovementSystem } from './ecs/systems/MovementSystem';
@@ -17,9 +19,13 @@ import { createRandomWeaponItem } from './Weapon';
 import { createDefaultArmorItem, createDefaultBagItem } from './DefaultItems';
 import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
+import { ItemAdapter } from './ItemAdapter';
+import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
+import { WorldSerializer } from './ecs/WorldSerializer';
 
 export { EntityAdapter } from './EntityAdapter';
+export { ItemAdapter } from './ItemAdapter';
 
 export class GameApp {
   private canvas: HTMLCanvasElement;
@@ -31,11 +37,13 @@ export class GameApp {
   private damageSystem: DamageSystem;
   private aiSystem: AISystem;
   public camera: Camera;
+  public entityFactory: EntityFactory;
+  private serializer: WorldSerializer;
 
   public selectedCreature: EntityAdapter | null = null;
-  public selectedItem: { id: string, data: ItemData } | null = null;
+  public selectedItem: ItemAdapter | null = null;
   public hoveredCreature: EntityAdapter | null = null;
-  public hoveredItem: { id: string, data: ItemData } | null = null;
+  public hoveredItem: ItemAdapter | null = null;
 
   public onFrame: (() => void) | null = null;
 
@@ -58,6 +66,8 @@ export class GameApp {
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
     this.camera = new Camera();
+    this.entityFactory = new EntityFactory();
+    this.serializer = new WorldSerializer(this);
 
     this.resizeCanvas();
     window.addEventListener('resize', this.handleResize);
@@ -71,28 +81,27 @@ export class GameApp {
     }
   }
 
-  public spawnItemEntity(itemData: ItemData): string {
-    const id = itemData.id;
-    this.world.createEntity(id);
-    this.world.addComponent(id, 'item', itemData);
-    return id;
+  public spawnItemEntity(itemData: ItemData, forcedId?: string): string {
+    return this.entityFactory.createEntityFromBlueprint(
+      this.world,
+      this.aiSystem,
+      { kind: 'item', itemData },
+      forcedId
+    );
   }
 
   public spawnCreature(
-    type: CreatureType,
-    radius: StandardRadius = 8,
-    mass: number = 10,
-    maxSpeed: number = 150,
-    maxTurnSpeedDeg: number = 270,
+    config: CreatureConfig,
     position?: Point,
-    _weapons?: WeaponConfig[],
-    runSpeedMultiplier: number = 2.5,
-    crouchSpeedMultiplier: number = 0.3,
-    crouchStealthMultiplier: number = 2.5,
     forcedId?: string
   ): EntityAdapter {
-    const prefix = type === 'player' ? 'player' : 'bot';
-    const id = forcedId || `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+    const id = this.entityFactory.createEntityFromBlueprint(
+      this.world,
+      this.aiSystem,
+      { kind: 'creature', config },
+      forcedId
+    );
+
     const pos = position
       ? { ...position }
       : {
@@ -100,127 +109,49 @@ export class GameApp {
           y: 100 + Math.random() * (this.canvas.height - 200),
         };
 
-    const body = new Circle({ x: pos.x, y: pos.y }, radius);
-    body.isStatic = false;
-
-    const initialWeaponItem: ItemData = createRandomWeaponItem();
-    const initialArmorItem: ItemData = createDefaultArmorItem();
-    const initialBagItem: ItemData = createDefaultBagItem();
-
-    const weaponId = this.spawnItemEntity(initialWeaponItem);
-    this.world.addComponent(weaponId, 'ownership', { ownerId: id, status: 'equipped' });
-    
-    const armorId = this.spawnItemEntity(initialArmorItem);
-    this.world.addComponent(armorId, 'ownership', { ownerId: id, status: 'equipped' });
-    
-    const bagId = this.spawnItemEntity(initialBagItem);
-    this.world.addComponent(bagId, 'ownership', { ownerId: id, status: 'equipped' });
-
-    this.world.createEntity(id);
-    this.world.addComponent(id, 'transform', { x: pos.x, y: pos.y, angle: 0 });
-    this.world.addComponent(id, 'physicsBody', { body, radius, mass: Math.max(0.1, mass), isStatic: false });
-    this.world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
-    this.world.addComponent(id, 'input', {
-      isMovingForward: false,
-      turnDirection: 0,
-      isRunning: false,
-      isCrouching: false,
-      wantsAttack: false,
-      turnSpeed: 0
-    });
-    this.world.addComponent(id, 'health', { isAlive: true, hitFlashTimer: 0 });
-    this.world.addComponent(id, 'stealth', { isCrouching: false });
-    this.world.addComponent(id, 'stats', {
-      hp: { base: 100, current: 100 },
-      maxHp: { base: 100, current: 100 },
-      radius: { base: radius, current: radius },
-      maxSpeed: { base: Math.max(0, maxSpeed), current: Math.max(0, maxSpeed) },
-      maxTurnSpeed: {
-        base: (Math.max(0, maxTurnSpeedDeg) * Math.PI) / 180,
-        current: (Math.max(0, maxTurnSpeedDeg) * Math.PI) / 180,
-      },
-      stealth: { base: 0, current: 0 },
-      runSpeedMultiplier: {
-        base: Math.max(0.1, runSpeedMultiplier),
-        current: Math.max(0.1, runSpeedMultiplier),
-      },
-      crouchSpeedMultiplier: {
-        base: Math.max(0.1, crouchSpeedMultiplier),
-        current: Math.max(0.1, crouchSpeedMultiplier),
-      },
-      crouchStealthMultiplier: {
-        base: Math.max(1, crouchStealthMultiplier),
-        current: Math.max(1, crouchStealthMultiplier),
-      },
-      interactionRange: { base: 100, current: 100 },
-      runTurnMultiplier: { base: 0.8, current: 0.8 },  
-      crouchTurnMultiplier: { base: 1.2, current: 1.2 },   
-    });
-
-    const emptySlots = Array.from({ length: 4 }, () =>
-      Array.from({ length: 6 }, () => ({ itemId: null, count: 0 }))
-    );
-    this.world.addComponent(id, 'inventory', {
-      size: { width: 6, height: 4 },
-      slots: emptySlots,
-    });
-
-    this.world.addComponent(id, 'equip', {
-      slots: [
-        { type: 'armor', itemId: armorId },
-        { type: 'bag', itemId: bagId },
-        { type: 'weapon', itemId: weaponId },
-      ],
-    });
-    this.world.addComponent(id, 'activeAttacks', { attacks: [] });
-    this.world.addComponent(id, 'meta', { id, type, state: 'idle' });
-
-    this.physics.registerBody(id, body);
-
-    if (type === 'ai') {
-      this.aiSystem.initBotBrain(this.world, id);
-    }
-
+    this.entityFactory.spawnEntityInWorld(this.world, this.physics, id, pos);
     return new EntityAdapter(id, this.world);
   }
 
-  public spawnWorldItem(itemData: ItemData, position: Point, isSolid?: boolean, radius?: StandardRadius): string {
+  public spawnWorldItem(
+    itemData: ItemData,
+    position: Point,
+    isSolid?: boolean,
+    radius?: StandardRadius
+  ): string {
     const id = this.spawnItemEntity(itemData);
-    this.world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
-    
-    const actualIsSolid = isSolid ?? itemData.config?.isSolid ?? true;
-    const actualRadius = radius ?? itemData.config?.radius ?? 16;
-    
-    if (actualIsSolid) {
-      const mass = itemData.config?.invWeight || 1;
-      const body = new Circle({ x: position.x, y: position.y }, actualRadius);
-      body.isStatic = false;
-      this.world.addComponent(id, 'physicsBody', { body, radius: actualRadius, mass, isStatic: false });
-      this.physics.registerBody(id, body);
-    }
+    this.entityFactory.spawnEntityInWorld(this.world, this.physics, id, position, {
+      isSolid,
+      radius,
+    });
     return id;
+  }
+
+  public despawnEntityFromWorld(id: string): void {
+    this.entityFactory.despawnEntityFromWorld(this.world, this.physics, id);
   }
 
   public deleteSelectedEntity(): void {
     if (this.selectedCreature) {
       const id = this.selectedCreature.id;
       
-      const inv = this.world.getComponent(id, 'inventory');
-      if (inv) {
-         for (const row of inv.slots) {
-            for (const cell of row) {
-               if (cell.itemId) {
-                   const phys = this.world.getComponent(cell.itemId, 'physicsBody');
-                   if (phys) this.physics.unregisterBody(phys.body);
-                   this.world.removeEntity(cell.itemId);
-               }
-            }
-         }
-      }
       const eq = this.world.getComponent(id, 'equip');
       if (eq) {
          for (const slot of eq.slots) {
             if (slot.itemId) {
+               const inv = this.world.getComponent(slot.itemId, 'inventory');
+               if (inv) {
+                 for (const row of inv.slots) {
+                    for (const cell of row) {
+                       if (cell.itemId) {
+                           const phys = this.world.getComponent(cell.itemId, 'physicsBody');
+                           if (phys) this.physics.unregisterBody(phys.body);
+                           this.world.removeEntity(cell.itemId);
+                       }
+                    }
+                 }
+               }
+
                const phys = this.world.getComponent(slot.itemId, 'physicsBody');
                if (phys) this.physics.unregisterBody(phys.body);
                this.world.removeEntity(slot.itemId);
@@ -235,6 +166,20 @@ export class GameApp {
       this.selectedCreature = null;
     } else if (this.selectedItem) {
       const id = this.selectedItem.id;
+      
+      const inv = this.world.getComponent(id, 'inventory');
+      if (inv) {
+         for (const row of inv.slots) {
+            for (const cell of row) {
+               if (cell.itemId) {
+                   const phys = this.world.getComponent(cell.itemId, 'physicsBody');
+                   if (phys) this.physics.unregisterBody(phys.body);
+                   this.world.removeEntity(cell.itemId);
+               }
+            }
+         }
+      }
+
       const phys = this.world.getComponent(id, 'physicsBody');
       if (phys) this.physics.unregisterBody(phys.body);
       this.world.removeEntity(id);
@@ -257,112 +202,11 @@ export class GameApp {
   }
 
   public serializeWorld(): any {
-    const entitiesData: any[] = [];
-    const itemsData: any[] = [];
-    
-    const allEntities = this.world.getAllEntities();
-    for (const [id, comp] of allEntities) {
-      if (comp.meta && comp.stats && comp.inventory && comp.equip && comp.physicsBody && comp.transform) {
-        entitiesData.push({
-          id,
-          type: comp.meta.type,
-          transform: { ...comp.transform },
-          radius: comp.physicsBody.radius,
-          mass: comp.physicsBody.mass,
-          stats: {
-            hp: comp.stats.hp.current,
-            maxHp: comp.stats.maxHp.current,
-            maxSpeed: comp.stats.maxSpeed.base,
-            maxTurnSpeed: (comp.stats.maxTurnSpeed.base * 180) / Math.PI,
-            runSpeedMultiplier: comp.stats.runSpeedMultiplier.base,
-            crouchSpeedMultiplier: comp.stats.crouchSpeedMultiplier.base,
-            crouchStealthMultiplier: comp.stats.crouchStealthMultiplier.base,
-          },
-          inventory: {
-            size: { ...comp.inventory.size },
-            slots: comp.inventory.slots,
-          },
-          equip: {
-            slots: comp.equip.slots,
-          },
-        });
-      } else if (comp.item) {
-        itemsData.push({
-          id,
-          transform: comp.transform ? { ...comp.transform } : undefined,
-          isSolid: !!comp.physicsBody,
-          radius: comp.physicsBody ? comp.physicsBody.radius : 16,
-          itemData: comp.item,
-          ownership: comp.ownership ? { ...comp.ownership } : undefined
-        });
-      }
-    }
-
-    return {
-      obstacles: this.physics.getObstacleLines() || [],
-      entities: entitiesData,
-      items: itemsData,
-    };
+    return this.serializer.serializeWorld();
   }
 
   public deserializeWorld(data: any): void {
-    if (!data) return;
-    this.clearWorld();
-
-    if (Array.isArray(data.obstacles)) {
-      this.physics.loadObstacles(data.obstacles);
-    }
-
-    if (Array.isArray(data.entities)) {
-      for (const entData of data.entities) {
-        const adapter = this.spawnCreature(
-          entData.type,
-          entData.radius,
-          entData.mass,
-          entData.stats.maxSpeed,
-          entData.stats.maxTurnSpeed,
-          entData.transform,
-          undefined,
-          entData.stats.runSpeedMultiplier,
-          entData.stats.crouchSpeedMultiplier,
-          entData.stats.crouchStealthMultiplier,
-          entData.id
-        );
-
-        adapter.updateParams({
-          hp: entData.stats.hp,
-          maxHp: entData.stats.maxHp,
-        });
-
-        const worldEnt = this.world.getEntity(adapter.id);
-        if (worldEnt) {
-          if (entData.inventory) {
-            worldEnt.inventory = {
-              size: { ...entData.inventory.size },
-              slots: entData.inventory.slots,
-            };
-          }
-          if (entData.equip) {
-            worldEnt.equip = {
-              slots: entData.equip.slots,
-            };
-          }
-        }
-      }
-    }
-
-    if (Array.isArray(data.items)) {
-      for (const itemData of data.items) {
-         if (itemData.transform) {
-             this.spawnWorldItem(itemData.itemData, itemData.transform, itemData.isSolid, itemData.radius);
-         } else {
-             const iId = this.spawnItemEntity(itemData.itemData);
-             if (itemData.ownership) {
-                 this.world.addComponent(iId, 'ownership', itemData.ownership);
-             }
-         }
-      }
-    }
+    this.serializer.deserializeWorld(data);
   }
 
   public start(): void {
@@ -419,7 +263,7 @@ export class GameApp {
       this.selectedItem = null;
     } else if (item) {
       this.selectedCreature = null;
-      this.selectedItem = { id, data: item };
+      this.selectedItem = new ItemAdapter(id, this.world);
     }
   }
 
@@ -436,7 +280,7 @@ export class GameApp {
       this.hoveredItem = null;
     } else if (item) {
       this.hoveredCreature = null;
-      this.hoveredItem = { id, data: item };
+      this.hoveredItem = new ItemAdapter(id, this.world);
     }
   }
 

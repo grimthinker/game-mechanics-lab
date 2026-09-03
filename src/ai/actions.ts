@@ -193,24 +193,7 @@ export class BTCommandAcceptCandidate extends BTSimpleAction {
   }
 }
 
-export class BTActionLookAtTarget extends BTSimpleAction {
-  public static readonly nodeName = 'Повернуться к цели';
-  public static readonly description =
-    'Поворачивает сущность в сторону текущей цели (поворот мгновенный)';
-
-  protected onTick(entity: EntityAdapter): NodeStatus {
-    const bb = entity.brain!.blackboard;
-    const target_id = bb.get('target_id');
-    if (target_id === undefined) return NodeStatus.FAILURE;
-
-    const target = entity.utils.get_entity(target_id);
-    const t_pos = target?.getPos();
-    if (!t_pos) return NodeStatus.FAILURE;
-
-    entity.look_at_pos(t_pos);
-    return NodeStatus.SUCCESS;
-  }
-}
+// export class BTActionLookAtTarget extends BTAction {}
 
 export class BTSucceedImmediately extends BTSimpleAction {
   public static readonly nodeName = 'Мгновенный успех';

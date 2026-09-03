@@ -9,7 +9,7 @@ export function createDefaultArmorItem(): ItemData {
     config: {
       id: `armor_cfg_${Math.random().toString(36).substring(2, 5)}`,
       name: 'Стандартный бронежилет',
-      invWeight: 3,
+      weight: 3,
       radius: 16,
       isSolid: true,
       defense: 15,
@@ -27,7 +27,7 @@ export function createDefaultBagItem(): ItemData {
     config: {
       id: `bag_cfg_${Math.random().toString(36).substring(2, 5)}`,
       name: 'Походный рюкзак',
-      invWeight: 1,
+      weight: 1,
       radius: 16,
       isSolid: true,
       size: { width: 6, height: 4 },

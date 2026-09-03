@@ -199,7 +199,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedItemData.data.config as WeaponConfig).invWeight}</dd>
+                    <dd>{(selectedItemData.data.config as WeaponConfig).weight}</dd>
                   </div>
                 </>
               )}
@@ -215,7 +215,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedItemData.data.config as ArmorConfig).invWeight}</dd>
+                    <dd>{(selectedItemData.data.config as ArmorConfig).weight}</dd>
                   </div>
                 </>
               )}
@@ -230,7 +230,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedItemData.data.config as InventoryConfig).invWeight}</dd>
+                    <dd>{(selectedItemData.data.config as InventoryConfig).weight}</dd>
                   </div>
                 </>
               )}
@@ -269,8 +269,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <dd>{selectedStats.radius} px</dd>
               </div>
               <div className="stat-row">
-                <dt>Масса:</dt>
-                <dd>{selectedStats.mass}</dd>
+                <dt>Масса (Вес):</dt>
+                <dd>{selectedStats.weight}</dd>
               </div>
               <div className="stat-row">
                 <dt>Здоровье (HP):</dt>

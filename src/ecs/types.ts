@@ -13,7 +13,7 @@ export interface TransformComponent {
 export interface PhysicsBodyComponent {
   body: Circle;
   radius: StandardRadius;
-  mass: number;
+  weight: number;
   isStatic: boolean;
 }
 
@@ -109,6 +109,7 @@ export interface CreatureMetaComponent {
   id: string;
   type: CreatureType;
   state: CreatureState;
+  config: CreatureConfig;
 }
 
 export type ItemComponent = ItemData;
@@ -149,12 +150,15 @@ export type InventorySize = {
   height: number;
 };
 
-export interface ItemConfig {
+export interface CoreStatsConfig {
+  radius: StandardRadius;
+  weight: number;
+  isSolid?: boolean;
+}
+
+export interface ItemConfig extends CoreStatsConfig {
   id: string;
   name: string;
-  invWeight: number;
-  radius: StandardRadius;
-  isSolid?: boolean;
   maxStack?: number;
 }
 
@@ -195,29 +199,25 @@ export interface WeaponConfig extends ItemConfig {
   zone: HitZoneConfig;
 }
 
-export interface ActiveAttack {
-  weapon: WeaponConfig;
-  phase: 'prep' | 'cast' | 'recovery';
-  timer: number;
-  totalDuration: number;
-}
-
-export interface CreatureConfig {
-  id: string;
+export interface CreatureConfig extends CoreStatsConfig {
   type: CreatureType;
-  position: Point;
-  radius: number;
-  mass: number;
   maxSpeed: number;
   maxTurnSpeed: number;
   maxHp?: number;
   hp?: number;
   stealth?: number;
-  baseStealth?: number;
-  weapons?: WeaponConfig[];
   runSpeedMultiplier?: number;
   crouchSpeedMultiplier?: number;
   crouchStealthMultiplier?: number;
+  runTurnMultiplier?: number;
+  crouchTurnMultiplier?: number;
+}
+
+export interface ActiveAttack {
+  weapon: WeaponConfig;
+  phase: 'prep' | 'cast' | 'recovery';
+  timer: number;
+  totalDuration: number;
 }
 
 export interface IMovable {
@@ -233,8 +233,6 @@ export interface IMovable {
 
 export interface EntityController {
   stop: () => boolean;
-  look_in_dir: (angle: number) => boolean;
-  look_at_pos: (target_pos: Point) => boolean;
   attack: (id_target?: string) => boolean;
   getPos: () => Point;
 }

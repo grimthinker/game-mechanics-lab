@@ -1,4 +1,4 @@
-import { CreatureType, CreatureState, ItemData, StandardRadius } from "./ecs/types";
+import { CreatureType, CreatureState, ItemData, StandardRadius, CreatureConfig } from "./ecs/types";
 
 export interface Point {
   x: number;
@@ -10,12 +10,11 @@ export interface ObstacleSegment {
   end: Point;
 }
 
-
 export interface CreatureStats {
   id: string;
   type: CreatureType;
   radius: number;
-  mass: number;
+  weight: number;
   currentSpeed: number;
   currentTurnSpeed: number;
   maxSpeed: number;
@@ -24,10 +23,6 @@ export interface CreatureStats {
   maxHp: number;
   state: CreatureState;
   equipSlots: { type: string; item: ItemData | null }[];
-  inventory?: {
-    size: { width: number; height: number };
-    slots: { item: ItemData | null; count: number }[][];
-  };
 }
 
 export interface PlacementConfig {
@@ -42,5 +37,5 @@ export interface PlacementConfig {
 }
 
 export type PlacementMode = 
-  | { kind: 'creature'; config: PlacementConfig }
+  | { kind: 'creature'; config: CreatureConfig }
   | { kind: 'item'; itemData: ItemData; isSolid: boolean; radius: StandardRadius };

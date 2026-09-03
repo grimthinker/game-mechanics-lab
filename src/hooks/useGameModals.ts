@@ -14,7 +14,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [pendingSpawnType, setPendingSpawnType] = useState<CreatureType>('player');
 
   const [radius, setRadius] = useState<StandardRadius>(16);
-  const [mass, setMass] = useState<number>(10);
+  const [weight, setWeight] = useState<number>(10);
   const [maxSpeed, setMaxSpeed] = useState<number>(150);
   const [maxTurnSpeed, setMaxTurnSpeed] = useState<number>(270);
   const [runSpeedMultiplier, setRunSpeedMultiplier] = useState<number>(1.5);
@@ -117,9 +117,6 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     
     if (itemComp) {
       Object.assign(itemComp, updatedItem);
-      if (app.selectedItem && app.selectedItem.id === entityId) {
-        app.selectedItem.data = itemComp;
-      }
       
       const phys = app.world.getComponent(entityId, 'physicsBody');
       const wasSolid = !!phys;
@@ -127,12 +124,12 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       
       if (!wasSolid && isSolidNow) {
         const rad = updatedItem.config?.radius ?? 16;
-        const mass = updatedItem.config?.invWeight || 1;
+        const weight = updatedItem.config?.weight || 1;
         const transform = app.world.getComponent(entityId, 'transform');
         if (transform) {
           const body = new Circle({ x: transform.x, y: transform.y }, rad);
           body.isStatic = false;
-          app.world.addComponent(entityId, 'physicsBody', { body, radius: rad, mass, isStatic: false });
+          app.world.addComponent(entityId, 'physicsBody', { body, radius: rad, weight, isStatic: false });
           app.physics.registerBody(entityId, body);
         }
       } else if (wasSolid && !isSolidNow) {
@@ -157,15 +154,15 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
     const c = app.selectedCreature;
     if (c && updatedItem.type === 'bag') {
-      const isInventoryEmpty = !c.inventory || c.inventory.slots.every((row) => row.every((cell) => !cell.itemId));
       const bagCfg = updatedItem.config as InventoryConfig;
-      if (isInventoryEmpty) {
-        const bagSlot = c.equip?.slots.find((s) => s.type === 'bag');
-        if (bagSlot && bagSlot.itemId) {
-           const bItem = app.world.getComponent(bagSlot.itemId, 'item');
-           if (bItem === selectedItemForEdit) {
-               c.updateInventorySize(bagCfg.size.width, bagCfg.size.height);
-           }
+      const inv = app.world.getComponent(entityId, 'inventory');
+      if (inv) {
+        const isInventoryEmpty = inv.slots.every((row) => row.every((cell) => !cell.itemId));
+        if (isInventoryEmpty) {
+            inv.size = { width: bagCfg.size.width, height: bagCfg.size.height };
+            inv.slots = Array.from({ length: bagCfg.size.height }, () =>
+                Array.from({ length: bagCfg.size.width }, () => ({ itemId: null, count: 0 }))
+            );
         }
       }
     }
@@ -180,8 +177,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setPendingSpawnType,
     radius,
     setRadius,
-    mass,
-    setMass,
+    weight,
+    setWeight,
     maxSpeed,
     setMaxSpeed,
     maxTurnSpeed,

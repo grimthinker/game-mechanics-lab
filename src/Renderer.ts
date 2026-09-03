@@ -83,105 +83,138 @@ export class Renderer {
     const entities = world.getEntitiesWith('transform', 'physicsBody', 'meta');
     const items = world.getEntitiesWith('transform', 'item');
 
-    const renderBody = (
-      id: EntityId,
-      transform: any,
-      phys: any,
-      isAlive: boolean,
-      meta: any
-    ) => {
-      this.ctx.save();
-      this.ctx.translate(transform.x, transform.y);
+    // 1. Отрисовка предметов на земле
+    this.renderItems(items, camera, selectedId, hoveredId);
 
-      this.ctx.save();
-      this.ctx.rotate(transform.angle);
-
-      let fillColor = '#34495e';
-      if (!isAlive) {
-        fillColor = '#7f8c8d';
-      } else {
-        switch (meta.state) {
-          case 'idle':
-            fillColor = '#34495e';
-            break;
-          case 'moving':
-            fillColor = '#3498db';
-            break;
-          case 'running':
-            fillColor = '#2ecc71';
-            break;
-          case 'crouching':
-            fillColor = '#9b59b6';
-            break;
-          case 'attacking':
-            fillColor = '#e67e22';
-            break;
-          case 'dead':
-            fillColor = '#7f8c8d';
-            break;
-        }
-      }
-
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, phys.radius, 0, Math.PI * 2);
-      this.ctx.fillStyle = fillColor;
-      this.ctx.fill();
-
-      const isPlayerInGame = gameMode === 'game' && id === playerId;
-      
-      let borderColor = meta.type === 'player' ? '#2980b9' : '#c0392b';
-      let lineWidth = 2 / camera.scale;
-
-      if (isPlayerInGame) {
-        borderColor = '#e67e22'; 
-        lineWidth = 3 / camera.scale;
-      }
-
-      this.ctx.strokeStyle = borderColor;
-      this.ctx.lineWidth = lineWidth;
-      this.ctx.stroke();
-
-      if (id === selectedId && !isPlayerInGame) {
-        this.ctx.strokeStyle = '#f1c40f';
-        this.ctx.lineWidth = 3 / camera.scale;
-        this.ctx.stroke();
-      } else if (id === hoveredId && !isPlayerInGame) {
-        this.ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)';
-        this.ctx.lineWidth = 3 / camera.scale;
-        this.ctx.stroke();
-      }
-
-      this.ctx.beginPath();
-      const arrowLen = phys.radius;
-
-      this.ctx.moveTo(arrowLen, 0);
-      this.ctx.lineTo(0, -arrowLen);
-      this.ctx.moveTo(arrowLen, 0);
-      this.ctx.lineTo(0, arrowLen);
-      this.ctx.lineTo(0, -arrowLen);
-
-      this.ctx.strokeStyle = '#f1c40f';
-      this.ctx.lineWidth = 2 / camera.scale;
-      this.ctx.stroke();
-
-      this.ctx.restore();
-      this.ctx.restore();
-    };
-
-    // Отрисовка мертвых существ
-    for (const [id, { transform, physicsBody, meta }] of entities) {
-      const healthComp = world.getComponent(id, 'health');
-      const statsComp = world.getComponent(id, 'stats' as any) as any;
-
-      const hp = statsComp?.hp?.current ?? 0;
-      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
-
-      if (!isAlive) {
-        renderBody(id, transform, physicsBody, isAlive, meta);
+    // 2. Отрисовка мертвых существ
+    for (const [id, entity] of entities) {
+      if (!this.isEntityAlive(world, id)) {
+        this.renderCreatureBody(id, entity.transform, entity.physicsBody, false, entity.meta, camera, selectedId, gameMode, playerId, hoveredId);
       }
     }
 
-    // Отрисовка предметов на земле
+    // 3. Отрисовка атак оружия (под живыми существами)
+    this.renderWeaponAttacks(entities, world, camera);
+
+    // 4. Отрисовка живых существ
+    for (const [id, entity] of entities) {
+      if (this.isEntityAlive(world, id)) {
+        this.renderCreatureBody(id, entity.transform, entity.physicsBody, true, entity.meta, camera, selectedId, gameMode, playerId, hoveredId);
+      }
+    }
+
+    // 5. Отрисовка Healthbars и ID-текстов
+    this.renderUIOverlays(entities, world, camera);
+
+    // 6. Отрисовка Hover-текстов для предметов
+    this.renderItemTooltips(world, camera, hoveredId);
+  }
+
+  // --- Вспомогательные методы рендеринга ---
+
+  private isEntityAlive(world: World, id: EntityId): boolean {
+    const healthComp = world.getComponent(id, 'health');
+    const statsComp = world.getComponent(id, 'stats' as any) as any;
+    const hp = statsComp?.hp?.current ?? 0;
+    return statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+  }
+
+  private renderCreatureBody(
+    id: EntityId,
+    transform: any,
+    phys: any,
+    isAlive: boolean,
+    meta: any,
+    camera: Camera,
+    selectedId: EntityId | null,
+    gameMode: string,
+    playerId: EntityId | null,
+    hoveredId: EntityId | null
+  ): void {
+    this.ctx.save();
+    this.ctx.translate(transform.x, transform.y);
+
+    this.ctx.save();
+    this.ctx.rotate(transform.angle);
+
+    let fillColor = '#34495e';
+    if (!isAlive) {
+      fillColor = '#7f8c8d';
+    } else {
+      switch (meta.state) {
+        case 'idle':
+          fillColor = '#34495e';
+          break;
+        case 'moving':
+          fillColor = '#3498db';
+          break;
+        case 'running':
+          fillColor = '#2ecc71';
+          break;
+        case 'crouching':
+          fillColor = '#9b59b6';
+          break;
+        case 'attacking':
+          fillColor = '#e67e22';
+          break;
+        case 'dead':
+          fillColor = '#7f8c8d';
+          break;
+      }
+    }
+
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, phys.radius, 0, Math.PI * 2);
+    this.ctx.fillStyle = fillColor;
+    this.ctx.fill();
+
+    const isPlayerInGame = gameMode === 'game' && id === playerId;
+    
+    let borderColor = meta.type === 'player' ? '#2980b9' : '#c0392b';
+    let lineWidth = 2 / camera.scale;
+
+    if (isPlayerInGame) {
+      borderColor = '#e67e22'; 
+      lineWidth = 3 / camera.scale;
+    }
+
+    this.ctx.strokeStyle = borderColor;
+    this.ctx.lineWidth = lineWidth;
+    this.ctx.stroke();
+
+    if (id === selectedId && !isPlayerInGame) {
+      this.ctx.strokeStyle = '#f1c40f';
+      this.ctx.lineWidth = 3 / camera.scale;
+      this.ctx.stroke();
+    } else if (id === hoveredId && !isPlayerInGame) {
+      this.ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)';
+      this.ctx.lineWidth = 3 / camera.scale;
+      this.ctx.stroke();
+    }
+
+    this.ctx.beginPath();
+    const arrowLen = phys.radius;
+
+    this.ctx.moveTo(arrowLen, 0);
+    this.ctx.lineTo(0, -arrowLen);
+    this.ctx.moveTo(arrowLen, 0);
+    this.ctx.lineTo(0, arrowLen);
+    this.ctx.lineTo(0, -arrowLen);
+
+    this.ctx.strokeStyle = '#f1c40f';
+    this.ctx.lineWidth = 2 / camera.scale;
+    this.ctx.stroke();
+
+    this.ctx.restore();
+    this.ctx.restore();
+  }
+
+  private renderItems(
+    items: Array<[EntityId, any]>,
+    camera: Camera,
+    selectedId: EntityId | null,
+    hoveredId: EntityId | null
+  ): void {
     for (const [id, { transform, physicsBody, item }] of items) {
       this.ctx.save();
       this.ctx.translate(transform.x, transform.y);
@@ -213,31 +246,19 @@ export class Renderer {
       
       this.ctx.restore();
     }
+  }
 
-    // Отрисовка живых существ
-    for (const [id, { transform, physicsBody, meta }] of entities) {
+  private renderWeaponAttacks(
+    entities: Array<[EntityId, any]>,
+    world: World,
+    camera: Camera
+  ): void {
+    for (const [id, { transform }] of entities) {
+      if (!this.isEntityAlive(world, id)) continue;
+
       const healthComp = world.getComponent(id, 'health');
-      const statsComp = world.getComponent(id, 'stats' as any) as any;
-
-      const hp = statsComp?.hp?.current ?? 0;
-      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
-
-      if (isAlive) {
-        renderBody(id, transform, physicsBody, isAlive, meta);
-      }
-    }
-
-    // Отрисовка атак оружия
-    for (const [id, { transform, physicsBody, meta }] of entities) {
-      const healthComp = world.getComponent(id, 'health');
-      const statsComp = world.getComponent(id, 'stats' as any) as any;
       const equipComp = world.getComponent(id, 'equip' as any) as any;
-
-      const hp = statsComp?.hp?.current ?? 0;
-      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
       const hitFlashTimer = healthComp?.hitFlashTimer ?? 0;
-
-      if (!isAlive) continue;
 
       const slots = Array.isArray(equipComp)
         ? equipComp
@@ -343,72 +364,69 @@ export class Renderer {
         }
       }
       this.ctx.restore();
-
-      renderBody(id, transform, physicsBody, isAlive, meta);
     }
+  }
 
-    // Healthbars
-    for (const [id, { transform, physicsBody }] of entities) {
-      const healthComp = world.getComponent(id, 'health');
+  private renderUIOverlays(
+    entities: Array<[EntityId, any]>,
+    world: World,
+    camera: Camera
+  ): void {
+    // Healthbars & ID texts
+    for (const [id, { transform, physicsBody, meta }] of entities) {
+      if (!this.isEntityAlive(world, id)) continue;
+
       const statsComp = world.getComponent(id, 'stats' as any) as any;
-
       const hp = statsComp?.hp?.current ?? 0;
       const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
-      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
 
-      if (isAlive) {
-        this.ctx.save();
-        this.ctx.translate(transform.x, transform.y);
-        const barW = physicsBody.radius * 2;
-        const barH = 4 / camera.scale;
-        const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
-        this.ctx.fillStyle = '#c0392b';
-        this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW, barH);
-        this.ctx.fillStyle = '#2ecc71';
-        this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW * hpRatio, barH);
-        this.ctx.restore();
-      }
+      // Healthbar
+      this.ctx.save();
+      this.ctx.translate(transform.x, transform.y);
+      const barW = physicsBody.radius * 2;
+      const barH = 4 / camera.scale;
+      const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
+      this.ctx.fillStyle = '#c0392b';
+      this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW, barH);
+      this.ctx.fillStyle = '#2ecc71';
+      this.ctx.fillRect(-barW / 2, -physicsBody.radius - 16 / camera.scale, barW * hpRatio, barH);
+      this.ctx.restore();
+
+      // ID Text
+      this.ctx.save();
+      this.ctx.translate(transform.x, transform.y);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'bottom';
+      this.ctx.fillText(meta.id, 0, -physicsBody.radius - 20 / camera.scale);
+      this.ctx.restore();
     }
+  }
 
-    // Creature ID texts
-    for (const [id, { transform, physicsBody, meta }] of entities) {
-      const healthComp = world.getComponent(id, 'health');
-      const statsComp = world.getComponent(id, 'stats' as any) as any;
+  private renderItemTooltips(
+    world: World,
+    camera: Camera,
+    hoveredId: EntityId | null
+  ): void {
+    if (!hoveredId) return;
 
-      const hp = statsComp?.hp?.current ?? 0;
-      const isAlive = statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
-
-      if (isAlive) {
-        this.ctx.save();
-        this.ctx.translate(transform.x, transform.y);
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText(meta.id, 0, -physicsBody.radius - 20 / camera.scale);
-        this.ctx.restore();
-      }
-    }
-
-    // Item Hover texts
-    if (hoveredId) {
-      const hoverComp = world.getEntity(hoveredId);
-      if (hoverComp && hoverComp.transform && hoverComp.item && !hoverComp.meta) {
-        this.ctx.save();
-        this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
-        const radius = hoverComp.physicsBody ? hoverComp.physicsBody.radius : 16;
-        
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.shadowColor = "black";
-        this.ctx.shadowBlur = 4;
-        this.ctx.shadowOffsetX = 1;
-        this.ctx.shadowOffsetY = 1;
-        this.ctx.fillText(hoverComp.item.name, 0, -radius - 15 / camera.scale);
-        this.ctx.restore();
-      }
+    const hoverComp = world.getEntity(hoveredId);
+    if (hoverComp && hoverComp.transform && hoverComp.item && !hoverComp.meta) {
+      this.ctx.save();
+      this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
+      const radius = hoverComp.physicsBody ? hoverComp.physicsBody.radius : 16;
+      
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'bottom';
+      this.ctx.shadowColor = "black";
+      this.ctx.shadowBlur = 4;
+      this.ctx.shadowOffsetX = 1;
+      this.ctx.shadowOffsetY = 1;
+      this.ctx.fillText(hoverComp.item.name, 0, -radius - 15 / camera.scale);
+      this.ctx.restore();
     }
   }
 }

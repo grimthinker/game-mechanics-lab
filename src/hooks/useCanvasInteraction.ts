@@ -136,16 +136,8 @@ export const useCanvasInteraction = ({
         if (placementMode.kind === 'creature') {
           const config = placementMode.config;
           app.spawnCreature(
-            config.type,
-            config.radius,
-            config.mass,
-            config.maxSpeed,
-            config.maxTurnSpeed,
-            point,
-            undefined,
-            config.runSpeedMultiplier,
-            config.crouchSpeedMultiplier,
-            config.crouchStealthMultiplier
+            config,
+            point
           );
         } else if (placementMode.kind === 'item') {
           app.spawnWorldItem(placementMode.itemData, point, placementMode.isSolid, placementMode.radius);

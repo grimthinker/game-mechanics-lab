@@ -11,8 +11,8 @@ export interface SpawnModalProps {
   setPendingSpawnType: (type: CreatureType) => void;
   radius: number;
   setRadius: (val: StandardRadius) => void;
-  mass: number;
-  setMass: (val: number) => void;
+  weight: number;
+  setWeight: (val: number) => void;
   maxSpeed: number;
   setMaxSpeed: (val: number) => void;
   maxTurnSpeed: number;
@@ -37,8 +37,8 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setPendingSpawnType,
   radius,
   setRadius,
-  mass,
-  setMass,
+  weight,
+  setWeight,
   maxSpeed,
   setMaxSpeed,
   maxTurnSpeed,
@@ -101,10 +101,10 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
             Масса:
             <input
               type="number"
-              value={mass}
+              value={weight}
               min={1}
               max={100}
-              onChange={(e) => setMass(Number(e.target.value))}
+              onChange={(e) => setWeight(Number(e.target.value))}
             />
           </label>
           <label>

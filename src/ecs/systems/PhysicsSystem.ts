@@ -194,9 +194,9 @@ export class PhysicsSystem {
       const overlapX = response.overlap * response.overlapV.x;
       const overlapY = response.overlap * response.overlapV.y;
 
-      const totalMass = p1.mass + p2.mass;
-      const ratio1 = p2.mass / totalMass;
-      const ratio2 = p1.mass / totalMass;
+      const totalMass = p1.weight + p2.weight;
+      const ratio1 = p2.weight / totalMass;
+      const ratio2 = p1.weight / totalMass;
 
       const mult = Math.min(PHYSICS_CONFIG.C, dt * PHYSICS_CONFIG.A);
       const deltaX1 = mult * overlapX * ratio1;

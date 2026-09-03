@@ -4,6 +4,7 @@ import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { ItemData, StandardRadius } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
+import { createDefaultCreatureConfig } from './Creature';
 import { serializeBTNode } from './ai/serializer';
 import { SpawnModal, CreatureEditModal, ItemSpawnModal, ItemEditModal } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
@@ -13,6 +14,7 @@ import { Toolbar } from './components/Toolbar';
 import { CreatureStats, PlacementMode } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { GameMode } from './constants';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -86,13 +88,12 @@ export const App: React.FC = () => {
     if (targetId) {
       const c = new EntityAdapter(targetId, app.world);
       const eq = c.equip;
-      const inv = c.inventory;
 
       setSelectedStats({
         id: c.id,
         type: c.type,
         radius: c.radius,
-        mass: c.mass,
+        weight: c.weight,
         currentSpeed: c.currentSpeed,
         currentTurnSpeed: (c.currentTurnSpeed * 180) / Math.PI,
         maxSpeed: c.maxSpeed,
@@ -104,15 +105,6 @@ export const App: React.FC = () => {
              type: s.type,
              item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
         })) : [],
-        inventory: inv
-          ? {
-              size: { ...inv.size },
-              slots: inv.slots.map((row) => row.map((cell) => ({
-                 count: cell.count,
-                 item: cell.itemId ? (app.world.getComponent(cell.itemId, 'item') ?? null) : null
-              }))),
-            }
-          : undefined,
       });
       setSelectedItemData(null);
       setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
@@ -165,7 +157,7 @@ export const App: React.FC = () => {
 
     app.start();
     app.onFrame = updateStats;
-    app.spawnCreature('player');
+    app.spawnCreature(createDefaultCreatureConfig('player'));
     updateStats();
 
     return () => {
@@ -246,12 +238,17 @@ export const App: React.FC = () => {
       config: {
         type: modals.pendingSpawnType,
         radius: modals.radius,
-        mass: modals.mass,
+        weight: modals.weight,
+        isSolid: true,
         maxSpeed: modals.maxSpeed,
         maxTurnSpeed: modals.maxTurnSpeed,
         runSpeedMultiplier: modals.runSpeedMultiplier,
         crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
         crouchStealthMultiplier: modals.crouchStealthMultiplier,
+        runTurnMultiplier: modals.runTurnMultiplier,
+        crouchTurnMultiplier: modals.crouchTurnMultiplier,
+        hp: 100,
+        maxHp: 100,
       },
     });
     modals.closeSpawnModal();
@@ -275,87 +272,21 @@ export const App: React.FC = () => {
     updateStats();
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.code === 'Escape') {
-        if (modals.selectedItemForEdit) modals.closeItemEditModal();
-        else if (modals.isEditModalOpen) modals.closeEditModal();
-        else if (modals.isModalOpen) modals.closeSpawnModal();
-        else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
-      } else if (e.key === 'Enter' || e.code === 'Enter') {
-        if (modals.isModalOpen) {
-          e.preventDefault();
-          handleSpawnConfirm();
-        } else if (modals.isEditModalOpen) {
-          e.preventDefault();
-          modals.handleEditConfirm();
-        }
-      } else if (e.code === 'Space' || e.key === ' ') {
-        if (
-          modals.isModalOpen ||
-          modals.isItemSpawnModalOpen ||
-          modals.isEditModalOpen ||
-          modals.selectedItemForEdit
-        ) {
-          return;
-        }
-
-        if (modeRef.current === GameMode.EDITOR) {
-          e.preventDefault();
-          return;
-        } else if (modeRef.current === GameMode.GAME) {
-          return;
-        } else {
-          const app = appRef.current;
-          const hasSelected = !!app?.selectedCreature || !!app?.selectedItem;
-          if (!hasSelected || e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            togglePause();
-          }
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modals, togglePause, handleSpawnConfirm]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
-        return;
-      }
-
-      if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
-        if (modeRef.current !== GameMode.GAME) {
-          setShowBTPanel((prev) => !prev);
-        }
-        e.preventDefault();
-      } else if (e.ctrlKey && (e.code === 'KeyB' || e.key.toLowerCase() === 'b')) {
-        if (modeRef.current === GameMode.EDITOR) {
-          modals.openSpawnModal('ai');
-        }
-        e.preventDefault();
-      } else if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
-        if (modeRef.current === GameMode.EDITOR) {
-          modals.openSpawnModal('player');
-        }
-        e.preventDefault();
-      } else if (e.ctrlKey && (e.code === 'KeyI' || e.key.toLowerCase() === 'i')) {
-        if (modeRef.current === GameMode.EDITOR) {
-          modals.openItemSpawnModal();
-        }
-        e.preventDefault();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modals, setShowBTPanel]);
+  useGlobalShortcuts({
+    mode,
+    isPaused,
+    togglePause,
+    modals,
+    handleSpawnConfirm,
+    setShowBTPanel
+  });
+  
+  const selectedItemEntityId = modals.selectedItemForEdit?.id;
+  const bagInventory = selectedItemEntityId ? appRef.current?.world.getComponent(selectedItemEntityId, 'inventory') : undefined;
 
   const isBagInventoryEmpty =
-    !selectedStats?.inventory ||
-    selectedStats.inventory.slots.every((row) => row.every((cell) => !cell.item));
+    !bagInventory ||
+    bagInventory.slots.every((row) => row.every((cell) => !cell.itemId));
 
   const isReadOnly = mode !== GameMode.EDITOR;
 
@@ -472,8 +403,8 @@ export const App: React.FC = () => {
         setPendingSpawnType={modals.setPendingSpawnType}
         radius={modals.radius}
         setRadius={modals.setRadius}
-        mass={modals.mass}
-        setMass={modals.setMass}
+        weight={modals.weight}
+        setWeight={modals.setWeight}
         maxSpeed={modals.maxSpeed}
         setMaxSpeed={modals.setMaxSpeed}
         maxTurnSpeed={modals.maxTurnSpeed}
@@ -533,8 +464,11 @@ export const App: React.FC = () => {
         item={modals.selectedItemForEdit}
         isReadOnly={isReadOnly}
         isBagInventoryEmpty={isBagInventoryEmpty}
-        inventorySlots={selectedStats?.inventory?.slots}
-        inventorySize={selectedStats?.inventory?.size}
+        inventorySlots={bagInventory?.slots.map((row) => row.map((cell) => ({
+          count: cell.count,
+          item: cell.itemId ? (appRef.current?.world.getComponent(cell.itemId, 'item') ?? null) : null
+        })))}
+        inventorySize={bagInventory?.size}
         onItemClick={modals.openItemEditModal}
         onClose={modals.closeItemEditModal}
         onConfirm={modals.handleItemEditConfirm}
