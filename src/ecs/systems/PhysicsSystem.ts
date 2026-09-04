@@ -131,7 +131,8 @@ export class PhysicsSystem {
     for (const [entityId, { transform, physicsBody, meta, item }] of entities) {
       if (!meta && !item) continue;
       
-      const radius = physicsBody ? physicsBody.radius : 16;
+      const physStats = world?.getComponent(entityId, 'physicsStats');
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? item?.config?.radius ?? 16;
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       const distToBoundary = Math.max(0, distToCenter - radius);
 
@@ -153,7 +154,8 @@ export class PhysicsSystem {
     for (const [entityId, { transform, physicsBody, meta, item }] of entities) {
       if (!meta && !item) continue;
       
-      const radius = physicsBody ? physicsBody.radius : 16;
+      const physStats = world?.getComponent(entityId, 'physicsStats');
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? item?.config?.radius ?? 16;
       const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       if (dist <= radius) {
         return entityId;
@@ -177,13 +179,13 @@ export class PhysicsSystem {
 
       const meta1 = world.getComponent(id1, 'meta');
       const health1 = world.getComponent(id1, 'health');
-      const stats1 = world.getComponent(id1, 'stats');
-      const valid1 = meta1 ? (health1?.isAlive && stats1 && stats1.hp.current > 0) : true;
+      const healthStats1 = world.getComponent(id1, 'healthStats');
+      const valid1 = meta1 ? (health1?.isAlive && healthStats1 && healthStats1.hp.current > 0) : true;
 
       const meta2 = world.getComponent(id2, 'meta');
       const health2 = world.getComponent(id2, 'health');
-      const stats2 = world.getComponent(id2, 'stats');
-      const valid2 = meta2 ? (health2?.isAlive && stats2 && stats2.hp.current > 0) : true;
+      const healthStats2 = world.getComponent(id2, 'healthStats');
+      const valid2 = meta2 ? (health2?.isAlive && healthStats2 && healthStats2.hp.current > 0) : true;
 
       if (!valid1 || !valid2) return;
 
@@ -191,12 +193,20 @@ export class PhysicsSystem {
       const p2 = world.getComponent(id2, 'physicsBody');
       if (!p1 || !p2) return;
 
+      const p1Stats = world.getComponent(id1, 'physicsStats');
+      const p1Item = world.getComponent(id1, 'item');
+      const weight1 = p1Stats?.weight.current ?? p1Item?.config?.weight ?? 1;
+
+      const p2Stats = world.getComponent(id2, 'physicsStats');
+      const p2Item = world.getComponent(id2, 'item');
+      const weight2 = p2Stats?.weight.current ?? p2Item?.config?.weight ?? 1;
+
       const overlapX = response.overlap * response.overlapV.x;
       const overlapY = response.overlap * response.overlapV.y;
 
-      const totalMass = p1.weight + p2.weight;
-      const ratio1 = p2.weight / totalMass;
-      const ratio2 = p1.weight / totalMass;
+      const totalMass = weight1 + weight2;
+      const ratio1 = weight2 / totalMass;
+      const ratio2 = weight1 / totalMass;
 
       const mult = Math.min(PHYSICS_CONFIG.C, dt * PHYSICS_CONFIG.A);
       const deltaX1 = mult * overlapX * ratio1;
@@ -270,7 +280,7 @@ export class PhysicsSystem {
 
       if (hitEntityId) {
         const hitHealth = world.getComponent(hitEntityId, 'health');
-        const hitStats = world.getComponent(hitEntityId, 'stats');
+        const hitStats = world.getComponent(hitEntityId, 'healthStats');
         if (hitHealth && (!hitHealth.isAlive || (hitStats && hitStats.hp.current <= 0))) {
           currStart = {
             x: hitPoint.x + ux * 1,
@@ -285,8 +295,9 @@ export class PhysicsSystem {
       }
 
       if (hitEntityId === attackerId) {
-        const attackerPhys = world.getComponent(attackerId, 'physicsBody');
-        const r = attackerPhys ? attackerPhys.radius : 24;
+        const attackerPhysStats = world.getComponent(attackerId, 'physicsStats');
+        const attackerBody = world.getComponent(attackerId, 'physicsBody');
+        const r = attackerPhysStats?.radius.current ?? attackerBody?.body.r ?? 24;
         const stepDist = r + 1;
         if (stepDist >= len) return false;
         currStart = {
@@ -308,12 +319,13 @@ export class PhysicsSystem {
       } else if (hitEntityId) {
         const hitMeta = world.getComponent(hitEntityId, 'meta');
         const hitTransform = world.getComponent(hitEntityId, 'transform');
-        const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
-        const r = hitPhys ? hitPhys.radius : 24;
+        const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
+        const hitBody = world.getComponent(hitEntityId, 'physicsBody');
+        const r = hitPhysStats?.radius.current ?? hitBody?.body.r ?? 24;
 
         if (hitMeta && hitTransform) {
-          const hitStats = world.getComponent(hitEntityId, 'stats');
-          const hitBehavior = hitStats?.behavior?.current ?? hitMeta.config.behavior;
+          const hitAiStats = world.getComponent(hitEntityId, 'aiStats');
+          const hitBehavior = hitAiStats?.behavior?.current ?? hitMeta.config.behavior;
           if (hitBehavior === 'PlayerTree') {
             if (weapon.zone.piercePlayers) {
               const distToCenter =
@@ -379,10 +391,13 @@ export class PhysicsSystem {
     const pos = { x: attackerTransform.x, y: attackerTransform.y };
     const angle = attackerTransform.angle;
 
-    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health', 'stats');
+    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health', 'healthStats');
 
-    for (const [targetId, { transform, physicsBody, health, stats }] of targets) {
-      if (targetId === attackerId || !health.isAlive || stats.hp.current <= 0) continue;
+    for (const [targetId, { transform, physicsBody, health, healthStats }] of targets) {
+      if (targetId === attackerId || !health.isAlive || healthStats.hp.current <= 0) continue;
+
+      const physStats = world.getComponent(targetId, 'physicsStats');
+      const targetRadius = physStats?.radius.current ?? physicsBody.body.r ?? 16;
 
       let isHit = false;
       const targetPos = { x: transform.x, y: transform.y };
@@ -393,7 +408,7 @@ export class PhysicsSystem {
       switch (weapon.zone.hitZoneType) {
         case 'radius': {
           const r = weapon.zone.radius ?? 50;
-          if (dist <= r + physicsBody.radius) {
+          if (dist <= r + targetRadius) {
             isHit = !this.isLineOfSightBlocked(pos, targetPos);
           }
           break;
@@ -401,7 +416,7 @@ export class PhysicsSystem {
         case 'angle': {
           const len = weapon.zone.length ?? 120;
           const maxAngle = (weapon.zone.angle ?? Math.PI / 6) / 2;
-          const maxDist = len + physicsBody.radius;
+          const maxDist = len + targetRadius;
 
           if (dist <= maxDist) {
             const targetAngle = Math.atan2(targetPos.y - pos.y, targetPos.x - pos.x);
@@ -411,7 +426,7 @@ export class PhysicsSystem {
             angleDiff = Math.abs(angleDiff);
 
             const angularTolerance =
-              dist > 0 ? Math.asin(Math.min(1, physicsBody.radius / dist)) : 0;
+              dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;
 
             if (angleDiff <= maxAngle + angularTolerance) {
               if (!this.isLineOfSightBlocked(pos, targetPos)) {
@@ -428,7 +443,7 @@ export class PhysicsSystem {
             y: pos.y + Math.sin(angle) * len,
           };
           const distToLine = this.getDistanceToSegment(targetPos, pos, endPoint);
-          if (distToLine <= physicsBody.radius) {
+          if (distToLine <= targetRadius) {
             if (this.canRayReachTarget(pos, endPoint, targetId, weapon, attackerId, world)) {
               isHit = true;
             }
@@ -447,7 +462,7 @@ export class PhysicsSystem {
               y: pos.y + Math.sin(rayAngle) * len,
             };
             const distToRay = this.getDistanceToSegment(targetPos, pos, endPoint);
-            if (distToRay <= physicsBody.radius) {
+            if (distToRay <= targetRadius) {
               if (this.canRayReachTarget(pos, endPoint, targetId, weapon, attackerId, world)) {
                 isHit = true;
                 break;

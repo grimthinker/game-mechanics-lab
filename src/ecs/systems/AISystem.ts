@@ -47,7 +47,7 @@ export class AISystem {
 
   private getAllAIEntities(): EntityAdapter[] {
     const result: EntityAdapter[] = [];
-    const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'stats', 'health', 'brain');
+    const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'aiStats', 'health', 'brain');
   
     for (const [id] of entities) {
       const adapter = this.getEntityAdapter(id);
@@ -58,7 +58,7 @@ export class AISystem {
 
   private getEntityAdapter(id: EntityId): EntityAdapter | undefined {
     const ent = this.world.getEntity(id);
-    if (!ent || !ent.transform || !ent.input || !ent.stats || !ent.health) {
+    if (!ent || !ent.transform || !ent.input || !ent.aiStats || !ent.health) {
       return undefined;
     }
     return new EntityAdapter(id, this.world);

@@ -23,6 +23,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [crouchStealthMultiplier, setCrouchStealthMultiplier] = useState<number>(1.5);
   const [runTurnMultiplier, setRunTurnMultiplier] = useState<number>(0.8);
   const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(1.2);
+  const [stealthPower, setStealthPower] = useState<number>(10);
+  const [runStealthMultiplier, setRunStealthMultiplier] = useState<number>(0.5);
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editBehavior, setEditBehavior] = useState<string>('PlayerTree');
@@ -40,6 +42,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const [editCrouchStealthMultiplier, setEditCrouchStealthMultiplier] = useState<number>(1.5);
   const [editRunTurnMultiplier, setEditRunTurnMultiplier] = useState<number>(0.8);
   const [editCrouchTurnMultiplier, setEditCrouchTurnMultiplier] = useState<number>(1.2);
+  const [editStealthPower, setEditStealthPower] = useState<number>(10);
+  const [editRunStealthMultiplier, setEditRunStealthMultiplier] = useState<number>(0.5);
 
   const [isItemSpawnModalOpen, setIsItemSpawnModalOpen] = useState(false);
   const openItemSpawnModal = () => setIsItemSpawnModalOpen(true);
@@ -76,6 +80,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setEditCrouchStealthMultiplier(c.crouchStealthMultiplier);
     setEditRunTurnMultiplier(c.runTurnMultiplier);
     setEditCrouchTurnMultiplier(c.crouchTurnMultiplier);
+    setEditStealthPower(c.stealthPower);
+    setEditRunStealthMultiplier(c.runStealthMultiplier);
     setIsEditModalOpen(true);
   };
 
@@ -103,6 +109,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
         crouchStealthMultiplier: editCrouchStealthMultiplier,
         runTurnMultiplier: editRunTurnMultiplier,
         crouchTurnMultiplier: editCrouchTurnMultiplier,
+        stealthPower: editStealthPower,
+        runStealthMultiplier: editRunStealthMultiplier,
       },
       (app as any).aiSystem,
       app.physics
@@ -135,12 +143,11 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       
       if (!wasSolid && isSolidNow) {
         const rad = updatedItem.config?.radius ?? 16;
-        const weight = updatedItem.config?.weight || 1;
         const transform = app.world.getComponent(entityId, 'transform');
         if (transform) {
           const body = new Circle({ x: transform.x, y: transform.y }, rad);
           body.isStatic = false;
-          app.world.addComponent(entityId, 'physicsBody', { body, radius: rad, weight, isStatic: false });
+          app.world.addComponent(entityId, 'physicsBody', { body, isStatic: false });
           app.physics.registerBody(entityId, body);
         }
       } else if (wasSolid && !isSolidNow) {
@@ -148,8 +155,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
         app.world.removeComponent(entityId, 'physicsBody');
       } else if (wasSolid && isSolidNow) {
         const newRadius = updatedItem.config?.radius ?? 16;
-        if (phys!.radius !== newRadius) {
-          phys!.radius = newRadius;
+        if (phys!.body.r !== newRadius) {
           phys!.body.r = newRadius;
         }
       }
@@ -206,6 +212,10 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setRunTurnMultiplier,
     crouchTurnMultiplier,
     setCrouchTurnMultiplier,
+    stealthPower,
+    setStealthPower,
+    runStealthMultiplier,
+    setRunStealthMultiplier,
     openSpawnModal,
     closeSpawnModal,
     isItemSpawnModalOpen,
@@ -242,6 +252,10 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setEditRunTurnMultiplier,
     editCrouchTurnMultiplier,
     setEditCrouchTurnMultiplier,
+    editStealthPower,
+    setEditStealthPower,
+    editRunStealthMultiplier,
+    setEditRunStealthMultiplier,
     openEditModal,
     closeEditModal,
     handleEditConfirm,

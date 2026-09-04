@@ -12,8 +12,6 @@ export interface TransformComponent {
 
 export interface PhysicsBodyComponent {
   body: Circle;
-  radius: StandardRadius;
-  weight: number;
   isStatic: boolean;
 }
 
@@ -22,8 +20,8 @@ export interface StatValue<T = number> {
   current: T;
 }
 
-export type StatsComponent = {
-  [K in keyof Required<CreatureConfig>]: StatValue<Required<CreatureConfig>[K]>;
+export type ComponentStats<T> = {
+  [K in keyof Required<T>]: StatValue<Required<T>[K]>;
 };
 
 export interface VelocityComponent {
@@ -43,10 +41,6 @@ export interface InputComponent {
 export interface HealthComponent {
   isAlive: boolean;
   hitFlashTimer: number;
-}
-
-export interface StealthComponent {
-  isCrouching: boolean;
 }
 
 export type ItemType = 'weapon' | 'armor' | 'bag' | 'resource' | 'other';
@@ -113,8 +107,11 @@ export interface EntityComponents {
   velocity?: VelocityComponent;
   input?: InputComponent;
   health?: HealthComponent;
-  stealth?: StealthComponent;
-  stats?: StatsComponent;
+  physicsStats?: PhysicsStatsComponent;
+  healthStats?: HealthStatsComponent;
+  movementStats?: MovementStatsComponent;
+  stealthStats?: StealthStatsComponent;
+  aiStats?: AIStatsComponent;
   brain?: BTLogicComponent;
   inventory?: InventoryComponent;
   equip?: EquipComponent;
@@ -136,13 +133,13 @@ export type InventorySize = {
   height: number;
 };
 
-export interface CoreStatsConfig {
+export interface PhysicsConfig {
   radius: StandardRadius;
   weight: number;
   isSolid?: boolean;
 }
 
-export interface ItemConfig extends CoreStatsConfig {
+export interface ItemConfig extends PhysicsConfig {
   id: string;
   name: string;
   maxStack?: number;
@@ -185,19 +182,38 @@ export interface WeaponConfig extends ItemConfig {
   zone: HitZoneConfig;
 }
 
-export interface CreatureConfig extends CoreStatsConfig {
-  behavior: string;
-  maxSpeed: number;
-  maxTurnSpeed: number;
+export interface HealthConfig {
   maxHp: number;
   hp?: number;
-  stealth?: number;
+}
+export interface MovementConfig {
+  maxSpeed: number;
+  maxTurnSpeed: number;
   runSpeedMultiplier?: number;
   crouchSpeedMultiplier?: number;
-  crouchStealthMultiplier?: number;
   runTurnMultiplier?: number;
   crouchTurnMultiplier?: number;
 }
+export interface StealthConfig {
+  stealthPower: number;
+  runStealthMultiplier: number;
+  crouchStealthMultiplier?: number;
+}
+export interface AIConfig {
+  behavior: string;
+}
+export interface CreatureConfig
+  extends PhysicsConfig,
+    HealthConfig,
+    MovementConfig,
+    StealthConfig,
+    AIConfig {}
+
+export type PhysicsStatsComponent = ComponentStats<PhysicsConfig>;
+export type HealthStatsComponent = ComponentStats<HealthConfig>;
+export type MovementStatsComponent = ComponentStats<MovementConfig>;
+export type StealthStatsComponent = ComponentStats<StealthConfig>;
+export type AIStatsComponent = ComponentStats<AIConfig>;
 
 export interface ActiveAttack {
   weapon: WeaponConfig;

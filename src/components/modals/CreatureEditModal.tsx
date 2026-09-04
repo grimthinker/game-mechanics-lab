@@ -35,6 +35,10 @@ export interface CreatureEditModalProps {
   setEditRunTurnMultiplier: (val: number) => void;
   editCrouchTurnMultiplier: number;
   setEditCrouchTurnMultiplier: (val: number) => void;
+  editStealthPower: number;
+  setEditStealthPower: (val: number) => void;
+  editRunStealthMultiplier: number;
+  setEditRunStealthMultiplier: (val: number) => void;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -72,6 +76,10 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
   setEditRunTurnMultiplier,
   editCrouchTurnMultiplier,
   setEditCrouchTurnMultiplier,
+  editStealthPower,
+  setEditStealthPower,
+  editRunStealthMultiplier,
+  setEditRunStealthMultiplier,
   onClose,
   onConfirm,
 }) => {
@@ -238,6 +246,18 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
             />
           </label>
           <label>
+            Скрытность (Stealth Power):
+            <input
+              disabled={isReadOnly}
+              type="number"
+              value={editStealthPower}
+              min={0}
+              max={1000}
+              step={1}
+              onChange={(e) => setEditStealthPower(Number(e.target.value))}
+            />
+          </label>
+          <label>
             Множитель скрытности присяда:
             <input
               disabled={isReadOnly}
@@ -247,6 +267,18 @@ export const CreatureEditModal: React.FC<CreatureEditModalProps> = ({
               max={10}
               step={0.1}
               onChange={(e) => setEditCrouchStealthMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скрытности при беге:
+            <input
+              disabled={isReadOnly}
+              type="number"
+              value={editRunStealthMultiplier}
+              min={0}
+              max={10}
+              step={0.1}
+              onChange={(e) => setEditRunStealthMultiplier(Number(e.target.value))}
             />
           </label>
           <label>

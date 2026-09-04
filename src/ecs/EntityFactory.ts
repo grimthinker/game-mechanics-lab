@@ -83,41 +83,40 @@ export class EntityFactory {
 
     // Шаг 1: навешивание базовых компонентов данных
     world.addComponent(id, 'health', { isAlive: true, hitFlashTimer: 0 });
-    world.addComponent(id, 'stealth', { isCrouching: false });
-    world.addComponent(id, 'stats', {
-        behavior: { base: config.behavior, current: config.behavior },
-        weight: { base: config.weight, current: config.weight },
-        isSolid: { base: config.isSolid ?? true, current: config.isSolid ?? true },
-        hp: { 
-            base: config.hp ?? config.maxHp, 
-            current: config.hp ?? config.maxHp 
-        },
-        maxHp: { 
-            base: config.maxHp, 
-            current: config.maxHp 
-        },
-        radius: { base: config.radius, current: config.radius },
-        maxSpeed: { base: Math.max(0, config.maxSpeed), current: Math.max(0, config.maxSpeed) },
-        maxTurnSpeed: {
-          base: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
-          current: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
-        },
-        stealth: { base: config.stealth ?? 0, current: config.stealth ?? 0 },
-        runSpeedMultiplier: {
-          base: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
-          current: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
-        },
-        crouchSpeedMultiplier: {
-          base: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
-          current: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
-        },
-        crouchStealthMultiplier: {
-          base: Math.max(1, config.crouchStealthMultiplier ?? 1.5),
-          current: Math.max(1, config.crouchStealthMultiplier ?? 1.5),
-        },
-        runTurnMultiplier: { base: config.runTurnMultiplier ?? 0.8, current: config.runTurnMultiplier ?? 0.8 },
-        crouchTurnMultiplier: { base: config.crouchTurnMultiplier ?? 1.2, current: config.crouchTurnMultiplier ?? 1.2 },
-      });
+    world.addComponent(id, 'physicsStats', {
+      radius: { base: config.radius, current: config.radius },
+      weight: { base: config.weight, current: config.weight },
+      isSolid: { base: config.isSolid ?? true, current: config.isSolid ?? true },
+    });
+    world.addComponent(id, 'healthStats', {
+      hp: { base: config.hp ?? config.maxHp, current: config.hp ?? config.maxHp },
+      maxHp: { base: config.maxHp, current: config.maxHp },
+    });
+    world.addComponent(id, 'movementStats', {
+      maxSpeed: { base: Math.max(0, config.maxSpeed), current: Math.max(0, config.maxSpeed) },
+      maxTurnSpeed: {
+        base: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
+        current: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
+      },
+      runSpeedMultiplier: {
+        base: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
+        current: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
+      },
+      crouchSpeedMultiplier: {
+        base: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
+        current: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
+      },
+      runTurnMultiplier: { base: config.runTurnMultiplier ?? 0.8, current: config.runTurnMultiplier ?? 0.8 },
+      crouchTurnMultiplier: { base: config.crouchTurnMultiplier ?? 1.2, current: config.crouchTurnMultiplier ?? 1.2 },
+    });
+    world.addComponent(id, 'stealthStats', {
+      stealthPower: { base: config.stealthPower ?? 10, current: config.stealthPower ?? 10 },
+      runStealthMultiplier: { base: config.runStealthMultiplier ?? 0.5, current: config.runStealthMultiplier ?? 0.5 },
+      crouchStealthMultiplier: { base: Math.max(1, config.crouchStealthMultiplier ?? 1.5), current: Math.max(1, config.crouchStealthMultiplier ?? 1.5) },
+    });
+    world.addComponent(id, 'aiStats', {
+      behavior: { base: config.behavior, current: config.behavior },
+    });
   
       world.addComponent(id, 'equip', {
           slots: [
@@ -177,19 +176,18 @@ export class EntityFactory {
     const item = world.getComponent(id, 'item');
 
     if (meta) {
-      // Существо: добавляем физическое тело, скорость и ввод
-      const stats = world.getComponent(id, 'stats');
-      const isSolid = options?.isSolid ?? stats?.isSolid.current ?? meta.config.isSolid ?? true;
-      const radius = options?.radius ?? stats?.radius.current ?? meta.config.radius ?? 16;
-      const weight = options?.weight ?? stats?.weight.current ?? Math.max(0.1, meta.config.weight);
-
-      if (isSolid) {
-        const body = new Circle({ x: position.x, y: position.y }, radius);
-        body.isStatic = false;
-
-        world.addComponent(id, 'physicsBody', { body, radius, weight, isStatic: false });
-        physics.registerBody(id, body);
-      }
+        // Существо: добавляем физическое тело, скорость и ввод
+        const physStats = world.getComponent(id, 'physicsStats');
+        const isSolid = options?.isSolid ?? physStats?.isSolid.current ?? meta.config.isSolid ?? true;
+        const radius = options?.radius ?? physStats?.radius.current ?? meta.config.radius ?? 16;
+  
+        if (isSolid) {
+          const body = new Circle({ x: position.x, y: position.y }, radius);
+          body.isStatic = false;
+  
+          world.addComponent(id, 'physicsBody', { body, isStatic: false });
+          physics.registerBody(id, body);
+        }
 
       world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
       world.addComponent(id, 'input', {
@@ -201,18 +199,17 @@ export class EntityFactory {
         turnSpeed: 0,
       });
     } else if (item) {
-      // Предмет: добавляем физическое тело при необходимости
-      const isSolid = options?.isSolid ?? item.config?.isSolid ?? true;
-      const radius = options?.radius ?? item.config?.radius ?? 16;
-      const weight = options?.weight ?? item.config?.weight ?? 1;
-
-      if (isSolid) {
-        const body = new Circle({ x: position.x, y: position.y }, radius);
-        body.isStatic = false;
-        world.addComponent(id, 'physicsBody', { body, radius, weight, isStatic: false });
-        physics.registerBody(id, body);
+        // Предмет: добавляем физическое тело при необходимости
+        const isSolid = options?.isSolid ?? item.config?.isSolid ?? true;
+        const radius = options?.radius ?? item.config?.radius ?? 16;
+  
+        if (isSolid) {
+          const body = new Circle({ x: position.x, y: position.y }, radius);
+          body.isStatic = false;
+          world.addComponent(id, 'physicsBody', { body, isStatic: false });
+          physics.registerBody(id, body);
+        }
       }
-    }
   }
 
   public despawnEntityFromWorld(

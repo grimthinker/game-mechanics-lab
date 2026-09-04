@@ -4,10 +4,10 @@ import { PhysicsSystem } from './PhysicsSystem';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
-    const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input', 'stats');
+    const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input', 'healthStats');
 
-    for (const [id, { equip, activeAttacks, health, input, stats }] of entities) {
-      if (!health.isAlive || stats.hp.current <= 0) continue;
+    for (const [id, { equip, activeAttacks, health, input, healthStats }] of entities) {
+      if (!health.isAlive || healthStats.hp.current <= 0) continue;
 
       if (input.wantsAttack && !input.isRunning) {
         const weaponSlot = equip.slots.find((s) => s.type === 'weapon' && s.itemId !== null);
@@ -72,7 +72,7 @@ export class AttackSystem {
 
     for (const targetId of targetIds) {
       const targetHealth = world.getComponent(targetId, 'health');
-      const targetStats = world.getComponent(targetId, 'stats');
+      const targetStats = world.getComponent(targetId, 'healthStats');
       if (!targetHealth || !targetHealth.isAlive || !targetStats) continue;
 
       const mult =

@@ -30,7 +30,7 @@ export class EntityAdapter implements IMovable, EntityController {
   ) {}
 
   public get behavior(): string {
-    return this.world.getComponent(this.id, 'stats')?.behavior.current ?? this.world.getComponent(this.id, 'meta')?.config?.behavior ?? 'IdleTree';
+    return this.world.getComponent(this.id, 'aiStats')?.behavior.current ?? this.world.getComponent(this.id, 'meta')?.config?.behavior ?? 'IdleTree';
   }
   public get state(): CreatureState {
     return this.world.getComponent(this.id, 'meta')?.state ?? 'idle';
@@ -44,39 +44,38 @@ export class EntityAdapter implements IMovable, EntityController {
     return transform ? transform.angle : 0;
   }
   public get radius(): StandardRadius {
-    return this.world.getComponent(this.id, 'stats')?.radius.current 
-        ?? this.world.getComponent(this.id, 'physicsBody')?.radius 
+    return this.world.getComponent(this.id, 'physicsStats')?.radius.current 
+        ?? (this.world.getComponent(this.id, 'physicsBody')?.body.r as StandardRadius)
         ?? 16;
   }
   public get baseRadius(): StandardRadius {
-    return this.world.getComponent(this.id, 'stats')?.radius.base ?? this.radius;
+    return this.world.getComponent(this.id, 'physicsStats')?.radius.base ?? this.radius;
   }
   public get weight(): number {
-    return this.world.getComponent(this.id, 'stats')?.weight.current
-        ?? this.world.getComponent(this.id, 'physicsBody')?.weight 
+    return this.world.getComponent(this.id, 'physicsStats')?.weight.current
         ?? this.world.getComponent(this.id, 'meta')?.config?.weight 
         ?? 10;
   }
   public get baseWeight(): number {
-    return this.world.getComponent(this.id, 'stats')?.weight.base ?? this.weight;
+    return this.world.getComponent(this.id, 'physicsStats')?.weight.base ?? this.weight;
   }
   public get isSolid(): boolean {
-    return this.world.getComponent(this.id, 'stats')?.isSolid.current ?? true;
+    return this.world.getComponent(this.id, 'physicsStats')?.isSolid.current ?? true;
   }
   public get hp(): number {
-    return this.world.getComponent(this.id, 'stats')?.hp.current ?? 0;
+    return this.world.getComponent(this.id, 'healthStats')?.hp.current ?? 0;
   }
   public get maxHp(): number {
-    return this.world.getComponent(this.id, 'stats')?.maxHp.current ?? 0;
+    return this.world.getComponent(this.id, 'healthStats')?.maxHp.current ?? 0;
   }
   public get isAlive(): boolean {
     return this.world.getComponent(this.id, 'health')?.isAlive ?? (this.hp > 0);
   }
   public get maxSpeed(): number {
-    return this.world.getComponent(this.id, 'stats')?.maxSpeed.current ?? 0;
+    return this.world.getComponent(this.id, 'movementStats')?.maxSpeed.current ?? 0;
   }
   public get maxTurnSpeed(): number {
-    return this.world.getComponent(this.id, 'stats')?.maxTurnSpeed.current ?? 0;
+    return this.world.getComponent(this.id, 'movementStats')?.maxTurnSpeed.current ?? 0;
   }
   public get currentSpeed(): number {
     return this.world.getComponent(this.id, 'velocity')?.currentSpeed ?? 0;
@@ -85,19 +84,28 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.world.getComponent(this.id, 'velocity')?.currentTurnSpeed ?? 0;
   }
   public get runSpeedMultiplier(): number {
-    return this.world.getComponent(this.id, 'stats')?.runSpeedMultiplier.current ?? 1.5;
+    return this.world.getComponent(this.id, 'movementStats')?.runSpeedMultiplier.current ?? 1.5;
   }
   public get crouchSpeedMultiplier(): number {
-    return this.world.getComponent(this.id, 'stats')?.crouchSpeedMultiplier.current ?? 0.5;
+    return this.world.getComponent(this.id, 'movementStats')?.crouchSpeedMultiplier.current ?? 0.5;
   }
   public get crouchStealthMultiplier(): number {
-    return this.world.getComponent(this.id, 'stats')?.crouchStealthMultiplier.current ?? 1.5;
+    return this.world.getComponent(this.id, 'stealthStats')?.crouchStealthMultiplier.current ?? 1.5;
+  }
+  public get stealthPower(): number {
+    return this.world.getComponent(this.id, 'stealthStats')?.stealthPower.current ?? 10;
+  }
+  public get baseStealthPower(): number {
+    return this.world.getComponent(this.id, 'stealthStats')?.stealthPower.base ?? this.stealthPower;
+  }
+  public get runStealthMultiplier(): number {
+    return this.world.getComponent(this.id, 'stealthStats')?.runStealthMultiplier.current ?? 0.5;
   }
   public get runTurnMultiplier(): number {
-    return this.world.getComponent(this.id, 'stats')?.runTurnMultiplier?.current ?? 0.8;
+    return this.world.getComponent(this.id, 'movementStats')?.runTurnMultiplier?.current ?? 0.8;
   }
   public get crouchTurnMultiplier(): number {
-    return this.world.getComponent(this.id, 'stats')?.crouchTurnMultiplier?.current ?? 1.2;
+    return this.world.getComponent(this.id, 'movementStats')?.crouchTurnMultiplier?.current ?? 1.2;
   }
   public get equip(): EquipComponent | undefined {
     return this.world.getComponent(this.id, 'equip');
@@ -131,8 +139,8 @@ export class EntityAdapter implements IMovable, EntityController {
   public startTurning(direction: -1 | 1, ratio = 1): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    const stats = this.world.getComponent(this.id, 'stats');
-    const maxTurnSpeed = stats ? stats.maxTurnSpeed.current : 0;
+    const moveStats = this.world.getComponent(this.id, 'movementStats');
+    const maxTurnSpeed = moveStats ? moveStats.maxTurnSpeed.current : 0;
     const turnSpeed = maxTurnSpeed * ratio;
     if (input && health?.isAlive && this.hp > 0) {
       input.turnDirection = direction;
@@ -190,11 +198,11 @@ export class EntityAdapter implements IMovable, EntityController {
   }
 
   public setBehavior(newBehavior: string, aiSystem: AISystem): void {
-    const stats = this.world.getComponent(this.id, 'stats');
+    const aiStats = this.world.getComponent(this.id, 'aiStats');
     const meta = this.world.getComponent(this.id, 'meta');
-    if (!stats || !meta || stats.behavior.current === newBehavior) return;
+    if (!aiStats || !meta || aiStats.behavior.current === newBehavior) return;
 
-    stats.behavior.current = newBehavior;
+    aiStats.behavior.current = newBehavior;
     if (meta.config) meta.config.behavior = newBehavior;
     aiSystem.initBotBrain(this.world, this.id, newBehavior);
 
@@ -223,6 +231,8 @@ export class EntityAdapter implements IMovable, EntityController {
       crouchStealthMultiplier?: number;
       runTurnMultiplier?: number;
       crouchTurnMultiplier?: number;
+      stealthPower?: number;
+      runStealthMultiplier?: number;
     },
     aiSystem?: AISystem,
     physicsSystem?: PhysicsSystem
@@ -233,108 +243,130 @@ export class EntityAdapter implements IMovable, EntityController {
 
     const meta = this.world.getComponent(this.id, 'meta');
     const phys = this.world.getComponent(this.id, 'physicsBody');
-    const stats = this.world.getComponent(this.id, 'stats');
+    const physStats = this.world.getComponent(this.id, 'physicsStats');
+    const healthStats = this.world.getComponent(this.id, 'healthStats');
+    const moveStats = this.world.getComponent(this.id, 'movementStats');
+    const stealthStats = this.world.getComponent(this.id, 'stealthStats');
     const health = this.world.getComponent(this.id, 'health');
 
-    if (stats) {
+    if (physStats) {
       if (params.baseRadius !== undefined) {
-        stats.radius.base = params.baseRadius;
+        physStats.radius.base = params.baseRadius;
         if (meta?.config) meta.config.radius = params.baseRadius;
       }
       if (params.radius !== undefined) {
-        stats.radius.current = params.radius;
+        physStats.radius.current = params.radius;
       }
       if (params.baseWeight !== undefined) {
         const val = Math.max(0.1, params.baseWeight);
-        stats.weight.base = val;
+        physStats.weight.base = val;
         if (meta?.config) meta.config.weight = val;
       }
       if (params.weight !== undefined) {
         const val = Math.max(0.1, params.weight);
-        stats.weight.current = val;
+        physStats.weight.current = val;
       }
       if (params.isSolid !== undefined) {
-        stats.isSolid.base = params.isSolid;
-        stats.isSolid.current = params.isSolid;
+        physStats.isSolid.base = params.isSolid;
+        physStats.isSolid.current = params.isSolid;
         if (meta?.config) meta.config.isSolid = params.isSolid;
       }
+    }
+
+    if (moveStats) {
       if (params.maxSpeed !== undefined) {
         const val = Math.max(0, params.maxSpeed);
-        stats.maxSpeed.base = val;
-        stats.maxSpeed.current = val;
+        moveStats.maxSpeed.base = val;
+        moveStats.maxSpeed.current = val;
         if (meta?.config) meta.config.maxSpeed = val;
       }
       if (params.maxTurnSpeed !== undefined) {
         const val = Math.max(0, params.maxTurnSpeed);
-        stats.maxTurnSpeed.base = val;
-        stats.maxTurnSpeed.current = val;
+        moveStats.maxTurnSpeed.base = val;
+        moveStats.maxTurnSpeed.current = val;
         if (meta?.config) meta.config.maxTurnSpeed = (val * 180) / Math.PI; 
-      }
-      if (params.maxHp !== undefined) {
-        const val = Math.max(1, params.maxHp);
-        stats.maxHp.base = val;
-        stats.maxHp.current = val;
-        if (meta?.config) meta.config.maxHp = val;
-      }
-      if (params.hp !== undefined) {
-        const val = Math.min(stats.maxHp.current, Math.max(0, params.hp));
-        stats.hp.base = val;
-        stats.hp.current = val;
-        if (health) health.isAlive = val > 0;
-        if (meta?.config) meta.config.hp = val;
       }
       if (params.runSpeedMultiplier !== undefined) {
         const val = Math.max(0.1, params.runSpeedMultiplier);
-        stats.runSpeedMultiplier.base = val;
-        stats.runSpeedMultiplier.current = val;
+        moveStats.runSpeedMultiplier.base = val;
+        moveStats.runSpeedMultiplier.current = val;
         if (meta?.config) meta.config.runSpeedMultiplier = val;
       }
       if (params.crouchSpeedMultiplier !== undefined) {
         const val = Math.max(0.1, params.crouchSpeedMultiplier);
-        stats.crouchSpeedMultiplier.base = val;
-        stats.crouchSpeedMultiplier.current = val;
+        moveStats.crouchSpeedMultiplier.base = val;
+        moveStats.crouchSpeedMultiplier.current = val;
         if (meta?.config) meta.config.crouchSpeedMultiplier = val;
-      }
-      if (params.crouchStealthMultiplier !== undefined) {
-        const val = Math.max(1, params.crouchStealthMultiplier);
-        stats.crouchStealthMultiplier.base = val;
-        stats.crouchStealthMultiplier.current = val;
-        if (meta?.config) meta.config.crouchStealthMultiplier = val;
       }
       if (params.runTurnMultiplier !== undefined) {
         const val = Math.max(0.1, params.runTurnMultiplier);
-        stats.runTurnMultiplier.base = val;
-        stats.runTurnMultiplier.current = val;
+        moveStats.runTurnMultiplier.base = val;
+        moveStats.runTurnMultiplier.current = val;
         if (meta?.config) meta.config.runTurnMultiplier = val;
       }
       if (params.crouchTurnMultiplier !== undefined) {
         const val = Math.max(0.1, params.crouchTurnMultiplier);
-        stats.crouchTurnMultiplier.base = val;
-        stats.crouchTurnMultiplier.current = val;
+        moveStats.crouchTurnMultiplier.base = val;
+        moveStats.crouchTurnMultiplier.current = val;
         if (meta?.config) meta.config.crouchTurnMultiplier = val;
       }
-      
-      if (phys) {
-        phys.radius = stats.radius.current as StandardRadius;
-        phys.body.r = stats.radius.current;
-        phys.weight = stats.weight.current;
-      }
+    }
 
-      if (physicsSystem) {
-        const wasSolid = !!phys;
-        const isSolidNow = stats.isSolid.current;
-        if (!wasSolid && isSolidNow) {
-          const transform = this.world.getComponent(this.id, 'transform');
-          if (transform) {
-            const body = new Circle({ x: transform.x, y: transform.y }, stats.radius.current as StandardRadius);
-            body.isStatic = false;
-            this.world.addComponent(this.id, 'physicsBody', { body, radius: stats.radius.current as StandardRadius, weight: stats.weight.current, isStatic: false });
-            physicsSystem.registerBody(this.id, body);
-          }
-        } else if (wasSolid && !isSolidNow) {
-          physicsSystem.unregisterBody(phys!.body);
-          this.world.removeComponent(this.id, 'physicsBody');
+    if (healthStats) {
+      if (params.maxHp !== undefined) {
+        const val = Math.max(1, params.maxHp);
+        healthStats.maxHp.base = val;
+        healthStats.maxHp.current = val;
+        if (meta?.config) meta.config.maxHp = val;
+      }
+      if (params.hp !== undefined) {
+        const val = Math.min(healthStats.maxHp.current, Math.max(0, params.hp));
+        healthStats.hp.base = val;
+        healthStats.hp.current = val;
+        if (health) health.isAlive = val > 0;
+        if (meta?.config) meta.config.hp = val;
+      }
+    }
+
+    if (stealthStats) {
+      if (params.stealthPower !== undefined) {
+        const val = Math.max(0, params.stealthPower);
+        stealthStats.stealthPower.base = val;
+        stealthStats.stealthPower.current = val;
+        if (meta?.config) meta.config.stealthPower = val;
+      }
+      if (params.runStealthMultiplier !== undefined) {
+        const val = Math.max(0, params.runStealthMultiplier);
+        stealthStats.runStealthMultiplier.base = val;
+        stealthStats.runStealthMultiplier.current = val;
+        if (meta?.config) meta.config.runStealthMultiplier = val;
+      }
+      if (params.crouchStealthMultiplier !== undefined) {
+        const val = Math.max(1, params.crouchStealthMultiplier);
+        stealthStats.crouchStealthMultiplier.base = val;
+        stealthStats.crouchStealthMultiplier.current = val;
+        if (meta?.config) meta.config.crouchStealthMultiplier = val;
+      }
+    }
+
+    if (physStats && phys) {
+      phys.body.r = physStats.radius.current;
+    }
+
+    if (physicsSystem && physStats) {
+      const wasSolid = !!phys;
+      const isSolidNow = physStats.isSolid.current;
+      if (!wasSolid && isSolidNow) {
+        const transform = this.world.getComponent(this.id, 'transform');
+        if (transform) {
+          const body = new Circle({ x: transform.x, y: transform.y }, physStats.radius.current as StandardRadius);
+          body.isStatic = false;
+          this.world.addComponent(this.id, 'physicsBody', { body, isStatic: false });
+          physicsSystem.registerBody(this.id, body);
         }
+      } else if (wasSolid && !isSolidNow) {
+        physicsSystem.unregisterBody(phys!.body);
+        this.world.removeComponent(this.id, 'physicsBody');
       }
     }
   }

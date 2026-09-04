@@ -9,13 +9,13 @@ export class MovementSystem {
       'input',
       'health',
       'activeAttacks',
-      'stealth',
       'meta',
-      'stats'
+      'movementStats'
     );
 
-    for (const [id, { transform, velocity, input, health, activeAttacks, stealth, meta, stats }] of entities) {
-      if (!health.isAlive || stats.hp.current <= 0) {
+    for (const [id, { transform, velocity, input, health, activeAttacks, meta, movementStats }] of entities) {
+      const healthStats = world.getComponent(id, 'healthStats');
+      if (!health.isAlive || (healthStats && healthStats.hp.current <= 0)) {
         velocity.currentSpeed = 0;
         velocity.currentTurnSpeed = 0;
         meta.state = 'dead';
@@ -23,9 +23,16 @@ export class MovementSystem {
       }
 
       // 1. Расчет стелса через текущие статы
-      stats.stealth.current = input.isCrouching
-        ? stats.stealth.base * stats.crouchStealthMultiplier.current
-        : stats.stealth.base;
+      const stealthStats = world.getComponent(id, 'stealthStats');
+      if (stealthStats) {
+        if (input.isCrouching) {
+          stealthStats.stealthPower.current = stealthStats.stealthPower.base * stealthStats.crouchStealthMultiplier.current;
+        } else if (input.isRunning) {
+          stealthStats.stealthPower.current = stealthStats.stealthPower.base * stealthStats.runStealthMultiplier.current;
+        } else {
+          stealthStats.stealthPower.current = stealthStats.stealthPower.base;
+        }
+      }
 
       // 2. Расчет замедления от атак
       let moveSlow = 1;
@@ -52,22 +59,22 @@ export class MovementSystem {
       // 3. Множитель скорости
       let speedMult = 1;
       if (input.isRunning) {
-        speedMult = stats.runSpeedMultiplier.current;
+        speedMult = movementStats.runSpeedMultiplier.current;
       } else if (input.isCrouching) {
-        speedMult = stats.crouchSpeedMultiplier.current;
+        speedMult = movementStats.crouchSpeedMultiplier.current;
       }
-      velocity.currentSpeed = (input.isMovingForward ? stats.maxSpeed.current * speedMult : 0) * moveSlow;
+      velocity.currentSpeed = (input.isMovingForward ? movementStats.maxSpeed.current * speedMult : 0) * moveSlow;
 
       // 4. Множитель поворота
       let turnMult = 1;
       if (input.isRunning) {
-        turnMult = stats.runTurnMultiplier.current;
+        turnMult = movementStats.runTurnMultiplier.current;
       } else if (input.isCrouching) {
-        turnMult = stats.crouchTurnMultiplier.current;
+        turnMult = movementStats.crouchTurnMultiplier.current;
       }
 
       // 5. Ограничение скорости поворота максимальным значением скорости поворота игрока
-      const turnSpeed = Math.min(stats.maxTurnSpeed.current, input.turnSpeed);
+      const turnSpeed = Math.min(movementStats.maxTurnSpeed.current, input.turnSpeed);
 
       velocity.currentTurnSpeed = input.turnDirection * turnSpeed * turnSlow * turnMult;
 

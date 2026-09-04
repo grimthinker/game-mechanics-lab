@@ -87,10 +87,11 @@ export class Renderer {
     // 2. Отрисовка мертвых существ
     for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) {
-        const stats = world.getComponent(id, 'stats');
+        const physStats = world.getComponent(id, 'physicsStats');
         const phys = world.getComponent(id, 'physicsBody');
-        const radius = phys?.radius ?? stats?.radius.current ?? entity.meta.config.radius ?? 16;
-        this.renderCreatureBody(id, entity.transform, radius, false, entity.meta, stats, camera, selectedId, gameMode, hoveredId);
+        const radius = physStats?.radius.current ?? phys?.body.r ?? entity.meta.config.radius ?? 16;
+        const aiStats = world.getComponent(id, 'aiStats');
+        this.renderCreatureBody(id, entity.transform, radius, false, entity.meta, aiStats, camera, selectedId, gameMode, hoveredId);
       }
     }
 
@@ -100,10 +101,11 @@ export class Renderer {
     // 4. Отрисовка живых существ
     for (const [id, entity] of entities) {
       if (this.isEntityAlive(world, id)) {
-        const stats = world.getComponent(id, 'stats');
+        const physStats = world.getComponent(id, 'physicsStats');
         const phys = world.getComponent(id, 'physicsBody');
-        const radius = phys?.radius ?? stats?.radius.current ?? entity.meta.config.radius ?? 16;
-        this.renderCreatureBody(id, entity.transform, radius, true, entity.meta, stats, camera, selectedId, gameMode, hoveredId);
+        const radius = physStats?.radius.current ?? phys?.body.r ?? entity.meta.config.radius ?? 16;
+        const aiStats = world.getComponent(id, 'aiStats');
+        this.renderCreatureBody(id, entity.transform, radius, true, entity.meta, aiStats, camera, selectedId, gameMode, hoveredId);
       }
     }
 
@@ -118,9 +120,9 @@ export class Renderer {
 
   private isEntityAlive(world: World, id: EntityId): boolean {
     const healthComp = world.getComponent(id, 'health');
-    const statsComp = world.getComponent(id, 'stats' as any) as any;
-    const hp = statsComp?.hp?.current ?? 0;
-    return statsComp ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+    const healthStats = world.getComponent(id, 'healthStats');
+    const hp = healthStats?.hp.current ?? 0;
+    return healthStats ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
   }
 
   private renderCreatureBody(
@@ -129,7 +131,7 @@ export class Renderer {
     radius: number,
     isAlive: boolean,
     meta: any,
-    stats: any,
+    aiStats: any,
     camera: Camera,
     selectedId: EntityId | null,
     gameMode: string,
@@ -172,7 +174,7 @@ export class Renderer {
     this.ctx.fillStyle = fillColor;
     this.ctx.fill();
 
-    let borderColor = (stats?.behavior?.current ?? meta.config.behavior) === 'PlayerTree' ? '#2980b9' : '#c0392b';
+    let borderColor = (aiStats?.behavior?.current ?? meta.config.behavior) === 'PlayerTree' ? '#2980b9' : '#c0392b';
     let lineWidth = 2 / camera.scale;
 
     this.ctx.strokeStyle = borderColor;
@@ -217,7 +219,7 @@ export class Renderer {
       this.ctx.translate(transform.x, transform.y);
       this.ctx.rotate(transform.angle);
       
-      const radius = physicsBody ? physicsBody.radius : 16;
+      const radius = physicsBody ? physicsBody.body.r : 16;
       const size = radius * 1.6;
       
       let color = '#7f8c8d';
@@ -375,12 +377,13 @@ export class Renderer {
 
       const transform = entity.transform;
       const meta = entity.meta;
-      const statsComp = world.getComponent(id, 'stats' as any) as any;
-      const hp = statsComp?.hp?.current ?? 0;
-      const maxHp = statsComp?.maxHp?.current ?? statsComp?.hp?.max ?? 100;
+      const healthStats = world.getComponent(id, 'healthStats');
+      const hp = healthStats?.hp.current ?? 0;
+      const maxHp = healthStats?.maxHp.current ?? 100;
       
+      const physStats = world.getComponent(id, 'physicsStats');
       const phys = world.getComponent(id, 'physicsBody');
-      const radius = phys?.radius ?? statsComp?.radius?.current ?? meta.config.radius ?? 16;
+      const radius = physStats?.radius.current ?? phys?.body.r ?? meta.config.radius ?? 16;
 
       // Healthbar
       this.ctx.save();
@@ -417,7 +420,7 @@ export class Renderer {
     if (hoverComp && hoverComp.transform && hoverComp.item && !hoverComp.meta) {
       this.ctx.save();
       this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
-      const radius = hoverComp.physicsBody ? hoverComp.physicsBody.radius : 16;
+      const radius = hoverComp.physicsBody ? hoverComp.physicsBody.body.r : 16;
       
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;

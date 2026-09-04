@@ -14,5 +14,7 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): Cr
     crouchStealthMultiplier: 1.5,
     runTurnMultiplier: 0.8,
     crouchTurnMultiplier: 1.2,
+    stealthPower: 10,
+    runStealthMultiplier: 0.5,
   };
 }

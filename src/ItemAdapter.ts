@@ -54,7 +54,7 @@ export class ItemAdapter {
 
   public get radius(): StandardRadius {
     return (
-      this.world.getComponent(this.id, 'physicsBody')?.radius ??
+      (this.world.getComponent(this.id, 'physicsBody')?.body.r as StandardRadius) ??
       this.data?.config?.radius ??
       16
     );
@@ -62,7 +62,6 @@ export class ItemAdapter {
 
   public get weight(): number {
     return (
-      this.world.getComponent(this.id, 'physicsBody')?.weight ??
       this.data?.config?.weight ??
       1
     );

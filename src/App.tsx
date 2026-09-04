@@ -62,7 +62,7 @@ export const App: React.FC = () => {
 
     if (currentMode === GameMode.GAME) {
       const isAnyPlayerAlive = app.world.getAllEntities().some(([_, comp]) => 
-        (comp.stats?.behavior?.current ?? comp.meta?.config?.behavior) === 'PlayerTree' && comp.health?.isAlive
+        (comp.aiStats?.behavior?.current ?? comp.meta?.config?.behavior) === 'PlayerTree' && comp.health?.isAlive
       );
       if (!isAnyPlayerAlive) {
         setModeSync(GameMode.SIMULATION);
@@ -220,7 +220,7 @@ export const App: React.FC = () => {
         behavior: modals.pendingSpawnBehavior,
         radius: modals.radius,
         weight: modals.weight,
-        isSolid: true,
+        isSolid: modals.isSolid,
         maxSpeed: modals.maxSpeed,
         maxTurnSpeed: modals.maxTurnSpeed,
         runSpeedMultiplier: modals.runSpeedMultiplier,
@@ -230,6 +230,8 @@ export const App: React.FC = () => {
         crouchTurnMultiplier: modals.crouchTurnMultiplier,
         hp: 100,
         maxHp: 100,
+        stealthPower: modals.stealthPower,
+        runStealthMultiplier: modals.runStealthMultiplier,
       },
     });
     modals.closeSpawnModal();
@@ -402,6 +404,10 @@ export const App: React.FC = () => {
         setRunTurnMultiplier={modals.setRunTurnMultiplier}
         crouchTurnMultiplier={modals.crouchTurnMultiplier}
         setCrouchTurnMultiplier={modals.setCrouchTurnMultiplier}
+        stealthPower={modals.stealthPower}
+        setStealthPower={modals.setStealthPower}
+        runStealthMultiplier={modals.runStealthMultiplier}
+        setRunStealthMultiplier={modals.setRunStealthMultiplier}
         onClose={modals.closeSpawnModal}
         onConfirm={handleSpawnConfirm}
       />
@@ -445,6 +451,10 @@ export const App: React.FC = () => {
         setEditRunTurnMultiplier={modals.setEditRunTurnMultiplier}
         editCrouchTurnMultiplier={modals.editCrouchTurnMultiplier}
         setEditCrouchTurnMultiplier={modals.setEditCrouchTurnMultiplier}
+        editStealthPower={modals.editStealthPower}
+        setEditStealthPower={modals.setEditStealthPower}
+        editRunStealthMultiplier={modals.editRunStealthMultiplier}
+        setEditRunStealthMultiplier={modals.setEditRunStealthMultiplier}
         onClose={modals.closeEditModal}
         onConfirm={modals.handleEditConfirm}
       />
