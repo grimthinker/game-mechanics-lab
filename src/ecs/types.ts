@@ -56,6 +56,7 @@ export interface InputComponent {
   isRunning: boolean;
   isCrouching: boolean;
   wantsAttack: boolean;
+  attackSlotIndex?: number;
 }
 
 export interface HealthComponent {
@@ -112,7 +113,6 @@ export interface CreatureMetaComponent {
   id: string;
   name: string;
   state: CreatureState;
-  config: CreatureConfig;
 }
 
 export type ItemComponent = ItemData;
@@ -121,6 +121,31 @@ export interface OwnershipComponent {
   ownerId: EntityId;
   status: 'equipped' | 'inventory';
 }
+
+export interface WeaponCombatConfig {
+  baseDamage: number;
+  prepTime: number;
+  castTime: number;
+  recoveryTime: number;
+  prepTurnSlow: number;
+  recoveryTurnSlow: number;
+  prepMoveSlow: number;
+  recoveryMoveSlow: number;
+  castMoveSlow: number;
+  minMultiplier: number;
+  maxMultiplier: number;
+  critChance: number;
+  critMultiplier: number;
+}
+
+export type WeaponStatsComponent = ComponentStats<WeaponCombatConfig>;
+
+export interface ArmorCombatConfig {
+  defense: number;
+  flatReduction: number;
+}
+
+export type ArmorStatsComponent = ComponentStats<ArmorCombatConfig>;
 
 export interface EntityComponents {
   transform?: TransformComponent;
@@ -141,7 +166,32 @@ export interface EntityComponents {
   meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
   gizmo?: GizmoComponent;
+  weaponStats?: WeaponStatsComponent;
+  weaponZone?: HitZoneConfig;
+  armorStats?: ArmorStatsComponent;
 }
+
+export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
+  'transform',
+  'physicsStats',
+  'healthStats',
+  'movementStats',
+  'stealthStats',
+  'aiStats',
+  'item',
+  'inventory',
+  'equip',
+  'meta',
+  'ownership',
+  'health',
+  'velocity',
+  'input',
+  'activeAttacks',
+  'gizmo',
+  'weaponStats',
+  'weaponZone',
+  'armorStats',
+] as const;
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
@@ -224,12 +274,6 @@ export interface StealthConfig {
 export interface AIConfig {
   behavior: string;
 }
-export interface CreatureConfig
-  extends PhysicsConfig,
-    HealthConfig,
-    MovementConfig,
-    StealthConfig,
-    AIConfig {}
 
 export type PhysicsStatsComponent = ComponentStats<PhysicsConfig>;
 export type HealthStatsComponent = ComponentStats<HealthConfig>;
@@ -252,10 +296,14 @@ export interface EntityConfig {
   inventory?: InventorySetup;
   equip?: EquipSlot[];
   meta?: { id?: string; name?: string; entityType?: string };
+  weaponStats?: Partial<WeaponCombatConfig>;
+  weaponZone?: HitZoneConfig;
+  armorStats?: Partial<ArmorCombatConfig>;
 }
 
 export interface ActiveAttack {
-  weapon: WeaponConfig;
+  weaponId: EntityId;
+  slotIndex: number;
   phase: 'prep' | 'cast' | 'recovery';
   timer: number;
   totalDuration: number;

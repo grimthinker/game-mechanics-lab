@@ -1,7 +1,7 @@
 import { World } from './ecs/World';
 import { Camera } from './Camera';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
-import { EntityId } from './ecs/types';
+import { EntityId, HitZoneConfig, WeaponConfig } from './ecs/types';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -167,7 +167,7 @@ export class Renderer {
     this.ctx.fillStyle = fillColor;
     this.ctx.fill();
 
-    const behavior = aiStats?.behavior?.current ?? meta?.config?.behavior ?? 'IdleTree';
+    const behavior = aiStats?.behavior?.current ?? 'IdleTree';
     let borderColor = behavior === 'PlayerTree' ? '#2980b9' : '#c0392b';
     let lineWidth = 2 / camera.scale;
 
@@ -287,7 +287,7 @@ export class Renderer {
     else if (item.type === 'bag') color = '#2ecc71';
     
     this.ctx.fillStyle = color;
-    this.ctx.fillRect(-size/2, -size/2, size, size);
+    this.ctx.fillRect(-size / 2, -size / 2, size, size);
     
     const isSelected = selectedId === id;
     const isHovered = hoveredId === id;
@@ -295,11 +295,11 @@ export class Renderer {
     if (isSelected) {
        this.ctx.strokeStyle = '#e74c3c';
        this.ctx.lineWidth = 3 / camera.scale;
-       this.ctx.strokeRect(-size/2, -size/2, size, size);
+       this.ctx.strokeRect(-size / 2, -size / 2, size, size);
     } else if (isHovered) {
        this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)';
        this.ctx.lineWidth = 3 / camera.scale;
-       this.ctx.strokeRect(-size/2, -size/2, size, size);
+       this.ctx.strokeRect(-size / 2, -size / 2, size, size);
     }
     
     this.ctx.restore();
@@ -310,117 +310,92 @@ export class Renderer {
     world: World,
     camera: Camera
   ): void {
-    for (const [id, { transform }] of entities) {
+    for (const [id, { transform, activeAttacks }] of entities) {
       if (!this.isEntityAlive(world, id)) continue;
 
       const healthComp = world.getComponent(id, 'health');
-      const equipComp = world.getComponent(id, 'equip' as any) as any;
       const hitFlashTimer = healthComp?.hitFlashTimer ?? 0;
+      const attacks = activeAttacks?.attacks || [];
 
-      const slots = Array.isArray(equipComp)
-        ? equipComp
-        : equipComp?.slots || equipComp?.items || [];
+      for (const activeAtk of attacks) {
+        const zoneComp = world.getComponent(activeAtk.weaponId, 'weaponZone');
+        const wItem = world.getComponent(activeAtk.weaponId, 'item');
+        const zone: HitZoneConfig | undefined =
+          zoneComp ?? (wItem?.type === 'weapon' ? (wItem.config as WeaponConfig).zone : undefined);
 
-      const weaponSlot = slots.find(
-        (s: any) =>
-          (s.type === 'weapon' || s.slotType === 'weapon') &&
-          s.itemId !== null &&
-          s.itemId !== undefined
-      );
+        if (!zone) {
+          continue;
+        }
 
-      let weaponToDraw: any = null;
-      if (weaponSlot && weaponSlot.itemId) {
-         const wItem = world.getComponent(weaponSlot.itemId, 'item');
-         if (wItem) {
-             weaponToDraw = wItem.config || wItem;
-         }
-      }
+        this.ctx.save();
+        this.ctx.translate(transform.x, transform.y);
+        this.ctx.rotate(transform.angle);
 
-      if (!weaponToDraw || !weaponToDraw.zone) {
-        continue;
-      }
+        let zoneAlpha = 0.15;
+        let zoneColor = '#f1c40f';
 
-      const activeAttacksComp =
-        world.getComponent(id, 'activeAttacks' as any) ||
-        world.getComponent(id, 'activeAttack' as any) ||
-        equipComp?.activeAttacks;
-
-      const activeAtkList = Array.isArray(activeAttacksComp)
-        ? activeAttacksComp
-        : (activeAttacksComp as any)?.attacks || [];
-      const activeAtk = activeAtkList[0];
-
-      this.ctx.save();
-      this.ctx.translate(transform.x, transform.y);
-      this.ctx.rotate(transform.angle);
-
-      let zoneAlpha = 0.15;
-      let zoneColor = '#f1c40f';
-
-      if (hitFlashTimer > 0 && activeAtk) {
-        zoneColor = '#e74c3c';
-        zoneAlpha = 0.9;
-      } else if (activeAtk) {
-        if (activeAtk.phase === 'prep') {
+        if (hitFlashTimer > 0) {
+          zoneColor = '#e74c3c';
+          zoneAlpha = 0.9;
+        } else if (activeAtk.phase === 'prep') {
           zoneColor = '#f39c12';
           zoneAlpha = 0.5;
         } else if (activeAtk.phase === 'recovery') {
           zoneAlpha = 0;
         }
-      }
 
-      if (zoneAlpha > 0) {
-        this.ctx.fillStyle = zoneColor;
-        this.ctx.strokeStyle = zoneColor;
-        this.ctx.globalAlpha = zoneAlpha;
-        this.ctx.lineWidth = 2 / camera.scale;
-        const zone = weaponToDraw.zone;
+        if (zoneAlpha > 0) {
+          this.ctx.fillStyle = zoneColor;
+          this.ctx.strokeStyle = zoneColor;
+          this.ctx.globalAlpha = zoneAlpha;
+          this.ctx.lineWidth = 2 / camera.scale;
 
-        switch (zone.hitZoneType) {
-          case 'radius': {
-            const r = zone.radius ?? 50;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, r, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.stroke();
-            break;
-          }
-          case 'angle': {
-            const len = zone.length ?? zone.range ?? 100;
-            const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, 0);
-            this.ctx.arc(0, 0, len, -maxAngle, maxAngle);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.stroke();
-            break;
-          }
-          case 'forward_line': {
-            const len = zone.length ?? zone.range ?? 150;
-            this.ctx.beginPath();
-            this.ctx.moveTo(0, 0);
-            this.ctx.lineTo(len, 0);
-            this.ctx.stroke();
-            break;
-          }
-          case 'shrapnel': {
-            const len = zone.length ?? zone.range ?? 120;
-            const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
-            const count = zone.rayCount ?? zone.numLines ?? zone.lines ?? 5;
-            for (let i = 0; i < count; i++) {
-              const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
-              const rayAngle = fraction * (maxAngle * 2);
+          switch (zone.hitZoneType) {
+            case 'radius': {
+              const r = zone.radius ?? 50;
+              this.ctx.beginPath();
+              this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+              this.ctx.fill();
+              this.ctx.stroke();
+              break;
+            }
+            case 'angle': {
+              const len = zone.length ?? 100;
+              const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
               this.ctx.beginPath();
               this.ctx.moveTo(0, 0);
-              this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
+              this.ctx.arc(0, 0, len, -maxAngle, maxAngle);
+              this.ctx.closePath();
+              this.ctx.fill();
               this.ctx.stroke();
+              break;
             }
-            break;
+            case 'forward_line': {
+              const len = zone.length ?? 150;
+              this.ctx.beginPath();
+              this.ctx.moveTo(0, 0);
+              this.ctx.lineTo(len, 0);
+              this.ctx.stroke();
+              break;
+            }
+            case 'shrapnel': {
+              const len = zone.length ?? 120;
+              const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
+              const count = zone.rayCount ?? 5;
+              for (let i = 0; i < count; i++) {
+                const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
+                const rayAngle = fraction * (maxAngle * 2);
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, 0);
+                this.ctx.lineTo(Math.cos(rayAngle) * len, Math.sin(rayAngle) * len);
+                this.ctx.stroke();
+              }
+              break;
+            }
           }
         }
+        this.ctx.restore();
       }
-      this.ctx.restore();
     }
   }
 
@@ -441,7 +416,7 @@ export class Renderer {
       
       const physStats = world.getComponent(id, 'physicsStats');
       const phys = world.getComponent(id, 'physicsBody');
-      const radius = physStats?.radius.current ?? phys?.body.r ?? meta?.config?.radius ?? 16;
+      const radius = physStats?.radius.current ?? phys?.body.r ?? 16;
 
       // Healthbar
       this.ctx.save();
@@ -462,7 +437,7 @@ export class Renderer {
       this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
-      const displayName = meta?.id ?? id;
+      const displayName = meta?.name ?? meta?.id ?? id;
       this.ctx.fillText(displayName, 0, -radius - 20 / camera.scale);
       this.ctx.restore();
     }
@@ -485,7 +460,7 @@ export class Renderer {
       this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
-      this.ctx.shadowColor = "black";
+      this.ctx.shadowColor = 'black';
       this.ctx.shadowBlur = 4;
       this.ctx.shadowOffsetX = 1;
       this.ctx.shadowOffsetY = 1;

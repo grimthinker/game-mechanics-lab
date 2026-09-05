@@ -8,10 +8,10 @@ export const HIT_ZONE_LABELS: Record<HitZoneType, string> = {
 };
 
 export interface ZoneTypeParams {
-  range: number;
+  length: number;
   radius: number;
   angle: number;
-  numLines: number;
+  rayCount: number;
   pierceObstacles: boolean;
   piercePlayers: boolean;
   pierceBots: boolean;
@@ -19,37 +19,37 @@ export interface ZoneTypeParams {
 
 export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   angle: {
-    range: 100,
+    length: 100,
     radius: 50,
     angle: 30,
-    numLines: 5,
+    rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
     pierceBots: false,
   },
   radius: {
-    range: 100,
+    length: 100,
     radius: 50,
     angle: 30,
-    numLines: 5,
+    rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
     pierceBots: false,
   },
   forward_line: {
-    range: 150,
+    length: 150,
     radius: 50,
     angle: 30,
-    numLines: 5,
+    rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
     pierceBots: false,
   },
   shrapnel: {
-    range: 120,
+    length: 120,
     radius: 50,
     angle: 60,
-    numLines: 5,
+    rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
     pierceBots: false,

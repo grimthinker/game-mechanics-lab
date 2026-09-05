@@ -6,6 +6,7 @@ import {
   WeaponConfig,
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
+  ArmorConfig,
 } from '../ecs/types';
 import { GameApp } from '../GameApp';
 import { Circle } from 'detect-collisions';
@@ -173,7 +174,30 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     }
     
     if (updatedItem.type === 'weapon') {
-      lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(updatedItem.config as WeaponConfig));
+      const wcfg = updatedItem.config as WeaponConfig;
+      lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(wcfg));
+
+      const wStats = app.world.getComponent(entityId, 'weaponStats');
+      if (wStats) {
+        wStats.baseDamage.base = wcfg.baseDamage;
+        wStats.baseDamage.current = wcfg.baseDamage;
+        wStats.prepTime.base = wcfg.prepTime;
+        wStats.prepTime.current = wcfg.prepTime;
+        wStats.recoveryTime.base = wcfg.recoveryTime;
+        wStats.recoveryTime.current = wcfg.recoveryTime;
+      }
+      if (wcfg.zone) {
+        app.world.addComponent(entityId, 'weaponZone', JSON.parse(JSON.stringify(wcfg.zone)));
+      }
+    } else if (updatedItem.type === 'armor') {
+      const acfg = updatedItem.config as ArmorConfig;
+      const aStats = app.world.getComponent(entityId, 'armorStats');
+      if (aStats) {
+        aStats.defense.base = acfg.defense;
+        aStats.defense.current = acfg.defense;
+        aStats.flatReduction.base = acfg.flat_reduction;
+        aStats.flatReduction.current = acfg.flat_reduction;
+      }
     }
 
     const c = app.selectedEntity;

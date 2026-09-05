@@ -61,7 +61,7 @@ export const App: React.FC = () => {
 
     if (currentMode === GameMode.GAME) {
       const isAnyPlayerAlive = app.world.getAllEntities().some(([_, comp]) => 
-        (comp.aiStats?.behavior?.current ?? comp.meta?.config?.behavior) === 'PlayerTree' && comp.health?.isAlive
+        comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
       );
       if (!isAnyPlayerAlive) {
         setModeSync(GameMode.SIMULATION);
@@ -135,7 +135,11 @@ export const App: React.FC = () => {
 
     app.start();
     app.onFrame = updateStats;
-    app.spawnCreature(createDefaultCreatureConfig('PlayerTree'));
+    const spawnPos = {
+      x: 100 + Math.random() * Math.max(0, canvasRef.current.width - 200),
+      y: 100 + Math.random() * Math.max(0, canvasRef.current.height - 200),
+    };
+    app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
     updateStats();
 
     return () => {

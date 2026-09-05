@@ -132,32 +132,58 @@ export class BTActionPatrol extends BTAction {
   }
 }
 
-const attack_duration = 0.5;
-
 export class BTActionAttack extends BTAction {
-  private timer: number = 0;
+  private hasStarted: boolean = false;
   public static readonly nodeName = 'Атака';
   public static readonly description =
-    'Совершает атаку. Пока идет атака, узел в состоянии RUNNING';
+    'Совершает атаку указанным слотом (или первым свободным) и ожидает её завершения в ECS';
+  public static readonly defaultParams: { slotIndex?: number } = {
+    slotIndex: undefined,
+  };
+
+  private params: typeof BTActionAttack.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionAttack.defaultParams>) {
+    super();
+    this.params = { ...BTActionAttack.defaultParams, ...params };
+  }
 
   protected onOpen(entity: EntityAdapter): void {
     const target_id = entity.brain!.blackboard.get('target_id');
     entity.stop();
-    entity.attack(target_id);
-    this.timer = 0;
+    entity.attack(target_id, this.params.slotIndex);
+    this.hasStarted = false;
   }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
-    this.timer += entity.dt;
+    // 1. Атака активна и обрабатывается в ECS (для конкретного слота или общая)
+    const isAttackingInECS = this.params.slotIndex !== undefined
+      ? entity.isSlotBusy(this.params.slotIndex)
+      : entity.attack_status !== 'idle';
 
-    if (this.timer >= attack_duration) {
+    if (isAttackingInECS) {
+      this.hasStarted = true;
+      return NodeStatus.RUNNING;
+    }
+
+    // 2. Запрос на атаку только что отправлен в input, но AttackSystem еще не выполнилась в текущем кадре
+    if (entity.hasPendingAttackRequest) {
+      return NodeStatus.RUNNING;
+    }
+
+    // 3. Атака была начата в ECS и теперь полностью завершилась (пройдено время восстановления)
+    if (this.hasStarted) {
       return NodeStatus.SUCCESS;
     }
 
-    return NodeStatus.RUNNING;
+    // 4. Запрос был обработан, но атака не началась (нет оружия в слотах, слот занят и т.д.)
+    return NodeStatus.FAILURE;
   }
 
-  protected stopAction(entity: EntityAdapter): void {}
+  protected stopAction(entity: EntityAdapter): void {
+    entity.cancelAttack(this.params.slotIndex);
+    this.hasStarted = false;
+  }
 }
 
 export class BTCommandForgetTarget extends BTSimpleAction {

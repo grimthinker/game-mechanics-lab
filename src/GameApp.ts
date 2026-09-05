@@ -1,10 +1,7 @@
-import { Circle } from 'detect-collisions';
 import { World } from './ecs/World';
 import {
-  WeaponConfig,
   ItemData,
   StandardRadius,
-  CreatureConfig,
   InventoryConfig,
 } from './ecs/types';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
@@ -14,8 +11,6 @@ import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
-import { createRandomWeaponItem } from './Weapon';
-import { createDefaultArmorItem, createDefaultBagItem } from './DefaultItems';
 import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { EntityFactory } from './ecs/EntityFactory';
@@ -80,32 +75,6 @@ export class GameApp {
     return this.entityFactory.spawnEntity(this.world, this.physics, this.aiSystem, config, position, forcedId);
   }
 
-  public spawnCreature(
-    config: CreatureConfig,
-    position?: Point,
-    forcedId?: string
-  ): EntityAdapter {
-    const entityConfig: EntityConfig = {
-      physics: { radius: config.radius, weight: config.weight, isSolid: config.isSolid },
-      health: { maxHp: config.maxHp, hp: config.hp },
-      movement: { maxSpeed: config.maxSpeed, maxTurnSpeed: config.maxTurnSpeed, runSpeedMultiplier: config.runSpeedMultiplier, crouchSpeedMultiplier: config.crouchSpeedMultiplier, runTurnMultiplier: config.runTurnMultiplier, crouchTurnMultiplier: config.crouchTurnMultiplier },
-      stealth: { stealthPower: config.stealthPower, runStealthMultiplier: config.runStealthMultiplier, crouchStealthMultiplier: config.crouchStealthMultiplier },
-      ai: { behavior: config.behavior },
-      equip: [ { type: 'armor', itemId: null }, { type: 'bag', itemId: null }, { type: 'weapon', itemId: null } ],
-      meta: { id: forcedId, entityType: 'creature' }
-    };
-
-    const pos = position
-      ? { ...position }
-      : {
-          x: 100 + Math.random() * (this.canvas.width - 200),
-          y: 100 + Math.random() * (this.canvas.height - 200),
-        };
-
-    const id = this.spawnEntity(entityConfig, pos, forcedId);
-    return new EntityAdapter(id, this.world);
-  }
-
   public spawnItemEntity(itemData: ItemData, forcedId?: string): string {
     const config: EntityConfig = { item: itemData };
     if (itemData.type === 'bag' && itemData.config) {
@@ -134,10 +103,6 @@ export class GameApp {
     }
     // Синхронизируем ID сущности в мире с внутренним ID предмета
     return this.spawnEntity(config, position, itemData.id);
-  }
-
-  public despawnEntityFromWorld(id: string): void {
-    this.entityFactory.despawnEntityFromWorld(this.world, this.physics, id);
   }
 
   public deleteSelectedEntity(): void {
@@ -209,8 +174,8 @@ export class GameApp {
 
     if (!this.isPaused) {
       this.aiSystem.update(dt, this.world);
-      this.movementSystem.update(dt, this.world);
       this.attackSystem.update(dt, this.world, this.physics);
+      this.movementSystem.update(dt, this.world);
       this.physics.update(dt, this.world);
       this.damageSystem.update(dt, this.world);
     }

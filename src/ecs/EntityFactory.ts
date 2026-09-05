@@ -5,7 +5,6 @@ import { AISystem } from './systems/AISystem';
 import {
     EntityId,
     EntityConfig,
-    CreatureConfig,
     CollisionCategory,
     COLLISION_MASK_ALL,
     COLLISION_MASK_NONE,
@@ -53,7 +52,13 @@ export class EntityFactory {
       });
       world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
       world.addComponent(id, 'input', {
-        isMovingForward: false, turnDirection: 0, turnSpeed: 0, isRunning: false, isCrouching: false, wantsAttack: false
+        isMovingForward: false,
+        turnDirection: 0,
+        turnSpeed: 0,
+        isRunning: false,
+        isCrouching: false,
+        wantsAttack: false,
+        attackSlotIndex: undefined,
       });
     }
 
@@ -73,10 +78,44 @@ export class EntityFactory {
     }
 
     if (config.item) {
-      world.addComponent(id, 'item', config.item);
-    }
-
-    if (config.inventory) {
+        world.addComponent(id, 'item', config.item);
+  
+        if (config.item.type === 'weapon') {
+          const wcfg = config.item.config as any;
+          const ws = config.weaponStats;
+          world.addComponent(id, 'weaponStats', {
+            baseDamage: { base: ws?.baseDamage ?? wcfg.baseDamage ?? 20, current: ws?.baseDamage ?? wcfg.baseDamage ?? 20 },
+            prepTime: { base: ws?.prepTime ?? wcfg.prepTime ?? 0.2, current: ws?.prepTime ?? wcfg.prepTime ?? 0.2 },
+            castTime: { base: ws?.castTime ?? wcfg.castTime ?? 0, current: ws?.castTime ?? wcfg.castTime ?? 0 },
+            recoveryTime: { base: ws?.recoveryTime ?? wcfg.recoveryTime ?? 0.3, current: ws?.recoveryTime ?? wcfg.recoveryTime ?? 0.3 },
+            prepTurnSlow: { base: ws?.prepTurnSlow ?? wcfg.prepTurnSlow ?? 0.5, current: ws?.prepTurnSlow ?? wcfg.prepTurnSlow ?? 0.5 },
+            recoveryTurnSlow: { base: ws?.recoveryTurnSlow ?? wcfg.recoveryTurnSlow ?? 0.8, current: ws?.recoveryTurnSlow ?? wcfg.recoveryTurnSlow ?? 0.8 },
+            prepMoveSlow: { base: ws?.prepMoveSlow ?? wcfg.prepMoveSlow ?? 0.5, current: ws?.prepMoveSlow ?? wcfg.prepMoveSlow ?? 0.5 },
+            recoveryMoveSlow: { base: ws?.recoveryMoveSlow ?? wcfg.recoveryMoveSlow ?? 0.8, current: ws?.recoveryMoveSlow ?? wcfg.recoveryMoveSlow ?? 0.8 },
+            castMoveSlow: { base: ws?.castMoveSlow ?? wcfg.castMoveSlow ?? 0.5, current: ws?.castMoveSlow ?? wcfg.castMoveSlow ?? 0.5 },
+            minMultiplier: { base: ws?.minMultiplier ?? wcfg.minMultiplier ?? 0.8, current: ws?.minMultiplier ?? wcfg.minMultiplier ?? 0.8 },
+            maxMultiplier: { base: ws?.maxMultiplier ?? wcfg.maxMultiplier ?? 1.2, current: ws?.maxMultiplier ?? wcfg.maxMultiplier ?? 1.2 },
+            critChance: { base: ws?.critChance ?? wcfg.critChance ?? 0.1, current: ws?.critChance ?? wcfg.critChance ?? 0.1 },
+            critMultiplier: { base: ws?.critMultiplier ?? wcfg.critMultiplier ?? 2.0, current: ws?.critMultiplier ?? wcfg.critMultiplier ?? 2.0 },
+          });
+  
+          const zone = config.weaponZone ?? wcfg.zone;
+          if (zone) {
+            world.addComponent(id, 'weaponZone', JSON.parse(JSON.stringify(zone)));
+          }
+        }
+  
+        if (config.item.type === 'armor') {
+          const acfg = config.item.config as any;
+          const as = config.armorStats;
+          world.addComponent(id, 'armorStats', {
+            defense: { base: as?.defense ?? acfg.defense ?? 0, current: as?.defense ?? acfg.defense ?? 0 },
+            flatReduction: { base: as?.flatReduction ?? acfg.flat_reduction ?? 0, current: as?.flatReduction ?? acfg.flat_reduction ?? 0 },
+          });
+        }
+      }
+  
+      if (config.inventory) {
         const w = config.inventory.size.width;
         const h = config.inventory.size.height;
         const slots = config.inventory.slots ?? Array.from({ length: h }, () =>
@@ -94,30 +133,12 @@ export class EntityFactory {
     }
 
     if (config.meta) {
-      const dummyConfig: CreatureConfig = {
-        radius: config.physics?.radius ?? 16,
-        weight: config.physics?.weight ?? 10,
-        isSolid: config.physics?.isSolid ?? true,
-        maxHp: config.health?.maxHp ?? 100,
-        hp: config.health?.hp ?? config.health?.maxHp ?? 100,
-        maxSpeed: config.movement?.maxSpeed ?? 150,
-        maxTurnSpeed: config.movement?.maxTurnSpeed ?? 270,
-        runSpeedMultiplier: config.movement?.runSpeedMultiplier ?? 1.5,
-        crouchSpeedMultiplier: config.movement?.crouchSpeedMultiplier ?? 0.5,
-        runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
-        crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 1.2,
-        stealthPower: config.stealth?.stealthPower ?? 10,
-        runStealthMultiplier: config.stealth?.runStealthMultiplier ?? 0.5,
-        crouchStealthMultiplier: config.stealth?.crouchStealthMultiplier ?? 1.5,
-        behavior: config.ai?.behavior ?? 'IdleTree',
-      };
-      world.addComponent(id, 'meta', {
-        id: config.meta.id || id,
-        name: config.meta.id || id,   // НУЖНО СДЕЛАТЬ ВОЗМОЖНОСТЬ УКАЗЫВАТЬ ИМЯ.
-        state: 'idle',
-        config: dummyConfig,
-      });
-    }
+        world.addComponent(id, 'meta', {
+          id: config.meta.id || id,
+          name: config.meta.name || config.meta.id || id,
+          state: 'idle',
+        });
+      }
 
     if (position) {
       world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
@@ -135,21 +156,5 @@ export class EntityFactory {
     }
 
     return id;
-  }
-
-  public despawnEntityFromWorld(
-    world: World,
-    physics: PhysicsSystem,
-    id: EntityId
-  ): void {
-    const phys = world.getComponent(id, 'physicsBody');
-    if (phys) {
-      physics.unregisterBody(phys.body);
-      world.removeComponent(id, 'physicsBody');
-    }
-
-    world.removeComponent(id, 'transform');
-    world.removeComponent(id, 'velocity');
-    world.removeComponent(id, 'input');
   }
 }

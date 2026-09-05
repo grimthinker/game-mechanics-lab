@@ -30,18 +30,6 @@ export interface BTNodeDTO {
     parameters?: Record<string, any>;
     timeToNextTick?: number; 
     children: BTNodeDTO[];
-  }
-
-export interface BTMessage {
-  type: 'BT_TICK';
-  payload: EntityBTState[];
-}
-
-export interface EntityBTState {
-  entity_id: number;
-  entity_name?: string;
-  tree: BTNodeDTO;
-  blackboard?: Record<string, any>; 
 }
 
 export interface EntityUtils {
@@ -56,7 +44,6 @@ export interface EntityUtils {
 
 
 export type AttackStatus = 'idle' | 'attacking' | 'cooldown';
-export type AttackData = any;
 
 export abstract class BTNode {
   public readonly id: string = Math.random().toString(36).substring(2, 9);

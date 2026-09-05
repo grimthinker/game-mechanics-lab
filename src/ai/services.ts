@@ -61,8 +61,6 @@ export class BTServiceFindNearestTarget extends BTService {
 
     const entities = entity.utils.get_all_entities();
 
-    console.log('entities', entities.length)
-
     let nearest_id: string | null = null;
     let min_dist_sq = rangeSq;
 

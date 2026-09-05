@@ -32,16 +32,16 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
       setDraft(JSON.parse(JSON.stringify(item)));
       const cfg = item.config as any;
       if (item.type === 'weapon') {
-        const zType = (cfg.zone.hitZoneType === 'line' ? 'forward_line' : cfg.zone.hitZoneType) as HitZoneType;
+        const zType = cfg.zone.hitZoneType as HitZoneType;
         setFormValues({
           name: item.name,
           weight: cfg.weight ?? 1,
           baseDamage: cfg.baseDamage,
           prepTime: cfg.prepTime,
           recoveryTime: cfg.recoveryTime,
-          range: cfg.zone.length ?? cfg.zone.range ?? 150,
+          length: cfg.zone.length ?? 150,
           radius: cfg.zone.radius ?? 50,
-          numLines: cfg.zone.rayCount ?? cfg.zone.numLines ?? cfg.zone.lines ?? 5,
+          rayCount: cfg.zone.rayCount ?? 5,
           angle: cfg.zone.angle !== undefined ? Math.round((cfg.zone.angle * 180) / Math.PI) : 30,
           pierceObstacles: !!cfg.zone.pierceObstacles,
           piercePlayers: !!cfg.zone.piercePlayers,
@@ -75,9 +75,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
 
     // Сохраняем текущие специфические параметры
     lastAddedWeaponConfigState.zoneParamsMap[currentValues.hitZoneType] = {
-      range: currentValues.range,
+      length: currentValues.length,
       radius: currentValues.radius,
-      numLines: currentValues.numLines,
+      rayCount: currentValues.rayCount,
       angle: currentValues.angle,
       pierceObstacles: currentValues.pierceObstacles,
       piercePlayers: currentValues.piercePlayers,
@@ -91,9 +91,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
     setFormValues({
       ...currentValues,
       hitZoneType: newType,
-      range: nextParams.range,
+      length: nextParams.length,
       radius: nextParams.radius,
-      numLines: nextParams.numLines,
+      rayCount: nextParams.rayCount,
       angle: nextParams.angle,
       pierceObstacles: nextParams.pierceObstacles,
       piercePlayers: nextParams.piercePlayers,
@@ -124,13 +124,13 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
       } else if (zoneType === 'angle') {
         newZone = {
           hitZoneType: 'angle',
-          length: formValues.range,
+          length: formValues.length,
           angle: (formValues.angle * Math.PI) / 180,
         };
       } else if (zoneType === 'forward_line') {
         newZone = {
           hitZoneType: 'forward_line',
-          length: formValues.range,
+          length: formValues.length,
           pierceObstacles: formValues.pierceObstacles,
           piercePlayers: formValues.piercePlayers,
           pierceBots: formValues.pierceBots,
@@ -138,9 +138,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
       } else {
         newZone = {
           hitZoneType: 'shrapnel',
-          length: formValues.range,
+          length: formValues.length,
           angle: (formValues.angle * Math.PI) / 180,
-          rayCount: formValues.numLines,
+          rayCount: formValues.rayCount,
           pierceObstacles: formValues.pierceObstacles,
           piercePlayers: formValues.piercePlayers,
           pierceBots: formValues.pierceBots,
@@ -152,9 +152,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
       // Обновляем глобальное состояние последнего добавленного оружия
       lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(cfg));
       lastAddedWeaponConfigState.zoneParamsMap[zoneType] = {
-        range: formValues.range,
+        length: formValues.length,
         radius: formValues.radius,
-        numLines: formValues.numLines,
+        rayCount: formValues.rayCount,
         angle: formValues.angle,
         pierceObstacles: formValues.pierceObstacles,
         piercePlayers: formValues.piercePlayers,

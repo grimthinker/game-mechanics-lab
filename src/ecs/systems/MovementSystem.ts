@@ -40,15 +40,26 @@ export class MovementSystem {
         let mMove = 1;
         let mTurn = 1;
 
+        const wStats = world.getComponent(atk.weaponId, 'weaponStats');
+        const wItem = world.getComponent(atk.weaponId, 'item');
+        const weaponConfig = wItem?.type === 'weapon' ? (wItem.config as any) : undefined;
+        if (!wStats && !weaponConfig) continue;
+
+        const prepMoveSlow = wStats?.prepMoveSlow.current ?? weaponConfig?.prepMoveSlow ?? 0.5;
+        const prepTurnSlow = wStats?.prepTurnSlow.current ?? weaponConfig?.prepTurnSlow ?? 0.5;
+        const castMoveSlow = wStats?.castMoveSlow.current ?? weaponConfig?.castMoveSlow ?? prepMoveSlow;
+        const recoveryMoveSlow = wStats?.recoveryMoveSlow.current ?? weaponConfig?.recoveryMoveSlow ?? 0.8;
+        const recoveryTurnSlow = wStats?.recoveryTurnSlow.current ?? weaponConfig?.recoveryTurnSlow ?? 0.8;
+
         if (atk.phase === 'prep') {
-          mMove = atk.weapon.prepMoveSlow;
-          mTurn = atk.weapon.prepTurnSlow;
+          mMove = prepMoveSlow;
+          mTurn = prepTurnSlow;
         } else if (atk.phase === 'cast') {
-          mMove = atk.weapon.castMoveSlow ?? atk.weapon.prepMoveSlow;
+          mMove = castMoveSlow;
           mTurn = 0; // Во время задержки перед ударом поворот запрещен
         } else {
-          mMove = atk.weapon.recoveryMoveSlow;
-          mTurn = atk.weapon.recoveryTurnSlow;
+          mMove = recoveryMoveSlow;
+          mTurn = recoveryTurnSlow;
         }
 
         if (mMove < moveSlow) moveSlow = mMove;

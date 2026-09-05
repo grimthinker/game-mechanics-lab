@@ -224,15 +224,13 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
       const id2 = this.bodyToEntityMap.get(c2);
       if (!id1 || !id2) return;
 
-      const meta1 = world.getComponent(id1, 'meta');
       const health1 = world.getComponent(id1, 'health');
       const healthStats1 = world.getComponent(id1, 'healthStats');
-      const valid1 = meta1 ? (health1?.isAlive && healthStats1 && healthStats1.hp.current > 0) : true;
+      const valid1 = healthStats1 ? (health1?.isAlive && healthStats1.hp.current > 0) : true;
 
-      const meta2 = world.getComponent(id2, 'meta');
       const health2 = world.getComponent(id2, 'health');
       const healthStats2 = world.getComponent(id2, 'healthStats');
-      const valid2 = meta2 ? (health2?.isAlive && healthStats2 && healthStats2.hp.current > 0) : true;
+      const valid2 = healthStats2 ? (health2?.isAlive && healthStats2.hp.current > 0) : true;
 
       if (!valid1 || !valid2) return;
 
@@ -280,8 +278,8 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
     if (this.obstaclesEnabled) {
       const entities = world.getEntitiesWith('physicsBody', 'transform');
       for (const [id, { physicsBody, transform }] of entities) {
-        const meta = world.getComponent(id, 'meta');
-        if (meta && !world.getComponent(id, 'health')?.isAlive) continue;
+        const health = world.getComponent(id, 'health');
+        if (health && !health.isAlive) continue;
         if ((physicsBody.mask & CollisionCategory.OBSTACLE) === 0) continue;
         
         this.resolveObstaclesForBody(physicsBody.body);
@@ -375,8 +373,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
 
         if (hitTransform) {
           const hitAiStats = world.getComponent(hitEntityId, 'aiStats');
-          const hitMeta = world.getComponent(hitEntityId, 'meta');
-          const hitBehavior = hitAiStats?.behavior?.current ?? hitMeta?.config?.behavior ?? 'IdleTree';
+          const hitBehavior = hitAiStats?.behavior?.current ?? 'IdleTree';
           
           if (hitBehavior === 'PlayerTree') {
             if (weapon.zone.piercePlayers) {

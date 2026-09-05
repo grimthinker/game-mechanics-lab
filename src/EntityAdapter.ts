@@ -9,6 +9,8 @@ import {
   StandardRadius,
   ItemData,
   OwnershipComponent,
+  ArmorStatsComponent,
+  WeaponStatsComponent,
 } from './ecs/types';
 import {
   EntityUtils,
@@ -35,6 +37,12 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get inventory(): InventoryComponent | undefined {
     return this.world.getComponent(this.id, 'inventory');
+  }
+  public get weaponStats(): WeaponStatsComponent | undefined {
+    return this.world.getComponent(this.id, 'weaponStats');
+  }
+  public get armorStats(): ArmorStatsComponent | undefined {
+    return this.world.getComponent(this.id, 'armorStats');
   }
   public get ownership(): OwnershipComponent | undefined {
     return this.world.getComponent(this.id, 'ownership');
@@ -120,8 +128,25 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.world.getComponent(this.id, 'brain') as BTLogicComponent | undefined;
   }
   public get attack_status(): AttackStatus {
+    const activeAttacks = this.world.getComponent(this.id, 'activeAttacks');
+    const currentAttack = activeAttacks?.attacks[0];
+    if (!currentAttack) return 'idle';
+
+    if (currentAttack.phase === 'prep' || currentAttack.phase === 'cast') {
+      return 'attacking';
+    }
+    if (currentAttack.phase === 'recovery') {
+      return 'cooldown';
+    }
+    return 'idle';
+  }
+  public get attack_phase(): 'prep' | 'cast' | 'recovery' | null {
+    const activeAttacks = this.world.getComponent(this.id, 'activeAttacks');
+    return activeAttacks?.attacks[0]?.phase ?? null;
+  }
+  public get hasPendingAttackRequest(): boolean {
     const input = this.world.getComponent(this.id, 'input');
-    return input?.wantsAttack ? 'attacking' : 'idle';
+    return input?.wantsAttack ?? false;
   }
   public get ai_stats(): BehaviorStatsConfig {
     return {
@@ -190,13 +215,50 @@ export class EntityAdapter implements IMovable, EntityController {
       input.turnDirection = 0;
       input.turnSpeed = 0;
       input.wantsAttack = false;
+      input.attackSlotIndex = undefined;
     }
     return true;
   }
-  public attack(_id_target?: string): boolean {
+  public attack(_id_target?: string, slotIndex?: number): boolean {
     const input = this.world.getComponent(this.id, 'input');
-    if (input) input.wantsAttack = true;
+    if (input) {
+      input.wantsAttack = true;
+      input.attackSlotIndex = slotIndex;
+    }
     return true;
+  }
+  public cancelAttack(slotIndex?: number): void {
+    const activeAttacks = this.world.getComponent(this.id, 'activeAttacks');
+    if (!activeAttacks) return;
+    if (slotIndex !== undefined) {
+      activeAttacks.attacks = activeAttacks.attacks.filter((a) => a.slotIndex !== slotIndex);
+    } else {
+      activeAttacks.attacks = [];
+    }
+  }
+  public isSlotBusy(slotIndex: number): boolean {
+    const activeAttacks = this.world.getComponent(this.id, 'activeAttacks');
+    return activeAttacks?.attacks.some((a) => a.slotIndex === slotIndex) ?? false;
+  }
+  public isWeaponBusy(weaponId: EntityId): boolean {
+    const activeAttacks = this.world.getComponent(this.id, 'activeAttacks');
+    return activeAttacks?.attacks.some((a) => a.weaponId === weaponId) ?? false;
+  }
+  public getFreeWeaponSlots(): { slotIndex: number; weaponId: EntityId }[] {
+    const equip = this.world.getComponent(this.id, 'equip');
+    const activeAttacks = this.world.getComponent(this.id, 'activeAttacks');
+    if (!equip) return [];
+
+    const busySlots = new Set(activeAttacks?.attacks.map((a) => a.slotIndex));
+    const freeSlots: { slotIndex: number; weaponId: EntityId }[] = [];
+
+    equip.slots.forEach((slot, index) => {
+      if (slot.type === 'weapon' && slot.itemId !== null && !busySlots.has(index)) {
+        freeSlots.push({ slotIndex: index, weaponId: slot.itemId });
+      }
+    });
+
+    return freeSlots;
   }
   public getPos(): Point {
     const transform = this.world.getComponent(this.id, 'transform');
@@ -205,11 +267,9 @@ export class EntityAdapter implements IMovable, EntityController {
 
   public setBehavior(newBehavior: string, aiSystem: AISystem): void {
     const aiStats = this.world.getComponent(this.id, 'aiStats');
-    const meta = this.world.getComponent(this.id, 'meta');
-    if (!aiStats || !meta || aiStats.behavior.current === newBehavior) return;
+    if (!aiStats || aiStats.behavior.current === newBehavior) return;
 
     aiStats.behavior.current = newBehavior;
-    if (meta.config) meta.config.behavior = newBehavior;
     aiSystem.initBotBrain(this.world, this.id, newBehavior);
 
     this.stop();
@@ -247,7 +307,6 @@ export class EntityAdapter implements IMovable, EntityController {
       this.setBehavior(params.behavior, aiSystem);
     }
 
-    const meta = this.world.getComponent(this.id, 'meta');
     const phys = this.world.getComponent(this.id, 'physicsBody');
     const physStats = this.world.getComponent(this.id, 'physicsStats');
     const healthStats = this.world.getComponent(this.id, 'healthStats');
@@ -258,7 +317,6 @@ export class EntityAdapter implements IMovable, EntityController {
     if (physStats) {
       if (params.baseRadius !== undefined) {
         physStats.radius.base = params.baseRadius;
-        if (meta?.config) meta.config.radius = params.baseRadius;
       }
       if (params.radius !== undefined) {
         physStats.radius.current = params.radius;
@@ -266,7 +324,6 @@ export class EntityAdapter implements IMovable, EntityController {
       if (params.baseWeight !== undefined) {
         const val = Math.max(0.1, params.baseWeight);
         physStats.weight.base = val;
-        if (meta?.config) meta.config.weight = val;
       }
       if (params.weight !== undefined) {
         const val = Math.max(0.1, params.weight);
@@ -275,7 +332,6 @@ export class EntityAdapter implements IMovable, EntityController {
       if (params.isSolid !== undefined) {
         physStats.isSolid.base = params.isSolid;
         physStats.isSolid.current = params.isSolid;
-        if (meta?.config) meta.config.isSolid = params.isSolid;
       }
     }
 
@@ -284,37 +340,31 @@ export class EntityAdapter implements IMovable, EntityController {
         const val = Math.max(0, params.maxSpeed);
         moveStats.maxSpeed.base = val;
         moveStats.maxSpeed.current = val;
-        if (meta?.config) meta.config.maxSpeed = val;
       }
       if (params.maxTurnSpeed !== undefined) {
         const val = Math.max(0, params.maxTurnSpeed);
         moveStats.maxTurnSpeed.base = val;
         moveStats.maxTurnSpeed.current = val;
-        if (meta?.config) meta.config.maxTurnSpeed = (val * 180) / Math.PI; 
       }
       if (params.runSpeedMultiplier !== undefined) {
         const val = Math.max(0.1, params.runSpeedMultiplier);
         moveStats.runSpeedMultiplier.base = val;
         moveStats.runSpeedMultiplier.current = val;
-        if (meta?.config) meta.config.runSpeedMultiplier = val;
       }
       if (params.crouchSpeedMultiplier !== undefined) {
         const val = Math.max(0.1, params.crouchSpeedMultiplier);
         moveStats.crouchSpeedMultiplier.base = val;
         moveStats.crouchSpeedMultiplier.current = val;
-        if (meta?.config) meta.config.crouchSpeedMultiplier = val;
       }
       if (params.runTurnMultiplier !== undefined) {
         const val = Math.max(0.1, params.runTurnMultiplier);
         moveStats.runTurnMultiplier.base = val;
         moveStats.runTurnMultiplier.current = val;
-        if (meta?.config) meta.config.runTurnMultiplier = val;
       }
       if (params.crouchTurnMultiplier !== undefined) {
         const val = Math.max(0.1, params.crouchTurnMultiplier);
         moveStats.crouchTurnMultiplier.base = val;
         moveStats.crouchTurnMultiplier.current = val;
-        if (meta?.config) meta.config.crouchTurnMultiplier = val;
       }
     }
 
@@ -323,14 +373,12 @@ export class EntityAdapter implements IMovable, EntityController {
         const val = Math.max(1, params.maxHp);
         healthStats.maxHp.base = val;
         healthStats.maxHp.current = val;
-        if (meta?.config) meta.config.maxHp = val;
       }
       if (params.hp !== undefined) {
         const val = Math.min(healthStats.maxHp.current, Math.max(0, params.hp));
         healthStats.hp.base = val;
         healthStats.hp.current = val;
         if (health) health.isAlive = val > 0;
-        if (meta?.config) meta.config.hp = val;
       }
     }
 
@@ -339,19 +387,16 @@ export class EntityAdapter implements IMovable, EntityController {
         const val = Math.max(0, params.stealthPower);
         stealthStats.stealthPower.base = val;
         stealthStats.stealthPower.current = val;
-        if (meta?.config) meta.config.stealthPower = val;
       }
       if (params.runStealthMultiplier !== undefined) {
         const val = Math.max(0, params.runStealthMultiplier);
         stealthStats.runStealthMultiplier.base = val;
         stealthStats.runStealthMultiplier.current = val;
-        if (meta?.config) meta.config.runStealthMultiplier = val;
       }
       if (params.crouchStealthMultiplier !== undefined) {
         const val = Math.max(1, params.crouchStealthMultiplier);
         stealthStats.crouchStealthMultiplier.base = val;
         stealthStats.crouchStealthMultiplier.current = val;
-        if (meta?.config) meta.config.crouchStealthMultiplier = val;
       }
     }
 
