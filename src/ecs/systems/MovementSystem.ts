@@ -1,3 +1,4 @@
+import { Radians } from '../../utils';
 import { World } from '../World';
 
 export class MovementSystem {
@@ -16,7 +17,7 @@ export class MovementSystem {
       const healthStats = world.getComponent(id, 'healthStats');
       if (!health.isAlive || (healthStats && healthStats.hp.current <= 0)) {
         velocity.currentSpeed = 0;
-        velocity.currentTurnSpeed = 0;
+        velocity.currentTurnSpeed = 0 as Radians;
         meta.state = 'dead';
         continue;
       }
@@ -74,11 +75,11 @@ export class MovementSystem {
       // 5. Ограничение скорости поворота максимальным значением скорости поворота игрока
       const turnSpeed = Math.min(movementStats.maxTurnSpeed.current, input.turnSpeed);
 
-      velocity.currentTurnSpeed = input.turnDirection * turnSpeed * turnSlow * turnMult;
+      velocity.currentTurnSpeed = (input.turnDirection * turnSpeed * turnSlow * turnMult) as Radians;
 
       // 6. Поворот
       if (velocity.currentTurnSpeed !== 0) {
-        transform.angle += velocity.currentTurnSpeed * dt;
+        transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
       }
 
       // 7. Обновление состояния

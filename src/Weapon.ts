@@ -1,4 +1,5 @@
 import { WeaponConfig, ItemData, HitZoneType } from './ecs/types';
+import { deg2Rad, Radians } from './utils';
 
 export const HIT_ZONE_LABELS: Record<HitZoneType, string> = {
   angle: 'Сектор',
@@ -10,7 +11,7 @@ export const HIT_ZONE_LABELS: Record<HitZoneType, string> = {
 export interface ZoneTypeParams {
   length: number;
   radius: number;
-  angle: number;
+  angle: Radians;
   rayCount: number;
   pierceObstacles: boolean;
   piercePlayers: boolean;
@@ -21,7 +22,7 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   angle: {
     length: 100,
     radius: 50,
-    angle: 30,
+    angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
@@ -30,7 +31,7 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   radius: {
     length: 100,
     radius: 50,
-    angle: 30,
+    angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
@@ -39,7 +40,7 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   forward_line: {
     length: 150,
     radius: 50,
-    angle: 30,
+    angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
@@ -48,7 +49,7 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   shrapnel: {
     length: 120,
     radius: 50,
-    angle: 60,
+    angle: deg2Rad(60),
     rayCount: 5,
     pierceObstacles: false,
     piercePlayers: false,
@@ -97,7 +98,7 @@ export function createDefaultWeapons(): WeaponConfig[] {
       zone: {
         hitZoneType: 'angle',
         length: 100,
-        angle: Math.PI / 6,
+        angle: deg2Rad(30),
       },
       weight: 1,
       radius: 16,
@@ -142,7 +143,7 @@ export function createDefaultWeapons(): WeaponConfig[] {
       zone: {
         hitZoneType: 'shrapnel',
         length: 120,
-        angle: Math.PI / 3,
+        angle: deg2Rad(60),
         rayCount: 5,
       },
       weight: 1,

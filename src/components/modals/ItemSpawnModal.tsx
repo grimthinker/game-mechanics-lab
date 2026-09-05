@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ItemData, STANDARD_RADII, StandardRadius, WeaponConfig } from '../../ecs/types';
 import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues, ArmorFormValues, BagFormValues } from './forms/FormFields';
 import { createRandomWeaponItem } from '../../Weapon';
+import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 
 export interface ItemSpawnModalProps {
   isOpen: boolean;
@@ -13,20 +14,20 @@ const createInitialWeaponState = () => {
     const w = createRandomWeaponItem();
     const cfg = w.config as WeaponConfig;
     const values: WeaponFormValues = {
-      name: w.name,
-      weight: cfg.weight ?? 1,
-      baseDamage: cfg.baseDamage,
-      prepTime: cfg.prepTime,
-      recoveryTime: cfg.recoveryTime,
-      length: cfg.zone.length ?? 150,
-      radius: cfg.zone.radius ?? 50,
-      rayCount: cfg.zone.rayCount ?? 5,
-      angle: cfg.zone.angle !== undefined ? Math.round((cfg.zone.angle * 180) / Math.PI) : 30,
-      pierceObstacles: !!cfg.zone.pierceObstacles,
-      piercePlayers: !!cfg.zone.piercePlayers,
-      pierceBots: !!cfg.zone.pierceBots,
-      hitZoneType: cfg.zone.hitZoneType,
-    };
+        name: w.name,
+        weight: cfg.weight ?? 1,
+        baseDamage: cfg.baseDamage,
+        prepTime: cfg.prepTime,
+        recoveryTime: cfg.recoveryTime,
+        length: cfg.zone.length ?? 150,
+        radius: cfg.zone.radius ?? 50,
+        rayCount: cfg.zone.rayCount ?? 5,
+        angle: cfg.zone.angle !== undefined ? Math.round(rad2Deg(cfg.zone.angle)) as Degrees : (30 as Degrees),
+        pierceObstacles: !!cfg.zone.pierceObstacles,
+        piercePlayers: !!cfg.zone.piercePlayers,
+        pierceBots: !!cfg.zone.pierceBots,
+        hitZoneType: cfg.zone.hitZoneType,
+      };
     return { draft: w, values };
   };
 
@@ -80,7 +81,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
           wcfg.zone = {
             hitZoneType: 'angle',
             length: weaponValues.length,
-            angle: (weaponValues.angle * Math.PI) / 180,
+            angle: deg2Rad(weaponValues.angle),
           };
         } else if (zoneType === 'forward_line') {
           wcfg.zone = {
@@ -94,7 +95,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
           wcfg.zone = {
             hitZoneType: 'shrapnel',
             length: weaponValues.length,
-            angle: (weaponValues.angle * Math.PI) / 180,
+            angle: deg2Rad(weaponValues.angle),
             rayCount: weaponValues.rayCount,
             pierceObstacles: weaponValues.pierceObstacles,
             piercePlayers: weaponValues.piercePlayers,

@@ -23,6 +23,7 @@ import { AISystem } from './ecs/systems/AISystem';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { Point } from './types';
 import { COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
+import { Radians } from './utils';
 
 export class EntityAdapter implements IMovable, EntityController {
   public dt: number = 0;
@@ -58,9 +59,9 @@ export class EntityAdapter implements IMovable, EntityController {
     const transform = this.world.getComponent(this.id, 'transform');
     return transform ? { x: transform.x, y: transform.y } : { x: 0, y: 0 };
   }
-  public get angle(): number {
+  public get angle(): Radians {
     const transform = this.world.getComponent(this.id, 'transform');
-    return transform ? transform.angle : 0;
+    return (transform ? transform.angle : 0) as Radians;
   }
   public get radius(): StandardRadius {
     return (this.world.getComponent(this.id, 'physicsStats')?.radius.current as StandardRadius) ?? 16;
@@ -89,14 +90,14 @@ export class EntityAdapter implements IMovable, EntityController {
   public get maxSpeed(): number {
     return this.world.getComponent(this.id, 'movementStats')?.maxSpeed.current ?? 0;
   }
-  public get maxTurnSpeed(): number {
-    return this.world.getComponent(this.id, 'movementStats')?.maxTurnSpeed.current ?? 0;
+  public get maxTurnSpeed(): Radians {
+    return (this.world.getComponent(this.id, 'movementStats')?.maxTurnSpeed.current ?? 0) as Radians;
   }
   public get currentSpeed(): number {
     return this.world.getComponent(this.id, 'velocity')?.currentSpeed ?? 0;
   }
-  public get currentTurnSpeed(): number {
-    return this.world.getComponent(this.id, 'velocity')?.currentTurnSpeed ?? 0;
+  public get currentTurnSpeed(): Radians {
+    return (this.world.getComponent(this.id, 'velocity')?.currentTurnSpeed ?? 0) as Radians;
   }
   public get runSpeedMultiplier(): number {
     return this.world.getComponent(this.id, 'movementStats')?.runSpeedMultiplier.current ?? 1.5;
@@ -174,8 +175,8 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
     const moveStats = this.world.getComponent(this.id, 'movementStats');
-    const maxTurnSpeed = moveStats ? moveStats.maxTurnSpeed.current : 0;
-    const turnSpeed = maxTurnSpeed * ratio;
+    const maxTurnSpeed = moveStats ? moveStats.maxTurnSpeed.current : (0 as Radians);
+    const turnSpeed = (maxTurnSpeed * ratio) as Radians;
     if (input && health?.isAlive && this.hp > 0) {
       input.turnDirection = direction;
       input.turnSpeed = turnSpeed;
@@ -184,7 +185,7 @@ export class EntityAdapter implements IMovable, EntityController {
   public stopTurning(): void {
     const input = this.world.getComponent(this.id, 'input');
     if (input) input.turnDirection = 0;
-    if (input) input.turnSpeed = 0;
+    if (input) input.turnSpeed = 0 as Radians;
   }
   public startRunning(): void {
     const input = this.world.getComponent(this.id, 'input');
@@ -216,7 +217,7 @@ export class EntityAdapter implements IMovable, EntityController {
     if (input) {
       input.isMovingForward = false;
       input.turnDirection = 0;
-      input.turnSpeed = 0;
+      input.turnSpeed = 0 as Radians;
       input.wantsAttack = false;
       input.attackSlotIndex = undefined;
     }
@@ -292,7 +293,7 @@ export class EntityAdapter implements IMovable, EntityController {
       baseWeight?: number;
       isSolid?: boolean;
       maxSpeed?: number;
-      maxTurnSpeed?: number;
+      maxTurnSpeed?: Radians;
       hp?: number;
       maxHp?: number;
       runSpeedMultiplier?: number;
@@ -345,7 +346,7 @@ export class EntityAdapter implements IMovable, EntityController {
         moveStats.maxSpeed.current = val;
       }
       if (params.maxTurnSpeed !== undefined) {
-        const val = Math.max(0, params.maxTurnSpeed);
+        const val = Math.max(0, params.maxTurnSpeed) as Radians;
         moveStats.maxTurnSpeed.base = val;
         moveStats.maxTurnSpeed.current = val;
       }

@@ -10,6 +10,7 @@ import {
     COLLISION_MASK_NONE,
 } from './types';
 import { Point } from '../types';
+import { Radians } from '../utils';
 
 export class EntityFactory {
   public spawnEntity(
@@ -42,19 +43,19 @@ export class EntityFactory {
     }
 
     if (config.movement) {
-      world.addComponent(id, 'movementStats', {
-        maxSpeed: { base: config.movement.maxSpeed, current: config.movement.maxSpeed },
-        maxTurnSpeed: { base: (config.movement.maxTurnSpeed * Math.PI) / 180, current: (config.movement.maxTurnSpeed * Math.PI) / 180 },
-        runSpeedMultiplier: { base: config.movement.runSpeedMultiplier ?? 1.5, current: config.movement.runSpeedMultiplier ?? 1.5 },
+        world.addComponent(id, 'movementStats', {
+          maxSpeed: { base: config.movement.maxSpeed, current: config.movement.maxSpeed },
+          maxTurnSpeed: { base: config.movement.maxTurnSpeed, current: config.movement.maxTurnSpeed },
+          runSpeedMultiplier: { base: config.movement.runSpeedMultiplier ?? 1.5, current: config.movement.runSpeedMultiplier ?? 1.5 },
         crouchSpeedMultiplier: { base: config.movement.crouchSpeedMultiplier ?? 0.5, current: config.movement.crouchSpeedMultiplier ?? 0.5 },
         runTurnMultiplier: { base: config.movement.runTurnMultiplier ?? 0.8, current: config.movement.runTurnMultiplier ?? 0.8 },
         crouchTurnMultiplier: { base: config.movement.crouchTurnMultiplier ?? 1.2, current: config.movement.crouchTurnMultiplier ?? 1.2 },
       });
-      world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
+      world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 as Radians });
       world.addComponent(id, 'input', {
         isMovingForward: false,
         turnDirection: 0,
-        turnSpeed: 0,
+        turnSpeed: 0 as Radians,
         isRunning: false,
         isCrouching: false,
         wantsAttack: false,
@@ -141,10 +142,10 @@ export class EntityFactory {
         });
       }
 
-    if (position) {
-      world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
-      
-      if (config.physics) {
+      if (position) {
+        world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 as Radians });
+        
+        if (config.physics) {
         const body = new Circle({ x: position.x, y: position.y }, config.physics.radius);
         body.isStatic = false;
         const category = config.item ? CollisionCategory.ITEM : CollisionCategory.CREATURE;

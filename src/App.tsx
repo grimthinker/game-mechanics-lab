@@ -5,6 +5,7 @@ import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { InventoryConfig, ItemData, StandardRadius } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { createDefaultCreatureConfig } from './Creature';
+import { deg2Rad, rad2Deg } from './utils';
 import { serializeBTNode } from './ai/serializer';
 import { SpawnModal, CreatureEditModal, ItemSpawnModal, ItemEditModal } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
@@ -95,9 +96,9 @@ export const App: React.FC = () => {
         radius: c.radius,
         weight: c.weight,
         currentSpeed: c.currentSpeed,
-        currentTurnSpeed: (c.currentTurnSpeed * 180) / Math.PI,
+        currentTurnSpeed: rad2Deg(c.currentTurnSpeed),
         maxSpeed: c.maxSpeed,
-        maxTurnSpeed: (c.maxTurnSpeed * 180) / Math.PI,
+        maxTurnSpeed: rad2Deg(c.maxTurnSpeed),
         hp: c.hp,
         maxHp: c.maxHp,
         state: c.state,
@@ -243,7 +244,7 @@ export const App: React.FC = () => {
       config: {
         physics: { radius: modals.radius, weight: modals.weight, isSolid: modals.isSolid },
         health: { hp: 100, maxHp: 100 },
-        movement: { maxSpeed: modals.maxSpeed, maxTurnSpeed: modals.maxTurnSpeed, runSpeedMultiplier: modals.runSpeedMultiplier, crouchSpeedMultiplier: modals.crouchSpeedMultiplier, runTurnMultiplier: modals.runTurnMultiplier, crouchTurnMultiplier: modals.crouchTurnMultiplier },
+        movement: { maxSpeed: modals.maxSpeed, maxTurnSpeed: deg2Rad(modals.maxTurnSpeed), runSpeedMultiplier: modals.runSpeedMultiplier, crouchSpeedMultiplier: modals.crouchSpeedMultiplier, runTurnMultiplier: modals.runTurnMultiplier, crouchTurnMultiplier: modals.crouchTurnMultiplier },
         stealth: { stealthPower: modals.stealthPower, runStealthMultiplier: modals.runStealthMultiplier, crouchStealthMultiplier: modals.crouchStealthMultiplier },
         ai: { behavior: modals.pendingSpawnBehavior },
         equip: [ { type: 'armor', itemId: null }, { type: 'bag', itemId: null }, { type: 'weapon', itemId: null } ],

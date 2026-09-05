@@ -1,6 +1,7 @@
 import { GameApp } from '../GameApp';
 import { EntityConfig, CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE, SERIALIZABLE_COMPONENT_KEYS } from './types';
 import { Circle } from 'detect-collisions';
+import { deg2Rad, Radians } from '../utils';
 
 export class WorldSerializer {
   constructor(private app: GameApp) {}
@@ -80,11 +81,11 @@ export class WorldSerializer {
                 }
 
                 if (comps.movementStats) {
-                    this.app.world.addComponent(ent.id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
+                    this.app.world.addComponent(ent.id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 as Radians });
                     this.app.world.addComponent(ent.id, 'input', {
                         isMovingForward: false,
                         turnDirection: 0,
-                        turnSpeed: 0,
+                        turnSpeed: 0 as Radians,
                         isRunning: false,
                         isCrouching: false,
                         wantsAttack: false,
@@ -101,6 +102,13 @@ export class WorldSerializer {
                 }
             } else {
                 // СТАРЫЙ LEGACY-ФОРМАТ СОХРАНЕНИЙ (Обертка для обратной совместимости)
+                // Конвертация legacy-градусов в радианы
+                if (ent.movement && typeof ent.movement.maxTurnSpeed === 'number') {
+                    if (ent.movement.maxTurnSpeed > 20) {
+                        ent.movement.maxTurnSpeed = deg2Rad(ent.movement.maxTurnSpeed);
+                    }
+                }
+
                 const config: EntityConfig = {
                    physics: ent.physics,
                    health: ent.health,

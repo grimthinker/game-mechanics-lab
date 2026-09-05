@@ -4,6 +4,7 @@ import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues } fr
 import { DEFAULT_ZONE_PARAMS } from '../../Weapon';
 import { weaponModalState } from './weaponModalState';
 import { World } from '../../ecs/World';
+import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 
 export interface ItemEditModalProps {
     itemEntityId: string | null;
@@ -56,7 +57,7 @@ export interface ItemEditModalProps {
           length: cfg.zone.length ?? 150,
           radius: cfg.zone.radius ?? 50,
           rayCount: cfg.zone.rayCount ?? 5,
-          angle: cfg.zone.angle !== undefined ? Math.round((cfg.zone.angle * 180) / Math.PI) : 30,
+          angle: cfg.zone.angle !== undefined ? Math.round(rad2Deg(cfg.zone.angle)) as Degrees : (30 as Degrees),
           pierceObstacles: !!cfg.zone.pierceObstacles,
           piercePlayers: !!cfg.zone.piercePlayers,
           pierceBots: !!cfg.zone.pierceBots,
@@ -89,31 +90,31 @@ export interface ItemEditModalProps {
 
     // Сохраняем текущие специфические параметры
     weaponModalState.zoneParamsMap[currentValues.hitZoneType] = {
-      length: currentValues.length,
-      radius: currentValues.radius,
-      rayCount: currentValues.rayCount,
-      angle: currentValues.angle,
-      pierceObstacles: currentValues.pierceObstacles,
-      piercePlayers: currentValues.piercePlayers,
-      pierceBots: currentValues.pierceBots,
-    };
+        length: currentValues.length,
+        radius: currentValues.radius,
+        rayCount: currentValues.rayCount,
+        angle: deg2Rad(currentValues.angle),
+        pierceObstacles: currentValues.pierceObstacles,
+        piercePlayers: currentValues.piercePlayers,
+        pierceBots: currentValues.pierceBots,
+      };
 
     // Получаем сохраненные или дефолтные параметры для нового типа
     const nextParams =
       weaponModalState.zoneParamsMap[newType] || DEFAULT_ZONE_PARAMS[newType];
 
-    setFormValues({
-      ...currentValues,
-      hitZoneType: newType,
-      length: nextParams.length,
-      radius: nextParams.radius,
-      rayCount: nextParams.rayCount,
-      angle: nextParams.angle,
-      pierceObstacles: nextParams.pierceObstacles,
-      piercePlayers: nextParams.piercePlayers,
-      pierceBots: nextParams.pierceBots,
-    });
-  };
+      setFormValues({
+        ...currentValues,
+        hitZoneType: newType,
+        length: nextParams.length,
+        radius: nextParams.radius,
+        rayCount: nextParams.rayCount,
+        angle: Math.round(rad2Deg(nextParams.angle)) as Degrees,
+        pierceObstacles: nextParams.pierceObstacles,
+        piercePlayers: nextParams.piercePlayers,
+        pierceBots: nextParams.pierceBots,
+      });
+    };
 
   const handleConfirm = () => {
     const updated = { ...draft };
@@ -139,7 +140,7 @@ export interface ItemEditModalProps {
         newZone = {
           hitZoneType: 'angle',
           length: formValues.length,
-          angle: (formValues.angle * Math.PI) / 180,
+          angle: deg2Rad(formValues.angle),
         };
       } else if (zoneType === 'forward_line') {
         newZone = {
@@ -153,7 +154,7 @@ export interface ItemEditModalProps {
         newZone = {
           hitZoneType: 'shrapnel',
           length: formValues.length,
-          angle: (formValues.angle * Math.PI) / 180,
+          angle: deg2Rad(formValues.angle),
           rayCount: formValues.rayCount,
           pierceObstacles: formValues.pierceObstacles,
           piercePlayers: formValues.piercePlayers,
@@ -169,7 +170,7 @@ export interface ItemEditModalProps {
         length: formValues.length,
         radius: formValues.radius,
         rayCount: formValues.rayCount,
-        angle: formValues.angle,
+        angle: deg2Rad(formValues.angle),
         pierceObstacles: formValues.pierceObstacles,
         piercePlayers: formValues.piercePlayers,
         pierceBots: formValues.pierceBots,

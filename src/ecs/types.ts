@@ -1,13 +1,14 @@
 import { Circle } from 'detect-collisions';
 import { Point } from '../types';
 import { BehaviorStatsConfig, BTLogicComponent } from '../ai/core';
+import { Radians } from '../utils';
 
 export type EntityId = string;
 
 export interface TransformComponent {
   x: number;
   y: number;
-  angle: number;
+  angle: Radians;
 }
 
 export const enum CollisionCategory {
@@ -46,13 +47,13 @@ export type ComponentStats<T> = {
 
 export interface VelocityComponent {
   currentSpeed: number;
-  currentTurnSpeed: number;
+  currentTurnSpeed: Radians;
 }
 
 export interface InputComponent {
   isMovingForward: boolean;
   turnDirection: -1 | 0 | 1;
-  turnSpeed: number;
+  turnSpeed: Radians;
   isRunning: boolean;
   isCrouching: boolean;
   wantsAttack: boolean;
@@ -223,7 +224,7 @@ export interface ArmorConfig extends ItemConfig {
 export type HitZoneConfig = {
   hitZoneType: HitZoneType;
   radius?: number;
-  angle?: number;
+  angle?: Radians;
   length?: number;
   rayCount?: number;
   pierceObstacles?: boolean;
@@ -254,7 +255,7 @@ export interface HealthConfig {
 }
 export interface MovementConfig {
   maxSpeed: number;
-  maxTurnSpeed: number;
+  maxTurnSpeed: Radians;
   runSpeedMultiplier?: number;
   crouchSpeedMultiplier?: number;
   runTurnMultiplier?: number;

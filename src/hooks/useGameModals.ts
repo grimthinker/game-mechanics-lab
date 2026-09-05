@@ -11,6 +11,7 @@ import {
 import { GameApp } from '../GameApp';
 import { Circle } from 'detect-collisions';
 import { weaponModalState } from '../components/modals/weaponModalState';
+import { deg2Rad, rad2Deg } from '../utils';
 
 interface UseGameModalsProps {
   appRef: React.RefObject<GameApp | null>;
@@ -80,7 +81,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setEditWeight(c.weight);
     setEditBaseWeight(c.baseWeight ?? c.weight);
     setEditMaxSpeed(c.maxSpeed);
-    setEditMaxTurnSpeed(Math.round((c.maxTurnSpeed * 180) / Math.PI));
+    setEditMaxTurnSpeed(Math.round(rad2Deg(c.maxTurnSpeed)));
     setEditHp(c.hp);
     setEditMaxHp(c.maxHp);
     setEditRunSpeedMultiplier(c.runSpeedMultiplier);
@@ -109,7 +110,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
         weight: editWeight,
         baseWeight: editBaseWeight,
         maxSpeed: editMaxSpeed,
-        maxTurnSpeed: (editMaxTurnSpeed * Math.PI) / 180,
+        maxTurnSpeed: deg2Rad(editMaxTurnSpeed),
         hp: editHp,
         maxHp: editMaxHp,
         runSpeedMultiplier: editRunSpeedMultiplier,

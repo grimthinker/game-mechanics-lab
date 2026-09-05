@@ -1,4 +1,5 @@
 import { EntityConfig, StandardRadius } from './ecs/types';
+import { deg2Rad } from './utils';
 
 export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): EntityConfig {
   return {
@@ -13,7 +14,7 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
     },
     movement: {
       maxSpeed: 150,
-      maxTurnSpeed: 270,
+      maxTurnSpeed: deg2Rad(270),
       runSpeedMultiplier: 1.5,
       crouchSpeedMultiplier: 0.5,
       runTurnMultiplier: 0.8,

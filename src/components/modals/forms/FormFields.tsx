@@ -1,6 +1,7 @@
 import React from 'react';
 import { HitZoneType } from '../../../ecs/types';
 import { HIT_ZONE_LABELS } from '../../../Weapon';
+import { Degrees } from '../../../utils';
 
 export interface WeaponFormValues {
     name: string;
@@ -11,7 +12,7 @@ export interface WeaponFormValues {
     length: number;
     radius: number;
     rayCount: number;
-    angle: number;
+    angle: Degrees;
     pierceObstacles: boolean;
     piercePlayers: boolean;
     pierceBots: boolean;
@@ -152,7 +153,7 @@ export interface WeaponFormValues {
             value={values.angle}
             min={0}
             max={360}
-            onChange={(e) => onChange({ angle: Number(e.target.value) })}
+            onChange={(e) => onChange({ angle: Number(e.target.value) as Degrees })}
           />
         </label>
       )}
