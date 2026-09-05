@@ -28,6 +28,13 @@ export interface PhysicsBodyComponent {
   mask: number;
 }
 
+export interface GizmoComponent {
+  type: 'spawner' | 'waypoint' | 'trigger' | 'sound' | 'marker';
+  color?: string;       // Цвет отрисовки в редакторе (например, '#e67e22')
+  icon?: string;        // Иконка (например, '🚩', '🔊', '⚙️', '📍')
+  radius?: number;      // Радиус кликабельной зоны в редакторе (по умолчанию, например, 14px)
+}
+
 export interface StatValue<T = number> {
   base: T;
   current: T;
@@ -103,6 +110,7 @@ export interface ActiveAttackComponent {
 
 export interface CreatureMetaComponent {
   id: string;
+  name: string;
   state: CreatureState;
   config: CreatureConfig;
 }
@@ -132,6 +140,7 @@ export interface EntityComponents {
   item?: ItemComponent;
   meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
+  gizmo?: GizmoComponent;
 }
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
@@ -230,6 +239,7 @@ export type AIStatsComponent = ComponentStats<AIConfig>;
 
 export interface InventorySetup {
   size: InventorySize;
+  slots?: InventorySlot[][];
 }
 
 export interface EntityConfig {

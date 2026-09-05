@@ -138,7 +138,9 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     const app = appRef.current;
     if (!app) return;
 
-    const entityId = updatedItem.id;
+    const entityId = (app.selectedEntity && app.selectedEntity.itemData?.id === updatedItem.id)
+      ? app.selectedEntity.id
+      : updatedItem.id;
     const itemComp = app.world.getComponent(entityId, 'item');
     
     if (itemComp) {

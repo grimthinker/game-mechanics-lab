@@ -33,6 +33,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   goToGame,
   obstaclesEnabled,
   setObstaclesEnabled,
+  setObstaclesData,
   selectedStats,
   fileInputRef,
   worldFileInputRef,
@@ -59,11 +60,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
+  const isItem = !!selectedStats?.itemData;
+  const isCreature =
+    !!selectedStats &&
+    !isItem &&
+    (selectedStats.maxHp > 0 ||
+      selectedStats.maxSpeed > 0 ||
+      selectedStats.equipSlots.length > 0 ||
+      selectedStats.behavior !== 'IdleTree');
+  const isMarker = !!selectedStats && !isItem && !isCreature;
+
+  const getCardTitle = () => {
+    if (isItem) return 'Выбранный предмет';
+    if (isCreature) return 'Выбранное существо';
+    if (isMarker) return 'Служебный объект';
+    return 'Выбранный объект';
+  };
+
   return (
     <div id="toolbar" style={{ backgroundColor: THEME_COLORS[mode] }}>
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
         <h3>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', width: '100%' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              position: 'relative',
+              width: '100%',
+            }}
+          >
             <span>Мир</span>
             {isPaused && mode !== GameMode.GAME && (
               <span
@@ -166,7 +192,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   try {
                     const data = JSON.parse(evt.target?.result as string);
                     if (Array.isArray(data)) {
-                      // запуск загрузки препятствий
+                      setObstaclesData(data);
                     }
                   } catch {
                     alert('Ошибка при чтении JSON файла!');
@@ -183,8 +209,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>{selectedStats?.itemData ? 'Выбранный предмет' : 'Выбранное существо'}</h3>
-        {selectedStats?.itemData ? (
+        <h3>{getCardTitle()}</h3>
+        {isItem && selectedStats?.itemData ? (
           <div className="stats-list">
             <dl className="stats-list">
               <div className="stat-row">
@@ -242,22 +268,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               {mode === GameMode.EDITOR && (
                 <>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedStats!.itemData!)}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={() => openItemEditModal(selectedStats.itemData!)}
+                  >
                     Изменить
                   </button>
-                  <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteEntity}>
+                  <button
+                    className="btn"
+                    style={{ flex: 1, backgroundColor: '#c0392b' }}
+                    onClick={handleDeleteEntity}
+                  >
                     Удалить
                   </button>
                 </>
               )}
               {mode === GameMode.SIMULATION && (
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedStats!.itemData!)}>
+                <button
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => openItemEditModal(selectedStats.itemData!)}
+                >
                   Осмотреть
                 </button>
               )}
             </div>
           </div>
-        ) : selectedStats ? (
+        ) : isCreature && selectedStats ? (
           <div className="stats-list">
             <dl className="stats-list">
               <div className="stat-row">
@@ -300,56 +338,60 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               </div>
             </dl>
 
-            <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-              {selectedStats.equipSlots.map((slot: { item: any; type: string }, index: any) => {
-                const item = slot.item;
-                const hasEditableItem = item && ['weapon', 'armor', 'bag'].includes(item.type) && !!item.config;
-                const isWeapon = item?.type === 'weapon';
-                const isArmor = item?.type === 'armor';
-                const isBag = item?.type === 'bag';
+            {selectedStats.equipSlots.length > 0 && (
+              <>
+                <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                  {selectedStats.equipSlots.map((slot: { item: any; type: string }, index: any) => {
+                    const item = slot.item;
+                    const hasEditableItem = item && ['weapon', 'armor', 'bag'].includes(item.type) && !!item.config;
+                    const isWeapon = item?.type === 'weapon';
+                    const isArmor = item?.type === 'armor';
+                    const isBag = item?.type === 'bag';
 
-                return (
-                  <div
-                    key={`${slot.type}_${index}`}
-                    onClick={() => {
-                      if (hasEditableItem && item) openItemEditModal(item);
-                    }}
-                    style={{
-                      backgroundColor: '#1e1e1e',
-                      padding: '6px 8px',
-                      borderRadius: '4px',
-                      cursor: hasEditableItem ? 'pointer' : 'default',
-                      fontSize: '12px',
-                      border: '1px solid #444',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
-                    <span>
-                      {item ? item.name : 'Пусто'}
-                      {isWeapon && item?.config && (
-                        <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
-                          ({(item.config as WeaponConfig).baseDamage} урона)
+                    return (
+                      <div
+                        key={`${slot.type}_${index}`}
+                        onClick={() => {
+                          if (hasEditableItem && item) openItemEditModal(item);
+                        }}
+                        style={{
+                          backgroundColor: '#1e1e1e',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          cursor: hasEditableItem ? 'pointer' : 'default',
+                          fontSize: '12px',
+                          border: '1px solid #444',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
+                        <span>
+                          {item ? item.name : 'Пусто'}
+                          {isWeapon && item?.config && (
+                            <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
+                              ({(item.config as WeaponConfig).baseDamage} урона)
+                            </span>
+                          )}
+                          {isArmor && item?.config && (
+                            <span style={{ color: '#3498db', marginLeft: '6px' }}>
+                              ({(item.config as ArmorConfig).defense} защиты)
+                            </span>
+                          )}
+                          {isBag && item?.config && (
+                            <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
+                              ({(item.config as InventoryConfig).size.width}x{(item.config as InventoryConfig).size.height})
+                            </span>
+                          )}
                         </span>
-                      )}
-                      {isArmor && item?.config && (
-                        <span style={{ color: '#3498db', marginLeft: '6px' }}>
-                          ({(item.config as ArmorConfig).defense} защиты)
-                        </span>
-                      )}
-                      {isBag && item?.config && (
-                        <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
-                          ({(item.config as InventoryConfig).size.width}x{(item.config as InventoryConfig).size.height})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               {mode === GameMode.EDITOR && (
@@ -361,15 +403,49 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                     Удалить
                   </button>
                 </>
-               )}
-               {mode === GameMode.SIMULATION && (
-                 <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
-                   Осмотреть
-                 </button>
-               )}
-             </div>
-           </div>
-         ) : (
+              )}
+              {mode === GameMode.SIMULATION && (
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
+                  Осмотреть
+                </button>
+              )}
+            </div>
+          </div>
+        ) : isMarker && selectedStats ? (
+          <div className="stats-list">
+            <dl className="stats-list">
+              <div className="stat-row">
+                <dt>Тип:</dt>
+                <dd>Служебный объект (Маркер)</dd>
+              </div>
+              <div className="stat-row">
+                <dt>ID:</dt>
+                <dd style={{ wordBreak: 'break-all' }}>{selectedStats.id}</dd>
+              </div>
+              <div className="stat-row">
+                <dt>Состояние:</dt>
+                <dd>{selectedStats.state}</dd>
+              </div>
+              {selectedStats.radius > 0 && (
+                <div className="stat-row">
+                  <dt>Радиус зоны:</dt>
+                  <dd>{selectedStats.radius} px</dd>
+                </div>
+              )}
+            </dl>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+              {mode === GameMode.EDITOR && (
+                <button
+                  className="btn"
+                  style={{ flex: 1, backgroundColor: '#c0392b' }}
+                  onClick={handleDeleteEntity}
+                >
+                  Удалить
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
           <p className="selection-hint">Ничего не выбрано</p>
         )}
       </div>

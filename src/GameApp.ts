@@ -246,16 +246,15 @@ export class GameApp {
   }
 
   public pickEntityAt(worldPoint: Point): string | null {
-    return this.physics.getEntityAt(worldPoint, this.world);
+    const isEditor = this.gameMode === GameMode.EDITOR;
+    return this.physics.getEntityAt(worldPoint, this.world, isEditor);
   }
-
-  public pickNearestEntity(
-    worldPoint: Point,
-    maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO
-  ): string | null {
+  
+  public pickNearestEntity(worldPoint: Point, maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO): string | null {
+    const isEditor = this.gameMode === GameMode.EDITOR;
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
-    return this.physics.getNearestEntity(worldPoint, maxWorldDist, this.world);
+    return this.physics.getNearestEntity(worldPoint, maxWorldDist, this.world, isEditor);
   }
 
   public startPan(clientX: number, clientY: number): void {

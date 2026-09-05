@@ -21,7 +21,7 @@ export class EntityFactory {
     position?: Point,
     forcedId?: string
   ): EntityId {
-    const id = forcedId || `ent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = forcedId || config.meta?.id || config.item?.id || `ent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     world.createEntity(id);
 
     if (config.physics) {
@@ -79,12 +79,12 @@ export class EntityFactory {
     if (config.inventory) {
         const w = config.inventory.size.width;
         const h = config.inventory.size.height;
-        const emptySlots = Array.from({ length: h }, () =>
+        const slots = config.inventory.slots ?? Array.from({ length: h }, () =>
           Array.from({ length: w }, () => ({ itemId: null, count: 0 }))
         );
         world.addComponent(id, 'inventory', {
           size: { width: w, height: h },
-          slots: emptySlots,
+          slots,
         });
     }
 
@@ -113,21 +113,25 @@ export class EntityFactory {
       };
       world.addComponent(id, 'meta', {
         id: config.meta.id || id,
+        name: config.meta.id || id,   // НУЖНО СДЕЛАТЬ ВОЗМОЖНОСТЬ УКАЗЫВАТЬ ИМЯ.
         state: 'idle',
         config: dummyConfig,
       });
     }
 
-    if (position && config.physics) {
+    if (position) {
       world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
-      const body = new Circle({ x: position.x, y: position.y }, config.physics.radius);
-      body.isStatic = false;
-      const category = config.item ? CollisionCategory.ITEM : CollisionCategory.CREATURE;
-      const mask = config.physics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-      (body as any).category = category;
-      (body as any).mask = mask;
-      world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
-      physics.registerBody(id, body);
+      
+      if (config.physics) {
+        const body = new Circle({ x: position.x, y: position.y }, config.physics.radius);
+        body.isStatic = false;
+        const category = config.item ? CollisionCategory.ITEM : CollisionCategory.CREATURE;
+        const mask = config.physics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        (body as any).category = category;
+        (body as any).mask = mask;
+        world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
+        physics.registerBody(id, body);
+      }
     }
 
     return id;

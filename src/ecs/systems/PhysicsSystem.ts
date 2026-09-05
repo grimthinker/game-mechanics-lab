@@ -136,48 +136,64 @@ export class PhysicsSystem {
   public getNearestEntity(
     worldPoint: Point,
     maxWorldDist: number,
-    world?: World
+    world?: World,
+    isEditor: boolean = false // <-- передаем флаг режима редактора
   ): EntityId | null {
-    if (!world) {
-      return null;
-    }
-
+    if (!world) return null;
+  
     let nearestId: EntityId | null = null;
     let minDistance = Infinity;
-
+  
     const entities = world.getEntitiesWith('transform');
     for (const [entityId, { transform, physicsBody }] of entities) {
       const physStats = world.getComponent(entityId, 'physicsStats');
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? 16;
+      const gizmo = world.getComponent(entityId, 'gizmo');
+  
+      // 1. В ИГРЕ И СИМУЛЯЦИИ:
+      // Полностью игнорируем сущности без реального физ. тела
+      if (!isEditor) {
+        if (!physicsBody && !physStats) continue;
+      }
+  
+      // 2. В РЕДАКТОРЕ:
+      // Если объект бестелесный, берем радиус его гизмо (или дефолтный 14px).
+      // Если физический — берем его настоящий физический радиус.
+      const radius = physStats?.radius.current 
+        ?? physicsBody?.body.r 
+        ?? gizmo?.radius 
+        ?? 14;
+  
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       const distToBoundary = Math.max(0, distToCenter - radius);
-
+  
       if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
         minDistance = distToBoundary;
         nearestId = entityId;
       }
     }
-
+  
     return nearestId;
   }
 
-  public getEntityAt(worldPoint: Point, world?: World): EntityId | null {
-    if (!world) {
-      return null;
-    }
+public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false): EntityId | null {
+  if (!world) return null;
 
-    const entities = world.getEntitiesWith('transform');
-    for (const [entityId, { transform, physicsBody }] of entities) {
-      const physStats = world.getComponent(entityId, 'physicsStats');
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? 16;
-      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      if (dist <= radius) {
-        return entityId;
-      }
-    }
+  const entities = world.getEntitiesWith('transform');
+  for (const [entityId, { transform, physicsBody }] of entities) {
+    const physStats = world.getComponent(entityId, 'physicsStats');
+    const gizmo = world.getComponent(entityId, 'gizmo');
 
-    return null;
+    if (!isEditor && !physicsBody && !physStats) continue;
+
+    const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+    const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+    if (dist <= radius) {
+      return entityId;
+    }
   }
+
+  return null;
+}
 
   public update(dt: number, world: World): void {
     const movingEntities = world.getEntitiesWith('transform', 'velocity');

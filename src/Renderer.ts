@@ -108,10 +108,15 @@ export class Renderer {
       }
     }
 
-    // 5. Отрисовка Healthbars и ID-текстов
+    // 5. Отрисовка Гизмо (ТОЛЬКО В РЕЖИМЕ РЕДАКТОРА)
+    if (gameMode === 'editor') {
+      this.renderEditorGizmos(world, camera, selectedId, hoveredId);
+    }
+
+    // 6. Отрисовка Healthbars и ID-текстов
     this.renderUIOverlays(world.getEntitiesWith('transform', 'healthStats'), world, camera);
 
-    // 6. Отрисовка Hover-текстов для предметов
+    // 7. Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
   }
 
@@ -195,6 +200,70 @@ export class Renderer {
 
     this.ctx.restore();
     this.ctx.restore();
+  }
+
+  private renderEditorGizmos(
+    world: World,
+    camera: Camera,
+    selectedId: EntityId | null,
+    hoveredId: EntityId | null
+  ): void {
+    const entities = world.getEntitiesWith('transform');
+  
+    for (const [id, comp] of entities) {
+      // Рисуем только то, что НЕ имеет физического тела (или явно помечено как gizmo)
+      const isIntangible = !comp.physicsBody && !comp.physicsStats;
+      if (!isIntangible && !comp.gizmo) continue;
+  
+      const { x, y } = comp.transform;
+      const isSelected = id === selectedId;
+      const isHovered = id === hoveredId;
+      const color = comp.gizmo?.color ?? '#9b59b6';
+      const icon = comp.gizmo?.icon ?? '📍';
+      const radius = (comp.gizmo?.radius ?? 14);
+  
+      this.ctx.save();
+      this.ctx.translate(x, y);
+  
+      // 1. Пунктирный контур круга
+      this.ctx.beginPath();
+      this.ctx.setLineDash([4 / camera.scale, 4 / camera.scale]);
+      this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      this.ctx.fillStyle = 'rgba(155, 89, 182, 0.15)';
+      this.ctx.fill();
+      this.ctx.lineWidth = 1.5 / camera.scale;
+      this.ctx.strokeStyle = color;
+      this.ctx.stroke();
+  
+      // 2. Подсветка при наведении или выделении
+      if (isSelected) {
+        this.ctx.setLineDash([]);
+        this.ctx.lineWidth = 2.5 / camera.scale;
+        this.ctx.strokeStyle = '#00e676';
+        this.ctx.stroke();
+      } else if (isHovered) {
+        this.ctx.setLineDash([]);
+        this.ctx.lineWidth = 2 / camera.scale;
+        this.ctx.strokeStyle = 'rgba(0, 230, 118, 0.5)';
+        this.ctx.stroke();
+      }
+  
+      // 3. Иконка по центру
+      this.ctx.setLineDash([]);
+      this.ctx.font = `${Math.max(10, 14 / camera.scale)}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(icon, 0, 0);
+  
+      // 4. Подпись имени/типа под объектом
+      const label = comp.meta?.name ?? comp.gizmo?.type ?? comp.meta?.id ?? id;
+      this.ctx.fillStyle = '#bbb';
+      this.ctx.font = `${Math.max(9, 10 / camera.scale)}px sans-serif`;
+      this.ctx.textBaseline = 'top';
+      this.ctx.fillText(label, 0, radius + 4 / camera.scale);
+  
+      this.ctx.restore();
+    }
   }
 
   private renderItemBody(
