@@ -78,15 +78,6 @@ export class GameApp {
     return this.entityFactory.spawnEntity(this.world, this.physics, this.aiSystem, config, position, forcedId);
   }
 
-  public spawnItemEntity(itemData: ItemData, forcedId?: string): string {
-    const config: EntityConfig = { item: itemData };
-    if (itemData.type === 'bag' && itemData.config) {
-      config.inventory = { ...itemData.config as InventoryConfig };
-    }
-    // Синхронизируем ID сущности в ECS с внутренним ID предмета
-    return this.spawnEntity(config, undefined, forcedId || itemData.id);
-  }
-
   public deleteSelectedEntity(): void {
     if (!this.selectedEntity) return;
     const id = this.selectedEntity.id;

@@ -3,35 +3,48 @@ import { ItemData, STANDARD_RADII, HitZoneType, HitZoneConfig } from '../../ecs/
 import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues } from './forms/FormFields';
 import { DEFAULT_ZONE_PARAMS } from '../../Weapon';
 import { weaponModalState } from './weaponModalState';
+import { World } from '../../ecs/World';
 
 export interface ItemEditModalProps {
-  item: ItemData | null;
-  isReadOnly?: boolean;
-  isBagInventoryEmpty?: boolean;
-  onItemClick?: (item: ItemData) => void;
-  inventorySlots?: { item: ItemData | null; count: number }[][];
-  inventorySize?: { width: number; height: number };
-  onClose: () => void;
-  onConfirm: (updatedItem: ItemData) => void;
-}
+    itemEntityId: string | null;
+    world?: World;
+    isReadOnly?: boolean;
+    isBagInventoryEmpty?: boolean;
+    onItemClick?: (entityId: string) => void;
+    inventorySlots?: { itemId: string | null; item: ItemData | null; count: number }[][];
+    inventorySize?: { width: number; height: number };
+    onClose: () => void;
+    onConfirm: (updatedItem: ItemData) => void;
+  }
 
-export const ItemEditModal: React.FC<ItemEditModalProps> = ({
-  item,
-  isReadOnly,
-  isBagInventoryEmpty = true,
-  onItemClick,
-  inventorySlots,
-  inventorySize,
-  onClose,
-  onConfirm,
-}) => {
-  const [draft, setDraft] = useState<ItemData | null>(null);
-  const [formValues, setFormValues] = useState<any>({});
-
-  useEffect(() => {
-    if (item) {
-      setDraft(JSON.parse(JSON.stringify(item)));
-      const cfg = item.config as any;
+  export const ItemEditModal: React.FC<ItemEditModalProps> = ({
+    itemEntityId,
+    world,
+    isReadOnly,
+    isBagInventoryEmpty = true,
+    onItemClick,
+    inventorySlots,
+    inventorySize,
+    onClose,
+    onConfirm,
+  }) => {
+    const [item, setItem] = useState<ItemData | null>(null);
+    const [draft, setDraft] = useState<ItemData | null>(null);
+    const [formValues, setFormValues] = useState<any>({});
+  
+    useEffect(() => {
+      if (itemEntityId && world) {
+        const fetchedItem = world.getComponent(itemEntityId, 'item') ?? null;
+        setItem(fetchedItem);
+      } else {
+        setItem(null);
+      }
+    }, [itemEntityId, world]);
+  
+    useEffect(() => {
+      if (item) {
+        setDraft(JSON.parse(JSON.stringify(item)));
+        const cfg = item.config as any;
       if (item.type === 'weapon') {
         const zType = cfg.zone.hitZoneType as HitZoneType;
         setFormValues({
@@ -172,10 +185,11 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
   };
 
   const getTypeName = () => {
-    if (item.type === 'weapon') return 'Оружие';
-    if (item.type === 'armor') return 'Броня';
-    if (item.type === 'bag') return 'Сумка';
-    return item.type;
+    const type: string = (item as any).type;
+    if (type === 'weapon') return 'Оружие';
+    if (type === 'armor') return 'Броня';
+    if (type === 'bag') return 'Сумка';
+    return type;
   };
 
   const isSolid = draft.config?.isSolid ?? true;
@@ -301,16 +315,17 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
               {(
                 inventorySlots ||
                 Array.from({ length: formValues.height || 4 }, () =>
-                  Array.from({ length: formValues.width || 6 }, () => ({ item: null, count: 0 }))
+                  Array.from({ length: formValues.width || 6 }, () => ({ itemId: null, item: null, count: 0 }))
                 )
               ).map((row, rIdx) =>
                 row.map((cell, cIdx) => {
                   const it = cell.item;
+                  const itemId = (cell as any).itemId;
                   return (
                     <div
                       key={`${rIdx}_${cIdx}`}
                       onClick={() => {
-                        if (it) onItemClick(it);
+                        if (it && itemId) onItemClick(itemId);
                       }}
                       title={it ? `${it.name} (${it.type})` : 'Пустая ячейка'}
                       style={{

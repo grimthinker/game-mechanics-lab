@@ -22,7 +22,7 @@ interface ToolbarProps {
   openItemSpawnModal: () => void;
   openEditModal: () => void;
   handleDeleteEntity: () => void;
-  openItemEditModal: (item: ItemData) => void;
+  openItemEditModal: (entityId: string) => void;
   isPaused: boolean;
 }
 
@@ -271,7 +271,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <button
                     className="btn btn-primary"
                     style={{ flex: 1 }}
-                    onClick={() => openItemEditModal(selectedStats.itemData!)}
+                    onClick={() => openItemEditModal(selectedStats.id)}
                   >
                     Изменить
                   </button>
@@ -286,12 +286,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               )}
               {mode === GameMode.SIMULATION && (
                 <button
-                  className="btn btn-primary"
-                  style={{ flex: 1 }}
-                  onClick={() => openItemEditModal(selectedStats.itemData!)}
-                >
-                  Осмотреть
-                </button>
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                onClick={() => openItemEditModal(selectedStats.id)}
+              >
+                Осмотреть
+              </button>
               )}
             </div>
           </div>
@@ -342,7 +342,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <>
                 <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                  {selectedStats.equipSlots.map((slot: { item: any; type: string }, index: any) => {
+                  {selectedStats.equipSlots.map((slot: { itemId: string | null; item: any; type: string }, index: any) => {
                     const item = slot.item;
                     const hasEditableItem = item && ['weapon', 'armor', 'bag'].includes(item.type) && !!item.config;
                     const isWeapon = item?.type === 'weapon';
@@ -353,7 +353,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       <div
                         key={`${slot.type}_${index}`}
                         onClick={() => {
-                          if (hasEditableItem && item) openItemEditModal(item);
+                          if (hasEditableItem && slot.itemId) openItemEditModal(slot.itemId);
                         }}
                         style={{
                           backgroundColor: '#1e1e1e',

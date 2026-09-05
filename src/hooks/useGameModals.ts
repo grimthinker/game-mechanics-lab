@@ -57,7 +57,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   const openItemSpawnModal = () => setIsItemSpawnModalOpen(true);
   const closeItemSpawnModal = () => setIsItemSpawnModalOpen(false);
 
-  const [selectedItemForEdit, setSelectedItemForEdit] = useState<ItemData | null>(null);
+  const [selectedItemEntityId, setSelectedItemEntityId] = useState<string | null>(null);
 
   const openSpawnModal = (behavior?: string) => {
     if (behavior) {
@@ -127,21 +127,19 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     updateStats();
   };
 
-  const openItemEditModal = (item: ItemData) => {
-    setSelectedItemForEdit(item);
+  const openItemEditModal = (entityId: string) => {
+    setSelectedItemEntityId(entityId);
   };
 
   const closeItemEditModal = () => {
-    setSelectedItemForEdit(null);
+    setSelectedItemEntityId(null);
   };
 
   const handleItemEditConfirm = (updatedItem: ItemData) => {
     const app = appRef.current;
-    if (!app) return;
+    if (!app || !selectedItemEntityId) return;
 
-    const entityId = (app.selectedEntity && app.selectedEntity.itemData?.id === updatedItem.id)
-      ? app.selectedEntity.id
-      : updatedItem.id;
+    const entityId = selectedItemEntityId;
     const itemComp = app.world.getComponent(entityId, 'item');
     
     if (itemComp) {
@@ -169,10 +167,6 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       }
     }
 
-    if (selectedItemForEdit) {
-      Object.assign(selectedItemForEdit, updatedItem);
-    }
-    
     if (updatedItem.type === 'weapon') {
       const wcfg = updatedItem.config as WeaponConfig;
       weaponModalState.config = JSON.parse(JSON.stringify(wcfg));
@@ -215,7 +209,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       }
     }
 
-    setSelectedItemForEdit(null);
+    setSelectedItemEntityId(null);
     updateStats();
   };
 
@@ -290,7 +284,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     openEditModal,
     closeEditModal,
     handleEditConfirm,
-    selectedItemForEdit,
+    selectedItemEntityId,
     openItemEditModal,
     closeItemEditModal,
     handleItemEditConfirm,

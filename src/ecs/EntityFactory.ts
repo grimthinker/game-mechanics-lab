@@ -20,7 +20,7 @@ export class EntityFactory {
     position?: Point,
     forcedId?: string
   ): EntityId {
-    const id = forcedId || config.meta?.id || config.item?.id || `ent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = forcedId || `ent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     world.createEntity(id);
 
     if (config.physics) {

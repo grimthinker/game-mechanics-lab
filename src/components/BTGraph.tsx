@@ -26,6 +26,24 @@ interface EdgeLayout {
     points: { x: number; y: number }[];
 }
 
+interface StaticGraphLayout {
+    nodePositions: Map<string, { x: number; y: number; width: number; height: number }>;
+    edges: EdgeLayout[];
+    width: number;
+    height: number;
+}
+
+function getTreeTopologyKey(node: BTNodeDTO, fallbackId: string = 'root_0'): string {
+    const nodeId = node.id || fallbackId;
+    if (!node.children || node.children.length === 0) {
+        return nodeId;
+    }
+    const childrenKeys = node.children.map((child, idx) =>
+        getTreeTopologyKey(child, `${nodeId}_${idx}`)
+    );
+    return `${nodeId}(${childrenKeys.join(',')})`;
+}
+
 interface BTGraphProps {
     tree: BTNodeDTO;
     selectedNodeId?: string | null;
@@ -62,7 +80,9 @@ export const BTGraph: React.FC<BTGraphProps> = ({
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-    const { nodes, edges, width, height } = useMemo(() => {
+    const topologyKey = useMemo(() => getTreeTopologyKey(tree), [tree]);
+
+    const staticLayout = useMemo<StaticGraphLayout>(() => {
         const g = new dagre.graphlib.Graph();
         g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 });
         g.setDefaultEdgeLabel(() => ({}));
@@ -82,59 +102,71 @@ export const BTGraph: React.FC<BTGraphProps> = ({
         processNode(tree, 'root_0');
         dagre.layout(g);
 
-        const calculatedNodes: NodeLayout[] = [];
-        const calculatedEdges: EdgeLayout[] = [];
-
-        g.nodes().forEach(nodeId => {
+        const nodePositions = new Map<string, { x: number; y: number; width: number; height: number }>();
+        g.nodes().forEach((nodeId) => {
             const nodeData = g.node(nodeId);
-            const findOriginal = (current: BTNodeDTO, currentId: string): BTNodeDTO | null => {
-                const actualId = current.id || currentId;
-                if (actualId === nodeId) return current;
-                if (current.children) {
-                    for (let i = 0; i < current.children.length; i++) {
-                        const ch = current.children[i];
-                        const found = findOriginal(ch, `${actualId}_${i}`);
-                        if (found) return found;
-                    }
-                }
-                return null;
-            };
-
-            const orig = findOriginal(tree, 'root_0');
-            if (orig) {
-                calculatedNodes.push({
-                    id: nodeId,
-                    name: orig.name,
-                    description: orig.description,
-                    category: orig.category,
-                    status: orig.status,
-                    parameters: orig.parameters,
-                    timeToNextTick: orig.timeToNextTick,
-                    originalNode: orig,
+            if (nodeData) {
+                nodePositions.set(nodeId, {
                     x: nodeData.x,
                     y: nodeData.y,
                     width: NODE_WIDTH,
-                    height: NODE_HEIGHT
+                    height: NODE_HEIGHT,
                 });
             }
         });
 
-        g.edges().forEach(edge => {
+        const calculatedEdges: EdgeLayout[] = [];
+        g.edges().forEach((edge) => {
             const edgeData = g.edge(edge);
             calculatedEdges.push({
                 from: edge.v,
                 to: edge.w,
-                points: edgeData.points
+                points: edgeData.points,
             });
         });
 
         return {
-            nodes: calculatedNodes,
+            nodePositions,
             edges: calculatedEdges,
             width: g.graph().width || 800,
-            height: g.graph().height || 600
+            height: g.graph().height || 600,
         };
-    }, [tree]);
+    }, [topologyKey]);
+
+    const nodes = useMemo(() => {
+        const calculatedNodes: NodeLayout[] = [];
+
+        const traverse = (node: BTNodeDTO, fallbackId: string) => {
+            const nodeId = node.id || fallbackId;
+            const pos = staticLayout.nodePositions.get(nodeId);
+            if (pos) {
+                calculatedNodes.push({
+                    id: nodeId,
+                    name: node.name,
+                    description: node.description,
+                    category: node.category,
+                    status: node.status,
+                    parameters: node.parameters,
+                    timeToNextTick: node.timeToNextTick,
+                    originalNode: node,
+                    x: pos.x,
+                    y: pos.y,
+                    width: pos.width,
+                    height: pos.height,
+                });
+            }
+            if (node.children) {
+                node.children.forEach((child, idx) => {
+                    traverse(child, `${nodeId}_${idx}`);
+                });
+            }
+        };
+
+        traverse(tree, 'root_0');
+        return calculatedNodes;
+    }, [tree, staticLayout]);
+
+    const { edges, width, height } = staticLayout;
 
     useEffect(() => {
         const container = containerRef.current;

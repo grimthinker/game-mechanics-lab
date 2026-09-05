@@ -51,6 +51,19 @@ export const App: React.FC = () => {
     setIsResizingBB,
   } = useBTPanelState();
 
+  const showBTPanelRef = useRef(showBTPanel);
+  const lastBTUpdateRef = useRef<number>(0);
+  const lastSelectedEntityIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    showBTPanelRef.current = showBTPanel;
+    if (showBTPanel && appRef.current?.selectedEntity) {
+      const c = appRef.current.selectedEntity;
+      setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
+      setBtBlackboard(!c.brain ? null : { ...c.brain.blackboard.getData() });
+    }
+  }, [showBTPanel]);
+
   const modals = useGameModals({ appRef, updateStats: () => updateStats() });
 
   const updateStats = useCallback(() => {
@@ -89,15 +102,27 @@ export const App: React.FC = () => {
         maxHp: c.maxHp,
         state: c.state,
         equipSlots: eq ? eq.slots.map((s) => ({
-             type: s.type,
-             item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
-        })) : [],
+          type: s.type,
+          itemId: s.itemId,
+          item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
+     })) : [],
         itemData: c.itemData ? JSON.parse(JSON.stringify(c.itemData)) : undefined,
         inventory: c.inventory,
       });
-      setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
-      setBtBlackboard(!c.brain ? null : c.brain.blackboard.getData());
+
+      const isEntityChanged = targetId !== lastSelectedEntityIdRef.current;
+      lastSelectedEntityIdRef.current = targetId;
+
+      if (showBTPanelRef.current) {
+        const now = performance.now();
+        if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 50) {
+          lastBTUpdateRef.current = now;
+          setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
+          setBtBlackboard(!c.brain ? null : { ...c.brain.blackboard.getData() });
+        }
+      }
     } else {
+      lastSelectedEntityIdRef.current = null;
       setSelectedStats(null);
       setBtData(null);
       setBtBlackboard(null);
@@ -108,7 +133,7 @@ export const App: React.FC = () => {
     isModalOpen:
       modals.isModalOpen ||
       modals.isItemSpawnModalOpen ||
-      !!modals.selectedItemForEdit ||
+      !!modals.selectedItemEntityId ||
       isPaused,
     isEditModalOpen: modals.isEditModalOpen,
     mode,
@@ -260,7 +285,7 @@ export const App: React.FC = () => {
     setShowBTPanel
   });
   
-  const selectedItemEntityId = modals.selectedItemForEdit?.id;
+  const selectedItemEntityId = modals.selectedItemEntityId;
   const bagInventory = selectedItemEntityId ? appRef.current?.world.getComponent(selectedItemEntityId, 'inventory') : undefined;
 
   const isBagInventoryEmpty =
@@ -457,10 +482,12 @@ export const App: React.FC = () => {
       />
 
       <ItemEditModal
-        item={modals.selectedItemForEdit}
+        itemEntityId={modals.selectedItemEntityId}
+        world={appRef.current?.world}
         isReadOnly={isReadOnly}
         isBagInventoryEmpty={isBagInventoryEmpty}
         inventorySlots={bagInventory?.slots.map((row) => row.map((cell) => ({
+          itemId: cell.itemId,
           count: cell.count,
           item: cell.itemId ? (appRef.current?.world.getComponent(cell.itemId, 'item') ?? null) : null
         })))}

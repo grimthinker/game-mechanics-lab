@@ -23,7 +23,7 @@ export interface EntityStats {
   hp: number;
   maxHp: number;
   state: CreatureState;
-  equipSlots: { type: string; item: ItemData | null }[];
+  equipSlots: { type: string; itemId: string | null; item: ItemData | null }[];
   itemData?: ItemData;
   inventory?: InventoryComponent;
 }
