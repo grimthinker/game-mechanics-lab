@@ -4,220 +4,133 @@ import { PhysicsSystem } from './systems/PhysicsSystem';
 import { AISystem } from './systems/AISystem';
 import {
     EntityId,
+    EntityConfig,
     CreatureConfig,
-    ItemData,
-    InventoryConfig,
-    StandardRadius,
     CollisionCategory,
     COLLISION_MASK_ALL,
     COLLISION_MASK_NONE,
-  } from './types';
+} from './types';
 import { Point } from '../types';
 
-export interface CreatureBlueprint {
-  kind: 'creature';
-  config: CreatureConfig;
-}
-
-export interface ItemBlueprint {
-  kind: 'item';
-  itemData: ItemData;
-  isSolid?: boolean;
-  radius?: StandardRadius;
-}
-
-export interface DoorBlueprint {
-  kind: 'door';
-  name?: string;
-  isOpen?: boolean;
-  isLocked?: boolean;
-  radius?: StandardRadius;
-  weight?: number;
-}
-
-export interface TrapBlueprint {
-  kind: 'trap';
-  name?: string;
-  damage?: number;
-  radius?: StandardRadius;
-}
-
-export type EntityBlueprint =
-  | CreatureBlueprint
-  | ItemBlueprint
-  | DoorBlueprint
-  | TrapBlueprint;
-
-export interface WorldSpawnOptions {
-  angle?: number;
-  isSolid?: boolean;
-  radius?: StandardRadius;
-  weight?: number;
-}
-
 export class EntityFactory {
-  public createEntityFromBlueprint(
+  public spawnEntity(
     world: World,
+    physics: PhysicsSystem,
     aiSystem: AISystem,
-    blueprint: EntityBlueprint,
+    config: EntityConfig,
+    position?: Point,
     forcedId?: string
   ): EntityId {
-    switch (blueprint.kind) {
-      case 'creature':
-        return this.createLogicalCreature(world, aiSystem, blueprint.config, forcedId);
-      case 'item':
-        return this.createLogicalItem(world, blueprint.itemData, forcedId);
-      case 'door':
-      case 'trap':
-        throw new Error(`Blueprint kind ${blueprint.kind} is not implemented yet.`);
-    }
-  }
-
-  private createLogicalCreature(
-    world: World,
-    aiSystem: AISystem,
-    config: CreatureConfig,
-    forcedId?: string
-  ): EntityId {
-    const prefix = 'bot';
-    const id = forcedId || `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-
+    const id = forcedId || `ent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     world.createEntity(id);
 
-    // Шаг 1: навешивание базовых компонентов данных
-    world.addComponent(id, 'health', { isAlive: true, hitFlashTimer: 0 });
-    world.addComponent(id, 'physicsStats', {
-      radius: { base: config.radius, current: config.radius },
-      weight: { base: config.weight, current: config.weight },
-      isSolid: { base: config.isSolid ?? true, current: config.isSolid ?? true },
-    });
-    world.addComponent(id, 'healthStats', {
-      hp: { base: config.hp ?? config.maxHp, current: config.hp ?? config.maxHp },
-      maxHp: { base: config.maxHp, current: config.maxHp },
-    });
-    world.addComponent(id, 'movementStats', {
-      maxSpeed: { base: Math.max(0, config.maxSpeed), current: Math.max(0, config.maxSpeed) },
-      maxTurnSpeed: {
-        base: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
-        current: (Math.max(0, config.maxTurnSpeed) * Math.PI) / 180,
-      },
-      runSpeedMultiplier: {
-        base: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
-        current: Math.max(0.1, config.runSpeedMultiplier ?? 1.5),
-      },
-      crouchSpeedMultiplier: {
-        base: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
-        current: Math.max(0.1, config.crouchSpeedMultiplier ?? 0.5),
-      },
-      runTurnMultiplier: { base: config.runTurnMultiplier ?? 0.8, current: config.runTurnMultiplier ?? 0.8 },
-      crouchTurnMultiplier: { base: config.crouchTurnMultiplier ?? 1.2, current: config.crouchTurnMultiplier ?? 1.2 },
-    });
-    world.addComponent(id, 'stealthStats', {
-      stealthPower: { base: config.stealthPower ?? 10, current: config.stealthPower ?? 10 },
-      runStealthMultiplier: { base: config.runStealthMultiplier ?? 0.5, current: config.runStealthMultiplier ?? 0.5 },
-      crouchStealthMultiplier: { base: Math.max(1, config.crouchStealthMultiplier ?? 1.5), current: Math.max(1, config.crouchStealthMultiplier ?? 1.5) },
-    });
-    world.addComponent(id, 'aiStats', {
-      behavior: { base: config.behavior, current: config.behavior },
-    });
-  
-      world.addComponent(id, 'equip', {
-          slots: [
-            { type: 'armor', itemId: null },
-            { type: 'bag', itemId: null },
-            { type: 'weapon', itemId: null },
-          ],
-        });
-        world.addComponent(id, 'activeAttacks', { attacks: [] });
-        world.addComponent(id, 'meta', {
-          id,
-          state: 'idle',
-          config: JSON.parse(JSON.stringify(config)),
-        });
-  
-      aiSystem.initBotBrain(world, id, config.behavior);
-  
-      return id;
-    }
-
-  private createLogicalItem(
-    world: World,
-    itemData: ItemData,
-    forcedId?: string
-  ): EntityId {
-    const id = forcedId || itemData.id;
-    world.createEntity(id);
-    world.addComponent(id, 'item', itemData);
-
-    if (itemData.type === 'bag' && itemData.config) {
-      const bagCfg = itemData.config as InventoryConfig;
-      const width = bagCfg.size?.width ?? 6;
-      const height = bagCfg.size?.height ?? 4;
-      const emptySlots = Array.from({ length: height }, () =>
-        Array.from({ length: width }, () => ({ itemId: null, count: 0 }))
-      );
-      world.addComponent(id, 'inventory', {
-        size: { width, height },
-        slots: emptySlots,
+    if (config.physics) {
+      world.addComponent(id, 'physicsStats', {
+        radius: { base: config.physics.radius, current: config.physics.radius },
+        weight: { base: config.physics.weight, current: config.physics.weight },
+        isSolid: { base: config.physics.isSolid ?? true, current: config.physics.isSolid ?? true },
       });
     }
 
-    return id;
-  }
+    if (config.health) {
+      const maxHp = config.health.maxHp;
+      const hp = config.health.hp ?? maxHp;
+      world.addComponent(id, 'health', { isAlive: hp > 0, hitFlashTimer: 0 });
+      world.addComponent(id, 'healthStats', {
+        hp: { base: hp, current: hp },
+        maxHp: { base: maxHp, current: maxHp },
+      });
+    }
 
-  public spawnEntityInWorld(
-    world: World,
-    physics: PhysicsSystem,
-    id: EntityId,
-    position: Point,
-    options?: WorldSpawnOptions
-  ): void {
-    const angle = options?.angle ?? 0;
-    world.addComponent(id, 'transform', { x: position.x, y: position.y, angle });
+    if (config.movement) {
+      world.addComponent(id, 'movementStats', {
+        maxSpeed: { base: config.movement.maxSpeed, current: config.movement.maxSpeed },
+        maxTurnSpeed: { base: (config.movement.maxTurnSpeed * Math.PI) / 180, current: (config.movement.maxTurnSpeed * Math.PI) / 180 },
+        runSpeedMultiplier: { base: config.movement.runSpeedMultiplier ?? 1.5, current: config.movement.runSpeedMultiplier ?? 1.5 },
+        crouchSpeedMultiplier: { base: config.movement.crouchSpeedMultiplier ?? 0.5, current: config.movement.crouchSpeedMultiplier ?? 0.5 },
+        runTurnMultiplier: { base: config.movement.runTurnMultiplier ?? 0.8, current: config.movement.runTurnMultiplier ?? 0.8 },
+        crouchTurnMultiplier: { base: config.movement.crouchTurnMultiplier ?? 1.2, current: config.movement.crouchTurnMultiplier ?? 1.2 },
+      });
+      world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
+      world.addComponent(id, 'input', {
+        isMovingForward: false, turnDirection: 0, turnSpeed: 0, isRunning: false, isCrouching: false, wantsAttack: false
+      });
+    }
 
-    const meta = world.getComponent(id, 'meta');
-    const item = world.getComponent(id, 'item');
+    if (config.stealth) {
+      world.addComponent(id, 'stealthStats', {
+        stealthPower: { base: config.stealth.stealthPower, current: config.stealth.stealthPower },
+        runStealthMultiplier: { base: config.stealth.runStealthMultiplier, current: config.stealth.runStealthMultiplier },
+        crouchStealthMultiplier: { base: config.stealth.crouchStealthMultiplier ?? 1.5, current: config.stealth.crouchStealthMultiplier ?? 1.5 },
+      });
+    }
 
-    if (meta) {
-        // Существо: добавляем физическое тело, скорость и ввод
-        const physStats = world.getComponent(id, 'physicsStats');
-        const isSolid = options?.isSolid ?? physStats?.isSolid.current ?? meta.config.isSolid ?? true;
-        const radius = options?.radius ?? physStats?.radius.current ?? meta.config.radius ?? 16;
-  
-        const body = new Circle({ x: position.x, y: position.y }, radius);
-        body.isStatic = false;
-        const category = CollisionCategory.CREATURE;
-        const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-        (body as any).category = category;
-        (body as any).mask = mask;
-  
-        world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
-        physics.registerBody(id, body);
-  
-        world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
-        world.addComponent(id, 'input', {
-          isMovingForward: false,
-          turnDirection: 0,
-          isRunning: false,
-          isCrouching: false,
-          wantsAttack: false,
-          turnSpeed: 0,
+    if (config.ai) {
+      world.addComponent(id, 'aiStats', {
+        behavior: { base: config.ai.behavior, current: config.ai.behavior },
+      });
+      aiSystem.initBotBrain(world, id, config.ai.behavior);
+    }
+
+    if (config.item) {
+      world.addComponent(id, 'item', config.item);
+    }
+
+    if (config.inventory) {
+        const w = config.inventory.size.width;
+        const h = config.inventory.size.height;
+        const emptySlots = Array.from({ length: h }, () =>
+          Array.from({ length: w }, () => ({ itemId: null, count: 0 }))
+        );
+        world.addComponent(id, 'inventory', {
+          size: { width: w, height: h },
+          slots: emptySlots,
         });
-      } else if (item) {
-        // Предмет: добавляем физическое тело в мире
-        const isSolid = options?.isSolid ?? item.config?.isSolid ?? true;
-        const radius = options?.radius ?? item.config?.radius ?? 16;
-  
-        const body = new Circle({ x: position.x, y: position.y }, radius);
-        body.isStatic = false;
-        const category = CollisionCategory.ITEM;
-        const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-        (body as any).category = category;
-        (body as any).mask = mask;
-  
-        world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
-        physics.registerBody(id, body);
-      }
+    }
+
+    if (config.equip) {
+      world.addComponent(id, 'equip', { slots: config.equip });
+      world.addComponent(id, 'activeAttacks', { attacks: [] });
+    }
+
+    if (config.meta) {
+      const dummyConfig: CreatureConfig = {
+        radius: config.physics?.radius ?? 16,
+        weight: config.physics?.weight ?? 10,
+        isSolid: config.physics?.isSolid ?? true,
+        maxHp: config.health?.maxHp ?? 100,
+        hp: config.health?.hp ?? config.health?.maxHp ?? 100,
+        maxSpeed: config.movement?.maxSpeed ?? 150,
+        maxTurnSpeed: config.movement?.maxTurnSpeed ?? 270,
+        runSpeedMultiplier: config.movement?.runSpeedMultiplier ?? 1.5,
+        crouchSpeedMultiplier: config.movement?.crouchSpeedMultiplier ?? 0.5,
+        runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
+        crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 1.2,
+        stealthPower: config.stealth?.stealthPower ?? 10,
+        runStealthMultiplier: config.stealth?.runStealthMultiplier ?? 0.5,
+        crouchStealthMultiplier: config.stealth?.crouchStealthMultiplier ?? 1.5,
+        behavior: config.ai?.behavior ?? 'IdleTree',
+      };
+      world.addComponent(id, 'meta', {
+        id: config.meta.id || id,
+        state: 'idle',
+        config: dummyConfig,
+      });
+    }
+
+    if (position && config.physics) {
+      world.addComponent(id, 'transform', { x: position.x, y: position.y, angle: 0 });
+      const body = new Circle({ x: position.x, y: position.y }, config.physics.radius);
+      body.isStatic = false;
+      const category = config.item ? CollisionCategory.ITEM : CollisionCategory.CREATURE;
+      const mask = config.physics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+      (body as any).category = category;
+      (body as any).mask = mask;
+      world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
+      physics.registerBody(id, body);
+    }
+
+    return id;
   }
 
   public despawnEntityFromWorld(

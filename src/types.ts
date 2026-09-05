@@ -1,4 +1,5 @@
 import { CreatureState, ItemData, StandardRadius, CreatureConfig } from "./ecs/types";
+import { InventoryComponent, EntityConfig } from './ecs/types';
 
 export interface Point {
   x: number;
@@ -10,7 +11,8 @@ export interface ObstacleSegment {
   end: Point;
 }
 
-export interface CreatureStats {
+
+export interface EntityStats {
   id: string;
   behavior: string;
   radius: number;
@@ -23,6 +25,8 @@ export interface CreatureStats {
   maxHp: number;
   state: CreatureState;
   equipSlots: { type: string; item: ItemData | null }[];
+  itemData?: ItemData;
+  inventory?: InventoryComponent;
 }
 
 export interface PlacementConfig {
@@ -36,6 +40,4 @@ export interface PlacementConfig {
   crouchStealthMultiplier: number;
 }
 
-export type PlacementMode = 
-  | { kind: 'creature'; config: CreatureConfig }
-  | { kind: 'item'; itemData: ItemData; isSolid: boolean; radius: StandardRadius };
+export type PlacementMode = { kind: 'entity'; config: EntityConfig };

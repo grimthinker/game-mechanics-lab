@@ -146,11 +146,9 @@ export class PhysicsSystem {
     let minDistance = Infinity;
 
     const entities = world.getEntitiesWith('transform');
-    for (const [entityId, { transform, physicsBody, meta, item }] of entities) {
-      if (!meta && !item) continue;
-      
-      const physStats = world?.getComponent(entityId, 'physicsStats');
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? item?.config?.radius ?? 16;
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const physStats = world.getComponent(entityId, 'physicsStats');
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? 16;
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       const distToBoundary = Math.max(0, distToCenter - radius);
 
@@ -169,11 +167,9 @@ export class PhysicsSystem {
     }
 
     const entities = world.getEntitiesWith('transform');
-    for (const [entityId, { transform, physicsBody, meta, item }] of entities) {
-      if (!meta && !item) continue;
-      
-      const physStats = world?.getComponent(entityId, 'physicsStats');
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? item?.config?.radius ?? 16;
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const physStats = world.getComponent(entityId, 'physicsStats');
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? 16;
       const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       if (dist <= radius) {
         return entityId;
@@ -229,12 +225,10 @@ export class PhysicsSystem {
       if (!p1 || !p2) return;
 
       const p1Stats = world.getComponent(id1, 'physicsStats');
-      const p1Item = world.getComponent(id1, 'item');
-      const weight1 = p1Stats?.weight.current ?? p1Item?.config?.weight ?? 1;
+      const weight1 = p1Stats?.weight.current ?? 1;
 
       const p2Stats = world.getComponent(id2, 'physicsStats');
-      const p2Item = world.getComponent(id2, 'item');
-      const weight2 = p2Stats?.weight.current ?? p2Item?.config?.weight ?? 1;
+      const weight2 = p2Stats?.weight.current ?? 1;
 
       const overlapX = response.overlap * response.overlapV.x;
       const overlapY = response.overlap * response.overlapV.y;
@@ -358,15 +352,16 @@ export class PhysicsSystem {
           return false;
         }
       } else if (hitEntityId) {
-        const hitMeta = world.getComponent(hitEntityId, 'meta');
         const hitTransform = world.getComponent(hitEntityId, 'transform');
         const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
         const hitBody = world.getComponent(hitEntityId, 'physicsBody');
         const r = hitPhysStats?.radius.current ?? hitBody?.body.r ?? 24;
 
-        if (hitMeta && hitTransform) {
+        if (hitTransform) {
           const hitAiStats = world.getComponent(hitEntityId, 'aiStats');
-          const hitBehavior = hitAiStats?.behavior?.current ?? hitMeta.config.behavior;
+          const hitMeta = world.getComponent(hitEntityId, 'meta');
+          const hitBehavior = hitAiStats?.behavior?.current ?? hitMeta?.config?.behavior ?? 'IdleTree';
+          
           if (hitBehavior === 'PlayerTree') {
             if (weapon.zone.piercePlayers) {
               const distToCenter =

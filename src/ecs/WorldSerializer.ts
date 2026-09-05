@@ -1,78 +1,39 @@
 import { GameApp } from '../GameApp';
-import { CreatureConfig } from './types';
+import { EntityConfig, CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './types';
+import { Circle } from 'detect-collisions';
 
 export class WorldSerializer {
   constructor(private app: GameApp) {}
 
   public serializeWorld(): any {
     const entitiesData: any[] = [];
-    const itemsData: any[] = [];
-    
-    const allEntities = this.app.world.getAllEntities();
-    for (const [id, comp] of allEntities) {
-        if (comp.meta && comp.healthStats && comp.equip) {
-            const config: CreatureConfig = {
-              behavior: comp.aiStats?.behavior?.current ?? comp.meta.config.behavior,
-              radius: comp.physicsStats?.radius.current ?? comp.meta.config.radius ?? 16,
-              weight: comp.physicsStats?.weight.current ?? comp.meta.config.weight ?? 10,
-              isSolid: comp.physicsStats?.isSolid.current ?? (comp.physicsBody !== undefined),
-              maxHp: comp.healthStats.maxHp.current,
-              hp: comp.healthStats.hp.current,
-              maxSpeed: comp.movementStats?.maxSpeed.current ?? comp.meta.config.maxSpeed ?? 150,
-              maxTurnSpeed: comp.movementStats
-                ? Math.round((comp.movementStats.maxTurnSpeed.current * 180) / Math.PI)
-                : comp.meta.config.maxTurnSpeed ?? 270,
-              runSpeedMultiplier: comp.movementStats?.runSpeedMultiplier.current ?? comp.meta.config.runSpeedMultiplier ?? 1.5,
-              crouchSpeedMultiplier: comp.movementStats?.crouchSpeedMultiplier.current ?? comp.meta.config.crouchSpeedMultiplier ?? 0.5,
-              runTurnMultiplier: comp.movementStats?.runTurnMultiplier.current ?? comp.meta.config.runTurnMultiplier ?? 0.8,
-              crouchTurnMultiplier: comp.movementStats?.crouchTurnMultiplier.current ?? comp.meta.config.crouchTurnMultiplier ?? 1.2,
-              stealthPower: comp.stealthStats?.stealthPower.current ?? comp.meta.config.stealthPower ?? 10,
-              runStealthMultiplier: comp.stealthStats?.runStealthMultiplier.current ?? comp.meta.config.runStealthMultiplier ?? 0.5,
-              crouchStealthMultiplier: comp.stealthStats?.crouchStealthMultiplier.current ?? comp.meta.config.crouchStealthMultiplier ?? 1.5,
-            };
 
-            entitiesData.push({
-              id,
-              behavior: config.behavior,
-              config,
-              transform: comp.transform ? { ...comp.transform } : undefined,
-              stats: {
-                hp: comp.healthStats.hp.current,
-                maxHp: comp.healthStats.maxHp.current,
-                maxSpeed: config.maxSpeed,
-                maxTurnSpeed: config.maxTurnSpeed,
-                runSpeedMultiplier: config.runSpeedMultiplier,
-                crouchSpeedMultiplier: config.crouchSpeedMultiplier,
-                runTurnMultiplier: config.runTurnMultiplier,
-                crouchTurnMultiplier: config.crouchTurnMultiplier,
-                stealthPower: config.stealthPower,
-                runStealthMultiplier: config.runStealthMultiplier,
-                crouchStealthMultiplier: config.crouchStealthMultiplier,
-              },
-              equip: {
-                slots: comp.equip.slots,
-              },
-            });
-        } else if (comp.item) {
-            itemsData.push({
-              id,
-              transform: comp.transform ? { ...comp.transform } : undefined,
-              isSolid: comp.physicsBody ? comp.physicsBody.mask !== 0 : (comp.item.config?.isSolid ?? true),
-              radius: comp.physicsBody ? comp.physicsBody.body.r : 16,
-              itemData: comp.item,
-              ownership: comp.ownership ? { ...comp.ownership } : undefined,
-          inventory: comp.inventory ? {
-             size: { ...comp.inventory.size },
-             slots: comp.inventory.slots,
-          } : undefined
-        });
-      }
+    for (const [id, comp] of this.app.world.getAllEntities()) {
+       const data: any = { id, components: {} };
+       
+       // PURE ECS: Глубокое копирование сырых компонентов
+       if (comp.transform) data.components.transform = JSON.parse(JSON.stringify(comp.transform));
+       if (comp.physicsStats) data.components.physicsStats = JSON.parse(JSON.stringify(comp.physicsStats));
+       if (comp.healthStats) data.components.healthStats = JSON.parse(JSON.stringify(comp.healthStats));
+       if (comp.movementStats) data.components.movementStats = JSON.parse(JSON.stringify(comp.movementStats));
+       if (comp.stealthStats) data.components.stealthStats = JSON.parse(JSON.stringify(comp.stealthStats));
+       if (comp.aiStats) data.components.aiStats = JSON.parse(JSON.stringify(comp.aiStats));
+       if (comp.item) data.components.item = JSON.parse(JSON.stringify(comp.item));
+       if (comp.inventory) data.components.inventory = JSON.parse(JSON.stringify(comp.inventory));
+       if (comp.equip) data.components.equip = JSON.parse(JSON.stringify(comp.equip));
+       if (comp.meta) data.components.meta = JSON.parse(JSON.stringify(comp.meta));
+       if (comp.ownership) data.components.ownership = JSON.parse(JSON.stringify(comp.ownership));
+       if (comp.health) data.components.health = JSON.parse(JSON.stringify(comp.health));
+       if (comp.velocity) data.components.velocity = JSON.parse(JSON.stringify(comp.velocity));
+       if (comp.input) data.components.input = JSON.parse(JSON.stringify(comp.input));
+       if (comp.activeAttacks) data.components.activeAttacks = JSON.parse(JSON.stringify(comp.activeAttacks));
+
+       entitiesData.push(data);
     }
 
     return {
       obstacles: this.app.physics.getObstacleLines() || [],
       entities: entitiesData,
-      items: itemsData,
     };
   }
 
@@ -85,76 +46,75 @@ export class WorldSerializer {
     }
 
     if (Array.isArray(data.entities)) {
-        for (const entData of data.entities) {
-            const rawConfig = entData.config || {};
-            const rawStats = entData.stats || {};
-    
-            const config: CreatureConfig = {
-              behavior: entData.behavior || rawConfig.behavior || 'PlayerTree',
-              radius: rawConfig.radius ?? entData.radius ?? 16,
-              weight: rawConfig.weight ?? entData.weight ?? entData.mass ?? 10,
-              isSolid: rawConfig.isSolid ?? entData.isSolid ?? true,
-              maxSpeed: rawConfig.maxSpeed ?? rawStats.maxSpeed ?? 150,
-              maxTurnSpeed: rawConfig.maxTurnSpeed ?? rawStats.maxTurnSpeed ?? 270,
-              runSpeedMultiplier: rawConfig.runSpeedMultiplier ?? rawStats.runSpeedMultiplier ?? 1.5,
-              crouchSpeedMultiplier: rawConfig.crouchSpeedMultiplier ?? rawStats.crouchSpeedMultiplier ?? 0.5,
-              runTurnMultiplier: rawConfig.runTurnMultiplier ?? rawStats.runTurnMultiplier ?? 0.8,
-              crouchTurnMultiplier: rawConfig.crouchTurnMultiplier ?? rawStats.crouchTurnMultiplier ?? 1.2,
-              stealthPower: rawConfig.stealthPower ?? rawStats.stealthPower ?? 10,
-              runStealthMultiplier: rawConfig.runStealthMultiplier ?? rawStats.runStealthMultiplier ?? 0.5,
-              crouchStealthMultiplier: rawConfig.crouchStealthMultiplier ?? rawStats.crouchStealthMultiplier ?? 1.5,
-              maxHp: rawConfig.maxHp ?? rawStats.maxHp ?? 100,
-              hp: rawStats.hp ?? rawConfig.hp ?? rawConfig.maxHp ?? 100,
-            };
-    
-            let creatureId: string;
-            if (entData.transform) {
-              const adapter = this.app.spawnCreature(config, entData.transform, entData.id);
-              creatureId = adapter.id;
-              const tr = this.app.world.getComponent(creatureId, 'transform');
-              if (tr && entData.transform.angle !== undefined) {
-                tr.angle = entData.transform.angle;
-              }
-            } else {
-              creatureId = this.app.entityFactory.createEntityFromBlueprint(
-                this.app.world,
-                (this.app as any).aiSystem,
-                { kind: 'creature', config },
-                entData.id
-              );
-            }
-    
-            const worldEnt = this.app.world.getEntity(creatureId);
-            if (worldEnt) {
-              if (worldEnt.healthStats && config.hp !== undefined) {
-                worldEnt.healthStats.hp.current = config.hp;
-                if (worldEnt.health) worldEnt.health.isAlive = config.hp > 0;
-              }
-              if (entData.equip) {
-                worldEnt.equip = { slots: entData.equip.slots };
-              }
-            }
-          }
-        }
+       for (const ent of data.entities) {
+           
+           if (ent.components) {
+               // НОВЫЙ PURE ECS ЗАГРУЗЧИК
+               this.app.world.createEntity(ent.id);
+               const comps = ent.components;
+               
+               // Заливаем стейт компонентов как есть
+               for (const [key, value] of Object.entries(comps)) {
+                   this.app.world.addComponent(ent.id, key as any, value as any);
+               }
 
-        if (Array.isArray(data.items)) {
-        for (const itemData of data.items) {
-            let iId;
-            if (itemData.transform) {
-                iId = this.app.spawnWorldItem(itemData.itemData, itemData.transform, itemData.isSolid, itemData.radius);
-            } else {
-                iId = this.app.spawnItemEntity(itemData.itemData);
-                if (itemData.ownership) {
-                    this.app.world.addComponent(iId, 'ownership', itemData.ownership);
-                }
-            }
-            if (itemData.inventory) {
-                this.app.world.addComponent(iId, 'inventory', {
-                    size: { ...itemData.inventory.size },
-                    slots: itemData.inventory.slots
-                });
-            }
-        }
-        }
+               // Вручную реставрируем несериализуемую физику и ИИ-мозги
+               if (comps.physicsStats && comps.transform) {
+                   const radius = comps.physicsStats.radius.current;
+                   const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
+                   body.isStatic = false;
+                   const category = comps.item ? CollisionCategory.ITEM : CollisionCategory.CREATURE;
+                   const mask = comps.physicsStats.isSolid.current ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+                   (body as any).category = category;
+                   (body as any).mask = mask;
+                   this.app.world.addComponent(ent.id, 'physicsBody', { body, isStatic: false, category, mask });
+                   this.app.physics.registerBody(ent.id, body);
+               }
+
+               if (comps.aiStats) {
+                   this.app.aiSystem.initBotBrain(this.app.world, ent.id, comps.aiStats.behavior.current);
+               }
+           } else {
+               // СТАРЫЙ LEGACY-ФОРМАТ СОХРАНЕНИЙ (Обертка для обратной совместимости)
+               const config: EntityConfig = {
+                  physics: ent.physics,
+                  health: ent.health,
+                  movement: ent.movement,
+                  stealth: ent.stealth,
+                  ai: ent.ai,
+                  item: ent.item,
+                  inventory: ent.inventory ? { size: ent.inventory.size } : undefined,
+                  equip: ent.equip,
+                  meta: ent.meta
+               };
+
+               if (ent.config && ent.stats) {
+                  config.physics = { radius: ent.config.radius, weight: ent.config.weight, isSolid: ent.config.isSolid };
+                  config.health = { maxHp: ent.stats.maxHp, hp: ent.stats.hp };
+                  config.movement = { maxSpeed: ent.stats.maxSpeed, maxTurnSpeed: ent.stats.maxTurnSpeed, runSpeedMultiplier: ent.stats.runSpeedMultiplier, crouchSpeedMultiplier: ent.stats.crouchSpeedMultiplier, runTurnMultiplier: ent.stats.runTurnMultiplier, crouchTurnMultiplier: ent.stats.crouchTurnMultiplier };
+                  config.stealth = { stealthPower: ent.stats.stealthPower, runStealthMultiplier: ent.stats.runStealthMultiplier, crouchStealthMultiplier: ent.stats.crouchStealthMultiplier };
+                  config.ai = { behavior: ent.behavior };
+                  config.equip = ent.equip?.slots;
+               }
+               if (ent.itemData) {
+                  config.item = ent.itemData;
+                  if (ent.isSolid !== undefined) {
+                      config.physics = { radius: ent.radius ?? 16, weight: ent.itemData.config?.weight ?? 1, isSolid: ent.isSolid };
+                  }
+                  config.inventory = ent.inventory ? { size: ent.inventory.size } : undefined;
+               }
+
+               const newId = this.app.spawnEntity(config, ent.transform, ent.id);
+               
+               if (ent.inventory && ent.inventory.slots) {
+                   const inv = this.app.world.getComponent(newId, 'inventory');
+                   if (inv) inv.slots = ent.inventory.slots;
+               }
+               if (ent.ownership) {
+                   this.app.world.addComponent(newId, 'ownership', ent.ownership);
+               }
+           }
+       }
     }
+  }
 }

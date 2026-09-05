@@ -1,6 +1,6 @@
 import React from 'react';
 import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
-import { CreatureStats } from '../types';
+import { EntityStats } from '../types';
 import { GameMode, THEME_COLORS, TOOL_GROUP_THEME_COLORS } from '../constants';
 import { BEHAVIOR_TREE_NAMES } from '../ai/trees_library';
 
@@ -12,8 +12,7 @@ interface ToolbarProps {
   obstaclesEnabled: boolean;
   setObstaclesEnabled: (val: boolean) => void;
   setObstaclesData: (data: any[]) => void;
-  selectedStats: CreatureStats | null;
-  selectedItemData: { id: string; data: ItemData } | null;
+  selectedStats: EntityStats | null;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   worldFileInputRef: React.RefObject<HTMLInputElement | null>;
   onNewWorld: () => void;
@@ -35,7 +34,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   obstaclesEnabled,
   setObstaclesEnabled,
   selectedStats,
-  selectedItemData,
   fileInputRef,
   worldFileInputRef,
   onNewWorld,
@@ -185,58 +183,58 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>{selectedItemData ? 'Выбранный предмет' : 'Выбранное существо'}</h3>
-        {selectedItemData ? (
+        <h3>{selectedStats?.itemData ? 'Выбранный предмет' : 'Выбранное существо'}</h3>
+        {selectedStats?.itemData ? (
           <div className="stats-list">
             <dl className="stats-list">
               <div className="stat-row">
                 <dt>Тип:</dt>
-                <dd>Предмет ({getSlotTypeName(selectedItemData.data.type)})</dd>
+                <dd>Предмет ({getSlotTypeName(selectedStats.itemData.type)})</dd>
               </div>
               <div className="stat-row">
                 <dt>Название:</dt>
-                <dd>{selectedItemData.data.name}</dd>
+                <dd>{selectedStats.itemData.name}</dd>
               </div>
-              {selectedItemData.data.type === 'weapon' && selectedItemData.data.config && (
+              {selectedStats.itemData.type === 'weapon' && selectedStats.itemData.config && (
                 <>
                   <div className="stat-row">
                     <dt>Урон:</dt>
-                    <dd>{(selectedItemData.data.config as WeaponConfig).baseDamage}</dd>
+                    <dd>{(selectedStats.itemData.config as WeaponConfig).baseDamage}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedItemData.data.config as WeaponConfig).weight}</dd>
+                    <dd>{(selectedStats.itemData.config as WeaponConfig).weight}</dd>
                   </div>
                 </>
               )}
-              {selectedItemData.data.type === 'armor' && selectedItemData.data.config && (
+              {selectedStats.itemData.type === 'armor' && selectedStats.itemData.config && (
                 <>
                   <div className="stat-row">
                     <dt>Защита:</dt>
-                    <dd>{(selectedItemData.data.config as ArmorConfig).defense}</dd>
+                    <dd>{(selectedStats.itemData.config as ArmorConfig).defense}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Поглощение:</dt>
-                    <dd>{(selectedItemData.data.config as ArmorConfig).flat_reduction}</dd>
+                    <dd>{(selectedStats.itemData.config as ArmorConfig).flat_reduction}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedItemData.data.config as ArmorConfig).weight}</dd>
+                    <dd>{(selectedStats.itemData.config as ArmorConfig).weight}</dd>
                   </div>
                 </>
               )}
-              {selectedItemData.data.type === 'bag' && selectedItemData.data.config && (
+              {selectedStats.itemData.type === 'bag' && selectedStats.itemData.config && (
                 <>
                   <div className="stat-row">
                     <dt>Размер:</dt>
                     <dd>
-                      {(selectedItemData.data.config as InventoryConfig).size.width}x
-                      {(selectedItemData.data.config as InventoryConfig).size.height}
+                      {(selectedStats.itemData.config as InventoryConfig).size.width}x
+                      {(selectedStats.itemData.config as InventoryConfig).size.height}
                     </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedItemData.data.config as InventoryConfig).weight}</dd>
+                    <dd>{(selectedStats.itemData.config as InventoryConfig).weight}</dd>
                   </div>
                 </>
               )}
@@ -244,7 +242,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               {mode === GameMode.EDITOR && (
                 <>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedItemData.data)}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedStats!.itemData!)}>
                     Изменить
                   </button>
                   <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteEntity}>
@@ -253,7 +251,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 </>
               )}
               {mode === GameMode.SIMULATION && (
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedItemData.data)}>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openItemEditModal(selectedStats!.itemData!)}>
                   Осмотреть
                 </button>
               )}

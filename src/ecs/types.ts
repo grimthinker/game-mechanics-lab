@@ -228,6 +228,22 @@ export type MovementStatsComponent = ComponentStats<MovementConfig>;
 export type StealthStatsComponent = ComponentStats<StealthConfig>;
 export type AIStatsComponent = ComponentStats<AIConfig>;
 
+export interface InventorySetup {
+  size: InventorySize;
+}
+
+export interface EntityConfig {
+  physics?: PhysicsConfig;
+  health?: HealthConfig;
+  movement?: MovementConfig;
+  stealth?: StealthConfig;
+  ai?: AIConfig;
+  item?: ItemData;
+  inventory?: InventorySetup;
+  equip?: EquipSlot[];
+  meta?: { id?: string; name?: string; entityType?: string };
+}
+
 export interface ActiveAttack {
   weapon: WeaponConfig;
   phase: 'prep' | 'cast' | 'recovery';

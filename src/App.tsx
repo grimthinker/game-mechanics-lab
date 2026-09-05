@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
-import { ItemData, StandardRadius } from './ecs/types';
+import { InventoryConfig, ItemData, StandardRadius } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { createDefaultCreatureConfig } from './Creature';
 import { serializeBTNode } from './ai/serializer';
@@ -11,7 +11,7 @@ import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
-import { CreatureStats, PlacementMode } from './types';
+import { PlacementMode, EntityStats } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { GameMode } from './constants';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -33,8 +33,7 @@ export const App: React.FC = () => {
   }, []);
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
-  const [selectedStats, setSelectedStats] = useState<CreatureStats | null>(null);
-  const [selectedItemData, setSelectedItemData] = useState<{ id: string; data: ItemData } | null>(null);
+  const [selectedStats, setSelectedStats] = useState<EntityStats | null>(null);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
 
@@ -71,7 +70,7 @@ export const App: React.FC = () => {
       }
     }
 
-    let targetId = app.selectedCreature?.id;
+    const targetId = app.selectedEntity?.id;
 
     if (targetId) {
       const c = new EntityAdapter(targetId, app.world);
@@ -93,18 +92,13 @@ export const App: React.FC = () => {
              type: s.type,
              item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
         })) : [],
+        itemData: c.itemData ? JSON.parse(JSON.stringify(c.itemData)) : undefined,
+        inventory: c.inventory,
       });
-      setSelectedItemData(null);
       setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
       setBtBlackboard(!c.brain ? null : c.brain.blackboard.getData());
-    } else if (app.selectedItem) {
-      setSelectedItemData({ id: app.selectedItem.id, data: JSON.parse(JSON.stringify(app.selectedItem.data)) });
-      setSelectedStats(null);
-      setBtData(null);
-      setBtBlackboard(null);
     } else {
       setSelectedStats(null);
-      setSelectedItemData(null);
       setBtData(null);
       setBtBlackboard(null);
     }
@@ -215,34 +209,31 @@ export const App: React.FC = () => {
   const handleSpawnConfirm = () => {
     if (!modals.pendingSpawnBehavior) return;
     setPlacementMode({
-      kind: 'creature',
+      kind: 'entity',
       config: {
-        behavior: modals.pendingSpawnBehavior,
-        radius: modals.radius,
-        weight: modals.weight,
-        isSolid: modals.isSolid,
-        maxSpeed: modals.maxSpeed,
-        maxTurnSpeed: modals.maxTurnSpeed,
-        runSpeedMultiplier: modals.runSpeedMultiplier,
-        crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
-        crouchStealthMultiplier: modals.crouchStealthMultiplier,
-        runTurnMultiplier: modals.runTurnMultiplier,
-        crouchTurnMultiplier: modals.crouchTurnMultiplier,
-        hp: 100,
-        maxHp: 100,
-        stealthPower: modals.stealthPower,
-        runStealthMultiplier: modals.runStealthMultiplier,
-      },
+        physics: { radius: modals.radius, weight: modals.weight, isSolid: modals.isSolid },
+        health: { hp: 100, maxHp: 100 },
+        movement: { maxSpeed: modals.maxSpeed, maxTurnSpeed: modals.maxTurnSpeed, runSpeedMultiplier: modals.runSpeedMultiplier, crouchSpeedMultiplier: modals.crouchSpeedMultiplier, runTurnMultiplier: modals.runTurnMultiplier, crouchTurnMultiplier: modals.crouchTurnMultiplier },
+        stealth: { stealthPower: modals.stealthPower, runStealthMultiplier: modals.runStealthMultiplier, crouchStealthMultiplier: modals.crouchStealthMultiplier },
+        ai: { behavior: modals.pendingSpawnBehavior },
+        equip: [ { type: 'armor', itemId: null }, { type: 'bag', itemId: null }, { type: 'weapon', itemId: null } ],
+        meta: { entityType: 'creature' }
+      }
     });
     modals.closeSpawnModal();
   };
 
   const handleItemSpawnConfirm = (itemData: ItemData, isSolid: boolean, radius: StandardRadius) => {
+    const config: any = {
+      item: itemData,
+      physics: { radius, weight: itemData.config?.weight ?? 1, isSolid }
+    };
+    if (itemData.type === 'bag' && itemData.config) {
+      config.inventory = { ...itemData.config as InventoryConfig };
+    }
     setPlacementMode({
-      kind: 'item',
-      itemData,
-      isSolid,
-      radius,
+      kind: 'entity',
+      config
     });
     modals.closeItemSpawnModal();
   };
@@ -323,7 +314,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      <Toolbar
+<Toolbar
         mode={mode}
         goToEditor={goToEditor}
         goToSimulation={goToSimulation}
@@ -335,7 +326,6 @@ export const App: React.FC = () => {
         }}
         setObstaclesData={(data) => appRef.current?.loadObstaclesFromData(data)}
         selectedStats={selectedStats}
-        selectedItemData={selectedItemData}
         fileInputRef={fileInputRef}
         worldFileInputRef={worldFileInputRef}
         onNewWorld={() => {

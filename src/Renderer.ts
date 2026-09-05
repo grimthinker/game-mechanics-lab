@@ -78,39 +78,38 @@ export class Renderer {
     gameMode: string,
     hoveredId: EntityId | null
   ): void {
-    const entities = world.getEntitiesWith('transform', 'meta');
-    const items = world.getEntitiesWith('transform', 'item');
+    const entities = world.getEntitiesWith('transform', 'physicsBody');
 
     // 1. Отрисовка предметов на земле
-    this.renderItems(items, camera, selectedId, hoveredId);
+    for (const [id, { transform, physicsBody, item }] of entities) {
+      if (item) {
+        this.renderItemBody(id, transform, physicsBody.body.r, item, camera, selectedId, hoveredId);
+      }
+    }
 
     // 2. Отрисовка мертвых существ
-    for (const [id, entity] of entities) {
-      if (!this.isEntityAlive(world, id)) {
-        const physStats = world.getComponent(id, 'physicsStats');
-        const phys = world.getComponent(id, 'physicsBody');
-        const radius = physStats?.radius.current ?? phys?.body.r ?? entity.meta.config.radius ?? 16;
+    for (const [id, comp] of entities) {
+      if (!comp.item && comp.healthStats && !this.isEntityAlive(world, id)) {
+        const radius = comp.physicsStats?.radius.current ?? comp.physicsBody.body.r;
         const aiStats = world.getComponent(id, 'aiStats');
-        this.renderCreatureBody(id, entity.transform, radius, false, entity.meta, aiStats, camera, selectedId, gameMode, hoveredId);
+        this.renderCreatureBody(id, comp.transform, radius, false, comp.meta, aiStats, camera, selectedId, gameMode, hoveredId);
       }
     }
 
     // 3. Отрисовка атак оружия (под живыми существами)
-    this.renderWeaponAttacks(entities, world, camera);
+    this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
 
     // 4. Отрисовка живых существ
-    for (const [id, entity] of entities) {
-      if (this.isEntityAlive(world, id)) {
-        const physStats = world.getComponent(id, 'physicsStats');
-        const phys = world.getComponent(id, 'physicsBody');
-        const radius = physStats?.radius.current ?? phys?.body.r ?? entity.meta.config.radius ?? 16;
+    for (const [id, comp] of entities) {
+      if (!comp.item && (!comp.healthStats || this.isEntityAlive(world, id))) {
+        const radius = comp.physicsStats?.radius.current ?? comp.physicsBody.body.r;
         const aiStats = world.getComponent(id, 'aiStats');
-        this.renderCreatureBody(id, entity.transform, radius, true, entity.meta, aiStats, camera, selectedId, gameMode, hoveredId);
+        this.renderCreatureBody(id, comp.transform, radius, true, comp.meta, aiStats, camera, selectedId, gameMode, hoveredId);
       }
     }
 
     // 5. Отрисовка Healthbars и ID-текстов
-    this.renderUIOverlays(entities, world, camera);
+    this.renderUIOverlays(world.getEntitiesWith('transform', 'healthStats'), world, camera);
 
     // 6. Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
@@ -143,29 +142,18 @@ export class Renderer {
     this.ctx.save();
     this.ctx.rotate(transform.angle);
 
+    const state = meta?.state ?? 'idle';
     let fillColor = '#34495e';
     if (!isAlive) {
       fillColor = '#7f8c8d';
     } else {
-      switch (meta.state) {
-        case 'idle':
-          fillColor = '#34495e';
-          break;
-        case 'moving':
-          fillColor = '#3498db';
-          break;
-        case 'running':
-          fillColor = '#2ecc71';
-          break;
-        case 'crouching':
-          fillColor = '#9b59b6';
-          break;
-        case 'attacking':
-          fillColor = '#e67e22';
-          break;
-        case 'dead':
-          fillColor = '#7f8c8d';
-          break;
+      switch (state) {
+        case 'idle': fillColor = '#34495e'; break;
+        case 'moving': fillColor = '#3498db'; break;
+        case 'running': fillColor = '#2ecc71'; break;
+        case 'crouching': fillColor = '#9b59b6'; break;
+        case 'attacking': fillColor = '#e67e22'; break;
+        case 'dead': fillColor = '#7f8c8d'; break;
       }
     }
 
@@ -174,7 +162,8 @@ export class Renderer {
     this.ctx.fillStyle = fillColor;
     this.ctx.fill();
 
-    let borderColor = (aiStats?.behavior?.current ?? meta.config.behavior) === 'PlayerTree' ? '#2980b9' : '#c0392b';
+    const behavior = aiStats?.behavior?.current ?? meta?.config?.behavior ?? 'IdleTree';
+    let borderColor = behavior === 'PlayerTree' ? '#2980b9' : '#c0392b';
     let lineWidth = 2 / camera.scale;
 
     this.ctx.strokeStyle = borderColor;
@@ -208,43 +197,43 @@ export class Renderer {
     this.ctx.restore();
   }
 
-  private renderItems(
-    items: Array<[EntityId, any]>,
+  private renderItemBody(
+    id: EntityId,
+    transform: any,
+    radius: number,
+    item: any,
     camera: Camera,
     selectedId: EntityId | null,
     hoveredId: EntityId | null
   ): void {
-    for (const [id, { transform, physicsBody, item }] of items) {
-      this.ctx.save();
-      this.ctx.translate(transform.x, transform.y);
-      this.ctx.rotate(transform.angle);
-      
-      const radius = physicsBody ? physicsBody.body.r : 16;
-      const size = radius * 1.6;
-      
-      let color = '#7f8c8d';
-      if (item.type === 'weapon') color = '#f1c40f';
-      else if (item.type === 'armor') color = '#3498db';
-      else if (item.type === 'bag') color = '#2ecc71';
-      
-      this.ctx.fillStyle = color;
-      this.ctx.fillRect(-size/2, -size/2, size, size);
-      
-      const isSelected = selectedId === id;
-      const isHovered = hoveredId === id;
-      
-      if (isSelected) {
-         this.ctx.strokeStyle = '#e74c3c';
-         this.ctx.lineWidth = 3 / camera.scale;
-         this.ctx.strokeRect(-size/2, -size/2, size, size);
-      } else if (isHovered) {
-         this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)';
-         this.ctx.lineWidth = 3 / camera.scale;
-         this.ctx.strokeRect(-size/2, -size/2, size, size);
-      }
-      
-      this.ctx.restore();
+    this.ctx.save();
+    this.ctx.translate(transform.x, transform.y);
+    this.ctx.rotate(transform.angle);
+    
+    const size = radius * 1.6;
+    
+    let color = '#7f8c8d';
+    if (item.type === 'weapon') color = '#f1c40f';
+    else if (item.type === 'armor') color = '#3498db';
+    else if (item.type === 'bag') color = '#2ecc71';
+    
+    this.ctx.fillStyle = color;
+    this.ctx.fillRect(-size/2, -size/2, size, size);
+    
+    const isSelected = selectedId === id;
+    const isHovered = hoveredId === id;
+    
+    if (isSelected) {
+       this.ctx.strokeStyle = '#e74c3c';
+       this.ctx.lineWidth = 3 / camera.scale;
+       this.ctx.strokeRect(-size/2, -size/2, size, size);
+    } else if (isHovered) {
+       this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)';
+       this.ctx.lineWidth = 3 / camera.scale;
+       this.ctx.strokeRect(-size/2, -size/2, size, size);
     }
+    
+    this.ctx.restore();
   }
 
   private renderWeaponAttacks(
@@ -383,7 +372,7 @@ export class Renderer {
       
       const physStats = world.getComponent(id, 'physicsStats');
       const phys = world.getComponent(id, 'physicsBody');
-      const radius = physStats?.radius.current ?? phys?.body.r ?? meta.config.radius ?? 16;
+      const radius = physStats?.radius.current ?? phys?.body.r ?? meta?.config?.radius ?? 16;
 
       // Healthbar
       this.ctx.save();
@@ -404,7 +393,8 @@ export class Renderer {
       this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
-      this.ctx.fillText(meta.id, 0, -radius - 20 / camera.scale);
+      const displayName = meta?.id ?? id;
+      this.ctx.fillText(displayName, 0, -radius - 20 / camera.scale);
       this.ctx.restore();
     }
   }

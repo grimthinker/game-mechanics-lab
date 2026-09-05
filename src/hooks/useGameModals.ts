@@ -70,8 +70,8 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
   };
 
   const openEditModal = () => {
-    const c = appRef.current?.selectedCreature;
-    if (!c) return;
+    const c = appRef.current?.selectedEntity;
+    if (!c || c.itemData) return;
     setEditBehavior(c.behavior);
     setEditIsSolid(c.isSolid);
     setEditRadius(c.radius);
@@ -96,7 +96,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
 
   const handleEditConfirm = () => {
     const app = appRef.current;
-    const c = app?.selectedCreature;
+    const c = app?.selectedEntity;
     if (!c || !app) return;
 
     c.updateParams(
@@ -145,12 +145,24 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       Object.assign(itemComp, updatedItem);
       
       const phys = app.world.getComponent(entityId, 'physicsBody');
+      const physStats = app.world.getComponent(entityId, 'physicsStats');
       if (phys) {
         const isSolidNow = !!updatedItem.config?.isSolid;
         const newRadius = updatedItem.config?.radius ?? 16;
+        const newWeight = updatedItem.config?.weight ?? 1;
+        
         phys.body.r = newRadius;
         phys.mask = isSolidNow ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
         (phys.body as any).mask = phys.mask;
+        
+        if (physStats) {
+           physStats.radius.current = newRadius;
+           physStats.radius.base = newRadius;
+           physStats.weight.current = newWeight;
+           physStats.weight.base = newWeight;
+           physStats.isSolid.current = isSolidNow;
+           physStats.isSolid.base = isSolidNow;
+        }
       }
     }
 
@@ -162,7 +174,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(updatedItem.config as WeaponConfig));
     }
 
-    const c = app.selectedCreature;
+    const c = app.selectedEntity;
     if (c && updatedItem.type === 'bag') {
       const bagCfg = updatedItem.config as InventoryConfig;
       const inv = app.world.getComponent(entityId, 'inventory');

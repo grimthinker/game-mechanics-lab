@@ -35,7 +35,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
         const zType = (cfg.zone.hitZoneType === 'line' ? 'forward_line' : cfg.zone.hitZoneType) as HitZoneType;
         setFormValues({
           name: item.name,
-          weight: cfg.invWeight ?? 1,
+          weight: cfg.weight ?? 1,
           baseDamage: cfg.baseDamage,
           prepTime: cfg.prepTime,
           recoveryTime: cfg.recoveryTime,
@@ -53,14 +53,14 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
           name: item.name,
           defense: cfg.defense,
           flatReduction: cfg.flat_reduction,
-          weight: cfg.invWeight ?? 1,
+          weight: cfg.weight ?? 1,
         });
       } else if (item.type === 'bag') {
         setFormValues({
           name: item.name,
           width: cfg.size?.width ?? 6,
           height: cfg.size?.height ?? 4,
-          weight: cfg.invWeight ?? 1,
+          weight: cfg.weight ?? 1,
         });
       }
     } else {
@@ -106,7 +106,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
     const cfg = updated.config as any;
     cfg.name = formValues.name;
     updated.name = formValues.name;
-    cfg.invWeight = formValues.weight;
+    cfg.weight = formValues.weight;
 
     if (item.type === 'weapon') {
       cfg.baseDamage = formValues.baseDamage;

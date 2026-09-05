@@ -18,13 +18,12 @@ import { createRandomWeaponItem } from './Weapon';
 import { createDefaultArmorItem, createDefaultBagItem } from './DefaultItems';
 import { ObstacleSegment, Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
-import { ItemAdapter } from './ItemAdapter';
 import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
 import { WorldSerializer } from './ecs/WorldSerializer';
+import { EntityConfig } from './ecs/types';
 
 export { EntityAdapter } from './EntityAdapter';
-export { ItemAdapter } from './ItemAdapter';
 
 export class GameApp {
   private canvas: HTMLCanvasElement;
@@ -34,15 +33,13 @@ export class GameApp {
   private movementSystem: MovementSystem;
   private attackSystem: AttackSystem;
   private damageSystem: DamageSystem;
-  private aiSystem: AISystem;
+  public aiSystem: AISystem;
   public camera: Camera;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
 
-  public selectedCreature: EntityAdapter | null = null;
-  public selectedItem: ItemAdapter | null = null;
-  public hoveredCreature: EntityAdapter | null = null;
-  public hoveredItem: ItemAdapter | null = null;
+  public selectedEntity: EntityAdapter | null = null;
+  public hoveredEntity: EntityAdapter | null = null;
 
   public onFrame: (() => void) | null = null;
 
@@ -79,13 +76,8 @@ export class GameApp {
     }
   }
 
-  public spawnItemEntity(itemData: ItemData, forcedId?: string): string {
-    return this.entityFactory.createEntityFromBlueprint(
-      this.world,
-      this.aiSystem,
-      { kind: 'item', itemData },
-      forcedId
-    );
+  public spawnEntity(config: EntityConfig, position?: Point, forcedId?: string): string {
+    return this.entityFactory.spawnEntity(this.world, this.physics, this.aiSystem, config, position, forcedId);
   }
 
   public spawnCreature(
@@ -93,12 +85,15 @@ export class GameApp {
     position?: Point,
     forcedId?: string
   ): EntityAdapter {
-    const id = this.entityFactory.createEntityFromBlueprint(
-      this.world,
-      this.aiSystem,
-      { kind: 'creature', config },
-      forcedId
-    );
+    const entityConfig: EntityConfig = {
+      physics: { radius: config.radius, weight: config.weight, isSolid: config.isSolid },
+      health: { maxHp: config.maxHp, hp: config.hp },
+      movement: { maxSpeed: config.maxSpeed, maxTurnSpeed: config.maxTurnSpeed, runSpeedMultiplier: config.runSpeedMultiplier, crouchSpeedMultiplier: config.crouchSpeedMultiplier, runTurnMultiplier: config.runTurnMultiplier, crouchTurnMultiplier: config.crouchTurnMultiplier },
+      stealth: { stealthPower: config.stealthPower, runStealthMultiplier: config.runStealthMultiplier, crouchStealthMultiplier: config.crouchStealthMultiplier },
+      ai: { behavior: config.behavior },
+      equip: [ { type: 'armor', itemId: null }, { type: 'bag', itemId: null }, { type: 'weapon', itemId: null } ],
+      meta: { id: forcedId, entityType: 'creature' }
+    };
 
     const pos = position
       ? { ...position }
@@ -107,8 +102,17 @@ export class GameApp {
           y: 100 + Math.random() * (this.canvas.height - 200),
         };
 
-    this.entityFactory.spawnEntityInWorld(this.world, this.physics, id, pos);
+    const id = this.spawnEntity(entityConfig, pos, forcedId);
     return new EntityAdapter(id, this.world);
+  }
+
+  public spawnItemEntity(itemData: ItemData, forcedId?: string): string {
+    const config: EntityConfig = { item: itemData };
+    if (itemData.type === 'bag' && itemData.config) {
+      config.inventory = { ...itemData.config as InventoryConfig };
+    }
+    // Синхронизируем ID сущности в ECS с внутренним ID предмета
+    return this.spawnEntity(config, undefined, forcedId || itemData.id);
   }
 
   public spawnWorldItem(
@@ -117,12 +121,19 @@ export class GameApp {
     isSolid?: boolean,
     radius?: StandardRadius
   ): string {
-    const id = this.spawnItemEntity(itemData);
-    this.entityFactory.spawnEntityInWorld(this.world, this.physics, id, position, {
-      isSolid,
-      radius,
-    });
-    return id;
+    const config: EntityConfig = {
+       item: itemData,
+       physics: {
+         radius: radius ?? itemData.config?.radius ?? 16,
+         weight: itemData.config?.weight ?? 1,
+         isSolid: isSolid ?? itemData.config?.isSolid ?? true
+       }
+    };
+    if (itemData.type === 'bag' && itemData.config) {
+      config.inventory = { ...itemData.config as InventoryConfig };
+    }
+    // Синхронизируем ID сущности в мире с внутренним ID предмета
+    return this.spawnEntity(config, position, itemData.id);
   }
 
   public despawnEntityFromWorld(id: string): void {
@@ -130,60 +141,31 @@ export class GameApp {
   }
 
   public deleteSelectedEntity(): void {
-    if (this.selectedCreature) {
-      const id = this.selectedCreature.id;
-      
-      const eq = this.world.getComponent(id, 'equip');
-      if (eq) {
-         for (const slot of eq.slots) {
-            if (slot.itemId) {
-               const inv = this.world.getComponent(slot.itemId, 'inventory');
-               if (inv) {
-                 for (const row of inv.slots) {
-                    for (const cell of row) {
-                       if (cell.itemId) {
-                           const phys = this.world.getComponent(cell.itemId, 'physicsBody');
-                           if (phys) this.physics.unregisterBody(phys.body);
-                           this.world.removeEntity(cell.itemId);
-                       }
-                    }
-                 }
-               }
+    if (!this.selectedEntity) return;
+    const id = this.selectedEntity.id;
+    this.deleteEntityRecursive(id);
+    if (this.hoveredEntity?.id === id) this.hoveredEntity = null;
+    this.selectedEntity = null;
+  }
 
-               const phys = this.world.getComponent(slot.itemId, 'physicsBody');
-               if (phys) this.physics.unregisterBody(phys.body);
-               this.world.removeEntity(slot.itemId);
-            }
-         }
+  private deleteEntityRecursive(id: string): void {
+    const eq = this.world.getComponent(id, 'equip');
+    if (eq) {
+      for (const slot of eq.slots) {
+        if (slot.itemId) this.deleteEntityRecursive(slot.itemId);
       }
-
-      const phys = this.world.getComponent(id, 'physicsBody');
-      if (phys) this.physics.unregisterBody(phys.body);
-      this.world.removeEntity(id);
-      if (this.hoveredCreature?.id === id) this.hoveredCreature = null;
-      this.selectedCreature = null;
-    } else if (this.selectedItem) {
-      const id = this.selectedItem.id;
-      
-      const inv = this.world.getComponent(id, 'inventory');
-      if (inv) {
-         for (const row of inv.slots) {
-            for (const cell of row) {
-               if (cell.itemId) {
-                   const phys = this.world.getComponent(cell.itemId, 'physicsBody');
-                   if (phys) this.physics.unregisterBody(phys.body);
-                   this.world.removeEntity(cell.itemId);
-               }
-            }
-         }
-      }
-
-      const phys = this.world.getComponent(id, 'physicsBody');
-      if (phys) this.physics.unregisterBody(phys.body);
-      this.world.removeEntity(id);
-      if (this.hoveredItem?.id === id) this.hoveredItem = null;
-      this.selectedItem = null;
     }
+    const inv = this.world.getComponent(id, 'inventory');
+    if (inv) {
+      for (const row of inv.slots) {
+        for (const cell of row) {
+          if (cell.itemId) this.deleteEntityRecursive(cell.itemId);
+        }
+      }
+    }
+    const phys = this.world.getComponent(id, 'physicsBody');
+    if (phys) this.physics.unregisterBody(phys.body);
+    this.world.removeEntity(id);
   }
 
   public clearWorld(): void {
@@ -237,9 +219,9 @@ export class GameApp {
       this.camera,
       this.world,
       this.physics,
-      this.selectedCreature?.id || this.selectedItem?.id || null,
+      this.selectedEntity?.id || null,
       this.gameMode,
-      this.hoveredCreature?.id || this.hoveredItem?.id || null
+      this.hoveredEntity?.id || null
     );
 
     if (this.onFrame) this.onFrame();
@@ -249,36 +231,18 @@ export class GameApp {
 
   public selectEntity(id: string | null): void {
     if (!id) {
-      this.selectedCreature = null;
-      this.selectedItem = null;
+      this.selectedEntity = null;
       return;
     }
-    const meta = this.world.getComponent(id, 'meta');
-    const item = this.world.getComponent(id, 'item');
-    if (meta) {
-      this.selectedCreature = new EntityAdapter(id, this.world);
-      this.selectedItem = null;
-    } else if (item) {
-      this.selectedCreature = null;
-      this.selectedItem = new ItemAdapter(id, this.world);
-    }
+    this.selectedEntity = new EntityAdapter(id, this.world);
   }
 
   public hoverEntity(id: string | null): void {
     if (!id) {
-      this.hoveredCreature = null;
-      this.hoveredItem = null;
+      this.hoveredEntity = null;
       return;
     }
-    const meta = this.world.getComponent(id, 'meta');
-    const item = this.world.getComponent(id, 'item');
-    if (meta) {
-      this.hoveredCreature = new EntityAdapter(id, this.world);
-      this.hoveredItem = null;
-    } else if (item) {
-      this.hoveredCreature = null;
-      this.hoveredItem = new ItemAdapter(id, this.world);
-    }
+    this.hoveredEntity = new EntityAdapter(id, this.world);
   }
 
   public pickEntityAt(worldPoint: Point): string | null {

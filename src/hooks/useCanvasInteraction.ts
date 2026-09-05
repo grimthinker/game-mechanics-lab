@@ -133,14 +133,8 @@ export const useCanvasInteraction = ({
     if (placementMode && mode === GameMode.EDITOR) {
       const wasDragging = app.endPan();
       if (!wasDragging) {
-        if (placementMode.kind === 'creature') {
-          const config = placementMode.config;
-          app.spawnCreature(
-            config,
-            point
-          );
-        } else if (placementMode.kind === 'item') {
-          app.spawnWorldItem(placementMode.itemData, point, placementMode.isSolid, placementMode.radius);
+        if (placementMode.kind === 'entity') {
+           app.spawnEntity(placementMode.config, point);
         }
         setPlacementMode(null);
         syncPlayerControls();

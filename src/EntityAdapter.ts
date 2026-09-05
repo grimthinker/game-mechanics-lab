@@ -7,7 +7,8 @@ import {
   InventoryComponent,
   EntityController,
   StandardRadius,
-  CreatureConfig,
+  ItemData,
+  OwnershipComponent,
 } from './ecs/types';
 import {
   EntityUtils,
@@ -17,7 +18,6 @@ import {
 } from './ai/core';
 import { AISystem } from './ecs/systems/AISystem';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
-import { Circle } from 'detect-collisions';
 import { Point } from './types';
 import { COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
 
@@ -30,8 +30,17 @@ export class EntityAdapter implements IMovable, EntityController {
     private world: World
   ) {}
 
+  public get itemData(): ItemData | undefined {
+    return this.world.getComponent(this.id, 'item');
+  }
+  public get inventory(): InventoryComponent | undefined {
+    return this.world.getComponent(this.id, 'inventory');
+  }
+  public get ownership(): OwnershipComponent | undefined {
+    return this.world.getComponent(this.id, 'ownership');
+  }
   public get behavior(): string {
-    return this.world.getComponent(this.id, 'aiStats')?.behavior.current ?? this.world.getComponent(this.id, 'meta')?.config?.behavior ?? 'IdleTree';
+    return this.world.getComponent(this.id, 'aiStats')?.behavior.current ?? 'IdleTree';
   }
   public get state(): CreatureState {
     return this.world.getComponent(this.id, 'meta')?.state ?? 'idle';
@@ -45,17 +54,13 @@ export class EntityAdapter implements IMovable, EntityController {
     return transform ? transform.angle : 0;
   }
   public get radius(): StandardRadius {
-    return this.world.getComponent(this.id, 'physicsStats')?.radius.current 
-        ?? (this.world.getComponent(this.id, 'physicsBody')?.body.r as StandardRadius)
-        ?? 16;
+    return (this.world.getComponent(this.id, 'physicsStats')?.radius.current as StandardRadius) ?? 16;
   }
   public get baseRadius(): StandardRadius {
-    return this.world.getComponent(this.id, 'physicsStats')?.radius.base ?? this.radius;
+    return (this.world.getComponent(this.id, 'physicsStats')?.radius.base as StandardRadius) ?? this.radius;
   }
   public get weight(): number {
-    return this.world.getComponent(this.id, 'physicsStats')?.weight.current
-        ?? this.world.getComponent(this.id, 'meta')?.config?.weight 
-        ?? 10;
+    return this.world.getComponent(this.id, 'physicsStats')?.weight.current ?? 1;
   }
   public get baseWeight(): number {
     return this.world.getComponent(this.id, 'physicsStats')?.weight.base ?? this.weight;
