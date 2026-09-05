@@ -1,8 +1,7 @@
 import { World } from '../World';
-import { PhysicsSystem } from './PhysicsSystem';
 
 export class MovementSystem {
-  public update(dt: number, world: World, physics: PhysicsSystem): void {
+  public update(dt: number, world: World): void {
     const entities = world.getEntitiesWith(
       'transform',
       'velocity',
@@ -83,14 +82,7 @@ export class MovementSystem {
         transform.angle += velocity.currentTurnSpeed * dt;
       }
 
-      // 7. Движение
-      if (velocity.currentSpeed > 0) {
-        const dx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
-        const dy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
-        physics.moveEntitySafe(world, id, dx, dy);
-      }
-
-      // 8. Обновление состояния
+      // 7. Обновление состояния
       if (activeAttacks.attacks.length > 0) {
         meta.state = 'attacking';
       } else if (input.isRunning && (input.isMovingForward || input.turnDirection !== 0)) {

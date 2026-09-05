@@ -19,6 +19,7 @@ import { AISystem } from './ecs/systems/AISystem';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { Circle } from 'detect-collisions';
 import { Point } from './types';
+import { COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
 
 export class EntityAdapter implements IMovable, EntityController {
   public dt: number = 0;
@@ -349,24 +350,11 @@ export class EntityAdapter implements IMovable, EntityController {
       }
     }
 
-    if (physStats && phys) {
+    if (phys && physStats) {
       phys.body.r = physStats.radius.current;
-    }
-
-    if (physicsSystem && physStats) {
-      const wasSolid = !!phys;
-      const isSolidNow = physStats.isSolid.current;
-      if (!wasSolid && isSolidNow) {
-        const transform = this.world.getComponent(this.id, 'transform');
-        if (transform) {
-          const body = new Circle({ x: transform.x, y: transform.y }, physStats.radius.current as StandardRadius);
-          body.isStatic = false;
-          this.world.addComponent(this.id, 'physicsBody', { body, isStatic: false });
-          physicsSystem.registerBody(this.id, body);
-        }
-      } else if (wasSolid && !isSolidNow) {
-        physicsSystem.unregisterBody(phys!.body);
-        this.world.removeComponent(this.id, 'physicsBody');
+      if (params.isSolid !== undefined) {
+        phys.mask = params.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        (phys.body as any).mask = phys.mask;
       }
     }
   }

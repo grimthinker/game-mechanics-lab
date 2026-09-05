@@ -227,7 +227,7 @@ export class GameApp {
 
     if (!this.isPaused) {
       this.aiSystem.update(dt, this.world);
-      this.movementSystem.update(dt, this.world, this.physics);
+      this.movementSystem.update(dt, this.world);
       this.attackSystem.update(dt, this.world, this.physics);
       this.physics.update(dt, this.world);
       this.damageSystem.update(dt, this.world);

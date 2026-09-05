@@ -53,14 +53,14 @@ export class WorldSerializer {
                 slots: comp.equip.slots,
               },
             });
-      } else if (comp.item) {
-        itemsData.push({
-          id,
-          transform: comp.transform ? { ...comp.transform } : undefined,
-          isSolid: !!comp.physicsBody,
-          radius: comp.physicsBody ? comp.physicsBody.body.r : 16,
-          itemData: comp.item,
-          ownership: comp.ownership ? { ...comp.ownership } : undefined,
+        } else if (comp.item) {
+            itemsData.push({
+              id,
+              transform: comp.transform ? { ...comp.transform } : undefined,
+              isSolid: comp.physicsBody ? comp.physicsBody.mask !== 0 : (comp.item.config?.isSolid ?? true),
+              radius: comp.physicsBody ? comp.physicsBody.body.r : 16,
+              itemData: comp.item,
+              ownership: comp.ownership ? { ...comp.ownership } : undefined,
           inventory: comp.inventory ? {
              size: { ...comp.inventory.size },
              slots: comp.inventory.slots,

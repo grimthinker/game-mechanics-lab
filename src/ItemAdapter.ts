@@ -49,7 +49,11 @@ export class ItemAdapter {
   }
 
   public get isSolid(): boolean {
-    return this.world.getComponent(this.id, 'physicsBody') !== undefined;
+    const phys = this.world.getComponent(this.id, 'physicsBody');
+    if (phys) {
+      return phys.mask !== 0;
+    }
+    return this.data?.config?.isSolid ?? true;
   }
 
   public get radius(): StandardRadius {

@@ -1,5 +1,12 @@
 import { useState } from 'react';
-import { StandardRadius, InventoryConfig, ItemData, WeaponConfig } from '../ecs/types';
+import {
+  StandardRadius,
+  InventoryConfig,
+  ItemData,
+  WeaponConfig,
+  COLLISION_MASK_ALL,
+  COLLISION_MASK_NONE,
+} from '../ecs/types';
 import { GameApp } from '../GameApp';
 import { Circle } from 'detect-collisions';
 import { lastAddedWeaponConfigState } from '../Weapon';
@@ -138,26 +145,12 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
       Object.assign(itemComp, updatedItem);
       
       const phys = app.world.getComponent(entityId, 'physicsBody');
-      const wasSolid = !!phys;
-      const isSolidNow = !!updatedItem.config?.isSolid;
-      
-      if (!wasSolid && isSolidNow) {
-        const rad = updatedItem.config?.radius ?? 16;
-        const transform = app.world.getComponent(entityId, 'transform');
-        if (transform) {
-          const body = new Circle({ x: transform.x, y: transform.y }, rad);
-          body.isStatic = false;
-          app.world.addComponent(entityId, 'physicsBody', { body, isStatic: false });
-          app.physics.registerBody(entityId, body);
-        }
-      } else if (wasSolid && !isSolidNow) {
-        app.physics.unregisterBody(phys!.body);
-        app.world.removeComponent(entityId, 'physicsBody');
-      } else if (wasSolid && isSolidNow) {
+      if (phys) {
+        const isSolidNow = !!updatedItem.config?.isSolid;
         const newRadius = updatedItem.config?.radius ?? 16;
-        if (phys!.body.r !== newRadius) {
-          phys!.body.r = newRadius;
-        }
+        phys.body.r = newRadius;
+        phys.mask = isSolidNow ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        (phys.body as any).mask = phys.mask;
       }
     }
 

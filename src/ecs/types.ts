@@ -10,9 +10,22 @@ export interface TransformComponent {
   angle: number;
 }
 
+export const enum CollisionCategory {
+  NONE = 0,
+  OBSTACLE = 1 << 0, // 1
+  CREATURE = 1 << 1, // 2
+  ITEM = 1 << 2,     // 4
+}
+
+export const COLLISION_MASK_ALL =
+  CollisionCategory.OBSTACLE | CollisionCategory.CREATURE | CollisionCategory.ITEM;
+export const COLLISION_MASK_NONE = 0;
+
 export interface PhysicsBodyComponent {
   body: Circle;
   isStatic: boolean;
+  category: number;
+  mask: number;
 }
 
 export interface StatValue<T = number> {

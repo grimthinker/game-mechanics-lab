@@ -1,6 +1,12 @@
 import { System, Line, Circle } from 'detect-collisions';
 import { World } from '../World';
-import { EntityId, WeaponConfig } from '../types';
+import {
+  EntityId,
+  WeaponConfig,
+  CollisionCategory,
+  COLLISION_MASK_ALL,
+  COLLISION_MASK_NONE,
+} from '../types';
 import { ObstacleSegment, Point } from '../../types';
 
 const PHYSICS_CONFIG = {
@@ -39,6 +45,8 @@ export class PhysicsSystem {
         { x: seg.end.x, y: seg.end.y },
         { isStatic: true }
       );
+      (line as any).category = CollisionCategory.OBSTACLE;
+      (line as any).mask = COLLISION_MASK_ALL;
       this.obstacleLines.push(line);
       if (this.obstaclesEnabled) {
         this.system.insert(line);
@@ -75,6 +83,15 @@ export class PhysicsSystem {
     if (!transform || !phys) return;
 
     const body = phys.body;
+
+    // Если тело не сталкивается с препятствиями (бестелесное), двигаем напрямую
+    if ((phys.mask & CollisionCategory.OBSTACLE) === 0) {
+      body.setPosition(body.x + dx, body.y + dy);
+      transform.x = body.x;
+      transform.y = body.y;
+      return;
+    }
+
     const moveSq = dx * dx + dy * dy;
     const radiusThreshold = body.r * PHYSICS_CONFIG.R_mult;
 
@@ -99,6 +116,7 @@ export class PhysicsSystem {
 
   private resolveObstaclesForBody(body: Circle): void {
     if (!this.obstaclesEnabled) return;
+    if (((body as any).mask & CollisionCategory.OBSTACLE) === 0) return;
 
     this.system.checkOne(body, (response) => {
       const wall = response.b === body ? response.a : response.b;
@@ -166,12 +184,29 @@ export class PhysicsSystem {
   }
 
   public update(dt: number, world: World): void {
+    const movingEntities = world.getEntitiesWith('transform', 'velocity');
+    for (const [id, { transform, velocity }] of movingEntities) {
+      if (velocity.currentSpeed > 0) {
+        const dx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
+        const dy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
+        this.moveEntitySafe(world, id, dx, dy);
+      }
+    }
+
     this.system.update();
 
     this.system.checkAll((response) => {
       const c1 = response.a;
       const c2 = response.b;
       if (c1.isStatic || c2.isStatic) return;
+
+      const cat1 = (c1 as any).category ?? CollisionCategory.NONE;
+      const mask1 = (c1 as any).mask ?? 0;
+      const cat2 = (c2 as any).category ?? CollisionCategory.NONE;
+      const mask2 = (c2 as any).mask ?? 0;
+
+      // Проверяем взаимное столкновение групп
+      if ((mask1 & cat2) === 0 || (mask2 & cat1) === 0) return;
 
       const id1 = this.bodyToEntityMap.get(c1);
       const id2 = this.bodyToEntityMap.get(c2);
@@ -237,6 +272,7 @@ export class PhysicsSystem {
       for (const [id, { physicsBody, transform }] of entities) {
         const meta = world.getComponent(id, 'meta');
         if (meta && !world.getComponent(id, 'health')?.isAlive) continue;
+        if ((physicsBody.mask & CollisionCategory.OBSTACLE) === 0) continue;
         
         this.resolveObstaclesForBody(physicsBody.body);
         transform.x = physicsBody.body.x;
@@ -281,7 +317,12 @@ export class PhysicsSystem {
       if (hitEntityId) {
         const hitHealth = world.getComponent(hitEntityId, 'health');
         const hitStats = world.getComponent(hitEntityId, 'healthStats');
-        if (hitHealth && (!hitHealth.isAlive || (hitStats && hitStats.hp.current <= 0))) {
+        const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
+        const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
+        const isDead = hitHealth && (!hitHealth.isAlive || (hitStats && hitStats.hp.current <= 0));
+        const isNonSolid = (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) || (hitPhysStats && !hitPhysStats.isSolid.current);
+
+        if (isDead || isNonSolid) {
           currStart = {
             x: hitPoint.x + ux * 1,
             y: hitPoint.y + uy * 1,
@@ -397,6 +438,9 @@ export class PhysicsSystem {
       if (targetId === attackerId || !health.isAlive || healthStats.hp.current <= 0) continue;
 
       const physStats = world.getComponent(targetId, 'physicsStats');
+      const isSolid = physStats ? physStats.isSolid.current : (physicsBody.mask !== COLLISION_MASK_NONE);
+      if (!isSolid) continue;
+
       const targetRadius = physStats?.radius.current ?? physicsBody.body.r ?? 16;
 
       let isHit = false;

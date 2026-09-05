@@ -3,12 +3,15 @@ import { World } from './World';
 import { PhysicsSystem } from './systems/PhysicsSystem';
 import { AISystem } from './systems/AISystem';
 import {
-  EntityId,
-  CreatureConfig,
-  ItemData,
-  InventoryConfig,
-  StandardRadius,
-} from './types';
+    EntityId,
+    CreatureConfig,
+    ItemData,
+    InventoryConfig,
+    StandardRadius,
+    CollisionCategory,
+    COLLISION_MASK_ALL,
+    COLLISION_MASK_NONE,
+  } from './types';
 import { Point } from '../types';
 
 export interface CreatureBlueprint {
@@ -181,34 +184,39 @@ export class EntityFactory {
         const isSolid = options?.isSolid ?? physStats?.isSolid.current ?? meta.config.isSolid ?? true;
         const radius = options?.radius ?? physStats?.radius.current ?? meta.config.radius ?? 16;
   
-        if (isSolid) {
-          const body = new Circle({ x: position.x, y: position.y }, radius);
-          body.isStatic = false;
+        const body = new Circle({ x: position.x, y: position.y }, radius);
+        body.isStatic = false;
+        const category = CollisionCategory.CREATURE;
+        const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        (body as any).category = category;
+        (body as any).mask = mask;
   
-          world.addComponent(id, 'physicsBody', { body, isStatic: false });
-          physics.registerBody(id, body);
-        }
-
-      world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
-      world.addComponent(id, 'input', {
-        isMovingForward: false,
-        turnDirection: 0,
-        isRunning: false,
-        isCrouching: false,
-        wantsAttack: false,
-        turnSpeed: 0,
-      });
-    } else if (item) {
-        // Предмет: добавляем физическое тело при необходимости
+        world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
+        physics.registerBody(id, body);
+  
+        world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
+        world.addComponent(id, 'input', {
+          isMovingForward: false,
+          turnDirection: 0,
+          isRunning: false,
+          isCrouching: false,
+          wantsAttack: false,
+          turnSpeed: 0,
+        });
+      } else if (item) {
+        // Предмет: добавляем физическое тело в мире
         const isSolid = options?.isSolid ?? item.config?.isSolid ?? true;
         const radius = options?.radius ?? item.config?.radius ?? 16;
   
-        if (isSolid) {
-          const body = new Circle({ x: position.x, y: position.y }, radius);
-          body.isStatic = false;
-          world.addComponent(id, 'physicsBody', { body, isStatic: false });
-          physics.registerBody(id, body);
-        }
+        const body = new Circle({ x: position.x, y: position.y }, radius);
+        body.isStatic = false;
+        const category = CollisionCategory.ITEM;
+        const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        (body as any).category = category;
+        (body as any).mask = mask;
+  
+        world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
+        physics.registerBody(id, body);
       }
   }
 
