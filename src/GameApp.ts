@@ -6,6 +6,7 @@ import {
 } from './ecs/types';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { MovementSystem } from './ecs/systems/MovementSystem';
+import { StealthSystem } from './ecs/systems/StealthSystem';
 import { AttackSystem } from './ecs/systems/AttackSystem';
 import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
@@ -26,6 +27,7 @@ export class GameApp {
   public world: World;
   public physics: PhysicsSystem;
   private movementSystem: MovementSystem;
+  private stealthSystem: StealthSystem;
   private attackSystem: AttackSystem;
   private damageSystem: DamageSystem;
   public aiSystem: AISystem;
@@ -52,6 +54,7 @@ export class GameApp {
     this.world = new World();
     this.physics = new PhysicsSystem();
     this.movementSystem = new MovementSystem();
+    this.stealthSystem = new StealthSystem();
     this.attackSystem = new AttackSystem();
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
@@ -82,27 +85,6 @@ export class GameApp {
     }
     // Синхронизируем ID сущности в ECS с внутренним ID предмета
     return this.spawnEntity(config, undefined, forcedId || itemData.id);
-  }
-
-  public spawnWorldItem(
-    itemData: ItemData,
-    position: Point,
-    isSolid?: boolean,
-    radius?: StandardRadius
-  ): string {
-    const config: EntityConfig = {
-       item: itemData,
-       physics: {
-         radius: radius ?? itemData.config?.radius ?? 16,
-         weight: itemData.config?.weight ?? 1,
-         isSolid: isSolid ?? itemData.config?.isSolid ?? true
-       }
-    };
-    if (itemData.type === 'bag' && itemData.config) {
-      config.inventory = { ...itemData.config as InventoryConfig };
-    }
-    // Синхронизируем ID сущности в мире с внутренним ID предмета
-    return this.spawnEntity(config, position, itemData.id);
   }
 
   public deleteSelectedEntity(): void {
@@ -176,6 +158,7 @@ export class GameApp {
       this.aiSystem.update(dt, this.world);
       this.attackSystem.update(dt, this.world, this.physics);
       this.movementSystem.update(dt, this.world);
+      this.stealthSystem.update(dt, this.world);
       this.physics.update(dt, this.world);
       this.damageSystem.update(dt, this.world);
     }

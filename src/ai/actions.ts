@@ -318,7 +318,7 @@ export class BTActionRotateToPos extends BTAction {
   }
 }
 
-export class BTActionStopTurn extends BTAction {
+export class BTActionStopTurn extends BTSimpleAction {
   public static readonly nodeName = 'Остановить поворот';
   public static readonly description = 'Останавливает вращение бота';
 

@@ -21,19 +21,7 @@ export class MovementSystem {
         continue;
       }
 
-      // 1. Расчет стелса через текущие статы
-      const stealthStats = world.getComponent(id, 'stealthStats');
-      if (stealthStats) {
-        if (input.isCrouching) {
-          stealthStats.stealthPower.current = stealthStats.stealthPower.base * stealthStats.crouchStealthMultiplier.current;
-        } else if (input.isRunning) {
-          stealthStats.stealthPower.current = stealthStats.stealthPower.base * stealthStats.runStealthMultiplier.current;
-        } else {
-          stealthStats.stealthPower.current = stealthStats.stealthPower.base;
-        }
-      }
-
-      // 2. Расчет замедления от атак
+      // 1. Расчет замедления от атак
       let moveSlow = 1;
       let turnSlow = 1;
       for (const atk of activeAttacks.attacks) {

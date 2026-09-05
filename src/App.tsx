@@ -171,6 +171,7 @@ export const App: React.FC = () => {
     if (!app) return;
     if (snapshot) {
       app.deserializeWorld(snapshot);
+      setSnapshot(null);
     }
     setModeSync(GameMode.EDITOR);
     app.isPaused = true;
@@ -333,6 +334,7 @@ export const App: React.FC = () => {
         fileInputRef={fileInputRef}
         worldFileInputRef={worldFileInputRef}
         onNewWorld={() => {
+          setSnapshot(null);
           appRef.current?.clearWorld();
           syncPlayerControls();
           updateStats();
@@ -356,6 +358,7 @@ export const App: React.FC = () => {
               const data = JSON.parse(evt.target?.result as string);
               const app = appRef.current;
               if (app) {
+                setSnapshot(null);
                 app.deserializeWorld(data);
                 syncPlayerControls();
                 updateStats();

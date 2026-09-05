@@ -10,7 +10,7 @@ import {
 } from '../ecs/types';
 import { GameApp } from '../GameApp';
 import { Circle } from 'detect-collisions';
-import { lastAddedWeaponConfigState } from '../Weapon';
+import { weaponModalState } from '../components/modals/weaponModalState';
 
 interface UseGameModalsProps {
   appRef: React.RefObject<GameApp | null>;
@@ -175,7 +175,7 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     
     if (updatedItem.type === 'weapon') {
       const wcfg = updatedItem.config as WeaponConfig;
-      lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(wcfg));
+      weaponModalState.config = JSON.parse(JSON.stringify(wcfg));
 
       const wStats = app.world.getComponent(entityId, 'weaponStats');
       if (wStats) {

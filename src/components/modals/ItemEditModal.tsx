@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ItemData, STANDARD_RADII, HitZoneType, HitZoneConfig } from '../../ecs/types';
 import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues } from './forms/FormFields';
-import { lastAddedWeaponConfigState, DEFAULT_ZONE_PARAMS } from '../../Weapon';
+import { DEFAULT_ZONE_PARAMS } from '../../Weapon';
+import { weaponModalState } from './weaponModalState';
 
 export interface ItemEditModalProps {
   item: ItemData | null;
@@ -74,7 +75,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
     const currentValues = formValues as WeaponFormValues;
 
     // Сохраняем текущие специфические параметры
-    lastAddedWeaponConfigState.zoneParamsMap[currentValues.hitZoneType] = {
+    weaponModalState.zoneParamsMap[currentValues.hitZoneType] = {
       length: currentValues.length,
       radius: currentValues.radius,
       rayCount: currentValues.rayCount,
@@ -86,7 +87,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
 
     // Получаем сохраненные или дефолтные параметры для нового типа
     const nextParams =
-      lastAddedWeaponConfigState.zoneParamsMap[newType] || DEFAULT_ZONE_PARAMS[newType];
+      weaponModalState.zoneParamsMap[newType] || DEFAULT_ZONE_PARAMS[newType];
 
     setFormValues({
       ...currentValues,
@@ -149,9 +150,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
 
       cfg.zone = newZone;
 
-      // Обновляем глобальное состояние последнего добавленного оружия
-      lastAddedWeaponConfigState.config = JSON.parse(JSON.stringify(cfg));
-      lastAddedWeaponConfigState.zoneParamsMap[zoneType] = {
+      // Обновляем состояние последнего добавленного оружия
+      weaponModalState.config = JSON.parse(JSON.stringify(cfg));
+      weaponModalState.zoneParamsMap[zoneType] = {
         length: formValues.length,
         radius: formValues.radius,
         rayCount: formValues.rayCount,

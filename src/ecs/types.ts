@@ -1,6 +1,6 @@
 import { Circle } from 'detect-collisions';
 import { Point } from '../types';
-import { BTLogicComponent } from '../ai/core';
+import { BehaviorStatsConfig, BTLogicComponent } from '../ai/core';
 
 export type EntityId = string;
 
@@ -64,14 +64,12 @@ export interface HealthComponent {
   hitFlashTimer: number;
 }
 
-export type ItemType = 'weapon' | 'armor' | 'bag' | 'resource' | 'other';
+export type ItemType = 'weapon' | 'armor' | 'bag';
 
 type ItemConfigMap = {
   weapon: WeaponConfig;
   armor: ArmorConfig;
   bag: InventoryConfig;
-  resource: ItemConfig;
-  other: ItemConfig;
 };
 
 export type ItemData<T extends ItemType = ItemType> = {
@@ -183,10 +181,6 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'equip',
   'meta',
   'ownership',
-  'health',
-  'velocity',
-  'input',
-  'activeAttacks',
   'gizmo',
   'weaponStats',
   'weaponZone',
@@ -273,13 +267,17 @@ export interface StealthConfig {
 }
 export interface AIConfig {
   behavior: string;
+  stats?: Partial<BehaviorStatsConfig>;
 }
 
 export type PhysicsStatsComponent = ComponentStats<PhysicsConfig>;
 export type HealthStatsComponent = ComponentStats<HealthConfig>;
 export type MovementStatsComponent = ComponentStats<MovementConfig>;
 export type StealthStatsComponent = ComponentStats<StealthConfig>;
-export type AIStatsComponent = ComponentStats<AIConfig>;
+export interface AIStatsComponent {
+  behavior: StatValue<string>;
+  stats?: Partial<BehaviorStatsConfig>;
+}
 
 export interface InventorySetup {
   size: InventorySize;

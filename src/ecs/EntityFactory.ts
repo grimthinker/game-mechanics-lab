@@ -71,11 +71,12 @@ export class EntityFactory {
     }
 
     if (config.ai) {
-      world.addComponent(id, 'aiStats', {
-        behavior: { base: config.ai.behavior, current: config.ai.behavior },
-      });
-      aiSystem.initBotBrain(world, id, config.ai.behavior);
-    }
+        world.addComponent(id, 'aiStats', {
+          behavior: { base: config.ai.behavior, current: config.ai.behavior },
+          stats: config.ai.stats,
+        });
+        aiSystem.initBotBrain(world, id, config.ai.behavior);
+      }
 
     if (config.item) {
         world.addComponent(id, 'item', config.item);

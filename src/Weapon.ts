@@ -56,20 +56,6 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   },
 };
 
-// Глобальное состояние последнего добавленного оружия и параметров для каждого типа зоны
-export const lastAddedWeaponConfigState: {
-  config: WeaponConfig | null;
-  zoneParamsMap: Record<HitZoneType, ZoneTypeParams>;
-} = {
-  config: null,
-  zoneParamsMap: {
-    angle: { ...DEFAULT_ZONE_PARAMS.angle },
-    radius: { ...DEFAULT_ZONE_PARAMS.radius },
-    forward_line: { ...DEFAULT_ZONE_PARAMS.forward_line },
-    shrapnel: { ...DEFAULT_ZONE_PARAMS.shrapnel },
-  },
-};
-
 export function createDefaultWeapons(): WeaponConfig[] {
   const weapons: WeaponConfig[] = [
     {

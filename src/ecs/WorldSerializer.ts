@@ -69,6 +69,36 @@ export class WorldSerializer {
                 if (comps.aiStats) {
                     this.app.aiSystem.initBotBrain(this.app.world, ent.id, comps.aiStats.behavior.current);
                 }
+
+                // Реинициализация транзиентных компонентов чистыми значениями
+                if (comps.healthStats) {
+                    const hp = comps.healthStats.hp.current;
+                    this.app.world.addComponent(ent.id, 'health', {
+                        isAlive: hp > 0,
+                        hitFlashTimer: 0,
+                    });
+                }
+
+                if (comps.movementStats) {
+                    this.app.world.addComponent(ent.id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 });
+                    this.app.world.addComponent(ent.id, 'input', {
+                        isMovingForward: false,
+                        turnDirection: 0,
+                        turnSpeed: 0,
+                        isRunning: false,
+                        isCrouching: false,
+                        wantsAttack: false,
+                        attackSlotIndex: undefined,
+                    });
+                }
+
+                if (comps.equip) {
+                    this.app.world.addComponent(ent.id, 'activeAttacks', { attacks: [] });
+                }
+
+                if (comps.meta && comps.meta.state === 'attacking') {
+                    comps.meta.state = 'idle';
+                }
             } else {
                 // СТАРЫЙ LEGACY-ФОРМАТ СОХРАНЕНИЙ (Обертка для обратной совместимости)
                 const config: EntityConfig = {

@@ -4,6 +4,8 @@ export type MobTypeId = string;
 export const LOGIC_CONFIG = {
   min_path_request_interval: 0.5,
   
+  detect_dist: 400,
+  lose_target_dist: 600,
   follow_up_dist: 50,
   follow_stop_dist: 40,
   /**Расстояние, на котором точка считается достигнутой */

@@ -18,6 +18,7 @@ import {
   AttackStatus,
   BehaviorStatsConfig,
 } from './ai/core';
+import { LOGIC_CONFIG } from './ai/config';
 import { AISystem } from './ecs/systems/AISystem';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { Point } from './types';
@@ -149,12 +150,14 @@ export class EntityAdapter implements IMovable, EntityController {
     return input?.wantsAttack ?? false;
   }
   public get ai_stats(): BehaviorStatsConfig {
+    const aiStats = this.world.getComponent(this.id, 'aiStats');
+    const custom = aiStats?.stats;
     return {
-      detect_dist: 500,
-      lose_target_dist: 700,
-      in_pos_dist: 10,
-      follow_stop_dist: 40,
-      follow_up_dist: 50,
+      detect_dist: custom?.detect_dist ?? LOGIC_CONFIG.detect_dist,
+      lose_target_dist: custom?.lose_target_dist ?? LOGIC_CONFIG.lose_target_dist,
+      in_pos_dist: custom?.in_pos_dist ?? LOGIC_CONFIG.in_pos_dist,
+      follow_stop_dist: custom?.follow_stop_dist ?? LOGIC_CONFIG.follow_stop_dist,
+      follow_up_dist: custom?.follow_up_dist ?? LOGIC_CONFIG.follow_up_dist,
     };
   }
 
