@@ -49,7 +49,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({ values, onCh
         min={0.1}
         max={100}
         step={0.5}
-        onChange={(e) => onChange({ weight: Number(e.target.value) })}
+        onChange={(e) => onChange({ weight: Math.round(Number(e.target.value) * 10) / 10 })}
       />
     </label>
   </div>

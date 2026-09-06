@@ -9,6 +9,10 @@ export class DamageSystem {
         health.hitFlashTimer--;
       }
 
+      if (health.healFlashTimer && health.healFlashTimer > 0) {
+        health.healFlashTimer--;
+      }
+
       if (healthStats.hp.current <= 0 && health.isAlive) {
         health.isAlive = false;
         healthStats.hp.current = 0;

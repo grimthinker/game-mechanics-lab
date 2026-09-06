@@ -46,9 +46,9 @@ export function assembleCreature(
     isSolid: { base: isSolid, current: isSolid },
   });
 
-  // 4. Здоровье
-  world.addComponent(id, 'health', { isAlive: hp > 0, hitFlashTimer: 0 });
-  world.addComponent(id, 'healthStats', {
+// 4. Здоровье
+world.addComponent(id, 'health', { isAlive: hp > 0, hitFlashTimer: 0, healFlashTimer: 0 });
+    world.addComponent(id, 'healthStats', {
     hp: { base: hp, current: hp },
     maxHp: { base: maxHp, current: maxHp },
   });

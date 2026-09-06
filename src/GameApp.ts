@@ -251,8 +251,7 @@ export class GameApp {
       transform.y = newY;
     }
     if (phys && phys.body) {
-      phys.body.x = newX;
-      phys.body.y = newY;
+      phys.body.setPosition(newX, newY);
     }
   }
 
@@ -270,8 +269,7 @@ export class GameApp {
       transform.y = this.draggedEntityOriginalPos.y;
     }
     if (phys && phys.body) {
-      phys.body.x = this.draggedEntityOriginalPos.x;
-      phys.body.y = this.draggedEntityOriginalPos.y;
+      phys.body.setPosition(this.draggedEntityOriginalPos.x, this.draggedEntityOriginalPos.y);
     }
     this.draggedEntityId = null;
     this.draggedEntityOriginalPos = null;

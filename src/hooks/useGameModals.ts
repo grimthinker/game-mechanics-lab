@@ -35,6 +35,11 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const openItemSpawnModal = () => setIsItemSpawnModalOpen(true);
   const closeItemSpawnModal = () => setIsItemSpawnModalOpen(false);
 
+  // Спавн зон
+  const [isZoneSpawnModalOpen, setIsZoneSpawnModalOpen] = useState(false);
+  const openZoneSpawnModal = () => setIsZoneSpawnModalOpen(true);
+  const closeZoneSpawnModal = () => setIsZoneSpawnModalOpen(false);
+
   // Единое модальное окно инспектора сущности
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
@@ -84,6 +89,9 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
     isItemSpawnModalOpen,
     openItemSpawnModal,
     closeItemSpawnModal,
+    isZoneSpawnModalOpen,
+    openZoneSpawnModal,
+    closeZoneSpawnModal,
     isEditModalOpen,
     editingEntityId,
     openEditModal,

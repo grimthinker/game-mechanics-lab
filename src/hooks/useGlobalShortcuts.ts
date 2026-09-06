@@ -30,6 +30,7 @@ export const useGlobalShortcuts = ({
         if (modals.isEditModalOpen) modals.closeEditModal();
         else if (modals.isModalOpen) modals.closeSpawnModal();
         else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
+        else if (modals.isZoneSpawnModalOpen) modals.closeZoneSpawnModal();
         return;
       }
       
@@ -42,7 +43,7 @@ export const useGlobalShortcuts = ({
       }
 
       // Если открыта любая модалка, блокируем остальные хоткеи
-      if (modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isEditModalOpen) {
+      if (modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || modals.isEditModalOpen) {
         return;
       }
 

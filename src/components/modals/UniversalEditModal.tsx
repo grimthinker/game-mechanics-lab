@@ -92,12 +92,12 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     setDraftMovement(
       moveStats
         ? {
-            maxSpeed: moveStats.maxSpeed.current,
+            maxSpeed: Math.round(moveStats.maxSpeed.current),
             maxTurnSpeed: Math.round(rad2Deg(moveStats.maxTurnSpeed.current)) as Degrees,
-            runSpeedMultiplier: moveStats.runSpeedMultiplier.current,
-            crouchSpeedMultiplier: moveStats.crouchSpeedMultiplier.current,
-            runTurnMultiplier: moveStats.runTurnMultiplier.current,
-            crouchTurnMultiplier: moveStats.crouchTurnMultiplier.current,
+            runSpeedMultiplier: Math.round(moveStats.runSpeedMultiplier.current * 100) / 100,
+            crouchSpeedMultiplier: Math.round(moveStats.crouchSpeedMultiplier.current * 100) / 100,
+            runTurnMultiplier: Math.round(moveStats.runTurnMultiplier.current * 100) / 100,
+            crouchTurnMultiplier: Math.round(moveStats.crouchTurnMultiplier.current * 100) / 100,
           }
         : null
     );
@@ -106,9 +106,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     setDraftStealth(
       stealthStats
         ? {
-            stealthPower: stealthStats.stealthPower.current,
-            crouchStealthMultiplier: stealthStats.crouchStealthMultiplier.current,
-            runStealthMultiplier: stealthStats.runStealthMultiplier.current,
+            stealthPower: Math.round(stealthStats.stealthPower.current),
+            crouchStealthMultiplier: Math.round(stealthStats.crouchStealthMultiplier.current * 100) / 100,
+            runStealthMultiplier: Math.round(stealthStats.runStealthMultiplier.current * 100) / 100,
           }
         : null
     );
@@ -204,10 +204,11 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     // 2. Физика
     const physStats = world.getComponent(entityId, 'physicsStats');
     if (physStats) {
+      const cleanWeight = Math.round(Math.max(0.1, draftPhysics.weight) * 10) / 10;
       physStats.radius.current = draftPhysics.radius;
       physStats.radius.base = draftPhysics.radius;
-      physStats.weight.current = Math.max(0.1, draftPhysics.weight);
-      physStats.weight.base = Math.max(0.1, draftPhysics.weight);
+      physStats.weight.current = cleanWeight;
+      physStats.weight.base = cleanWeight;
       physStats.isSolid.current = draftPhysics.isSolid;
       physStats.isSolid.base = draftPhysics.isSolid;
     }
@@ -234,35 +235,35 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
     // 4. Движение
     if (draftMovement) {
-      const moveStats = world.getComponent(entityId, 'movementStats');
-      if (moveStats) {
-        moveStats.maxSpeed.current = Math.max(0, draftMovement.maxSpeed);
-        moveStats.maxSpeed.base = moveStats.maxSpeed.current;
-        moveStats.maxTurnSpeed.current = deg2Rad(Math.max(0, draftMovement.maxTurnSpeed));
-        moveStats.maxTurnSpeed.base = moveStats.maxTurnSpeed.current;
-        moveStats.runSpeedMultiplier.current = Math.max(0.1, draftMovement.runSpeedMultiplier);
-        moveStats.runSpeedMultiplier.base = moveStats.runSpeedMultiplier.current;
-        moveStats.crouchSpeedMultiplier.current = Math.max(0.1, draftMovement.crouchSpeedMultiplier);
-        moveStats.crouchSpeedMultiplier.base = moveStats.crouchSpeedMultiplier.current;
-        moveStats.runTurnMultiplier.current = Math.max(0.1, draftMovement.runTurnMultiplier);
-        moveStats.runTurnMultiplier.base = moveStats.runTurnMultiplier.current;
-        moveStats.crouchTurnMultiplier.current = Math.max(0.1, draftMovement.crouchTurnMultiplier);
-        moveStats.crouchTurnMultiplier.base = moveStats.crouchTurnMultiplier.current;
+        const moveStats = world.getComponent(entityId, 'movementStats');
+        if (moveStats) {
+          moveStats.maxSpeed.current = Math.max(0, Math.round(draftMovement.maxSpeed));
+          moveStats.maxSpeed.base = moveStats.maxSpeed.current;
+          moveStats.maxTurnSpeed.current = deg2Rad(Math.max(0, Math.round(draftMovement.maxTurnSpeed)));
+          moveStats.maxTurnSpeed.base = moveStats.maxTurnSpeed.current;
+          moveStats.runSpeedMultiplier.current = Math.round(Math.max(0.1, draftMovement.runSpeedMultiplier) * 100) / 100;
+          moveStats.runSpeedMultiplier.base = moveStats.runSpeedMultiplier.current;
+          moveStats.crouchSpeedMultiplier.current = Math.round(Math.max(0.1, draftMovement.crouchSpeedMultiplier) * 100) / 100;
+          moveStats.crouchSpeedMultiplier.base = moveStats.crouchSpeedMultiplier.current;
+          moveStats.runTurnMultiplier.current = Math.round(Math.max(0.1, draftMovement.runTurnMultiplier) * 100) / 100;
+          moveStats.runTurnMultiplier.base = moveStats.runTurnMultiplier.current;
+          moveStats.crouchTurnMultiplier.current = Math.round(Math.max(0.1, draftMovement.crouchTurnMultiplier) * 100) / 100;
+          moveStats.crouchTurnMultiplier.base = moveStats.crouchTurnMultiplier.current;
+        }
       }
-    }
-
-    // 5. Скрытность
-    if (draftStealth) {
-      const stealthStats = world.getComponent(entityId, 'stealthStats');
-      if (stealthStats) {
-        stealthStats.stealthPower.current = Math.max(0, draftStealth.stealthPower);
-        stealthStats.stealthPower.base = stealthStats.stealthPower.current;
-        stealthStats.crouchStealthMultiplier.current = Math.max(1, draftStealth.crouchStealthMultiplier);
-        stealthStats.crouchStealthMultiplier.base = stealthStats.crouchStealthMultiplier.current;
-        stealthStats.runStealthMultiplier.current = Math.max(0, draftStealth.runStealthMultiplier);
-        stealthStats.runStealthMultiplier.base = stealthStats.runStealthMultiplier.current;
+  
+      // 5. Скрытность
+      if (draftStealth) {
+        const stealthStats = world.getComponent(entityId, 'stealthStats');
+        if (stealthStats) {
+          stealthStats.stealthPower.current = Math.max(0, Math.round(draftStealth.stealthPower));
+          stealthStats.stealthPower.base = stealthStats.stealthPower.current;
+          stealthStats.crouchStealthMultiplier.current = Math.round(Math.max(1, draftStealth.crouchStealthMultiplier) * 100) / 100;
+          stealthStats.crouchStealthMultiplier.base = stealthStats.crouchStealthMultiplier.current;
+          stealthStats.runStealthMultiplier.current = Math.round(Math.max(0, draftStealth.runStealthMultiplier) * 100) / 100;
+          stealthStats.runStealthMultiplier.base = stealthStats.runStealthMultiplier.current;
+        }
       }
-    }
 
     // 6. ИИ
     if (draftAI && aiSystem) {

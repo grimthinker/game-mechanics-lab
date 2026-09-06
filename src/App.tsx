@@ -8,7 +8,7 @@ import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, rad2Deg } from './utils';
 import { serializeBTNode } from './ai/serializer';
-import { SpawnModal, UniversalEditModal, ItemSpawnModal } from './components/modals';
+import { SpawnModal, UniversalEditModal, ItemSpawnModal, ZoneSpawnModal } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
@@ -111,7 +111,7 @@ export const App: React.FC = () => {
   }, [setModeSync]);
 
   const { syncPlayerControls } = useKeyboardControls({
-    isModalOpen: modals.isModalOpen || modals.isItemSpawnModalOpen || isPaused,
+    isModalOpen: modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || isPaused,
     isEditModalOpen: modals.isEditModalOpen,
     mode,
   });
@@ -241,6 +241,14 @@ export const App: React.FC = () => {
       config
     });
     modals.closeItemSpawnModal();
+  };
+
+  const handleZoneSpawnConfirm = (config: EntityConfig) => {
+    setPlacementMode({
+      kind: 'entity',
+      config
+    });
+    modals.closeZoneSpawnModal();
   };
 
   const handleDeleteEntity = () => {
@@ -376,12 +384,19 @@ export const App: React.FC = () => {
         }}
         openSpawnModal={modals.openSpawnModal}
         openItemSpawnModal={modals.openItemSpawnModal}
+        openZoneSpawnModal={modals.openZoneSpawnModal}
         openEditModal={modals.openEditModal}
         handleDeleteEntity={handleDeleteEntity}
         isPaused={isPaused}
       />
 
-<SpawnModal
+      <ZoneSpawnModal
+        isOpen={modals.isZoneSpawnModalOpen}
+        onClose={modals.closeZoneSpawnModal}
+        onConfirm={handleZoneSpawnConfirm}
+      />
+
+      <SpawnModal
         isOpen={modals.isModalOpen}
         pendingSpawnBehavior={modals.pendingSpawnBehavior}
         setPendingSpawnBehavior={modals.setPendingSpawnBehavior}

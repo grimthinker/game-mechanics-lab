@@ -175,6 +175,7 @@ export interface InputComponent {
 export interface HealthComponent {
   isAlive: boolean;
   hitFlashTimer: number;
+  healFlashTimer?: number;
 }
 
 export type ItemType = 'weapon' | 'armor' | 'bag';

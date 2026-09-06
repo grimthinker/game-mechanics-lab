@@ -21,6 +21,7 @@ interface ToolbarProps {
   onLoadWorldFile: (file: File) => void;
   openSpawnModal: (behavior?: string) => void;
   openItemSpawnModal: () => void;
+  openZoneSpawnModal: () => void;
   openEditModal: (entityId?: string) => void;
   handleDeleteEntity: () => void;
   isPaused: boolean;
@@ -43,6 +44,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onLoadWorldFile,
   openSpawnModal,
   openItemSpawnModal,
+  openZoneSpawnModal,
   openEditModal,
   handleDeleteEntity,
   isPaused,
@@ -178,6 +180,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             <button className="btn btn-primary" style={{ width: '100%' }} onClick={openItemSpawnModal}>
               Добавить Предмет
             </button>
+            <button className="btn btn-primary" style={{ width: '100%' }} onClick={openZoneSpawnModal}>
+              Добавить Зону
+            </button>
           </div>
         </div>
       )}
@@ -284,7 +289,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                   <div className="stat-row">
                     <dt>Масса (Вес):</dt>
-                    <dd>{physicsStats.weight.current}</dd>
+                    <dd>{Number(physicsStats.weight.current.toFixed(1))}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Коллизия:</dt>
@@ -316,15 +321,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Скрытность:</dt>
-                    <dd>{stealthStats.stealthPower.current}</dd>
+                    <dd>{Math.round(stealthStats.stealthPower.current)}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Скрытность (присяд):</dt>
-                    <dd>x{stealthStats.crouchStealthMultiplier.current}</dd>
+                    <dd>x{stealthStats.crouchStealthMultiplier.current.toFixed(1)}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Скрытность (бег):</dt>
-                    <dd>x{stealthStats.runStealthMultiplier.current}</dd>
+                    <dd>x{stealthStats.runStealthMultiplier.current.toFixed(1)}</dd>
                   </div>
                 </>
               )}
@@ -332,12 +337,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Базовый урон:</dt>
-                    <dd>{weaponStats.baseDamage.current}</dd>
+                    <dd>{Math.round(weaponStats.baseDamage.current)}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Подготовка / Восст.:</dt>
                     <dd>
-                      {weaponStats.prepTime.current}с / {weaponStats.recoveryTime.current}с
+                      {weaponStats.prepTime.current.toFixed(2)}с / {weaponStats.recoveryTime.current.toFixed(2)}с
                     </dd>
                   </div>
                 </>

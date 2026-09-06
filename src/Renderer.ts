@@ -99,7 +99,7 @@ export class Renderer {
         attacksRendered = true;
       }
 
-      this.renderEntityPrimitives(id, transform, renderable, camera, selectedId, hoveredId);
+      this.renderEntityPrimitives(id, transform, renderable, camera, selectedId, hoveredId, world);
     }
 
     if (!attacksRendered) {
@@ -119,7 +119,8 @@ export class Renderer {
     renderable: RenderableComponent,
     camera: Camera,
     selectedId: EntityId | null,
-    hoveredId: EntityId | null
+    hoveredId: EntityId | null,
+    world: World
   ): void {
     this.ctx.save();
     this.ctx.translate(transform.x, transform.y);
@@ -127,6 +128,28 @@ export class Renderer {
 
     for (const prim of renderable.primitives) {
       this.drawPrimitive(prim, camera, transform.angle);
+    }
+
+    // Визуальный отклик урона и исцеления
+    const health = world.getComponent(id, 'health');
+    const physStats = world.getComponent(id, 'physicsStats');
+    const physBody = world.getComponent(id, 'physicsBody');
+    const radius = physStats?.radius.current ?? physBody?.body.r ?? 16;
+
+    if (health?.hitFlashTimer && health.hitFlashTimer > 0) {
+      this.ctx.beginPath();
+      this.ctx.setLineDash([]);
+      this.ctx.arc(0, 0, radius + 4 / camera.scale, 0, Math.PI * 2);
+      this.ctx.strokeStyle = '#e74c3c';
+      this.ctx.lineWidth = 2.5 / camera.scale;
+      this.ctx.stroke();
+    } else if (health?.healFlashTimer && health.healFlashTimer > 0) {
+      this.ctx.beginPath();
+      this.ctx.setLineDash([]);
+      this.ctx.arc(0, 0, radius + 4 / camera.scale, 0, Math.PI * 2);
+      this.ctx.strokeStyle = '#2ecc71';
+      this.ctx.lineWidth = 2.5 / camera.scale;
+      this.ctx.stroke();
     }
 
     // Универсальная подсветка выбора и наведения

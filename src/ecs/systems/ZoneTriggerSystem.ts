@@ -18,13 +18,16 @@ export class ZoneTriggerSystem {
 
         if (distSq <= radiusSq) {
             if (zoneTrigger.effect === 'damage') {
-              const nextHp = Math.max(0, healthStats.hp.current - deltaValue);
-              healthStats.hp.current = Math.round(nextHp * 100) / 100;
-              health.hitFlashTimer = 2;
-            } else if (zoneTrigger.effect === 'heal') {
-              const nextHp = Math.min(healthStats.maxHp.current, healthStats.hp.current + deltaValue);
-              healthStats.hp.current = Math.round(nextHp * 100) / 100;
-            }
+                const nextHp = Math.max(0, healthStats.hp.current - deltaValue);
+                healthStats.hp.current = Math.round(nextHp * 100) / 100;
+                health.hitFlashTimer = 2;
+              } else if (zoneTrigger.effect === 'heal') {
+                if (healthStats.hp.current < healthStats.maxHp.current) {
+                  const nextHp = Math.min(healthStats.maxHp.current, healthStats.hp.current + deltaValue);
+                  healthStats.hp.current = Math.round(nextHp * 100) / 100;
+                  health.healFlashTimer = 3;
+                }
+              }
           }
       }
     }

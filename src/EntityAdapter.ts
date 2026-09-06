@@ -21,9 +21,7 @@ import {
 } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
 import { AISystem } from './ecs/systems/AISystem';
-import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { Point } from './types';
-import { COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
 import { Radians } from './utils';
 
 export class EntityAdapter implements IMovable, EntityController {
@@ -285,135 +283,6 @@ export class EntityAdapter implements IMovable, EntityController {
     if (input) {
       input.isRunning = false;
       input.isCrouching = false;
-    }
-  }
-
-  public updateParams(
-    params: {
-      behavior?: string;
-      radius?: StandardRadius;
-      baseRadius?: StandardRadius;
-      weight?: number;
-      baseWeight?: number;
-      isSolid?: boolean;
-      maxSpeed?: number;
-      maxTurnSpeed?: Radians;
-      hp?: number;
-      maxHp?: number;
-      runSpeedMultiplier?: number;
-      crouchSpeedMultiplier?: number;
-      crouchStealthMultiplier?: number;
-      runTurnMultiplier?: number;
-      crouchTurnMultiplier?: number;
-      stealthPower?: number;
-      runStealthMultiplier?: number;
-    },
-    aiSystem?: AISystem,
-    physicsSystem?: PhysicsSystem
-  ): void {
-    if (params.behavior !== undefined && aiSystem) {
-      this.setBehavior(params.behavior, aiSystem);
-    }
-
-    const phys = this.world.getComponent(this.id, 'physicsBody');
-    const physStats = this.world.getComponent(this.id, 'physicsStats');
-    const healthStats = this.world.getComponent(this.id, 'healthStats');
-    const moveStats = this.world.getComponent(this.id, 'movementStats');
-    const stealthStats = this.world.getComponent(this.id, 'stealthStats');
-    const health = this.world.getComponent(this.id, 'health');
-
-    if (physStats) {
-      if (params.baseRadius !== undefined) {
-        physStats.radius.base = params.baseRadius;
-      }
-      if (params.radius !== undefined) {
-        physStats.radius.current = params.radius;
-      }
-      if (params.baseWeight !== undefined) {
-        const val = Math.max(0.1, params.baseWeight);
-        physStats.weight.base = val;
-      }
-      if (params.weight !== undefined) {
-        const val = Math.max(0.1, params.weight);
-        physStats.weight.current = val;
-      }
-      if (params.isSolid !== undefined) {
-        physStats.isSolid.base = params.isSolid;
-        physStats.isSolid.current = params.isSolid;
-      }
-    }
-
-    if (moveStats) {
-      if (params.maxSpeed !== undefined) {
-        const val = Math.max(0, params.maxSpeed);
-        moveStats.maxSpeed.base = val;
-        moveStats.maxSpeed.current = val;
-      }
-      if (params.maxTurnSpeed !== undefined) {
-        const val = Math.max(0, params.maxTurnSpeed) as Radians;
-        moveStats.maxTurnSpeed.base = val;
-        moveStats.maxTurnSpeed.current = val;
-      }
-      if (params.runSpeedMultiplier !== undefined) {
-        const val = Math.max(0.1, params.runSpeedMultiplier);
-        moveStats.runSpeedMultiplier.base = val;
-        moveStats.runSpeedMultiplier.current = val;
-      }
-      if (params.crouchSpeedMultiplier !== undefined) {
-        const val = Math.max(0.1, params.crouchSpeedMultiplier);
-        moveStats.crouchSpeedMultiplier.base = val;
-        moveStats.crouchSpeedMultiplier.current = val;
-      }
-      if (params.runTurnMultiplier !== undefined) {
-        const val = Math.max(0.1, params.runTurnMultiplier);
-        moveStats.runTurnMultiplier.base = val;
-        moveStats.runTurnMultiplier.current = val;
-      }
-      if (params.crouchTurnMultiplier !== undefined) {
-        const val = Math.max(0.1, params.crouchTurnMultiplier);
-        moveStats.crouchTurnMultiplier.base = val;
-        moveStats.crouchTurnMultiplier.current = val;
-      }
-    }
-
-    if (healthStats) {
-      if (params.maxHp !== undefined) {
-        const val = Math.max(1, params.maxHp);
-        healthStats.maxHp.base = val;
-        healthStats.maxHp.current = val;
-      }
-      if (params.hp !== undefined) {
-        const val = Math.min(healthStats.maxHp.current, Math.max(0, params.hp));
-        healthStats.hp.base = val;
-        healthStats.hp.current = val;
-        if (health) health.isAlive = val > 0;
-      }
-    }
-
-    if (stealthStats) {
-      if (params.stealthPower !== undefined) {
-        const val = Math.max(0, params.stealthPower);
-        stealthStats.stealthPower.base = val;
-        stealthStats.stealthPower.current = val;
-      }
-      if (params.runStealthMultiplier !== undefined) {
-        const val = Math.max(0, params.runStealthMultiplier);
-        stealthStats.runStealthMultiplier.base = val;
-        stealthStats.runStealthMultiplier.current = val;
-      }
-      if (params.crouchStealthMultiplier !== undefined) {
-        const val = Math.max(1, params.crouchStealthMultiplier);
-        stealthStats.crouchStealthMultiplier.base = val;
-        stealthStats.crouchStealthMultiplier.current = val;
-      }
-    }
-
-    if (phys && physStats) {
-      phys.body.r = physStats.radius.current;
-      if (params.isSolid !== undefined) {
-        phys.mask = params.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-        (phys.body as any).mask = phys.mask;
-      }
     }
   }
 }

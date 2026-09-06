@@ -77,6 +77,7 @@ export class WorldSerializer {
             this.app.world.addComponent(ent.id, 'health', {
               isAlive: hp > 0,
               hitFlashTimer: 0,
+            healFlashTimer: 0,
             });
           }
   
