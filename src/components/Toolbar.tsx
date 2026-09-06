@@ -1,5 +1,5 @@
 import React from 'react';
-import { WeaponConfig, ArmorConfig, InventoryConfig, ItemData } from '../ecs/types';
+import { ItemData } from '../ecs/types';
 import { EntityStats } from '../types';
 import { GameMode, THEME_COLORS, TOOL_GROUP_THEME_COLORS } from '../constants';
 import { BEHAVIOR_TREE_NAMES } from '../ai/trees_library';
@@ -221,46 +221,46 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <dt>Название:</dt>
                 <dd>{selectedStats.itemData.name}</dd>
               </div>
-              {selectedStats.itemData.type === 'weapon' && selectedStats.itemData.config && (
+              {selectedStats.itemData.type === 'weapon' && selectedStats.weaponStats && (
                 <>
                   <div className="stat-row">
                     <dt>Урон:</dt>
-                    <dd>{(selectedStats.itemData.config as WeaponConfig).baseDamage}</dd>
+                    <dd>{selectedStats.weaponStats.baseDamage.current}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedStats.itemData.config as WeaponConfig).weight}</dd>
+                    <dd>{selectedStats.weight}</dd>
                   </div>
                 </>
               )}
-              {selectedStats.itemData.type === 'armor' && selectedStats.itemData.config && (
+              {selectedStats.itemData.type === 'armor' && selectedStats.armorStats && (
                 <>
                   <div className="stat-row">
                     <dt>Защита:</dt>
-                    <dd>{(selectedStats.itemData.config as ArmorConfig).defense}</dd>
+                    <dd>{selectedStats.armorStats.defense.current}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Поглощение:</dt>
-                    <dd>{(selectedStats.itemData.config as ArmorConfig).flat_reduction}</dd>
+                    <dd>{selectedStats.armorStats.flatReduction.current}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedStats.itemData.config as ArmorConfig).weight}</dd>
+                    <dd>{selectedStats.weight}</dd>
                   </div>
                 </>
               )}
-              {selectedStats.itemData.type === 'bag' && selectedStats.itemData.config && (
+              {selectedStats.itemData.type === 'bag' && selectedStats.inventory && (
                 <>
                   <div className="stat-row">
                     <dt>Размер:</dt>
                     <dd>
-                      {(selectedStats.itemData.config as InventoryConfig).size.width}x
-                      {(selectedStats.itemData.config as InventoryConfig).size.height}
+                      {selectedStats.inventory.size.width}x
+                      {selectedStats.inventory.size.height}
                     </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Вес:</dt>
-                    <dd>{(selectedStats.itemData.config as InventoryConfig).weight}</dd>
+                    <dd>{selectedStats.weight}</dd>
                   </div>
                 </>
               )}
@@ -342,9 +342,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <>
                 <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                  {selectedStats.equipSlots.map((slot: { itemId: string | null; item: any; type: string }, index: any) => {
+                  {selectedStats.equipSlots.map((slot, index) => {
                     const item = slot.item;
-                    const hasEditableItem = item && ['weapon', 'armor', 'bag'].includes(item.type) && !!item.config;
+                    const hasEditableItem = !!item && !!slot.itemId;
                     const isWeapon = item?.type === 'weapon';
                     const isArmor = item?.type === 'armor';
                     const isBag = item?.type === 'bag';
@@ -370,19 +370,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                         <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
                         <span>
                           {item ? item.name : 'Пусто'}
-                          {isWeapon && item?.config && (
+                          {isWeapon && slot.weaponStats && (
                             <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
-                              ({(item.config as WeaponConfig).baseDamage} урона)
+                              ({slot.weaponStats.baseDamage.current} урона)
                             </span>
                           )}
-                          {isArmor && item?.config && (
+                          {isArmor && slot.armorStats && (
                             <span style={{ color: '#3498db', marginLeft: '6px' }}>
-                              ({(item.config as ArmorConfig).defense} защиты)
+                              ({slot.armorStats.defense.current} защиты)
                             </span>
                           )}
-                          {isBag && item?.config && (
+                          {isBag && slot.inventory && (
                             <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
-                              ({(item.config as InventoryConfig).size.width}x{(item.config as InventoryConfig).size.height})
+                              ({slot.inventory.size.width}x{slot.inventory.size.height})
                             </span>
                           )}
                         </span>

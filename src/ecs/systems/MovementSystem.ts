@@ -30,15 +30,13 @@ export class MovementSystem {
         let mTurn = 1;
 
         const wStats = world.getComponent(atk.weaponId, 'weaponStats');
-        const wItem = world.getComponent(atk.weaponId, 'item');
-        const weaponConfig = wItem?.type === 'weapon' ? (wItem.config as any) : undefined;
-        if (!wStats && !weaponConfig) continue;
+        if (!wStats) continue;
 
-        const prepMoveSlow = wStats?.prepMoveSlow.current ?? weaponConfig?.prepMoveSlow ?? 0.5;
-        const prepTurnSlow = wStats?.prepTurnSlow.current ?? weaponConfig?.prepTurnSlow ?? 0.5;
-        const castMoveSlow = wStats?.castMoveSlow.current ?? weaponConfig?.castMoveSlow ?? prepMoveSlow;
-        const recoveryMoveSlow = wStats?.recoveryMoveSlow.current ?? weaponConfig?.recoveryMoveSlow ?? 0.8;
-        const recoveryTurnSlow = wStats?.recoveryTurnSlow.current ?? weaponConfig?.recoveryTurnSlow ?? 0.8;
+        const prepMoveSlow = wStats.prepMoveSlow.current;
+        const prepTurnSlow = wStats.prepTurnSlow.current;
+        const castMoveSlow = wStats.castMoveSlow.current;
+        const recoveryMoveSlow = wStats.recoveryMoveSlow.current;
+        const recoveryTurnSlow = wStats.recoveryTurnSlow.current;
 
         if (atk.phase === 'prep') {
           mMove = prepMoveSlow;

@@ -1,4 +1,3 @@
-import { ArmorConfig, WeaponConfig } from '../types';
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 
@@ -28,11 +27,9 @@ export class AttackSystem {
           const weaponSlot = equip.slots[chosenSlotIndex];
           const weaponId = weaponSlot.itemId!;
           const wStats = world.getComponent(weaponId, 'weaponStats');
-          const wItem = world.getComponent(weaponId, 'item');
-          const wCfg = wItem?.config as WeaponConfig | undefined;
-          const prepTime = wStats?.prepTime.current ?? wCfg?.prepTime;
 
-          if (prepTime !== undefined) {
+          if (wStats) {
+            const prepTime = wStats.prepTime.current;
             activeAttacks.attacks.push({
               weaponId,
               slotIndex: chosenSlotIndex,
@@ -53,16 +50,14 @@ export class AttackSystem {
         const slot = equip.slots[atk.slotIndex];
         const isStillEquipped = slot && slot.type === 'weapon' && slot.itemId === atk.weaponId;
         const wStats = isStillEquipped ? world.getComponent(atk.weaponId, 'weaponStats') : undefined;
-        const wItem = isStillEquipped ? world.getComponent(atk.weaponId, 'item') : undefined;
-        const wCfg = wItem?.config as WeaponConfig | undefined;
 
-        if (!isStillEquipped || (!wStats && !wCfg)) {
+        if (!isStillEquipped || !wStats) {
           activeAttacks.attacks.splice(i, 1);
           continue;
         }
 
-        const castTime = wStats?.castTime.current ?? wCfg?.castTime ?? 0;
-        const recoveryTime = wStats?.recoveryTime.current ?? wCfg?.recoveryTime ?? 0.3;
+        const castTime = wStats.castTime.current;
+        const recoveryTime = wStats.recoveryTime.current;
 
         atk.timer -= dt;
 
@@ -100,38 +95,17 @@ export class AttackSystem {
     physics: PhysicsSystem
   ): void {
     const wStats = world.getComponent(weaponId, 'weaponStats');
-    const wZone = world.getComponent(weaponId, 'weaponZone') ?? (world.getComponent(weaponId, 'item')?.config as WeaponConfig)?.zone;
-    const wItem = world.getComponent(weaponId, 'item');
-    const wCfg = wItem?.config as WeaponConfig | undefined;
+    const wZone = world.getComponent(weaponId, 'weaponZone');
 
-    if (!wZone) return;
+    if (!wStats || !wZone) return;
 
-    const effectiveWeapon: WeaponConfig = {
-      id: weaponId,
-      name: wItem?.name ?? 'Weapon',
-      weight: 1,
-      radius: 16,
-      prepTime: wStats?.prepTime.current ?? wCfg?.prepTime ?? 0.2,
-      recoveryTime: wStats?.recoveryTime.current ?? wCfg?.recoveryTime ?? 0.3,
-      prepTurnSlow: wStats?.prepTurnSlow.current ?? wCfg?.prepTurnSlow ?? 0.5,
-      recoveryTurnSlow: wStats?.recoveryTurnSlow.current ?? wCfg?.recoveryTurnSlow ?? 0.8,
-      prepMoveSlow: wStats?.prepMoveSlow.current ?? wCfg?.prepMoveSlow ?? 0.5,
-      recoveryMoveSlow: wStats?.recoveryMoveSlow.current ?? wCfg?.recoveryMoveSlow ?? 0.8,
-      baseDamage: wStats?.baseDamage.current ?? wCfg?.baseDamage ?? 20,
-      minMultiplier: wStats?.minMultiplier.current ?? wCfg?.minMultiplier ?? 0.8,
-      maxMultiplier: wStats?.maxMultiplier.current ?? wCfg?.maxMultiplier ?? 1.2,
-      critChance: wStats?.critChance.current ?? wCfg?.critChance ?? 0.1,
-      critMultiplier: wStats?.critMultiplier.current ?? wCfg?.critMultiplier ?? 2.0,
-      zone: wZone,
-    };
+    const targetIds = physics.checkWeaponHits(attackerId, wZone, world);
 
-    const targetIds = physics.checkWeaponHits(attackerId, effectiveWeapon, world);
-
-    const baseDamage = wStats?.baseDamage.current ?? wCfg?.baseDamage ?? 20;
-    const minMultiplier = wStats?.minMultiplier.current ?? wCfg?.minMultiplier ?? 0.8;
-    const maxMultiplier = wStats?.maxMultiplier.current ?? wCfg?.maxMultiplier ?? 1.2;
-    const critChance = wStats?.critChance.current ?? wCfg?.critChance ?? 0.1;
-    const critMultiplier = wStats?.critMultiplier.current ?? wCfg?.critMultiplier ?? 2.0;
+    const baseDamage = wStats.baseDamage.current;
+    const minMultiplier = wStats.minMultiplier.current;
+    const maxMultiplier = wStats.maxMultiplier.current;
+    const critChance = wStats.critChance.current;
+    const critMultiplier = wStats.critMultiplier.current;
 
     for (const targetId of targetIds) {
       const targetHealth = world.getComponent(targetId, 'health');
@@ -152,11 +126,10 @@ export class AttackSystem {
       const armorSlot = targetEquip?.slots.find((s) => s.type === 'armor' && s.itemId !== null);
       if (armorSlot && armorSlot.itemId) {
         const aStats = world.getComponent(armorSlot.itemId, 'armorStats');
-        const aItem = world.getComponent(armorSlot.itemId, 'item');
-        const aCfg = aItem?.config as ArmorConfig | undefined;
-
-        defense = aStats?.defense.current ?? aCfg?.defense ?? 0;
-        flatReduction = aStats?.flatReduction.current ?? aCfg?.flat_reduction ?? 0;
+        if (aStats) {
+          defense = aStats.defense.current;
+          flatReduction = aStats.flatReduction.current;
+        }
       }
 
       const mitigatedDamage = rawDamage * (1 - Math.min(0.9, Math.max(0, defense / 100)));

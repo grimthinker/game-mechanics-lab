@@ -1,9 +1,4 @@
 import { World } from './ecs/World';
-import {
-  ItemData,
-  StandardRadius,
-  InventoryConfig,
-} from './ecs/types';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
 import { MovementSystem } from './ecs/systems/MovementSystem';
 import { StealthSystem } from './ecs/systems/StealthSystem';

@@ -11,6 +11,7 @@ import {
   OwnershipComponent,
   ArmorStatsComponent,
   WeaponStatsComponent,
+  HitZoneConfig,
 } from './ecs/types';
 import {
   EntityUtils,
@@ -42,6 +43,9 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get weaponStats(): WeaponStatsComponent | undefined {
     return this.world.getComponent(this.id, 'weaponStats');
+  }
+  public get weaponZone(): HitZoneConfig | undefined {
+    return this.world.getComponent(this.id, 'weaponZone');
   }
   public get armorStats(): ArmorStatsComponent | undefined {
     return this.world.getComponent(this.id, 'armorStats');

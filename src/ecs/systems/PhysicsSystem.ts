@@ -2,7 +2,7 @@ import { System, Line, Circle } from 'detect-collisions';
 import { World } from '../World';
 import {
   EntityId,
-  WeaponConfig,
+  HitZoneConfig,
   CollisionCategory,
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
@@ -299,7 +299,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
     from: Point,
     rayEnd: Point,
     targetId: EntityId,
-    weapon: WeaponConfig,
+    zone: HitZoneConfig,
     attackerId: EntityId,
     world: World
   ): boolean {
@@ -357,7 +357,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
       }
 
       if (hitBody instanceof Line) {
-        if (weapon.zone.pierceObstacles) {
+        if (zone.pierceObstacles) {
           currStart = {
             x: hitPoint.x + ux * 1,
             y: hitPoint.y + uy * 1,
@@ -376,7 +376,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
           const hitBehavior = hitAiStats?.behavior?.current ?? 'IdleTree';
           
           if (hitBehavior === 'PlayerTree') {
-            if (weapon.zone.piercePlayers) {
+            if (zone.piercePlayers) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +
                 (hitTransform.y - from.y) * uy;
@@ -390,7 +390,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
               return false;
             }
           } else {
-            if (weapon.zone.pierceBots) {
+            if (zone.pierceBots) {
               const distToCenter =
                 (hitTransform.x - from.x) * ux +
                 (hitTransform.y - from.y) * uy;
@@ -430,7 +430,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
 
   public checkWeaponHits(
     attackerId: EntityId,
-    weapon: WeaponConfig,
+    zone: HitZoneConfig,
     world: World
   ): EntityId[] {
     const hitEntities: EntityId[] = [];
@@ -457,17 +457,17 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
       const dy = targetPos.y - pos.y;
       const dist = Math.hypot(dx, dy);
 
-      switch (weapon.zone.hitZoneType) {
+      switch (zone.hitZoneType) {
         case 'radius': {
-          const r = weapon.zone.radius ?? 50;
+          const r = zone.radius ?? 50;
           if (dist <= r + targetRadius) {
             isHit = !this.isLineOfSightBlocked(pos, targetPos);
           }
           break;
         }
         case 'angle': {
-          const len = weapon.zone.length ?? 120;
-          const maxAngle = (weapon.zone.angle ?? Math.PI / 6) / 2;
+          const len = zone.length ?? 120;
+          const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
           const maxDist = len + targetRadius;
 
           if (dist <= maxDist) {
@@ -489,23 +489,23 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
           break;
         }
         case 'forward_line': {
-          const len = weapon.zone.length ?? 150;
+          const len = zone.length ?? 150;
           const endPoint = {
             x: pos.x + Math.cos(angle) * len,
             y: pos.y + Math.sin(angle) * len,
           };
           const distToLine = this.getDistanceToSegment(targetPos, pos, endPoint);
           if (distToLine <= targetRadius) {
-            if (this.canRayReachTarget(pos, endPoint, targetId, weapon, attackerId, world)) {
+            if (this.canRayReachTarget(pos, endPoint, targetId, zone, attackerId, world)) {
               isHit = true;
             }
           }
           break;
         }
         case 'shrapnel': {
-          const len = weapon.zone.length ?? 120;
-          const maxAngle = (weapon.zone.angle ?? Math.PI / 3) / 2;
-          const count = weapon.zone.rayCount ?? 5;
+          const len = zone.length ?? 120;
+          const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
+          const count = zone.rayCount ?? 5;
           for (let i = 0; i < count; i++) {
             const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
             const rayAngle = angle + fraction * (maxAngle * 2);
@@ -515,7 +515,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
             };
             const distToRay = this.getDistanceToSegment(targetPos, pos, endPoint);
             if (distToRay <= targetRadius) {
-              if (this.canRayReachTarget(pos, endPoint, targetId, weapon, attackerId, world)) {
+              if (this.canRayReachTarget(pos, endPoint, targetId, zone, attackerId, world)) {
                 isHit = true;
                 break;
               }

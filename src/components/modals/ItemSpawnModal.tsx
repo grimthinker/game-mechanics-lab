@@ -1,35 +1,34 @@
 import React, { useState } from 'react';
-import { ItemData, STANDARD_RADII, StandardRadius, WeaponConfig } from '../../ecs/types';
+import { EntityConfig, STANDARD_RADII, StandardRadius, HitZoneConfig } from '../../ecs/types';
 import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues, ArmorFormValues, BagFormValues } from './forms/FormFields';
-import { createRandomWeaponItem } from '../../Weapon';
+import { createRandomWeaponPreset } from '../../Weapon';
 import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 
 export interface ItemSpawnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (itemData: ItemData, isSolid: boolean, radius: StandardRadius) => void;
+  onConfirm: (config: EntityConfig) => void;
 }
 
 const createInitialWeaponState = () => {
-    const w = createRandomWeaponItem();
-    const cfg = w.config as WeaponConfig;
-    const values: WeaponFormValues = {
-        name: w.name,
-        weight: cfg.weight ?? 1,
-        baseDamage: cfg.baseDamage,
-        prepTime: cfg.prepTime,
-        recoveryTime: cfg.recoveryTime,
-        length: cfg.zone.length ?? 150,
-        radius: cfg.zone.radius ?? 50,
-        rayCount: cfg.zone.rayCount ?? 5,
-        angle: cfg.zone.angle !== undefined ? Math.round(rad2Deg(cfg.zone.angle)) as Degrees : (30 as Degrees),
-        pierceObstacles: !!cfg.zone.pierceObstacles,
-        piercePlayers: !!cfg.zone.piercePlayers,
-        pierceBots: !!cfg.zone.pierceBots,
-        hitZoneType: cfg.zone.hitZoneType,
-      };
-    return { draft: w, values };
+  const preset = createRandomWeaponPreset();
+  const values: WeaponFormValues = {
+    name: preset.name,
+    weight: preset.weight,
+    baseDamage: preset.combat.baseDamage,
+    prepTime: preset.combat.prepTime,
+    recoveryTime: preset.combat.recoveryTime,
+    length: preset.zone.length ?? 150,
+    radius: preset.zone.radius ?? 50,
+    rayCount: preset.zone.rayCount ?? 5,
+    angle: preset.zone.angle !== undefined ? (Math.round(rad2Deg(preset.zone.angle)) as Degrees) : (30 as Degrees),
+    pierceObstacles: !!preset.zone.pierceObstacles,
+    piercePlayers: !!preset.zone.piercePlayers,
+    pierceBots: !!preset.zone.pierceBots,
+    hitZoneType: preset.zone.hitZoneType,
   };
+  return { preset, values };
+};
 
 export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [type, setType] = useState<'weapon' | 'armor' | 'bag'>('weapon');
@@ -37,7 +36,6 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
   const [radius, setRadius] = useState<StandardRadius>(16);
 
   const [initialWeapon] = useState(createInitialWeaponState);
-  const [weaponDraft] = useState<ItemData>(initialWeapon.draft);
   const [weaponValues, setWeaponValues] = useState<WeaponFormValues>(initialWeapon.values);
 
   const [armorValues, setArmorValues] = useState<ArmorFormValues>({
@@ -57,87 +55,72 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
   if (!isOpen) return null;
 
   const handleConfirm = () => {
-    const id = `item_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-    let finalData: ItemData;
+    let config: EntityConfig;
 
     if (type === 'weapon') {
-        const wcfg: WeaponConfig = JSON.parse(JSON.stringify(weaponDraft.config));
-        wcfg.id = `wcfg_${Date.now()}`;
-        wcfg.name = weaponValues.name;
-        wcfg.weight = weaponValues.weight;
-        wcfg.baseDamage = weaponValues.baseDamage;
-        wcfg.prepTime = weaponValues.prepTime;
-        wcfg.recoveryTime = weaponValues.recoveryTime;
-        wcfg.isSolid = isSolid;
-        wcfg.radius = radius;
-  
-        const zoneType = weaponValues.hitZoneType;
-        if (zoneType === 'radius') {
-          wcfg.zone = {
-            hitZoneType: 'radius',
-            radius: weaponValues.radius,
-          };
-        } else if (zoneType === 'angle') {
-          wcfg.zone = {
-            hitZoneType: 'angle',
-            length: weaponValues.length,
-            angle: deg2Rad(weaponValues.angle),
-          };
-        } else if (zoneType === 'forward_line') {
-          wcfg.zone = {
-            hitZoneType: 'forward_line',
-            length: weaponValues.length,
-            pierceObstacles: weaponValues.pierceObstacles,
-            piercePlayers: weaponValues.piercePlayers,
-            pierceBots: weaponValues.pierceBots,
-          };
-        } else {
-          wcfg.zone = {
-            hitZoneType: 'shrapnel',
-            length: weaponValues.length,
-            angle: deg2Rad(weaponValues.angle),
-            rayCount: weaponValues.rayCount,
-            pierceObstacles: weaponValues.pierceObstacles,
-            piercePlayers: weaponValues.piercePlayers,
-            pierceBots: weaponValues.pierceBots,
-          };
-        }
-  
-        finalData = { ...weaponDraft, id, name: weaponValues.name, config: wcfg } as ItemData;
-      } else if (type === 'armor') {
-      finalData = {
-        id,
-        name: armorValues.name,
-        type: 'armor',
-        maxStack: 1,
-        config: {
-          id: `armor_cfg_${Math.random().toString(36).substring(2, 5)}`,
-          name: armorValues.name,
-          weight: armorValues.weight,
-          radius,
-          isSolid,
-          defense: armorValues.defense,
-          flat_reduction: armorValues.flatReduction,
+      const zoneType = weaponValues.hitZoneType;
+      let zone: HitZoneConfig;
+      if (zoneType === 'radius') {
+        zone = {
+          hitZoneType: 'radius',
+          radius: weaponValues.radius,
+        };
+      } else if (zoneType === 'angle') {
+        zone = {
+          hitZoneType: 'angle',
+          length: weaponValues.length,
+          angle: deg2Rad(weaponValues.angle),
+        };
+      } else if (zoneType === 'forward_line') {
+        zone = {
+          hitZoneType: 'forward_line',
+          length: weaponValues.length,
+          pierceObstacles: weaponValues.pierceObstacles,
+          piercePlayers: weaponValues.piercePlayers,
+          pierceBots: weaponValues.pierceBots,
+        };
+      } else {
+        zone = {
+          hitZoneType: 'shrapnel',
+          length: weaponValues.length,
+          angle: deg2Rad(weaponValues.angle),
+          rayCount: weaponValues.rayCount,
+          pierceObstacles: weaponValues.pierceObstacles,
+          piercePlayers: weaponValues.piercePlayers,
+          pierceBots: weaponValues.pierceBots,
+        };
+      }
+
+      config = {
+        item: { name: weaponValues.name, type: 'weapon', maxStack: 1 },
+        physics: { radius, weight: weaponValues.weight, isSolid },
+        weaponStats: {
+          baseDamage: weaponValues.baseDamage,
+          prepTime: weaponValues.prepTime,
+          recoveryTime: weaponValues.recoveryTime,
         },
-      } as ItemData;
+        weaponZone: zone,
+      };
+    } else if (type === 'armor') {
+      config = {
+        item: { name: armorValues.name, type: 'armor', maxStack: 1 },
+        physics: { radius, weight: armorValues.weight, isSolid },
+        armorStats: {
+          defense: armorValues.defense,
+          flatReduction: armorValues.flatReduction,
+        },
+      };
     } else {
-      finalData = {
-        id,
-        name: bagValues.name,
-        type: 'bag',
-        maxStack: 1,
-        config: {
-          id: `bag_cfg_${Math.random().toString(36).substring(2, 5)}`,
-          name: bagValues.name,
-          weight: bagValues.weight,
-          radius,
-          isSolid,
+      config = {
+        item: { name: bagValues.name, type: 'bag', maxStack: 1 },
+        physics: { radius, weight: bagValues.weight, isSolid },
+        inventory: {
           size: { width: bagValues.width, height: bagValues.height },
         },
-      } as ItemData;
+      };
     }
 
-    onConfirm(finalData, isSolid, radius);
+    onConfirm(config);
   };
 
   return (

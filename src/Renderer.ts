@@ -1,7 +1,7 @@
 import { World } from './ecs/World';
 import { Camera } from './Camera';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
-import { EntityId, HitZoneConfig, WeaponConfig } from './ecs/types';
+import { EntityId, HitZoneConfig } from './ecs/types';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -256,7 +256,7 @@ export class Renderer {
       this.ctx.fillText(icon, 0, 0);
   
       // 4. Подпись имени/типа под объектом
-      const label = comp.meta?.name ?? comp.gizmo?.type ?? comp.meta?.id ?? id;
+      const label = comp.meta?.name ?? comp.gizmo?.type ?? id;
       this.ctx.fillStyle = '#bbb';
       this.ctx.font = `${Math.max(9, 10 / camera.scale)}px sans-serif`;
       this.ctx.textBaseline = 'top';
@@ -318,10 +318,7 @@ export class Renderer {
       const attacks = activeAttacks?.attacks || [];
 
       for (const activeAtk of attacks) {
-        const zoneComp = world.getComponent(activeAtk.weaponId, 'weaponZone');
-        const wItem = world.getComponent(activeAtk.weaponId, 'item');
-        const zone: HitZoneConfig | undefined =
-          zoneComp ?? (wItem?.type === 'weapon' ? (wItem.config as WeaponConfig).zone : undefined);
+        const zone = world.getComponent(activeAtk.weaponId, 'weaponZone');
 
         if (!zone) {
           continue;
@@ -437,7 +434,7 @@ export class Renderer {
       this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
-      const displayName = meta?.name ?? meta?.id ?? id;
+      const displayName = meta?.name ?? id;
       this.ctx.fillText(displayName, 0, -radius - 20 / camera.scale);
       this.ctx.restore();
     }

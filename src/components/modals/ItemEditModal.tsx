@@ -1,12 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { ItemData, STANDARD_RADII, HitZoneType, HitZoneConfig } from '../../ecs/types';
+import { ItemData, STANDARD_RADII, HitZoneType, HitZoneConfig, StandardRadius } from '../../ecs/types';
 import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues } from './forms/FormFields';
 import { DEFAULT_ZONE_PARAMS } from '../../Weapon';
 import { weaponModalState } from './weaponModalState';
 import { World } from '../../ecs/World';
 import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 
-export interface ItemEditModalProps {
+export interface ItemEditValues {
+    name: string;
+    isSolid: boolean;
+    radius: StandardRadius;
+    weight: number;
+    weapon?: {
+      baseDamage: number;
+      prepTime: number;
+      recoveryTime: number;
+      zone: HitZoneConfig;
+    };
+    armor?: {
+      defense: number;
+      flatReduction: number;
+    };
+    bag?: {
+      width: number;
+      height: number;
+    };
+  }
+  
+  export interface ItemEditModalProps {
     itemEntityId: string | null;
     world?: World;
     isReadOnly?: boolean;
@@ -15,9 +36,9 @@ export interface ItemEditModalProps {
     inventorySlots?: { itemId: string | null; item: ItemData | null; count: number }[][];
     inventorySize?: { width: number; height: number };
     onClose: () => void;
-    onConfirm: (updatedItem: ItemData) => void;
+    onConfirm: (values: ItemEditValues) => void;
   }
-
+  
   export const ItemEditModal: React.FC<ItemEditModalProps> = ({
     itemEntityId,
     world,
@@ -30,60 +51,69 @@ export interface ItemEditModalProps {
     onConfirm,
   }) => {
     const [item, setItem] = useState<ItemData | null>(null);
-    const [draft, setDraft] = useState<ItemData | null>(null);
+    const [isSolid, setIsSolid] = useState<boolean>(true);
+    const [radius, setRadius] = useState<StandardRadius>(16);
     const [formValues, setFormValues] = useState<any>({});
   
     useEffect(() => {
       if (itemEntityId && world) {
         const fetchedItem = world.getComponent(itemEntityId, 'item') ?? null;
         setItem(fetchedItem);
+  
+        const physStats = world.getComponent(itemEntityId, 'physicsStats');
+        const physBody = world.getComponent(itemEntityId, 'physicsBody');
+        const wStats = world.getComponent(itemEntityId, 'weaponStats');
+        const wZone = world.getComponent(itemEntityId, 'weaponZone');
+        const aStats = world.getComponent(itemEntityId, 'armorStats');
+        const inv = world.getComponent(itemEntityId, 'inventory');
+  
+        const currentSolid = physStats?.isSolid.current ?? (physBody ? physBody.mask !== 0 : true);
+        const currentRadius = (physStats?.radius.current ?? physBody?.body.r ?? 16) as StandardRadius;
+        const currentWeight = physStats?.weight.current ?? 1;
+  
+        setIsSolid(currentSolid);
+        setRadius(currentRadius);
+  
+        if (fetchedItem) {
+          if (fetchedItem.type === 'weapon') {
+            const zType = (wZone?.hitZoneType ?? 'forward_line') as HitZoneType;
+            setFormValues({
+              name: fetchedItem.name,
+              weight: currentWeight,
+              baseDamage: wStats?.baseDamage.current ?? 20,
+              prepTime: wStats?.prepTime.current ?? 0.2,
+              recoveryTime: wStats?.recoveryTime.current ?? 0.3,
+              length: wZone?.length ?? 150,
+              radius: wZone?.radius ?? 50,
+              rayCount: wZone?.rayCount ?? 5,
+              angle: wZone?.angle !== undefined ? (Math.round(rad2Deg(wZone.angle)) as Degrees) : (30 as Degrees),
+              pierceObstacles: !!wZone?.pierceObstacles,
+              piercePlayers: !!wZone?.piercePlayers,
+              pierceBots: !!wZone?.pierceBots,
+              hitZoneType: zType,
+            });
+          } else if (fetchedItem.type === 'armor') {
+            setFormValues({
+              name: fetchedItem.name,
+              defense: aStats?.defense.current ?? 0,
+              flatReduction: aStats?.flatReduction.current ?? 0,
+              weight: currentWeight,
+            });
+          } else if (fetchedItem.type === 'bag') {
+            setFormValues({
+              name: fetchedItem.name,
+              width: inv?.size?.width ?? 6,
+              height: inv?.size?.height ?? 4,
+              weight: currentWeight,
+            });
+          }
+        }
       } else {
         setItem(null);
       }
     }, [itemEntityId, world]);
   
-    useEffect(() => {
-      if (item) {
-        setDraft(JSON.parse(JSON.stringify(item)));
-        const cfg = item.config as any;
-      if (item.type === 'weapon') {
-        const zType = cfg.zone.hitZoneType as HitZoneType;
-        setFormValues({
-          name: item.name,
-          weight: cfg.weight ?? 1,
-          baseDamage: cfg.baseDamage,
-          prepTime: cfg.prepTime,
-          recoveryTime: cfg.recoveryTime,
-          length: cfg.zone.length ?? 150,
-          radius: cfg.zone.radius ?? 50,
-          rayCount: cfg.zone.rayCount ?? 5,
-          angle: cfg.zone.angle !== undefined ? Math.round(rad2Deg(cfg.zone.angle)) as Degrees : (30 as Degrees),
-          pierceObstacles: !!cfg.zone.pierceObstacles,
-          piercePlayers: !!cfg.zone.piercePlayers,
-          pierceBots: !!cfg.zone.pierceBots,
-          hitZoneType: zType,
-        });
-      } else if (item.type === 'armor') {
-        setFormValues({
-          name: item.name,
-          defense: cfg.defense,
-          flatReduction: cfg.flat_reduction,
-          weight: cfg.weight ?? 1,
-        });
-      } else if (item.type === 'bag') {
-        setFormValues({
-          name: item.name,
-          width: cfg.size?.width ?? 6,
-          height: cfg.size?.height ?? 4,
-          weight: cfg.weight ?? 1,
-        });
-      }
-    } else {
-      setDraft(null);
-    }
-  }, [item]);
-
-  if (!item || !draft) return null;
+    if (!item) return null;
 
   const handleZoneTypeChange = (newType: HitZoneType) => {
     const currentValues = formValues as WeaponFormValues;
@@ -116,85 +146,87 @@ export interface ItemEditModalProps {
       });
     };
 
-  const handleConfirm = () => {
-    const updated = { ...draft };
-    const cfg = updated.config as any;
-    cfg.name = formValues.name;
-    updated.name = formValues.name;
-    cfg.weight = formValues.weight;
-
-    if (item.type === 'weapon') {
-      cfg.baseDamage = formValues.baseDamage;
-      cfg.prepTime = formValues.prepTime;
-      cfg.recoveryTime = formValues.recoveryTime;
-
-      const zoneType: HitZoneType = formValues.hitZoneType;
-      let newZone: HitZoneConfig;
-
-      if (zoneType === 'radius') {
-        newZone = {
-          hitZoneType: 'radius',
-          radius: formValues.radius,
+    const handleConfirm = () => {
+        const result: ItemEditValues = {
+          name: formValues.name,
+          isSolid,
+          radius,
+          weight: formValues.weight ?? 1,
         };
-      } else if (zoneType === 'angle') {
-        newZone = {
-          hitZoneType: 'angle',
-          length: formValues.length,
-          angle: deg2Rad(formValues.angle),
-        };
-      } else if (zoneType === 'forward_line') {
-        newZone = {
-          hitZoneType: 'forward_line',
-          length: formValues.length,
-          pierceObstacles: formValues.pierceObstacles,
-          piercePlayers: formValues.piercePlayers,
-          pierceBots: formValues.pierceBots,
-        };
-      } else {
-        newZone = {
-          hitZoneType: 'shrapnel',
-          length: formValues.length,
-          angle: deg2Rad(formValues.angle),
-          rayCount: formValues.rayCount,
-          pierceObstacles: formValues.pierceObstacles,
-          piercePlayers: formValues.piercePlayers,
-          pierceBots: formValues.pierceBots,
-        };
-      }
-
-      cfg.zone = newZone;
-
-      // Обновляем состояние последнего добавленного оружия
-      weaponModalState.config = JSON.parse(JSON.stringify(cfg));
-      weaponModalState.zoneParamsMap[zoneType] = {
-        length: formValues.length,
-        radius: formValues.radius,
-        rayCount: formValues.rayCount,
-        angle: deg2Rad(formValues.angle),
-        pierceObstacles: formValues.pierceObstacles,
-        piercePlayers: formValues.piercePlayers,
-        pierceBots: formValues.pierceBots,
+    
+        if (item.type === 'weapon') {
+          const zoneType: HitZoneType = formValues.hitZoneType;
+          let newZone: HitZoneConfig;
+    
+          if (zoneType === 'radius') {
+            newZone = {
+              hitZoneType: 'radius',
+              radius: formValues.radius,
+            };
+          } else if (zoneType === 'angle') {
+            newZone = {
+              hitZoneType: 'angle',
+              length: formValues.length,
+              angle: deg2Rad(formValues.angle),
+            };
+          } else if (zoneType === 'forward_line') {
+            newZone = {
+              hitZoneType: 'forward_line',
+              length: formValues.length,
+              pierceObstacles: formValues.pierceObstacles,
+              piercePlayers: formValues.piercePlayers,
+              pierceBots: formValues.pierceBots,
+            };
+          } else {
+            newZone = {
+              hitZoneType: 'shrapnel',
+              length: formValues.length,
+              angle: deg2Rad(formValues.angle),
+              rayCount: formValues.rayCount,
+              pierceObstacles: formValues.pierceObstacles,
+              piercePlayers: formValues.piercePlayers,
+              pierceBots: formValues.pierceBots,
+            };
+          }
+    
+          result.weapon = {
+            baseDamage: formValues.baseDamage,
+            prepTime: formValues.prepTime,
+            recoveryTime: formValues.recoveryTime,
+            zone: newZone,
+          };
+    
+          weaponModalState.zoneParamsMap[zoneType] = {
+            length: formValues.length,
+            radius: formValues.radius,
+            rayCount: formValues.rayCount,
+            angle: deg2Rad(formValues.angle),
+            pierceObstacles: formValues.pierceObstacles,
+            piercePlayers: formValues.piercePlayers,
+            pierceBots: formValues.pierceBots,
+          };
+        } else if (item.type === 'armor') {
+          result.armor = {
+            defense: formValues.defense,
+            flatReduction: formValues.flatReduction,
+          };
+        } else if (item.type === 'bag') {
+          result.bag = {
+            width: formValues.width,
+            height: formValues.height,
+          };
+        }
+    
+        onConfirm(result);
       };
-    } else if (item.type === 'armor') {
-      cfg.defense = formValues.defense;
-      cfg.flat_reduction = formValues.flatReduction;
-    } else if (item.type === 'bag') {
-      cfg.size = { width: formValues.width, height: formValues.height };
-    }
-
-    onConfirm(updated);
-  };
-
-  const getTypeName = () => {
-    const type: string = (item as any).type;
-    if (type === 'weapon') return 'Оружие';
-    if (type === 'armor') return 'Броня';
-    if (type === 'bag') return 'Сумка';
-    return type;
-  };
-
-  const isSolid = draft.config?.isSolid ?? true;
-  const radius = draft.config?.radius ?? 16;
+    
+      const getTypeName = () => {
+        const type: string = item.type;
+        if (type === 'weapon') return 'Оружие';
+        if (type === 'armor') return 'Броня';
+        if (type === 'bag') return 'Сумка';
+        return type;
+      };
 
   return (
     <div
@@ -235,12 +267,7 @@ export interface ItemEditModalProps {
               type="checkbox"
               disabled={isReadOnly}
               checked={isSolid}
-              onChange={(e) =>
-                setDraft({
-                  ...draft,
-                  config: { ...draft.config, isSolid: e.target.checked },
-                } as any)
-              }
+              onChange={(e) => setIsSolid(e.target.checked)}
             />
             Участвует в коллизии
           </label>
@@ -251,12 +278,7 @@ export interface ItemEditModalProps {
               <select
                 disabled={isReadOnly}
                 value={radius}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    config: { ...draft.config, radius: Number(e.target.value) },
-                  } as any)
-                }
+                onChange={(e) => setRadius(Number(e.target.value) as StandardRadius)}
               >
                 {STANDARD_RADII.map((r) => (
                   <option key={r} value={r}>

@@ -67,21 +67,11 @@ export interface HealthComponent {
 
 export type ItemType = 'weapon' | 'armor' | 'bag';
 
-type ItemConfigMap = {
-  weapon: WeaponConfig;
-  armor: ArmorConfig;
-  bag: InventoryConfig;
-};
-
-export type ItemData<T extends ItemType = ItemType> = {
-  [K in T]: {
-    id: string;
-    name: string;
-    type: K;
-    maxStack: number;
-    config: ItemConfigMap[K];
-  };
-}[T];
+export interface ItemData {
+  name: string;
+  type: ItemType;
+  maxStack: number;
+}
 
 export interface InventorySlot {
   itemId: EntityId | null;
@@ -109,9 +99,9 @@ export interface ActiveAttackComponent {
 }
 
 export interface CreatureMetaComponent {
-  id: string;
   name: string;
   state: CreatureState;
+  entityType?: string;
 }
 
 export type ItemComponent = ItemData;
@@ -206,21 +196,6 @@ export interface PhysicsConfig {
   isSolid?: boolean;
 }
 
-export interface ItemConfig extends PhysicsConfig {
-  id: string;
-  name: string;
-  maxStack?: number;
-}
-
-export interface InventoryConfig extends ItemConfig {
-  size: InventorySize;
-}
-
-export interface ArmorConfig extends ItemConfig {
-  defense: number;
-  flat_reduction: number;
-}
-
 export type HitZoneConfig = {
   hitZoneType: HitZoneType;
   radius?: number;
@@ -231,23 +206,6 @@ export type HitZoneConfig = {
   piercePlayers?: boolean;
   pierceBots?: boolean;
 };
-
-export interface WeaponConfig extends ItemConfig {
-  prepTime: number;
-  castTime?: number;
-  recoveryTime: number;
-  prepTurnSlow: number;
-  recoveryTurnSlow: number;
-  prepMoveSlow: number;
-  recoveryMoveSlow: number;
-  castMoveSlow?: number;
-  baseDamage: number;
-  minMultiplier: number;
-  maxMultiplier: number;
-  critChance: number;
-  critMultiplier: number;
-  zone: HitZoneConfig;
-}
 
 export interface HealthConfig {
   maxHp: number;
@@ -294,7 +252,7 @@ export interface EntityConfig {
   item?: ItemData;
   inventory?: InventorySetup;
   equip?: EquipSlot[];
-  meta?: { id?: string; name?: string; entityType?: string };
+  meta?: { name?: string; entityType?: string };
   weaponStats?: Partial<WeaponCombatConfig>;
   weaponZone?: HitZoneConfig;
   armorStats?: Partial<ArmorCombatConfig>;

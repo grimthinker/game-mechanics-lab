@@ -79,42 +79,39 @@ export class EntityFactory {
         aiSystem.initBotBrain(world, id, config.ai.behavior);
       }
 
-    if (config.item) {
+      if (config.item) {
         world.addComponent(id, 'item', config.item);
+      }
   
-        if (config.item.type === 'weapon') {
-          const wcfg = config.item.config as any;
-          const ws = config.weaponStats;
-          world.addComponent(id, 'weaponStats', {
-            baseDamage: { base: ws?.baseDamage ?? wcfg.baseDamage ?? 20, current: ws?.baseDamage ?? wcfg.baseDamage ?? 20 },
-            prepTime: { base: ws?.prepTime ?? wcfg.prepTime ?? 0.2, current: ws?.prepTime ?? wcfg.prepTime ?? 0.2 },
-            castTime: { base: ws?.castTime ?? wcfg.castTime ?? 0, current: ws?.castTime ?? wcfg.castTime ?? 0 },
-            recoveryTime: { base: ws?.recoveryTime ?? wcfg.recoveryTime ?? 0.3, current: ws?.recoveryTime ?? wcfg.recoveryTime ?? 0.3 },
-            prepTurnSlow: { base: ws?.prepTurnSlow ?? wcfg.prepTurnSlow ?? 0.5, current: ws?.prepTurnSlow ?? wcfg.prepTurnSlow ?? 0.5 },
-            recoveryTurnSlow: { base: ws?.recoveryTurnSlow ?? wcfg.recoveryTurnSlow ?? 0.8, current: ws?.recoveryTurnSlow ?? wcfg.recoveryTurnSlow ?? 0.8 },
-            prepMoveSlow: { base: ws?.prepMoveSlow ?? wcfg.prepMoveSlow ?? 0.5, current: ws?.prepMoveSlow ?? wcfg.prepMoveSlow ?? 0.5 },
-            recoveryMoveSlow: { base: ws?.recoveryMoveSlow ?? wcfg.recoveryMoveSlow ?? 0.8, current: ws?.recoveryMoveSlow ?? wcfg.recoveryMoveSlow ?? 0.8 },
-            castMoveSlow: { base: ws?.castMoveSlow ?? wcfg.castMoveSlow ?? 0.5, current: ws?.castMoveSlow ?? wcfg.castMoveSlow ?? 0.5 },
-            minMultiplier: { base: ws?.minMultiplier ?? wcfg.minMultiplier ?? 0.8, current: ws?.minMultiplier ?? wcfg.minMultiplier ?? 0.8 },
-            maxMultiplier: { base: ws?.maxMultiplier ?? wcfg.maxMultiplier ?? 1.2, current: ws?.maxMultiplier ?? wcfg.maxMultiplier ?? 1.2 },
-            critChance: { base: ws?.critChance ?? wcfg.critChance ?? 0.1, current: ws?.critChance ?? wcfg.critChance ?? 0.1 },
-            critMultiplier: { base: ws?.critMultiplier ?? wcfg.critMultiplier ?? 2.0, current: ws?.critMultiplier ?? wcfg.critMultiplier ?? 2.0 },
-          });
+      if (config.weaponStats) {
+        const ws = config.weaponStats;
+        world.addComponent(id, 'weaponStats', {
+          baseDamage: { base: ws.baseDamage ?? 20, current: ws.baseDamage ?? 20 },
+          prepTime: { base: ws.prepTime ?? 0.2, current: ws.prepTime ?? 0.2 },
+          castTime: { base: ws.castTime ?? 0, current: ws.castTime ?? 0 },
+          recoveryTime: { base: ws.recoveryTime ?? 0.3, current: ws.recoveryTime ?? 0.3 },
+          prepTurnSlow: { base: ws.prepTurnSlow ?? 0.5, current: ws.prepTurnSlow ?? 0.5 },
+          recoveryTurnSlow: { base: ws.recoveryTurnSlow ?? 0.8, current: ws.recoveryTurnSlow ?? 0.8 },
+          prepMoveSlow: { base: ws.prepMoveSlow ?? 0.5, current: ws.prepMoveSlow ?? 0.5 },
+          recoveryMoveSlow: { base: ws.recoveryMoveSlow ?? 0.8, current: ws.recoveryMoveSlow ?? 0.8 },
+          castMoveSlow: { base: ws.castMoveSlow ?? 0.5, current: ws.castMoveSlow ?? 0.5 },
+          minMultiplier: { base: ws.minMultiplier ?? 0.8, current: ws.minMultiplier ?? 0.8 },
+          maxMultiplier: { base: ws.maxMultiplier ?? 1.2, current: ws.maxMultiplier ?? 1.2 },
+          critChance: { base: ws.critChance ?? 0.1, current: ws.critChance ?? 0.1 },
+          critMultiplier: { base: ws.critMultiplier ?? 2.0, current: ws.critMultiplier ?? 2.0 },
+        });
+      }
   
-          const zone = config.weaponZone ?? wcfg.zone;
-          if (zone) {
-            world.addComponent(id, 'weaponZone', JSON.parse(JSON.stringify(zone)));
-          }
-        }
+      if (config.weaponZone) {
+        world.addComponent(id, 'weaponZone', JSON.parse(JSON.stringify(config.weaponZone)));
+      }
   
-        if (config.item.type === 'armor') {
-          const acfg = config.item.config as any;
-          const as = config.armorStats;
-          world.addComponent(id, 'armorStats', {
-            defense: { base: as?.defense ?? acfg.defense ?? 0, current: as?.defense ?? acfg.defense ?? 0 },
-            flatReduction: { base: as?.flatReduction ?? acfg.flat_reduction ?? 0, current: as?.flatReduction ?? acfg.flat_reduction ?? 0 },
-          });
-        }
+      if (config.armorStats) {
+        const as = config.armorStats;
+        world.addComponent(id, 'armorStats', {
+          defense: { base: as.defense ?? 0, current: as.defense ?? 0 },
+          flatReduction: { base: as.flatReduction ?? 0, current: as.flatReduction ?? 0 },
+        });
       }
   
       if (config.inventory) {
@@ -136,9 +133,9 @@ export class EntityFactory {
 
     if (config.meta) {
         world.addComponent(id, 'meta', {
-          id: config.meta.id || id,
-          name: config.meta.name || config.meta.id || id,
+          name: config.meta.name || id,
           state: 'idle',
+          entityType: config.meta.entityType,
         });
       }
 

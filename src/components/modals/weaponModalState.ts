@@ -1,13 +1,11 @@
-import { HitZoneType, WeaponConfig } from '../../ecs/types';
+import { HitZoneType } from '../../ecs/types';
 import { DEFAULT_ZONE_PARAMS, ZoneTypeParams } from '../../Weapon';
 
 export interface WeaponModalState {
-  config: WeaponConfig | null;
   zoneParamsMap: Record<HitZoneType, ZoneTypeParams>;
 }
 
 export const weaponModalState: WeaponModalState = {
-  config: null,
   zoneParamsMap: {
     angle: { ...DEFAULT_ZONE_PARAMS.angle },
     radius: { ...DEFAULT_ZONE_PARAMS.radius },

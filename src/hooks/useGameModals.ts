@@ -1,16 +1,11 @@
 import { useState } from 'react';
 import {
   StandardRadius,
-  InventoryConfig,
-  ItemData,
-  WeaponConfig,
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
-  ArmorConfig,
 } from '../ecs/types';
 import { GameApp } from '../GameApp';
-import { Circle } from 'detect-collisions';
-import { weaponModalState } from '../components/modals/weaponModalState';
+import { ItemEditValues } from '../components/modals/ItemEditModal';
 import { deg2Rad, rad2Deg } from '../utils';
 
 interface UseGameModalsProps {
@@ -136,76 +131,62 @@ export function useGameModals({ appRef, updateStats }: UseGameModalsProps) {
     setSelectedItemEntityId(null);
   };
 
-  const handleItemEditConfirm = (updatedItem: ItemData) => {
+  const handleItemEditConfirm = (values: ItemEditValues) => {
     const app = appRef.current;
     if (!app || !selectedItemEntityId) return;
 
     const entityId = selectedItemEntityId;
     const itemComp = app.world.getComponent(entityId, 'item');
-    
+
     if (itemComp) {
-      Object.assign(itemComp, updatedItem);
-      
-      const phys = app.world.getComponent(entityId, 'physicsBody');
-      const physStats = app.world.getComponent(entityId, 'physicsStats');
-      if (phys) {
-        const isSolidNow = !!updatedItem.config?.isSolid;
-        const newRadius = updatedItem.config?.radius ?? 16;
-        const newWeight = updatedItem.config?.weight ?? 1;
-        
-        phys.body.r = newRadius;
-        phys.mask = isSolidNow ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-        (phys.body as any).mask = phys.mask;
-        
-        if (physStats) {
-           physStats.radius.current = newRadius;
-           physStats.radius.base = newRadius;
-           physStats.weight.current = newWeight;
-           physStats.weight.base = newWeight;
-           physStats.isSolid.current = isSolidNow;
-           physStats.isSolid.base = isSolidNow;
-        }
-      }
+      itemComp.name = values.name;
     }
 
-    if (updatedItem.type === 'weapon') {
-      const wcfg = updatedItem.config as WeaponConfig;
-      weaponModalState.config = JSON.parse(JSON.stringify(wcfg));
+    const phys = app.world.getComponent(entityId, 'physicsBody');
+    const physStats = app.world.getComponent(entityId, 'physicsStats');
+    if (phys) {
+      phys.body.r = values.radius;
+      phys.mask = values.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+      (phys.body as any).mask = phys.mask;
+    }
+    if (physStats) {
+      physStats.radius.current = values.radius;
+      physStats.radius.base = values.radius;
+      physStats.weight.current = values.weight;
+      physStats.weight.base = values.weight;
+      physStats.isSolid.current = values.isSolid;
+      physStats.isSolid.base = values.isSolid;
+    }
 
+    if (values.weapon) {
       const wStats = app.world.getComponent(entityId, 'weaponStats');
       if (wStats) {
-        wStats.baseDamage.base = wcfg.baseDamage;
-        wStats.baseDamage.current = wcfg.baseDamage;
-        wStats.prepTime.base = wcfg.prepTime;
-        wStats.prepTime.current = wcfg.prepTime;
-        wStats.recoveryTime.base = wcfg.recoveryTime;
-        wStats.recoveryTime.current = wcfg.recoveryTime;
+        wStats.baseDamage.base = values.weapon.baseDamage;
+        wStats.baseDamage.current = values.weapon.baseDamage;
+        wStats.prepTime.base = values.weapon.prepTime;
+        wStats.prepTime.current = values.weapon.prepTime;
+        wStats.recoveryTime.base = values.weapon.recoveryTime;
+        wStats.recoveryTime.current = values.weapon.recoveryTime;
       }
-      if (wcfg.zone) {
-        app.world.addComponent(entityId, 'weaponZone', JSON.parse(JSON.stringify(wcfg.zone)));
-      }
-    } else if (updatedItem.type === 'armor') {
-      const acfg = updatedItem.config as ArmorConfig;
+      app.world.addComponent(entityId, 'weaponZone', JSON.parse(JSON.stringify(values.weapon.zone)));
+    } else if (values.armor) {
       const aStats = app.world.getComponent(entityId, 'armorStats');
       if (aStats) {
-        aStats.defense.base = acfg.defense;
-        aStats.defense.current = acfg.defense;
-        aStats.flatReduction.base = acfg.flat_reduction;
-        aStats.flatReduction.current = acfg.flat_reduction;
+        aStats.defense.base = values.armor.defense;
+        aStats.defense.current = values.armor.defense;
+        aStats.flatReduction.base = values.armor.flatReduction;
+        aStats.flatReduction.current = values.armor.flatReduction;
       }
-    }
-
-    const c = app.selectedEntity;
-    if (c && updatedItem.type === 'bag') {
-      const bagCfg = updatedItem.config as InventoryConfig;
+    } else if (values.bag) {
+      const { width, height } = values.bag;
       const inv = app.world.getComponent(entityId, 'inventory');
       if (inv) {
         const isInventoryEmpty = inv.slots.every((row) => row.every((cell) => !cell.itemId));
         if (isInventoryEmpty) {
-            inv.size = { width: bagCfg.size.width, height: bagCfg.size.height };
-            inv.slots = Array.from({ length: bagCfg.size.height }, () =>
-                Array.from({ length: bagCfg.size.width }, () => ({ itemId: null, count: 0 }))
-            );
+          inv.size = { width, height };
+          inv.slots = Array.from({ length: height }, () =>
+            Array.from({ length: width }, () => ({ itemId: null, count: 0 }))
+          );
         }
       }
     }

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
-import { InventoryConfig, ItemData, StandardRadius } from './ecs/types';
+import { EntityConfig } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { createDefaultCreatureConfig } from './Creature';
 import { deg2Rad, rad2Deg } from './utils';
@@ -92,6 +92,7 @@ export const App: React.FC = () => {
 
       setSelectedStats({
         id: c.id,
+        name: app.world.getComponent(c.id, 'meta')?.name ?? c.itemData?.name,
         behavior: c.behavior,
         radius: c.radius,
         weight: c.weight,
@@ -106,8 +107,14 @@ export const App: React.FC = () => {
           type: s.type,
           itemId: s.itemId,
           item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
-     })) : [],
+          weaponStats: s.itemId ? (app.world.getComponent(s.itemId, 'weaponStats') ?? null) : null,
+          armorStats: s.itemId ? (app.world.getComponent(s.itemId, 'armorStats') ?? null) : null,
+          inventory: s.itemId ? (app.world.getComponent(s.itemId, 'inventory') ?? null) : null,
+        })) : [],
         itemData: c.itemData ? JSON.parse(JSON.stringify(c.itemData)) : undefined,
+        weaponStats: c.weaponStats,
+        weaponZone: c.weaponZone,
+        armorStats: c.armorStats,
         inventory: c.inventory,
       });
 
@@ -248,20 +255,13 @@ export const App: React.FC = () => {
         stealth: { stealthPower: modals.stealthPower, runStealthMultiplier: modals.runStealthMultiplier, crouchStealthMultiplier: modals.crouchStealthMultiplier },
         ai: { behavior: modals.pendingSpawnBehavior },
         equip: [ { type: 'armor', itemId: null }, { type: 'bag', itemId: null }, { type: 'weapon', itemId: null } ],
-        meta: { entityType: 'creature' }
+        meta: { name: 'Существо', entityType: 'creature' }
       }
     });
     modals.closeSpawnModal();
   };
 
-  const handleItemSpawnConfirm = (itemData: ItemData, isSolid: boolean, radius: StandardRadius) => {
-    const config: any = {
-      item: itemData,
-      physics: { radius, weight: itemData.config?.weight ?? 1, isSolid }
-    };
-    if (itemData.type === 'bag' && itemData.config) {
-      config.inventory = { ...itemData.config as InventoryConfig };
-    }
+  const handleItemSpawnConfirm = (config: EntityConfig) => {
     setPlacementMode({
       kind: 'entity',
       config
