@@ -13,13 +13,25 @@ export interface TransformComponent {
 
 export const enum CollisionCategory {
   NONE = 0,
-  OBSTACLE = 1 << 0, // 1
-  CREATURE = 1 << 1, // 2
-  ITEM = 1 << 2,     // 4
+  OBSTACLE = 1 << 0,     // 1
+  CREATURE = 1 << 1,     // 2
+  ITEM = 1 << 2,         // 4
+  PROJECTILE = 1 << 3,   // 8
+  TRIGGER_ZONE = 1 << 4, // 16
+  PARTICLE = 1 << 5,     // 32
 }
 
-export const COLLISION_MASK_ALL =
+export const COLLISION_MASK_PHYSICAL =
   CollisionCategory.OBSTACLE | CollisionCategory.CREATURE | CollisionCategory.ITEM;
+
+export const COLLISION_MASK_ALL =
+  CollisionCategory.OBSTACLE |
+  CollisionCategory.CREATURE |
+  CollisionCategory.ITEM |
+  CollisionCategory.PROJECTILE |
+  CollisionCategory.TRIGGER_ZONE |
+  CollisionCategory.PARTICLE;
+
 export const COLLISION_MASK_NONE = 0;
 
 export interface PhysicsBodyComponent {
@@ -27,6 +39,98 @@ export interface PhysicsBodyComponent {
   isStatic: boolean;
   category: number;
   mask: number;
+  isTrigger?: boolean;
+}
+
+export type EntityArchetype =
+  | 'creature'
+  | 'item'
+  | 'projectile'
+  | 'zone'
+  | 'marker'
+  | 'obstacle'
+  | 'particles';
+
+export interface TagComponent {
+  archetype: EntityArchetype;
+  subType?: string;
+}
+
+export interface RenderCirclePrimitive {
+  kind: 'circle';
+  radius: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  dash?: number[];
+}
+
+export interface RenderRectPrimitive {
+  kind: 'rect';
+  width: number;
+  height: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  dash?: number[];
+}
+
+export interface RenderLinePrimitive {
+  kind: 'line';
+  from: Point;
+  to: Point;
+  stroke: string;
+  strokeWidth?: number;
+  dash?: number[];
+}
+
+export interface RenderArcPrimitive {
+  kind: 'arc';
+  radius: number;
+  startAngle: number;
+  endAngle: number;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  closed?: boolean;
+}
+
+export interface RenderTextPrimitive {
+  kind: 'text';
+  text: string;
+  offset?: Point;
+  font?: string;
+  fill: string;
+  ignoreRotation?: boolean;
+  align?: CanvasTextAlign;
+  baseline?: CanvasTextBaseline;
+}
+
+export type RenderPrimitive =
+  | RenderCirclePrimitive
+  | RenderRectPrimitive
+  | RenderLinePrimitive
+  | RenderArcPrimitive
+  | RenderTextPrimitive;
+
+export const RENDER_Z_INDEX = {
+  ZONES: 0,
+  OBSTACLES: 5,
+  ITEMS: 10,
+  CORPSES: 20,
+  PROJECTILES: 30,
+  CREATURES: 40,
+  ATTACKS: 50,
+  PARTICLES: 60,
+  GIZMOS: 90,
+  UI: 100,
+} as const;
+
+export interface RenderableComponent {
+  zIndex: number;
+  primitives: RenderPrimitive[];
+  isVisible: boolean;
+  syncWithTransform?: boolean;
 }
 
 export interface GizmoComponent {
@@ -137,6 +241,8 @@ export interface ArmorCombatConfig {
 export type ArmorStatsComponent = ComponentStats<ArmorCombatConfig>;
 
 export interface EntityComponents {
+  tag?: TagComponent;
+  renderable?: RenderableComponent;
   transform?: TransformComponent;
   physicsBody?: PhysicsBodyComponent;
   velocity?: VelocityComponent;
@@ -161,6 +267,8 @@ export interface EntityComponents {
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
+  'tag',
+  'renderable',
   'transform',
   'physicsStats',
   'healthStats',
@@ -244,6 +352,9 @@ export interface InventorySetup {
 }
 
 export interface EntityConfig {
+  tag?: TagComponent;
+  renderable?: RenderableComponent;
+  gizmo?: GizmoComponent;
   physics?: PhysicsConfig;
   health?: HealthConfig;
   movement?: MovementConfig;

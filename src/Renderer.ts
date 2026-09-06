@@ -1,7 +1,13 @@
 import { World } from './ecs/World';
 import { Camera } from './Camera';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
-import { EntityId, HitZoneConfig } from './ecs/types';
+import {
+  EntityId,
+  HitZoneConfig,
+  RenderableComponent,
+  RenderPrimitive,
+  TransformComponent,
+} from './ecs/types';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -17,7 +23,7 @@ export class Renderer {
     world: World,
     physics: PhysicsSystem,
     selectedId: EntityId | null,
-    gameMode: string = 'editor',
+    _gameMode: string = 'editor',
     hoveredId: EntityId | null = null
   ): void {
     this.ctx.save();
@@ -28,7 +34,7 @@ export class Renderer {
 
     this.renderGrid(camera);
     this.renderObstacles(camera, physics);
-    this.renderEntities(world, camera, selectedId, gameMode, hoveredId);
+    this.renderEntities(world, camera, selectedId, hoveredId);
 
     this.ctx.restore();
   }
@@ -75,234 +81,179 @@ export class Renderer {
     world: World,
     camera: Camera,
     selectedId: EntityId | null,
-    gameMode: string,
     hoveredId: EntityId | null
   ): void {
-    const entities = world.getEntitiesWith('transform', 'physicsBody');
+    const renderables = world.getEntitiesWith('transform', 'renderable');
 
-    // 1. Отрисовка предметов на земле
-    for (const [id, { transform, physicsBody, item }] of entities) {
-      if (item) {
-        this.renderItemBody(id, transform, physicsBody.body.r, item, camera, selectedId, hoveredId);
+    // Сортировка по zIndex (от меньшего к большему)
+    renderables.sort((a, b) => a[1].renderable.zIndex - b[1].renderable.zIndex);
+
+    let attacksRendered = false;
+
+    for (const [id, { transform, renderable }] of renderables) {
+      if (!renderable.isVisible) continue;
+
+      // Отрисовка зон удара оружия перед живыми существами (zIndex >= 40)
+      if (!attacksRendered && renderable.zIndex >= 40) {
+        this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
+        attacksRendered = true;
       }
+
+      this.renderEntityPrimitives(id, transform, renderable, camera, selectedId, hoveredId);
     }
 
-    // 2. Отрисовка мертвых существ
-    for (const [id, comp] of entities) {
-      if (!comp.item && comp.healthStats && !this.isEntityAlive(world, id)) {
-        const radius = comp.physicsStats?.radius.current ?? comp.physicsBody.body.r;
-        const aiStats = world.getComponent(id, 'aiStats');
-        this.renderCreatureBody(id, comp.transform, radius, false, comp.meta, aiStats, camera, selectedId, gameMode, hoveredId);
-      }
+    if (!attacksRendered) {
+      this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
     }
 
-    // 3. Отрисовка атак оружия (под живыми существами)
-    this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
-
-    // 4. Отрисовка живых существ
-    for (const [id, comp] of entities) {
-      if (!comp.item && (!comp.healthStats || this.isEntityAlive(world, id))) {
-        const radius = comp.physicsStats?.radius.current ?? comp.physicsBody.body.r;
-        const aiStats = world.getComponent(id, 'aiStats');
-        this.renderCreatureBody(id, comp.transform, radius, true, comp.meta, aiStats, camera, selectedId, gameMode, hoveredId);
-      }
-    }
-
-    // 5. Отрисовка Гизмо (ТОЛЬКО В РЕЖИМЕ РЕДАКТОРА)
-    if (gameMode === 'editor') {
-      this.renderEditorGizmos(world, camera, selectedId, hoveredId);
-    }
-
-    // 6. Отрисовка Healthbars и ID-текстов
+    // Отрисовка Healthbars и ID-текстов
     this.renderUIOverlays(world.getEntitiesWith('transform', 'healthStats'), world, camera);
 
-    // 7. Отрисовка Hover-текстов для предметов
+    // Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
   }
 
-  // --- Вспомогательные методы рендеринга ---
+  private renderEntityPrimitives(
+    id: EntityId,
+    transform: TransformComponent,
+    renderable: RenderableComponent,
+    camera: Camera,
+    selectedId: EntityId | null,
+    hoveredId: EntityId | null
+  ): void {
+    this.ctx.save();
+    this.ctx.translate(transform.x, transform.y);
+    this.ctx.rotate(transform.angle);
+
+    for (const prim of renderable.primitives) {
+      this.drawPrimitive(prim, camera, transform.angle);
+    }
+
+    // Универсальная подсветка выбора и наведения
+    const isSelected = id === selectedId;
+    const isHovered = id === hoveredId;
+    if (isSelected || isHovered) {
+      const strokeColor = isSelected ? '#f1c40f' : 'rgba(241, 196, 15, 0.4)';
+      const lineWidth = 3 / camera.scale;
+      this.drawSelectionOutline(renderable.primitives[0], strokeColor, lineWidth);
+    }
+
+    this.ctx.restore();
+  }
+
+  private drawPrimitive(prim: RenderPrimitive, camera: Camera, angle: number): void {
+    switch (prim.kind) {
+      case 'circle': {
+        this.ctx.beginPath();
+        if (prim.dash) {
+          this.ctx.setLineDash(prim.dash.map((d) => d / camera.scale));
+        } else {
+          this.ctx.setLineDash([]);
+        }
+        this.ctx.arc(0, 0, prim.radius, 0, Math.PI * 2);
+        if (prim.fill) {
+          this.ctx.fillStyle = prim.fill;
+          this.ctx.fill();
+        }
+        if (prim.stroke) {
+          this.ctx.strokeStyle = prim.stroke;
+          this.ctx.lineWidth = (prim.strokeWidth ?? 1) / camera.scale;
+          this.ctx.stroke();
+        }
+        this.ctx.setLineDash([]);
+        break;
+      }
+      case 'rect': {
+        this.ctx.beginPath();
+        if (prim.dash) {
+          this.ctx.setLineDash(prim.dash.map((d) => d / camera.scale));
+        } else {
+          this.ctx.setLineDash([]);
+        }
+        if (prim.fill) {
+          this.ctx.fillStyle = prim.fill;
+          this.ctx.fillRect(-prim.width / 2, -prim.height / 2, prim.width, prim.height);
+        }
+        if (prim.stroke) {
+          this.ctx.strokeStyle = prim.stroke;
+          this.ctx.lineWidth = (prim.strokeWidth ?? 1) / camera.scale;
+          this.ctx.strokeRect(-prim.width / 2, -prim.height / 2, prim.width, prim.height);
+        }
+        this.ctx.setLineDash([]);
+        break;
+      }
+      case 'line': {
+        this.ctx.beginPath();
+        if (prim.dash) {
+          this.ctx.setLineDash(prim.dash.map((d) => d / camera.scale));
+        } else {
+          this.ctx.setLineDash([]);
+        }
+        this.ctx.moveTo(prim.from.x, prim.from.y);
+        this.ctx.lineTo(prim.to.x, prim.to.y);
+        this.ctx.strokeStyle = prim.stroke;
+        this.ctx.lineWidth = (prim.strokeWidth ?? 1) / camera.scale;
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+        break;
+      }
+      case 'arc': {
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, prim.radius, prim.startAngle, prim.endAngle);
+        if (prim.closed) this.ctx.closePath();
+        if (prim.fill) {
+          this.ctx.fillStyle = prim.fill;
+          this.ctx.fill();
+        }
+        if (prim.stroke) {
+          this.ctx.strokeStyle = prim.stroke;
+          this.ctx.lineWidth = (prim.strokeWidth ?? 1) / camera.scale;
+          this.ctx.stroke();
+        }
+        break;
+      }
+      case 'text': {
+        this.ctx.save();
+        if (prim.ignoreRotation && angle !== 0) {
+          this.ctx.rotate(-angle);
+        }
+        const offsetX = prim.offset?.x ?? 0;
+        const offsetY = prim.offset?.y ?? 0;
+        this.ctx.setLineDash([]);
+        this.ctx.font = prim.font ?? `${Math.max(10, 14 / camera.scale)}px sans-serif`;
+        this.ctx.textAlign = prim.align ?? 'center';
+        this.ctx.textBaseline = prim.baseline ?? 'middle';
+        this.ctx.fillStyle = prim.fill;
+        this.ctx.fillText(prim.text, offsetX, offsetY);
+        this.ctx.restore();
+        break;
+      }
+    }
+  }
+
+  private drawSelectionOutline(firstPrim: RenderPrimitive | undefined, strokeColor: string, lineWidth: number): void {
+    if (!firstPrim) return;
+
+    this.ctx.setLineDash([]);
+    this.ctx.strokeStyle = strokeColor;
+    this.ctx.lineWidth = lineWidth;
+
+    if (firstPrim.kind === 'circle') {
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, firstPrim.radius, 0, Math.PI * 2);
+      this.ctx.stroke();
+    } else if (firstPrim.kind === 'rect') {
+      this.ctx.strokeRect(-firstPrim.width / 2, -firstPrim.height / 2, firstPrim.width, firstPrim.height);
+    }
+  }
+
+  // --- Вспомогательные методы рендеринга боевых зон и оверлеев ---
 
   private isEntityAlive(world: World, id: EntityId): boolean {
     const healthComp = world.getComponent(id, 'health');
     const healthStats = world.getComponent(id, 'healthStats');
     const hp = healthStats?.hp.current ?? 0;
     return healthStats ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
-  }
-
-  private renderCreatureBody(
-    id: EntityId,
-    transform: any,
-    radius: number,
-    isAlive: boolean,
-    meta: any,
-    aiStats: any,
-    camera: Camera,
-    selectedId: EntityId | null,
-    gameMode: string,
-    hoveredId: EntityId | null
-  ): void {
-    this.ctx.save();
-    this.ctx.translate(transform.x, transform.y);
-
-    this.ctx.save();
-    this.ctx.rotate(transform.angle);
-
-    const state = meta?.state ?? 'idle';
-    let fillColor = '#34495e';
-    if (!isAlive) {
-      fillColor = '#7f8c8d';
-    } else {
-      switch (state) {
-        case 'idle': fillColor = '#34495e'; break;
-        case 'moving': fillColor = '#3498db'; break;
-        case 'running': fillColor = '#2ecc71'; break;
-        case 'crouching': fillColor = '#9b59b6'; break;
-        case 'attacking': fillColor = '#e67e22'; break;
-        case 'dead': fillColor = '#7f8c8d'; break;
-      }
-    }
-
-    this.ctx.beginPath();
-    this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    this.ctx.fillStyle = fillColor;
-    this.ctx.fill();
-
-    const behavior = aiStats?.behavior?.current ?? 'IdleTree';
-    let borderColor = behavior === 'PlayerTree' ? '#2980b9' : '#c0392b';
-    let lineWidth = 2 / camera.scale;
-
-    this.ctx.strokeStyle = borderColor;
-    this.ctx.lineWidth = lineWidth;
-    this.ctx.stroke();
-
-    if (id === selectedId) {
-      this.ctx.strokeStyle = '#f1c40f';
-      this.ctx.lineWidth = 3 / camera.scale;
-      this.ctx.stroke();
-    } else if (id === hoveredId) {
-      this.ctx.strokeStyle = 'rgba(241, 196, 15, 0.4)';
-      this.ctx.lineWidth = 3 / camera.scale;
-      this.ctx.stroke();
-    }
-
-    this.ctx.beginPath();
-    const arrowLen = radius;
-
-    this.ctx.moveTo(arrowLen, 0);
-    this.ctx.lineTo(0, -arrowLen);
-    this.ctx.moveTo(arrowLen, 0);
-    this.ctx.lineTo(0, arrowLen);
-    this.ctx.lineTo(0, -arrowLen);
-
-    this.ctx.strokeStyle = '#f1c40f';
-    this.ctx.lineWidth = 2 / camera.scale;
-    this.ctx.stroke();
-
-    this.ctx.restore();
-    this.ctx.restore();
-  }
-
-  private renderEditorGizmos(
-    world: World,
-    camera: Camera,
-    selectedId: EntityId | null,
-    hoveredId: EntityId | null
-  ): void {
-    const entities = world.getEntitiesWith('transform');
-  
-    for (const [id, comp] of entities) {
-      // Рисуем только то, что НЕ имеет физического тела (или явно помечено как gizmo)
-      const isIntangible = !comp.physicsBody && !comp.physicsStats;
-      if (!isIntangible && !comp.gizmo) continue;
-  
-      const { x, y } = comp.transform;
-      const isSelected = id === selectedId;
-      const isHovered = id === hoveredId;
-      const color = comp.gizmo?.color ?? '#9b59b6';
-      const icon = comp.gizmo?.icon ?? '📍';
-      const radius = (comp.gizmo?.radius ?? 14);
-  
-      this.ctx.save();
-      this.ctx.translate(x, y);
-  
-      // 1. Пунктирный контур круга
-      this.ctx.beginPath();
-      this.ctx.setLineDash([4 / camera.scale, 4 / camera.scale]);
-      this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      this.ctx.fillStyle = 'rgba(155, 89, 182, 0.15)';
-      this.ctx.fill();
-      this.ctx.lineWidth = 1.5 / camera.scale;
-      this.ctx.strokeStyle = color;
-      this.ctx.stroke();
-  
-      // 2. Подсветка при наведении или выделении
-      if (isSelected) {
-        this.ctx.setLineDash([]);
-        this.ctx.lineWidth = 2.5 / camera.scale;
-        this.ctx.strokeStyle = '#00e676';
-        this.ctx.stroke();
-      } else if (isHovered) {
-        this.ctx.setLineDash([]);
-        this.ctx.lineWidth = 2 / camera.scale;
-        this.ctx.strokeStyle = 'rgba(0, 230, 118, 0.5)';
-        this.ctx.stroke();
-      }
-  
-      // 3. Иконка по центру
-      this.ctx.setLineDash([]);
-      this.ctx.font = `${Math.max(10, 14 / camera.scale)}px sans-serif`;
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.fillText(icon, 0, 0);
-  
-      // 4. Подпись имени/типа под объектом
-      const label = comp.meta?.name ?? comp.gizmo?.type ?? id;
-      this.ctx.fillStyle = '#bbb';
-      this.ctx.font = `${Math.max(9, 10 / camera.scale)}px sans-serif`;
-      this.ctx.textBaseline = 'top';
-      this.ctx.fillText(label, 0, radius + 4 / camera.scale);
-  
-      this.ctx.restore();
-    }
-  }
-
-  private renderItemBody(
-    id: EntityId,
-    transform: any,
-    radius: number,
-    item: any,
-    camera: Camera,
-    selectedId: EntityId | null,
-    hoveredId: EntityId | null
-  ): void {
-    this.ctx.save();
-    this.ctx.translate(transform.x, transform.y);
-    this.ctx.rotate(transform.angle);
-    
-    const size = radius * 1.6;
-    
-    let color = '#7f8c8d';
-    if (item.type === 'weapon') color = '#f1c40f';
-    else if (item.type === 'armor') color = '#3498db';
-    else if (item.type === 'bag') color = '#2ecc71';
-    
-    this.ctx.fillStyle = color;
-    this.ctx.fillRect(-size / 2, -size / 2, size, size);
-    
-    const isSelected = selectedId === id;
-    const isHovered = hoveredId === id;
-    
-    if (isSelected) {
-       this.ctx.strokeStyle = '#e74c3c';
-       this.ctx.lineWidth = 3 / camera.scale;
-       this.ctx.strokeRect(-size / 2, -size / 2, size, size);
-    } else if (isHovered) {
-       this.ctx.strokeStyle = 'rgba(231, 76, 60, 0.4)';
-       this.ctx.lineWidth = 3 / camera.scale;
-       this.ctx.strokeRect(-size / 2, -size / 2, size, size);
-    }
-    
-    this.ctx.restore();
   }
 
   private renderWeaponAttacks(
