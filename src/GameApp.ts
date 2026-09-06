@@ -6,6 +6,7 @@ import { AttackSystem } from './ecs/systems/AttackSystem';
 import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
 import { RenderSyncSystem } from './ecs/systems/RenderSyncSystem';
+import { ZoneTriggerSystem } from './ecs/systems/ZoneTriggerSystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
 import { ObstacleSegment, Point } from './types';
@@ -28,6 +29,7 @@ export class GameApp {
   private damageSystem: DamageSystem;
   public aiSystem: AISystem;
   private renderSyncSystem: RenderSyncSystem;
+  private zoneTriggerSystem: ZoneTriggerSystem;
   public camera: Camera;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
@@ -56,6 +58,7 @@ export class GameApp {
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
     this.renderSyncSystem = new RenderSyncSystem();
+    this.zoneTriggerSystem = new ZoneTriggerSystem();
     this.camera = new Camera();
     this.entityFactory = new EntityFactory();
     this.serializer = new WorldSerializer(this);
@@ -148,6 +151,7 @@ export class GameApp {
       this.attackSystem.update(dt, this.world, this.physics);
       this.movementSystem.update(dt, this.world);
       this.stealthSystem.update(dt, this.world);
+      this.zoneTriggerSystem.update(dt, this.world);
       this.physics.update(dt, this.world);
       this.damageSystem.update(dt, this.world);
     }

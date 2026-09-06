@@ -133,6 +133,14 @@ export interface RenderableComponent {
   syncWithTransform?: boolean;
 }
 
+export type ZoneEffectType = 'damage' | 'heal';
+
+export interface ZoneTriggerComponent {
+  effect: ZoneEffectType;
+  valuePerSec: number;
+  radius: number;
+}
+
 export interface GizmoComponent {
   type: 'spawner' | 'waypoint' | 'trigger' | 'sound' | 'marker';
   color?: string;       // Цвет отрисовки в редакторе (например, '#e67e22')
@@ -243,6 +251,7 @@ export type ArmorStatsComponent = ComponentStats<ArmorCombatConfig>;
 export interface EntityComponents {
   tag?: TagComponent;
   renderable?: RenderableComponent;
+  zoneTrigger?: ZoneTriggerComponent;
   transform?: TransformComponent;
   physicsBody?: PhysicsBodyComponent;
   velocity?: VelocityComponent;
@@ -269,6 +278,7 @@ export interface EntityComponents {
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
   'tag',
   'renderable',
+  'zoneTrigger',
   'transform',
   'physicsStats',
   'healthStats',
@@ -354,6 +364,7 @@ export interface InventorySetup {
 export interface EntityConfig {
   tag?: TagComponent;
   renderable?: RenderableComponent;
+  zoneTrigger?: ZoneTriggerComponent;
   gizmo?: GizmoComponent;
   physics?: PhysicsConfig;
   health?: HealthConfig;

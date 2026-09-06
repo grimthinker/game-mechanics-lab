@@ -1,8 +1,8 @@
 import React from 'react';
-import { ItemData } from '../ecs/types';
-import { EntityStats } from '../types';
+import { World } from '../ecs/World';
 import { GameMode, THEME_COLORS, TOOL_GROUP_THEME_COLORS } from '../constants';
 import { BEHAVIOR_TREE_NAMES } from '../ai/trees_library';
+import { rad2Deg } from '../utils';
 
 interface ToolbarProps {
   mode: GameMode;
@@ -12,7 +12,8 @@ interface ToolbarProps {
   obstaclesEnabled: boolean;
   setObstaclesEnabled: (val: boolean) => void;
   setObstaclesData: (data: any[]) => void;
-  selectedStats: EntityStats | null;
+  selectedEntityId: string | null;
+  world: World | null | undefined;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   worldFileInputRef: React.RefObject<HTMLInputElement | null>;
   onNewWorld: () => void;
@@ -20,9 +21,8 @@ interface ToolbarProps {
   onLoadWorldFile: (file: File) => void;
   openSpawnModal: (behavior?: string) => void;
   openItemSpawnModal: () => void;
-  openEditModal: () => void;
+  openEditModal: (entityId?: string) => void;
   handleDeleteEntity: () => void;
-  openItemEditModal: (entityId: string) => void;
   isPaused: boolean;
 }
 
@@ -34,7 +34,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   obstaclesEnabled,
   setObstaclesEnabled,
   setObstaclesData,
-  selectedStats,
+  selectedEntityId,
+  world,
   fileInputRef,
   worldFileInputRef,
   onNewWorld,
@@ -44,7 +45,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   openItemSpawnModal,
   openEditModal,
   handleDeleteEntity,
-  openItemEditModal,
   isPaused,
 }) => {
   const getSlotTypeName = (type: string) => {
@@ -60,21 +60,36 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     }
   };
 
-  const isItem = !!selectedStats?.itemData;
-  const isCreature =
-    !!selectedStats &&
-    !isItem &&
-    (selectedStats.maxHp > 0 ||
-      selectedStats.maxSpeed > 0 ||
-      selectedStats.equipSlots.length > 0 ||
-      selectedStats.behavior !== 'IdleTree');
-  const isMarker = !!selectedStats && !isItem && !isCreature;
+  const tag = selectedEntityId && world ? world.getComponent(selectedEntityId, 'tag') : undefined;
+  const meta = selectedEntityId && world ? world.getComponent(selectedEntityId, 'meta') : undefined;
+  const item = selectedEntityId && world ? world.getComponent(selectedEntityId, 'item') : undefined;
+  const healthStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'healthStats') : undefined;
+  const physicsStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'physicsStats') : undefined;
+  const movementStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'movementStats') : undefined;
+  const velocity = selectedEntityId && world ? world.getComponent(selectedEntityId, 'velocity') : undefined;
+  const stealthStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'stealthStats') : undefined;
+  const aiStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'aiStats') : undefined;
+  const zoneTrigger = selectedEntityId && world ? world.getComponent(selectedEntityId, 'zoneTrigger') : undefined;
+  const weaponStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'weaponStats') : undefined;
+  const armorStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'armorStats') : undefined;
+  const inventory = selectedEntityId && world ? world.getComponent(selectedEntityId, 'inventory') : undefined;
+  const equip = selectedEntityId && world ? world.getComponent(selectedEntityId, 'equip') : undefined;
 
   const getCardTitle = () => {
-    if (isItem) return 'Выбранный предмет';
-    if (isCreature) return 'Выбранное существо';
-    if (isMarker) return 'Служебный объект';
-    return 'Выбранный объект';
+    switch (tag?.archetype) {
+      case 'creature':
+        return 'Выбранное существо';
+      case 'item':
+        return `Выбранный предмет (${item?.type ? getSlotTypeName(item.type) : ''})`;
+      case 'marker':
+        return 'Служебный объект (Маркер)';
+      case 'zone':
+        return 'Триггерная зона';
+      case 'projectile':
+        return 'Снаряд';
+      default:
+        return 'Выбранный объект';
+    }
   };
 
   return (
@@ -209,69 +224,207 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>{getCardTitle()}</h3>
-        {isItem && selectedStats?.itemData ? (
+        <h3>{selectedEntityId ? getCardTitle() : 'Выбранный объект'}</h3>
+        {selectedEntityId && world ? (
           <div className="stats-list">
             <dl className="stats-list">
-              <div className="stat-row">
-                <dt>Тип:</dt>
-                <dd>Предмет ({getSlotTypeName(selectedStats.itemData.type)})</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Название:</dt>
-                <dd>{selectedStats.itemData.name}</dd>
-              </div>
-              {selectedStats.itemData.type === 'weapon' && selectedStats.weaponStats && (
+              {meta && (
+                <div className="stat-row">
+                  <dt>Название:</dt>
+                  <dd>{meta.name}</dd>
+                </div>
+              )}
+              {item && !meta && (
+                <div className="stat-row">
+                  <dt>Название:</dt>
+                  <dd>{item.name}</dd>
+                </div>
+              )}
+              {meta?.state && (
+                <div className="stat-row">
+                  <dt>Состояние:</dt>
+                  <dd>{meta.state}</dd>
+                </div>
+              )}
+              {aiStats && (
+                <div className="stat-row">
+                  <dt>Поведение:</dt>
+                  <dd>{BEHAVIOR_TREE_NAMES[aiStats.behavior.current] ?? aiStats.behavior.current}</dd>
+                </div>
+              )}
+              {zoneTrigger && (
                 <>
                   <div className="stat-row">
-                    <dt>Урон:</dt>
-                    <dd>{selectedStats.weaponStats.baseDamage.current}</dd>
+                    <dt>Тип эффекта:</dt>
+                    <dd>{zoneTrigger.effect === 'damage' ? 'Урон' : 'Лечение'}</dd>
                   </div>
                   <div className="stat-row">
-                    <dt>Вес:</dt>
-                    <dd>{selectedStats.weight}</dd>
+                    <dt>Сила эффекта:</dt>
+                    <dd>{zoneTrigger.valuePerSec} HP/с</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Радиус зоны:</dt>
+                    <dd>{zoneTrigger.radius} px</dd>
                   </div>
                 </>
               )}
-              {selectedStats.itemData.type === 'armor' && selectedStats.armorStats && (
+              {healthStats && (
+                <div className="stat-row">
+                  <dt>Здоровье (HP):</dt>
+                  <dd>
+                    {Math.round(healthStats.hp.current)} / {healthStats.maxHp.current}
+                  </dd>
+                </div>
+              )}
+              {physicsStats && (
+                <>
+                  <div className="stat-row">
+                    <dt>Радиус:</dt>
+                    <dd>{physicsStats.radius.current} px</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Масса (Вес):</dt>
+                    <dd>{physicsStats.weight.current}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Коллизия:</dt>
+                    <dd>{physicsStats.isSolid.current ? 'Да' : 'Нет'}</dd>
+                  </div>
+                </>
+              )}
+              {movementStats && (
+                <>
+                  <div className="stat-row">
+                    <dt>Текущая скорость:</dt>
+                    <dd>{(velocity?.currentSpeed ?? 0).toFixed(0)} px/с</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Текущий поворот:</dt>
+                    <dd>{rad2Deg(velocity?.currentTurnSpeed ?? 0).toFixed(0)} °/с</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Макс. скорость:</dt>
+                    <dd>{movementStats.maxSpeed.current} px/с</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Макс. поворот:</dt>
+                    <dd>{Math.round(rad2Deg(movementStats.maxTurnSpeed.current))} °/с</dd>
+                  </div>
+                </>
+              )}
+              {stealthStats && (
+                <>
+                  <div className="stat-row">
+                    <dt>Скрытность:</dt>
+                    <dd>{stealthStats.stealthPower.current}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Скрытность (присяд):</dt>
+                    <dd>x{stealthStats.crouchStealthMultiplier.current}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Скрытность (бег):</dt>
+                    <dd>x{stealthStats.runStealthMultiplier.current}</dd>
+                  </div>
+                </>
+              )}
+              {weaponStats && (
+                <>
+                  <div className="stat-row">
+                    <dt>Базовый урон:</dt>
+                    <dd>{weaponStats.baseDamage.current}</dd>
+                  </div>
+                  <div className="stat-row">
+                    <dt>Подготовка / Восст.:</dt>
+                    <dd>
+                      {weaponStats.prepTime.current}с / {weaponStats.recoveryTime.current}с
+                    </dd>
+                  </div>
+                </>
+              )}
+              {armorStats && (
                 <>
                   <div className="stat-row">
                     <dt>Защита:</dt>
-                    <dd>{selectedStats.armorStats.defense.current}</dd>
+                    <dd>{armorStats.defense.current}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Поглощение:</dt>
-                    <dd>{selectedStats.armorStats.flatReduction.current}</dd>
-                  </div>
-                  <div className="stat-row">
-                    <dt>Вес:</dt>
-                    <dd>{selectedStats.weight}</dd>
+                    <dd>{armorStats.flatReduction.current}</dd>
                   </div>
                 </>
               )}
-              {selectedStats.itemData.type === 'bag' && selectedStats.inventory && (
-                <>
-                  <div className="stat-row">
-                    <dt>Размер:</dt>
-                    <dd>
-                      {selectedStats.inventory.size.width}x
-                      {selectedStats.inventory.size.height}
-                    </dd>
-                  </div>
-                  <div className="stat-row">
-                    <dt>Вес:</dt>
-                    <dd>{selectedStats.weight}</dd>
-                  </div>
-                </>
+              {inventory && (
+                <div className="stat-row">
+                  <dt>Размер инвентаря:</dt>
+                  <dd>
+                    {inventory.size.width}x{inventory.size.height}
+                  </dd>
+                </div>
               )}
             </dl>
+
+            {equip && equip.slots.length > 0 && (
+              <>
+                <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                  {equip.slots.map((slot, index) => {
+                    const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
+                    const slotWeapon = slot.itemId ? world.getComponent(slot.itemId, 'weaponStats') : null;
+                    const slotArmor = slot.itemId ? world.getComponent(slot.itemId, 'armorStats') : null;
+                    const slotInv = slot.itemId ? world.getComponent(slot.itemId, 'inventory') : null;
+
+                    return (
+                      <div
+                        key={`${slot.type}_${index}`}
+                        onClick={() => {
+                          if (slot.itemId) openEditModal(slot.itemId);
+                        }}
+                        style={{
+                          backgroundColor: '#1e1e1e',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          cursor: slot.itemId ? 'pointer' : 'default',
+                          fontSize: '12px',
+                          border: '1px solid #444',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
+                        <span>
+                          {slotItem ? slotItem.name : 'Пусто'}
+                          {slotWeapon && (
+                            <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
+                              ({slotWeapon.baseDamage.current} урона)
+                            </span>
+                          )}
+                          {slotArmor && (
+                            <span style={{ color: '#3498db', marginLeft: '6px' }}>
+                              ({slotArmor.defense.current} защиты)
+                            </span>
+                          )}
+                          {slotInv && (
+                            <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
+                              ({slotInv.size.width}x{slotInv.size.height})
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
             <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
               {mode === GameMode.EDITOR && (
                 <>
                   <button
                     className="btn btn-primary"
                     style={{ flex: 1 }}
-                    onClick={() => openItemEditModal(selectedStats.id)}
+                    onClick={() => openEditModal(selectedEntityId)}
                   >
                     Изменить
                   </button>
@@ -286,161 +439,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               )}
               {mode === GameMode.SIMULATION && (
                 <button
-                className="btn btn-primary"
-                style={{ flex: 1 }}
-                onClick={() => openItemEditModal(selectedStats.id)}
-              >
-                Осмотреть
-              </button>
-              )}
-            </div>
-          </div>
-        ) : isCreature && selectedStats ? (
-          <div className="stats-list">
-            <dl className="stats-list">
-              <div className="stat-row">
-                <dt>Поведение:</dt>
-                <dd>{BEHAVIOR_TREE_NAMES[selectedStats.behavior] || selectedStats.behavior}</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Состояние:</dt>
-                <dd>{selectedStats.state}</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Радиус:</dt>
-                <dd>{selectedStats.radius} px</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Масса (Вес):</dt>
-                <dd>{selectedStats.weight}</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Здоровье (HP):</dt>
-                <dd>
-                  {selectedStats.hp} / {selectedStats.maxHp}
-                </dd>
-              </div>
-              <div className="stat-row">
-                <dt>Текущая скорость:</dt>
-                <dd>{selectedStats.currentSpeed.toFixed(0)} px/с</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Текущий поворот:</dt>
-                <dd>{selectedStats.currentTurnSpeed.toFixed(0)} °/с</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Макс. скорость:</dt>
-                <dd>{selectedStats.maxSpeed} px/с</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Макс. поворот:</dt>
-                <dd>{selectedStats.maxTurnSpeed} °/с</dd>
-              </div>
-            </dl>
-
-            {selectedStats.equipSlots.length > 0 && (
-              <>
-                <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-                  {selectedStats.equipSlots.map((slot, index) => {
-                    const item = slot.item;
-                    const hasEditableItem = !!item && !!slot.itemId;
-                    const isWeapon = item?.type === 'weapon';
-                    const isArmor = item?.type === 'armor';
-                    const isBag = item?.type === 'bag';
-
-                    return (
-                      <div
-                        key={`${slot.type}_${index}`}
-                        onClick={() => {
-                          if (hasEditableItem && slot.itemId) openItemEditModal(slot.itemId);
-                        }}
-                        style={{
-                          backgroundColor: '#1e1e1e',
-                          padding: '6px 8px',
-                          borderRadius: '4px',
-                          cursor: hasEditableItem ? 'pointer' : 'default',
-                          fontSize: '12px',
-                          border: '1px solid #444',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
-                        <span>
-                          {item ? item.name : 'Пусто'}
-                          {isWeapon && slot.weaponStats && (
-                            <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
-                              ({slot.weaponStats.baseDamage.current} урона)
-                            </span>
-                          )}
-                          {isArmor && slot.armorStats && (
-                            <span style={{ color: '#3498db', marginLeft: '6px' }}>
-                              ({slot.armorStats.defense.current} защиты)
-                            </span>
-                          )}
-                          {isBag && slot.inventory && (
-                            <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
-                              ({slot.inventory.size.width}x{slot.inventory.size.height})
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              {mode === GameMode.EDITOR && (
-                <>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
-                    Изменить
-                  </button>
-                  <button className="btn" style={{ flex: 1, backgroundColor: '#c0392b' }} onClick={handleDeleteEntity}>
-                    Удалить
-                  </button>
-                </>
-              )}
-              {mode === GameMode.SIMULATION && (
-                <button className="btn btn-primary" style={{ flex: 1 }} onClick={openEditModal}>
-                  Осмотреть
-                </button>
-              )}
-            </div>
-          </div>
-        ) : isMarker && selectedStats ? (
-          <div className="stats-list">
-            <dl className="stats-list">
-              <div className="stat-row">
-                <dt>Тип:</dt>
-                <dd>Служебный объект (Маркер)</dd>
-              </div>
-              <div className="stat-row">
-                <dt>ID:</dt>
-                <dd style={{ wordBreak: 'break-all' }}>{selectedStats.id}</dd>
-              </div>
-              <div className="stat-row">
-                <dt>Состояние:</dt>
-                <dd>{selectedStats.state}</dd>
-              </div>
-              {selectedStats.radius > 0 && (
-                <div className="stat-row">
-                  <dt>Радиус зоны:</dt>
-                  <dd>{selectedStats.radius} px</dd>
-                </div>
-              )}
-            </dl>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-              {mode === GameMode.EDITOR && (
-                <button
-                  className="btn"
-                  style={{ flex: 1, backgroundColor: '#c0392b' }}
-                  onClick={handleDeleteEntity}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                  onClick={() => openEditModal(selectedEntityId)}
                 >
-                  Удалить
+                  Осмотреть
                 </button>
               )}
             </div>

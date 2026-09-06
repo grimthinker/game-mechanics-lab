@@ -27,8 +27,7 @@ export const useGlobalShortcuts = ({
 
       // Обработка Esc и Enter для модалок
       if (e.key === 'Escape' || e.code === 'Escape') {
-        if (modals.selectedItemEntityId) modals.closeItemEditModal();
-        else if (modals.isEditModalOpen) modals.closeEditModal();
+        if (modals.isEditModalOpen) modals.closeEditModal();
         else if (modals.isModalOpen) modals.closeSpawnModal();
         else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
         return;
@@ -38,15 +37,12 @@ export const useGlobalShortcuts = ({
         if (modals.isModalOpen) {
           e.preventDefault();
           handleSpawnConfirm();
-        } else if (modals.isEditModalOpen) {
-          e.preventDefault();
-          modals.handleEditConfirm();
         }
         return;
       }
 
       // Если открыта любая модалка, блокируем остальные хоткеи
-      if (modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isEditModalOpen || modals.selectedItemEntityId) {
+      if (modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isEditModalOpen) {
         return;
       }
 

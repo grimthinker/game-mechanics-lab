@@ -1,5 +1,4 @@
 export * from './SpawnModal';
-export * from './CreatureEditModal';
-export * from './ItemEditModal';
+export * from './UniversalEditModal';
 export * from './BTNodeModal';
 export * from './ItemSpawnModal';

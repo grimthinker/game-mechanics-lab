@@ -5,14 +5,15 @@ import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { createDefaultCreatureConfig } from './Creature';
+import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, rad2Deg } from './utils';
 import { serializeBTNode } from './ai/serializer';
-import { SpawnModal, CreatureEditModal, ItemSpawnModal, ItemEditModal } from './components/modals';
+import { SpawnModal, UniversalEditModal, ItemSpawnModal } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
-import { PlacementMode, EntityStats } from './types';
+import { PlacementMode } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { GameMode } from './constants';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -34,7 +35,8 @@ export const App: React.FC = () => {
   }, []);
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
-  const [selectedStats, setSelectedStats] = useState<EntityStats | null>(null);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [, setFrameTick] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
 
@@ -84,40 +86,12 @@ export const App: React.FC = () => {
       }
     }
 
-    const targetId = app.selectedEntity?.id;
+    const targetId = app.selectedEntity?.id ?? null;
+    setSelectedEntityId(targetId);
+    setFrameTick((t) => (t + 1) % 1000);
 
     if (targetId) {
       const c = new EntityAdapter(targetId, app.world);
-      const eq = c.equip;
-
-      setSelectedStats({
-        id: c.id,
-        name: app.world.getComponent(c.id, 'meta')?.name ?? c.itemData?.name,
-        behavior: c.behavior,
-        radius: c.radius,
-        weight: c.weight,
-        currentSpeed: c.currentSpeed,
-        currentTurnSpeed: rad2Deg(c.currentTurnSpeed),
-        maxSpeed: c.maxSpeed,
-        maxTurnSpeed: rad2Deg(c.maxTurnSpeed),
-        hp: c.hp,
-        maxHp: c.maxHp,
-        state: c.state,
-        equipSlots: eq ? eq.slots.map((s) => ({
-          type: s.type,
-          itemId: s.itemId,
-          item: s.itemId ? (app.world.getComponent(s.itemId, 'item') ?? null) : null,
-          weaponStats: s.itemId ? (app.world.getComponent(s.itemId, 'weaponStats') ?? null) : null,
-          armorStats: s.itemId ? (app.world.getComponent(s.itemId, 'armorStats') ?? null) : null,
-          inventory: s.itemId ? (app.world.getComponent(s.itemId, 'inventory') ?? null) : null,
-        })) : [],
-        itemData: c.itemData ? JSON.parse(JSON.stringify(c.itemData)) : undefined,
-        weaponStats: c.weaponStats,
-        weaponZone: c.weaponZone,
-        armorStats: c.armorStats,
-        inventory: c.inventory,
-      });
-
       const isEntityChanged = targetId !== lastSelectedEntityIdRef.current;
       lastSelectedEntityIdRef.current = targetId;
 
@@ -131,18 +105,13 @@ export const App: React.FC = () => {
       }
     } else {
       lastSelectedEntityIdRef.current = null;
-      setSelectedStats(null);
       setBtData(null);
       setBtBlackboard(null);
     }
   }, [setModeSync]);
 
   const { syncPlayerControls } = useKeyboardControls({
-    isModalOpen:
-      modals.isModalOpen ||
-      modals.isItemSpawnModalOpen ||
-      !!modals.selectedItemEntityId ||
-      isPaused,
+    isModalOpen: modals.isModalOpen || modals.isItemSpawnModalOpen || isPaused,
     isEditModalOpen: modals.isEditModalOpen,
     mode,
   });
@@ -173,6 +142,11 @@ export const App: React.FC = () => {
       y: 100 + Math.random() * Math.max(0, canvasRef.current.height - 200),
     };
     app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+
+    // Спавним рядом с игроком зону урона и зону лечения
+    app.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 160, y: spawnPos.y });
+    app.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 160, y: spawnPos.y });
+
     updateStats();
 
     return () => {
@@ -285,13 +259,6 @@ export const App: React.FC = () => {
     handleSpawnConfirm,
     setShowBTPanel
   });
-  
-  const selectedItemEntityId = modals.selectedItemEntityId;
-  const bagInventory = selectedItemEntityId ? appRef.current?.world.getComponent(selectedItemEntityId, 'inventory') : undefined;
-
-  const isBagInventoryEmpty =
-    !bagInventory ||
-    bagInventory.slots.every((row) => row.every((cell) => !cell.itemId));
 
   const isReadOnly = mode !== GameMode.EDITOR;
 
@@ -356,12 +323,24 @@ export const App: React.FC = () => {
           appRef.current?.physics.setObstaclesEnabled(val);
         }}
         setObstaclesData={(data) => appRef.current?.loadObstaclesFromData(data)}
-        selectedStats={selectedStats}
+        selectedEntityId={selectedEntityId}
+        world={appRef.current?.world}
         fileInputRef={fileInputRef}
         worldFileInputRef={worldFileInputRef}
         onNewWorld={() => {
           setSnapshot(null);
-          appRef.current?.clearWorld();
+          const app = appRef.current;
+          if (app) {
+            app.clearWorld();
+            const canvas = canvasRef.current;
+            const spawnPos = {
+              x: canvas ? canvas.width / 2 : 300,
+              y: canvas ? canvas.height / 2 : 300,
+            };
+            app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+            app.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 160, y: spawnPos.y });
+            app.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 160, y: spawnPos.y });
+          }
           syncPlayerControls();
           updateStats();
         }}
@@ -399,7 +378,6 @@ export const App: React.FC = () => {
         openItemSpawnModal={modals.openItemSpawnModal}
         openEditModal={modals.openEditModal}
         handleDeleteEntity={handleDeleteEntity}
-        openItemEditModal={modals.openItemEditModal}
         isPaused={isPaused}
       />
 
@@ -441,61 +419,19 @@ export const App: React.FC = () => {
         onConfirm={handleItemSpawnConfirm}
       />
 
-<CreatureEditModal
+      <UniversalEditModal
         isOpen={modals.isEditModalOpen}
-        isReadOnly={isReadOnly}
-        editBehavior={modals.editBehavior}
-        setEditBehavior={modals.setEditBehavior}
-        editIsSolid={modals.editIsSolid}
-        setEditIsSolid={modals.setEditIsSolid}
-        editRadius={modals.editRadius}
-        setEditRadius={modals.setEditRadius}
-        editBaseRadius={modals.editBaseRadius}
-        setEditBaseRadius={modals.setEditBaseRadius}
-        editWeight={modals.editWeight}
-        setEditWeight={modals.setEditWeight}
-        editBaseWeight={modals.editBaseWeight}
-        setEditBaseWeight={modals.setEditBaseWeight}
-        editHp={modals.editHp}
-        setEditHp={modals.setEditHp}
-        editMaxHp={modals.editMaxHp}
-        setEditMaxHp={modals.setEditMaxHp}
-        editMaxSpeed={modals.editMaxSpeed}
-        setEditMaxSpeed={modals.setEditMaxSpeed}
-        editMaxTurnSpeed={modals.editMaxTurnSpeed}
-        setEditMaxTurnSpeed={modals.setEditMaxTurnSpeed}
-        editRunSpeedMultiplier={modals.editRunSpeedMultiplier}
-        setEditRunSpeedMultiplier={modals.setEditRunSpeedMultiplier}
-        editCrouchSpeedMultiplier={modals.editCrouchSpeedMultiplier}
-        setEditCrouchSpeedMultiplier={modals.setEditCrouchSpeedMultiplier}
-        editCrouchStealthMultiplier={modals.editCrouchStealthMultiplier}
-        setEditCrouchStealthMultiplier={modals.setEditCrouchStealthMultiplier}
-        editRunTurnMultiplier={modals.editRunTurnMultiplier}
-        setEditRunTurnMultiplier={modals.setEditRunTurnMultiplier}
-        editCrouchTurnMultiplier={modals.editCrouchTurnMultiplier}
-        setEditCrouchTurnMultiplier={modals.setEditCrouchTurnMultiplier}
-        editStealthPower={modals.editStealthPower}
-        setEditStealthPower={modals.setEditStealthPower}
-        editRunStealthMultiplier={modals.editRunStealthMultiplier}
-        setEditRunStealthMultiplier={modals.setEditRunStealthMultiplier}
-        onClose={modals.closeEditModal}
-        onConfirm={modals.handleEditConfirm}
-      />
-
-      <ItemEditModal
-        itemEntityId={modals.selectedItemEntityId}
+        entityId={modals.editingEntityId}
         world={appRef.current?.world}
+        physics={appRef.current?.physics}
+        aiSystem={appRef.current?.aiSystem}
         isReadOnly={isReadOnly}
-        isBagInventoryEmpty={isBagInventoryEmpty}
-        inventorySlots={bagInventory?.slots.map((row) => row.map((cell) => ({
-          itemId: cell.itemId,
-          count: cell.count,
-          item: cell.itemId ? (appRef.current?.world.getComponent(cell.itemId, 'item') ?? null) : null
-        })))}
-        inventorySize={bagInventory?.size}
-        onItemClick={modals.openItemEditModal}
-        onClose={modals.closeItemEditModal}
-        onConfirm={modals.handleItemEditConfirm}
+        onClose={modals.closeEditModal}
+        onConfirm={() => {
+          modals.closeEditModal();
+          updateStats();
+        }}
+        onInspectItem={(itemId) => modals.openEditModal(itemId)}
       />
     </div>
   );

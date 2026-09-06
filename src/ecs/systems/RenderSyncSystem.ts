@@ -16,7 +16,16 @@ export class RenderSyncSystem {
         continue;
       }
 
-      // 2. Синхронизация визуального состояния существ
+      // 2. Синхронизация триггерных зон
+      if (archetype === 'zone') {
+        const zoneTrigger = world.getComponent(id, 'zoneTrigger');
+        if (zoneTrigger && renderable.primitives[0]?.kind === 'circle') {
+          (renderable.primitives[0] as RenderCirclePrimitive).radius = zoneTrigger.radius;
+        }
+        continue;
+      }
+
+      // 3. Синхронизация визуального состояния существ
       if (archetype === 'creature') {
         const healthStats = world.getComponent(id, 'healthStats');
         const health = world.getComponent(id, 'health');

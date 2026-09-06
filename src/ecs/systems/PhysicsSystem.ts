@@ -224,6 +224,13 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
       const id2 = this.bodyToEntityMap.get(c2);
       if (!id1 || !id2) return;
 
+      const p1 = world.getComponent(id1, 'physicsBody');
+      const p2 = world.getComponent(id2, 'physicsBody');
+      if (!p1 || !p2) return;
+
+      // Триггеры и сенсоры не должны физически выталкивать объекты
+      if (p1.isTrigger || p2.isTrigger) return;
+
       const health1 = world.getComponent(id1, 'health');
       const healthStats1 = world.getComponent(id1, 'healthStats');
       const valid1 = healthStats1 ? (health1?.isAlive && healthStats1.hp.current > 0) : true;
@@ -233,10 +240,6 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
       const valid2 = healthStats2 ? (health2?.isAlive && healthStats2.hp.current > 0) : true;
 
       if (!valid1 || !valid2) return;
-
-      const p1 = world.getComponent(id1, 'physicsBody');
-      const p2 = world.getComponent(id2, 'physicsBody');
-      if (!p1 || !p2) return;
 
       const p1Stats = world.getComponent(id1, 'physicsStats');
       const weight1 = p1Stats?.weight.current ?? 1;
