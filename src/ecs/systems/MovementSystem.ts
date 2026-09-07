@@ -1,6 +1,6 @@
 import { Radians } from '../../utils';
 import { World } from '../World';
-import { ModifierType } from '../types';
+import { CreatureMovementMode, CreatureStance, ModifierType } from '../types';
 import { addModifier, removeModifier } from '../stats/StatEvaluator';
 import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
 
@@ -25,46 +25,83 @@ export class MovementSystem {
           velocity.currentSpeed = 0;
           velocity.currentTurnSpeed = 0 as Radians;
         }
+        removeModifier(movementStats.maxSpeed, 'stance_crouch_speed');
+        removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
+        removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
+        removeModifier(movementStats.maxSpeed, 'attack_slow_move');
+        removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
         continue;
       }
 
-      // 1. Модификаторы состояний бега и присяда
-      if (input.isRunning) {
-        addModifier(movementStats.maxSpeed, {
-          id: 'state_run_speed',
-          type: ModifierType.PERCENT_MULT,
-          value: movementStats.runSpeedMultiplier,
-        });
-        removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
+      // 1. Положение существа (Stance)
+      const stance: CreatureStance = input.isCrouching ? 'crouching' : 'standing';
 
-        addModifier(movementStats.maxTurnSpeed, {
-          id: 'state_run_turn',
-          type: ModifierType.PERCENT_MULT,
-          value: movementStats.runTurnMultiplier,
-        });
-        removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
-      } else if (input.isCrouching) {
+      if (stance === 'crouching') {
         addModifier(movementStats.maxSpeed, {
-          id: 'state_crouch_speed',
+          id: 'stance_crouch_speed',
           type: ModifierType.PERCENT_MULT,
           value: movementStats.crouchSpeedMultiplier,
         });
-        removeModifier(movementStats.maxSpeed, 'state_run_speed');
-
         addModifier(movementStats.maxTurnSpeed, {
-          id: 'state_crouch_turn',
+          id: 'stance_crouch_turn',
           type: ModifierType.PERCENT_MULT,
           value: movementStats.crouchTurnMultiplier,
         });
-        removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
       } else {
-        removeModifier(movementStats.maxSpeed, 'state_run_speed');
-        removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
-        removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
-        removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
+        removeModifier(movementStats.maxSpeed, 'stance_crouch_speed');
+        removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
       }
 
-      // 2. Модификаторы замедления от активных атак оружия
+      // 2. Определение вида движения (Movement Mode) с приоритетом: LShift (спринт) > X (ходьба)
+      let movementMode: CreatureMovementMode = 'immobile';
+
+      if (activeAttacks.attacks.length > 0) {
+        movementMode = 'attacking';
+      } else if (input.isMovingForward) {
+        if (input.isRunning) {
+          movementMode = 'sprinting';
+        } else if (input.isSlowWalking) {
+          movementMode = 'walking';
+        } else {
+          movementMode = 'jogging';
+        }
+      } else if (input.turnDirection !== 0) {
+        movementMode = 'turning';
+      } else {
+        movementMode = 'immobile';
+      }
+
+      // 3. Модификаторы скорости и поворота от вида движения
+      if (movementMode === 'sprinting') {
+        addModifier(movementStats.maxSpeed, {
+          id: 'mode_sprint_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.runSpeedMultiplier,
+        });
+        removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
+
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'mode_sprint_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.runTurnMultiplier,
+        });
+      } else if (movementMode === 'walking') {
+        addModifier(movementStats.maxSpeed, {
+          id: 'mode_walk_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.walkSpeedMultiplier,
+        });
+        removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+      } else {
+        removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
+        removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+      }
+
+      // 4. Модификаторы замедления от активных атак оружия
       let moveSlow = 1;
       let turnSlow = 1;
       for (const atk of activeAttacks.attacks) {
@@ -131,17 +168,8 @@ export class MovementSystem {
       }
 
       // 6. Обновление состояния сущности
-      if (activeAttacks.attacks.length > 0) {
-        meta.state = 'attacking';
-      } else if (input.isRunning && (input.isMovingForward || input.turnDirection !== 0)) {
-        meta.state = 'running';
-      } else if (input.isCrouching && (input.isMovingForward || input.turnDirection !== 0)) {
-        meta.state = 'crouching';
-      } else if (input.isMovingForward || input.turnDirection !== 0) {
-        meta.state = 'moving';
-      } else {
-        meta.state = 'idle';
-      }
+      meta.stance = stance;
+      meta.movementMode = movementMode;
     }
   }
 }

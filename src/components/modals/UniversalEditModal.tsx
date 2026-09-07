@@ -107,6 +107,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             maxTurnSpeed: Math.round(rad2Deg(moveStats.maxTurnSpeed.base)) as Degrees,
             runSpeedMultiplier: Math.round(moveStats.runSpeedMultiplier * 100) / 100,
             crouchSpeedMultiplier: Math.round(moveStats.crouchSpeedMultiplier * 100) / 100,
+            walkSpeedMultiplier: Math.round((moveStats.walkSpeedMultiplier ?? 0.5) * 100) / 100,
             runTurnMultiplier: Math.round(moveStats.runTurnMultiplier * 100) / 100,
             crouchTurnMultiplier: Math.round(moveStats.crouchTurnMultiplier * 100) / 100,
           }
@@ -120,6 +121,12 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             stealthPower: Math.round(stealthStats.stealthPower.base),
             crouchStealthMultiplier: Math.round(stealthStats.crouchStealthMultiplier * 100) / 100,
             runStealthMultiplier: Math.round(stealthStats.runStealthMultiplier * 100) / 100,
+            walkStealthMultiplier:
+              Math.round((stealthStats.walkStealthMultiplier ?? 1.3) * 100) / 100,
+            turnInPlaceStealthMultiplier:
+              Math.round((stealthStats.turnInPlaceStealthMultiplier ?? 1.5) * 100) / 100,
+            immobileStealthMultiplier:
+              Math.round((stealthStats.immobileStealthMultiplier ?? 2.0) * 100) / 100,
           }
         : null
     );
@@ -271,8 +278,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
         } else {
           health.isAlive = true;
           const meta = world.getComponent(entityId, 'meta');
-          if (meta && meta.state === 'dead') {
-            meta.state = 'idle';
+          if (meta && meta.movementMode === 'dead') {
+            meta.movementMode = 'immobile';
           }
         }
       }
@@ -291,6 +298,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           Math.round(Math.max(0.1, draftMovement.runSpeedMultiplier) * 100) / 100;
         moveStats.crouchSpeedMultiplier =
           Math.round(Math.max(0.1, draftMovement.crouchSpeedMultiplier) * 100) / 100;
+        moveStats.walkSpeedMultiplier =
+          Math.round(Math.max(0.1, draftMovement.walkSpeedMultiplier ?? 0.5) * 100) / 100;
         moveStats.runTurnMultiplier =
           Math.round(Math.max(0.1, draftMovement.runTurnMultiplier) * 100) / 100;
         moveStats.crouchTurnMultiplier =
@@ -307,6 +316,12 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           Math.round(Math.max(1, draftStealth.crouchStealthMultiplier) * 100) / 100;
         stealthStats.runStealthMultiplier =
           Math.round(Math.max(0, draftStealth.runStealthMultiplier) * 100) / 100;
+        stealthStats.walkStealthMultiplier =
+          Math.round(Math.max(0, draftStealth.walkStealthMultiplier ?? 1.3) * 100) / 100;
+        stealthStats.turnInPlaceStealthMultiplier =
+          Math.round(Math.max(0, draftStealth.turnInPlaceStealthMultiplier ?? 1.5) * 100) / 100;
+        stealthStats.immobileStealthMultiplier =
+          Math.round(Math.max(0, draftStealth.immobileStealthMultiplier ?? 2.0) * 100) / 100;
       }
     }
 

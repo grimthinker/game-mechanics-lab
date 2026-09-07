@@ -6,6 +6,7 @@ export interface MovementInspectorValues {
   maxTurnSpeed: Degrees;
   runSpeedMultiplier: number;
   crouchSpeedMultiplier: number;
+  walkSpeedMultiplier: number;
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
 }
@@ -71,6 +72,20 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
         step={0.1}
         onChange={(e) =>
           onChange({ crouchSpeedMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скорости замедленного шага:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.walkSpeedMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ walkSpeedMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
         }
       />
     </label>

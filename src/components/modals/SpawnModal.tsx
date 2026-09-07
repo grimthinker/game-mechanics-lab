@@ -20,6 +20,8 @@ export interface SpawnModalProps {
   setRunSpeedMultiplier: (val: number) => void;
   crouchSpeedMultiplier: number;
   setCrouchSpeedMultiplier: (val: number) => void;
+  walkSpeedMultiplier: number;
+  setWalkSpeedMultiplier: (val: number) => void;
   crouchStealthMultiplier: number;
   setCrouchStealthMultiplier: (val: number) => void;
   runTurnMultiplier: number;
@@ -30,6 +32,12 @@ export interface SpawnModalProps {
   setStealthPower: (val: number) => void;
   runStealthMultiplier: number;
   setRunStealthMultiplier: (val: number) => void;
+  walkStealthMultiplier: number;
+  setWalkStealthMultiplier: (val: number) => void;
+  turnInPlaceStealthMultiplier: number;
+  setTurnInPlaceStealthMultiplier: (val: number) => void;
+  immobileStealthMultiplier: number;
+  setImmobileStealthMultiplier: (val: number) => void;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -52,6 +60,8 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setRunSpeedMultiplier,
   crouchSpeedMultiplier,
   setCrouchSpeedMultiplier,
+  walkSpeedMultiplier,
+  setWalkSpeedMultiplier,
   crouchStealthMultiplier,
   setCrouchStealthMultiplier,
   runTurnMultiplier,
@@ -62,6 +72,12 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setStealthPower,
   runStealthMultiplier,
   setRunStealthMultiplier,
+  walkStealthMultiplier,
+  setWalkStealthMultiplier,
+  turnInPlaceStealthMultiplier,
+  setTurnInPlaceStealthMultiplier,
+  immobileStealthMultiplier,
+  setImmobileStealthMultiplier,
   onClose,
   onConfirm,
 }) => {
@@ -180,6 +196,17 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
             />
           </label>
           <label>
+            Множитель скорости замедленного шага:
+            <input
+              type="number"
+              value={walkSpeedMultiplier}
+              min={0.1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setWalkSpeedMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
             Скрытность (Stealth Power):
             <input
               type="number"
@@ -210,6 +237,39 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
               max={10}
               step={0.1}
               onChange={(e) => setRunStealthMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скрытности при шаге:
+            <input
+              type="number"
+              value={walkStealthMultiplier}
+              min={0.1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setWalkStealthMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скрытности при повороте на месте:
+            <input
+              type="number"
+              value={turnInPlaceStealthMultiplier}
+              min={0.1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setTurnInPlaceStealthMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скрытности при неподвижности:
+            <input
+              type="number"
+              value={immobileStealthMultiplier}
+              min={0.1}
+              max={10}
+              step={0.1}
+              onChange={(e) => setImmobileStealthMultiplier(Number(e.target.value))}
             />
           </label>
           <label>

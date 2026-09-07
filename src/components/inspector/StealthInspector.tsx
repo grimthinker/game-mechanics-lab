@@ -4,6 +4,9 @@ export interface StealthInspectorValues {
   stealthPower: number;
   crouchStealthMultiplier: number;
   runStealthMultiplier: number;
+  walkStealthMultiplier: number;
+  turnInPlaceStealthMultiplier: number;
+  immobileStealthMultiplier: number;
 }
 
 export interface StealthInspectorProps {
@@ -45,7 +48,7 @@ export const StealthInspector: React.FC<StealthInspectorProps> = ({
       />
     </label>
     <label>
-      Множитель скрытности при беге:
+      Множитель скрытности при спринте:
       <input
         disabled={isReadOnly}
         type="number"
@@ -55,6 +58,48 @@ export const StealthInspector: React.FC<StealthInspectorProps> = ({
         step={0.1}
         onChange={(e) =>
           onChange({ runStealthMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скрытности при шаге:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.walkStealthMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ walkStealthMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скрытности при повороте на месте:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.turnInPlaceStealthMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ turnInPlaceStealthMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скрытности при неподвижности:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.immobileStealthMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ immobileStealthMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
         }
       />
     </label>

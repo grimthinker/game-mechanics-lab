@@ -201,6 +201,7 @@ export class WorldSerializer {
             turnRatio: 0,
             isRunning: false,
             isCrouching: false,
+            isSlowWalking: false,
             wantsAttack: false,
             attackSlotIndex: undefined,
           });
@@ -210,8 +211,8 @@ export class WorldSerializer {
           this.app.world.addComponent(ent.id, 'activeAttacks', { attacks: [] });
         }
 
-        if (comps.meta && comps.meta.state === 'attacking') {
-          comps.meta.state = 'idle';
+        if (comps.meta && comps.meta.movementMode === 'attacking') {
+          comps.meta.movementMode = 'immobile';
         }
       }
     }

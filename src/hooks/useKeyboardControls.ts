@@ -8,7 +8,7 @@ interface UseKeyboardControlsProps {
   mode: GameMode;
 }
 
-const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c']);
+const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c', 'x']);
 
 const getKeyName = (e: KeyboardEvent): string => {
   switch (e.code) {
@@ -25,6 +25,8 @@ const getKeyName = (e: KeyboardEvent): string => {
       return 'shift';
     case 'KeyC':
       return 'c';
+    case 'KeyX':
+      return 'x';
     case 'Space':
       return ' ';
     default:
@@ -67,7 +69,20 @@ export const useKeyboardControls = ({
         }
       }
 
-      if (!CONTROL_KEYS.has(key) || GlobalInput.keys.has(key)) return;
+      if (!CONTROL_KEYS.has(key)) return;
+
+      // Клавиша X работает в режиме тумблера (переключатель ходьбы)
+      if (key === 'x') {
+        if (GlobalInput.keys.has('x')) {
+          GlobalInput.keys.delete('x');
+        } else {
+          GlobalInput.keys.add('x');
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (GlobalInput.keys.has(key)) return;
 
       GlobalInput.keys.add(key);
       e.preventDefault();
@@ -76,6 +91,8 @@ export const useKeyboardControls = ({
     const onKeyUp = (e: KeyboardEvent) => {
       const key = getKeyName(e);
       if (!CONTROL_KEYS.has(key)) return;
+      // Состояние тумблера X не сбрасывается при отпускании клавиши
+      if (key === 'x') return;
 
       GlobalInput.keys.delete(key);
     };

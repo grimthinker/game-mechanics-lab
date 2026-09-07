@@ -1,6 +1,7 @@
 import { World } from './ecs/World';
 import {
-  CreatureState,
+  CreatureStance,
+  CreatureMovementMode,
   EntityId,
   IMovable,
   EquipComponent,
@@ -61,8 +62,12 @@ export class EntityAdapter implements IMovable, EntityController {
   public get behavior(): string {
     return this.getComponent('aiStats')?.behavior.current ?? 'IdleTree';
   }
-  public get state(): CreatureState {
-    return this.getComponent('meta')?.state ?? 'idle';
+  public get stance(): 'standing' | 'crouching' {
+    return this.getComponent('meta')?.stance ?? 'standing';
+  }
+  public get movementMode():
+    'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting' | 'attacking' | 'dead' {
+    return this.getComponent('meta')?.movementMode ?? 'immobile';
   }
   public get pos(): Point {
     const transform = this.getComponent('transform');
@@ -209,12 +214,23 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.getInputIfActive();
     if (input) {
       input.isCrouching = true;
-      input.isRunning = false;
     }
   }
   public stopCrouching(): void {
     const input = this.getComponent('input');
     if (input) input.isCrouching = false;
+  }
+  public startWalking(): void {
+    const input = this.getInputIfActive();
+    if (input) input.isSlowWalking = true;
+  }
+  public stopWalking(): void {
+    const input = this.getComponent('input');
+    if (input) input.isSlowWalking = false;
+  }
+  public toggleWalking(): void {
+    const input = this.getInputIfActive();
+    if (input) input.isSlowWalking = !input.isSlowWalking;
   }
 
   public stop(): boolean {

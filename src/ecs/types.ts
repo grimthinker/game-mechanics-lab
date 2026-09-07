@@ -88,6 +88,15 @@ export interface RenderArcPrimitive {
   closed?: boolean;
 }
 
+export interface RenderPolygonPrimitive {
+  kind: 'polygon';
+  points: Point[];
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  dash?: number[];
+}
+
 export interface RenderTextPrimitive {
   kind: 'text';
   text: string;
@@ -104,6 +113,7 @@ export type RenderPrimitive =
   | RenderRectPrimitive
   | RenderLinePrimitive
   | RenderArcPrimitive
+  | RenderPolygonPrimitive
   | RenderTextPrimitive;
 
 export const RENDER_Z_INDEX = {
@@ -185,6 +195,7 @@ export interface InputComponent {
   turnRatio: number;
   isRunning: boolean;
   isCrouching: boolean;
+  isSlowWalking: boolean;
   wantsAttack: boolean;
   attackSlotIndex?: number;
 }
@@ -230,9 +241,15 @@ export interface ActiveAttackComponent {
   attacks: ActiveAttack[];
 }
 
+export type CreatureStance = 'standing' | 'crouching';
+
+export type CreatureMovementMode =
+  'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting' | 'attacking' | 'dead';
+
 export interface CreatureMetaComponent {
   name: string;
-  state: CreatureState;
+  stance?: CreatureStance;
+  movementMode?: CreatureMovementMode;
   entityType?: string;
 }
 
@@ -299,8 +316,6 @@ export function isValidStandardRadius(radius: number): radius is StandardRadius 
   return (STANDARD_RADII as readonly number[]).includes(radius);
 }
 
-export type CreatureState = 'idle' | 'moving' | 'running' | 'crouching' | 'attacking' | 'dead';
-
 export type HitZoneType = 'radius' | 'angle' | 'forward_line' | 'shrapnel';
 
 export type InventorySize = {
@@ -341,6 +356,7 @@ export interface MovementConfig {
   maxTurnSpeed: Radians;
   runSpeedMultiplier?: number;
   crouchSpeedMultiplier?: number;
+  walkSpeedMultiplier?: number;
   runTurnMultiplier?: number;
   crouchTurnMultiplier?: number;
 }
@@ -350,6 +366,7 @@ export interface MovementStatsComponent {
   maxTurnSpeed: StatValue<number>;
   runSpeedMultiplier: number;
   crouchSpeedMultiplier: number;
+  walkSpeedMultiplier: number;
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
 }
@@ -358,12 +375,18 @@ export interface StealthConfig {
   stealthPower: number;
   runStealthMultiplier: number;
   crouchStealthMultiplier?: number;
+  walkStealthMultiplier?: number;
+  turnInPlaceStealthMultiplier?: number;
+  immobileStealthMultiplier?: number;
 }
 
 export interface StealthStatsComponent {
   stealthPower: StatValue<number>;
   runStealthMultiplier: number;
   crouchStealthMultiplier: number;
+  walkStealthMultiplier: number;
+  turnInPlaceStealthMultiplier: number;
+  immobileStealthMultiplier: number;
 }
 
 export interface AIConfig {
@@ -437,7 +460,7 @@ export interface EntityConfig {
   item?: ItemData;
   inventory?: InventorySetup;
   equip?: EquipSlot[];
-  meta?: { name?: string; entityType?: string };
+  meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
   weaponStats?: Partial<WeaponCombatConfig>;
   weaponZone?: HitZoneConfig;

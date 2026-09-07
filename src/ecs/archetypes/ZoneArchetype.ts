@@ -107,7 +107,6 @@ export function assembleZone(
   // 2. Мета
   world.addComponent(id, 'meta', {
     name,
-    state: 'idle',
     entityType: 'zone',
   });
 

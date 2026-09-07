@@ -19,9 +19,13 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const [crouchSpeedMultiplier, setCrouchSpeedMultiplier] = useState<number>(0.5);
   const [crouchStealthMultiplier, setCrouchStealthMultiplier] = useState<number>(1.5);
   const [runTurnMultiplier, setRunTurnMultiplier] = useState<number>(0.8);
-  const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(1.2);
+  const [walkSpeedMultiplier, setWalkSpeedMultiplier] = useState<number>(0.5);
+  const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(0.8);
   const [stealthPower, setStealthPower] = useState<number>(10);
   const [runStealthMultiplier, setRunStealthMultiplier] = useState<number>(0.5);
+  const [walkStealthMultiplier, setWalkStealthMultiplier] = useState<number>(1.3);
+  const [turnInPlaceStealthMultiplier, setTurnInPlaceStealthMultiplier] = useState<number>(1.5);
+  const [immobileStealthMultiplier, setImmobileStealthMultiplier] = useState<number>(2.0);
 
   const openSpawnModal = useCallback((behavior?: string) => {
     if (behavior) setPendingSpawnBehavior(behavior);
@@ -81,12 +85,20 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       setCrouchStealthMultiplier,
       runTurnMultiplier,
       setRunTurnMultiplier,
+      walkSpeedMultiplier,
+      setWalkSpeedMultiplier,
       crouchTurnMultiplier,
       setCrouchTurnMultiplier,
       stealthPower,
       setStealthPower,
       runStealthMultiplier,
       setRunStealthMultiplier,
+      walkStealthMultiplier,
+      setWalkStealthMultiplier,
+      turnInPlaceStealthMultiplier,
+      setTurnInPlaceStealthMultiplier,
+      immobileStealthMultiplier,
+      setImmobileStealthMultiplier,
       openSpawnModal,
       closeSpawnModal,
       isItemSpawnModalOpen,
@@ -112,9 +124,13 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       crouchSpeedMultiplier,
       crouchStealthMultiplier,
       runTurnMultiplier,
+      walkSpeedMultiplier,
       crouchTurnMultiplier,
       stealthPower,
       runStealthMultiplier,
+      walkStealthMultiplier,
+      turnInPlaceStealthMultiplier,
+      immobileStealthMultiplier,
       openSpawnModal,
       closeSpawnModal,
       isItemSpawnModalOpen,

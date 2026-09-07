@@ -79,32 +79,24 @@ export class RenderSyncSystem {
         const physStats = world.getComponent(id, 'physicsStats');
 
         const isAlive = health ? health.isAlive : true;
-        const state = meta?.state ?? 'idle';
+        const stance = meta?.stance ?? 'standing';
+        const movementMode = meta?.movementMode ?? 'immobile';
         const radius = physStats ? physStats.radius.current : 16;
 
-        // Синхронизация радиуса и линий направления
+        // Синхронизация радиуса тела
         const bodyPrim = renderable.primitives[0];
         if (bodyPrim && bodyPrim.kind === 'circle') {
           (bodyPrim as RenderCirclePrimitive).radius = radius;
         }
 
-        if (renderable.primitives.length >= 4) {
-          const line1 = renderable.primitives[1] as RenderLinePrimitive;
-          const line2 = renderable.primitives[2] as RenderLinePrimitive;
-          const line3 = renderable.primitives[3] as RenderLinePrimitive;
-
-          if (line1 && line1.kind === 'line') {
-            line1.from = { x: radius, y: 0 };
-            line1.to = { x: 0, y: -radius };
-          }
-          if (line2 && line2.kind === 'line') {
-            line2.from = { x: radius, y: 0 };
-            line2.to = { x: 0, y: radius };
-          }
-          if (line3 && line3.kind === 'line') {
-            line3.from = { x: 0, y: radius };
-            line3.to = { x: 0, y: -radius };
-          }
+        // Синхронизация полигона стрелки направления
+        const arrowPrim = renderable.primitives[1];
+        if (arrowPrim && arrowPrim.kind === 'polygon') {
+          arrowPrim.points = [
+            { x: radius, y: 0 },
+            { x: 0, y: -radius },
+            { x: 0, y: radius },
+          ];
         }
 
         if (bodyPrim && bodyPrim.kind === 'circle') {
@@ -115,30 +107,51 @@ export class RenderSyncSystem {
             renderable.zIndex = RENDER_Z_INDEX.CORPSES;
           } else {
             renderable.zIndex = RENDER_Z_INDEX.CREATURES;
-            switch (state) {
-              case 'idle':
-                circlePrim.fill = '#34495e';
-                break;
-              case 'moving':
-                circlePrim.fill = '#3498db';
-                break;
-              case 'running':
-                circlePrim.fill = '#2ecc71';
-                break;
-              case 'crouching':
-                circlePrim.fill = '#9b59b6';
-                break;
-              case 'attacking':
-                circlePrim.fill = '#e67e22';
-                break;
-              default:
-                circlePrim.fill = '#34495e';
-                break;
-            }
+            // 1. Основная заливка отображает положение (Stance)
+            circlePrim.fill = stance === 'crouching' ? '#9b59b6' : '#34495e';
 
-            // Актуализация цвета границы (игрок / бот)
+            // Граница: игрок / бот
             const behavior = aiStats?.behavior?.current ?? 'IdleTree';
             circlePrim.stroke = behavior === 'PlayerTree' ? '#2980b9' : '#c0392b';
+          }
+        }
+
+        if (arrowPrim && arrowPrim.kind === 'polygon') {
+          if (!isAlive) {
+            arrowPrim.fill = 'transparent';
+            arrowPrim.stroke = '#7f8c8d';
+          } else {
+            // 2. Треугольная стрелка заливается цветом в соответствии с видом движения
+            switch (movementMode) {
+              case 'immobile':
+                arrowPrim.fill = '#7f8c8d';
+                arrowPrim.stroke = '#95a5a6';
+                break;
+              case 'turning':
+                arrowPrim.fill = '#f1c40f';
+                arrowPrim.stroke = '#f39c12';
+                break;
+              case 'walking':
+                arrowPrim.fill = '#1abc9c';
+                arrowPrim.stroke = '#16a085';
+                break;
+              case 'jogging':
+                arrowPrim.fill = '#3498db';
+                arrowPrim.stroke = '#2980b9';
+                break;
+              case 'sprinting':
+                arrowPrim.fill = '#2ecc71';
+                arrowPrim.stroke = '#27ae60';
+                break;
+              case 'attacking':
+                arrowPrim.fill = '#e67e22';
+                arrowPrim.stroke = '#d35400';
+                break;
+              default:
+                arrowPrim.fill = '#7f8c8d';
+                arrowPrim.stroke = '#95a5a6';
+                break;
+            }
           }
         }
       }

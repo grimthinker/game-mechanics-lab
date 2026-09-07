@@ -282,10 +282,30 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   <dd>{item.name}</dd>
                 </div>
               )}
-              {meta?.state && (
+              {meta?.stance && (
                 <div className="stat-row">
-                  <dt>Состояние:</dt>
-                  <dd>{meta.state}</dd>
+                  <dt>Положение:</dt>
+                  <dd>{meta.stance === 'crouching' ? 'Присед' : 'Стоя'}</dd>
+                </div>
+              )}
+              {meta?.movementMode && (
+                <div className="stat-row">
+                  <dt>Вид движения:</dt>
+                  <dd>
+                    {meta.movementMode === 'immobile'
+                      ? 'Полная неподвижность'
+                      : meta.movementMode === 'turning'
+                        ? 'Поворот на месте'
+                        : meta.movementMode === 'walking'
+                          ? 'Спокойный шаг'
+                          : meta.movementMode === 'jogging'
+                            ? 'Обычное движение'
+                            : meta.movementMode === 'sprinting'
+                              ? 'Спринт'
+                              : meta.movementMode === 'attacking'
+                                ? 'Атака'
+                                : 'Мёртв'}
+                  </dd>
                 </div>
               )}
               {aiStats && (
@@ -701,10 +721,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо
             </li>
             <li>
-              <kbd>LShift</kbd> Бег (удержание)
+              <kbd>LShift</kbd> Спринт (удержание)
             </li>
             <li>
-              <kbd>C</kbd> Полуприсяд (удержание)
+              <kbd>X</kbd> Шаг (переключатель)
+            </li>
+            <li>
+              <kbd>C</kbd> Присед (удержание)
             </li>
             <li>
               <kbd>Пробел</kbd> Атака оружием

@@ -17,13 +17,17 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       maxTurnSpeed: deg2Rad(270),
       runSpeedMultiplier: 1.5,
       crouchSpeedMultiplier: 0.5,
+      walkSpeedMultiplier: 0.5,
       runTurnMultiplier: 0.8,
-      crouchTurnMultiplier: 1.2,
+      crouchTurnMultiplier: 0.8,
     },
     stealth: {
       stealthPower: 10,
       runStealthMultiplier: 0.5,
       crouchStealthMultiplier: 1.5,
+      walkStealthMultiplier: 1.3,
+      turnInPlaceStealthMultiplier: 1.5,
+      immobileStealthMultiplier: 2.0,
     },
     ai: {
       behavior,
@@ -35,6 +39,8 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
     ],
     meta: {
       name: 'Существо',
+      stance: 'standing',
+      movementMode: 'immobile',
       entityType: 'creature',
     },
   };

@@ -247,6 +247,32 @@ export class Renderer {
         }
         break;
       }
+      case 'polygon': {
+        this.ctx.beginPath();
+        if (prim.dash) {
+          this.ctx.setLineDash(prim.dash.map((d) => d / camera.scale));
+        } else {
+          this.ctx.setLineDash([]);
+        }
+        if (prim.points.length > 0) {
+          this.ctx.moveTo(prim.points[0].x, prim.points[0].y);
+          for (let i = 1; i < prim.points.length; i++) {
+            this.ctx.lineTo(prim.points[i].x, prim.points[i].y);
+          }
+          this.ctx.closePath();
+        }
+        if (prim.fill) {
+          this.ctx.fillStyle = prim.fill;
+          this.ctx.fill();
+        }
+        if (prim.stroke) {
+          this.ctx.strokeStyle = prim.stroke;
+          this.ctx.lineWidth = (prim.strokeWidth ?? 1) / camera.scale;
+          this.ctx.stroke();
+        }
+        this.ctx.setLineDash([]);
+        break;
+      }
       case 'text': {
         this.ctx.save();
         if (prim.ignoreRotation && angle !== 0) {

@@ -260,6 +260,7 @@ export const App: React.FC = () => {
           maxTurnSpeed: deg2Rad(modals.maxTurnSpeed),
           runSpeedMultiplier: modals.runSpeedMultiplier,
           crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
+          walkSpeedMultiplier: modals.walkSpeedMultiplier,
           runTurnMultiplier: modals.runTurnMultiplier,
           crouchTurnMultiplier: modals.crouchTurnMultiplier,
         },
@@ -267,6 +268,9 @@ export const App: React.FC = () => {
           stealthPower: modals.stealthPower,
           runStealthMultiplier: modals.runStealthMultiplier,
           crouchStealthMultiplier: modals.crouchStealthMultiplier,
+          walkStealthMultiplier: modals.walkStealthMultiplier,
+          turnInPlaceStealthMultiplier: modals.turnInPlaceStealthMultiplier,
+          immobileStealthMultiplier: modals.immobileStealthMultiplier,
         },
         ai: { behavior: modals.pendingSpawnBehavior },
         equip: [
@@ -274,7 +278,12 @@ export const App: React.FC = () => {
           { type: 'bag', itemId: null },
           { type: 'weapon', itemId: null },
         ],
-        meta: { name: 'Существо', entityType: 'creature' },
+        meta: {
+          name: 'Существо',
+          stance: 'standing',
+          movementMode: 'immobile',
+          entityType: 'creature',
+        },
       },
     });
     modals.closeSpawnModal();
@@ -453,6 +462,8 @@ export const App: React.FC = () => {
         setRunSpeedMultiplier={modals.setRunSpeedMultiplier}
         crouchSpeedMultiplier={modals.crouchSpeedMultiplier}
         setCrouchSpeedMultiplier={modals.setCrouchSpeedMultiplier}
+        walkSpeedMultiplier={modals.walkSpeedMultiplier}
+        setWalkSpeedMultiplier={modals.setWalkSpeedMultiplier}
         crouchStealthMultiplier={modals.crouchStealthMultiplier}
         setCrouchStealthMultiplier={modals.setCrouchStealthMultiplier}
         runTurnMultiplier={modals.runTurnMultiplier}
@@ -463,6 +474,12 @@ export const App: React.FC = () => {
         setStealthPower={modals.setStealthPower}
         runStealthMultiplier={modals.runStealthMultiplier}
         setRunStealthMultiplier={modals.setRunStealthMultiplier}
+        walkStealthMultiplier={modals.walkStealthMultiplier}
+        setWalkStealthMultiplier={modals.setWalkStealthMultiplier}
+        turnInPlaceStealthMultiplier={modals.turnInPlaceStealthMultiplier}
+        setTurnInPlaceStealthMultiplier={modals.setTurnInPlaceStealthMultiplier}
+        immobileStealthMultiplier={modals.immobileStealthMultiplier}
+        setImmobileStealthMultiplier={modals.setImmobileStealthMultiplier}
         onClose={modals.closeSpawnModal}
         onConfirm={handleSpawnConfirm}
       />

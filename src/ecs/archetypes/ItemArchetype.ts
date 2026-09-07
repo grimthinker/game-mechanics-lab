@@ -37,7 +37,6 @@ export function assembleItem(
   // 3. Мета-информация
   world.addComponent(id, 'meta', {
     name: itemData.name,
-    state: 'idle',
     entityType: 'item',
   });
 

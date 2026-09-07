@@ -21,6 +21,7 @@ export function killEntity(world: World, id: EntityId): void {
     input.turnRatio = 0;
     input.isRunning = false;
     input.isCrouching = false;
+    input.isSlowWalking = false;
     input.wantsAttack = false;
     input.attackSlotIndex = undefined;
   }
@@ -48,7 +49,7 @@ export function killEntity(world: World, id: EntityId): void {
 
   const meta = world.getComponent(id, 'meta');
   if (meta) {
-    meta.state = 'dead';
+    meta.movementMode = 'dead';
   }
 }
 

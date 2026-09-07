@@ -295,6 +295,7 @@ export class BTServiceInputController extends BTService {
   protected override onAbort(entity: EntityAdapter): void {
     entity.stop();
     entity.stopRunning();
+    entity.stopWalking();
     entity.stopCrouching();
     super.onAbort(entity);
   }
@@ -302,6 +303,7 @@ export class BTServiceInputController extends BTService {
   protected override onClose(entity: EntityAdapter): void {
     entity.stop();
     entity.stopRunning();
+    entity.stopWalking();
     entity.stopCrouching();
     super.onClose(entity);
   }
@@ -329,6 +331,12 @@ export class BTServiceInputController extends BTService {
       entity.startRunning();
     } else {
       entity.stopRunning();
+    }
+
+    if (keysSet.has('x')) {
+      entity.startWalking();
+    } else {
+      entity.stopWalking();
     }
 
     if (keysSet.has('c')) {

@@ -38,7 +38,8 @@ export function assembleCreature(
   // 2. Мета-информация
   world.addComponent(id, 'meta', {
     name: config.meta?.name || id,
-    state: 'idle',
+    stance: config.meta?.stance ?? 'standing',
+    movementMode: config.meta?.movementMode ?? 'immobile',
     entityType: config.meta?.entityType || 'creature',
   });
 
@@ -66,8 +67,9 @@ export function assembleCreature(
     maxTurnSpeed: createStat(maxTurnSpeed) as any,
     runSpeedMultiplier: config.movement?.runSpeedMultiplier ?? 1.5,
     crouchSpeedMultiplier: config.movement?.crouchSpeedMultiplier ?? 0.5,
+    walkSpeedMultiplier: config.movement?.walkSpeedMultiplier ?? 0.5,
     runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
-    crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 1.2,
+    crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 0.8,
   });
   world.addComponent(id, 'velocity', {
     currentSpeed: 0,
@@ -81,6 +83,7 @@ export function assembleCreature(
     turnRatio: 0,
     isRunning: false,
     isCrouching: false,
+    isSlowWalking: false,
     wantsAttack: false,
     attackSlotIndex: undefined,
   });
@@ -91,6 +94,9 @@ export function assembleCreature(
     stealthPower: createStat(stealthPower),
     runStealthMultiplier: config.stealth?.runStealthMultiplier ?? 0.5,
     crouchStealthMultiplier: config.stealth?.crouchStealthMultiplier ?? 1.5,
+    walkStealthMultiplier: config.stealth?.walkStealthMultiplier ?? 1.3,
+    turnInPlaceStealthMultiplier: config.stealth?.turnInPlaceStealthMultiplier ?? 1.5,
+    immobileStealthMultiplier: config.stealth?.immobileStealthMultiplier ?? 2.0,
   });
 
   // 7. ИИ и поведение
@@ -135,27 +141,17 @@ export function assembleCreature(
         stroke: borderColor,
         strokeWidth: 2,
       },
-      // Стрелка направления взгляда
+      // Треугольная стрелка направления взгляда
       {
-        kind: 'line',
-        from: { x: radius, y: 0 },
-        to: { x: 0, y: -radius },
-        stroke: '#f1c40f',
-        strokeWidth: 2,
-      },
-      {
-        kind: 'line',
-        from: { x: radius, y: 0 },
-        to: { x: 0, y: radius },
-        stroke: '#f1c40f',
-        strokeWidth: 2,
-      },
-      {
-        kind: 'line',
-        from: { x: 0, y: radius },
-        to: { x: 0, y: -radius },
-        stroke: '#f1c40f',
-        strokeWidth: 2,
+        kind: 'polygon',
+        points: [
+          { x: radius, y: 0 },
+          { x: 0, y: -radius },
+          { x: 0, y: radius },
+        ],
+        fill: '#7f8c8d',
+        stroke: '#95a5a6',
+        strokeWidth: 1.5,
       },
     ],
   };

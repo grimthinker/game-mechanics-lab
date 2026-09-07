@@ -31,7 +31,6 @@ export function assembleMarker(
   // 2. Мета-информация
   world.addComponent(id, 'meta', {
     name,
-    state: 'idle',
     entityType: 'marker',
   });
 
