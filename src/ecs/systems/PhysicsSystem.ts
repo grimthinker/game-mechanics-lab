@@ -125,86 +125,23 @@ export class PhysicsSystem {
     this.system.checkOne(body, (response) => {
       const wall = response.b === body ? response.a : response.b;
       if (wall instanceof Line) {
-        const pushX =
-          response.overlap * response.overlapV.x +
-          PHYSICS_CONFIG.B * Math.sign(response.overlapV.x);
-        const pushY =
-          response.overlap * response.overlapV.y +
-          PHYSICS_CONFIG.B * Math.sign(response.overlapV.y);
+        const pushX = response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x);
+        const pushY = response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y);
 
         body.setPosition(body.x - pushX, body.y - pushY);
       }
     });
   }
 
-  public getNearestEntity(
-    worldPoint: Point,
-    maxWorldDist: number,
-    world?: World,
-    isEditor: boolean = false
-  ): EntityId | null {
-    if (!world) return null;
-
-    let nearestId: EntityId | null = null;
-    let minDistance = Infinity;
-    let bestZIndex = -Infinity;
-
-    const entities = world.getEntitiesWith('transform');
-    for (const [entityId, { transform, physicsBody }] of entities) {
-      const physStats = world.getComponent(entityId, 'physicsStats');
-      const gizmo = world.getComponent(entityId, 'gizmo');
-      const renderable = world.getComponent(entityId, 'renderable');
-
-      if (!isEditor && !physicsBody && !physStats) continue;
-
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
-      const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      const distToBoundary = Math.max(0, distToCenter - radius);
-
-      if (distToBoundary <= maxWorldDist) {
-        const zIndex = renderable?.zIndex ?? 0;
-
-        if (distToBoundary < minDistance - 0.001) {
-          minDistance = distToBoundary;
-          nearestId = entityId;
-          bestZIndex = zIndex;
-        } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
-          nearestId = entityId;
-          bestZIndex = zIndex;
-        }
-      }
-    }
-
-    return nearestId;
-  }
-
-  public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false): EntityId | null {
-    if (!world) return null;
-
-    const entities = world.getEntitiesWith('transform');
-    const hits: { id: EntityId; zIndex: number }[] = [];
-
-    for (const [entityId, { transform, physicsBody }] of entities) {
-      const physStats = world.getComponent(entityId, 'physicsStats');
-      const gizmo = world.getComponent(entityId, 'gizmo');
-      const renderable = world.getComponent(entityId, 'renderable');
-
-      if (!isEditor && !physicsBody && !physStats) continue;
-
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
-      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      if (dist <= radius) {
-        hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
-      }
-    }
-
-    if (hits.length === 0) return null;
-    // Тот, кто выше по zIndex, имеет безусловный приоритет выбора кликом
-    hits.sort((a, b) => b.zIndex - a.zIndex);
-    return hits[0].id;
-  }
-
   public update(dt: number, world: World): void {
+    // Синхронизация радиуса физических тел с актуальными статами (на случай баффов/дебаффов)
+    const statEntities = world.getEntitiesWith('physicsBody', 'physicsStats');
+    for (const [_id, { physicsBody, physicsStats }] of statEntities) {
+      if (physicsBody.body.r !== physicsStats.radius.current) {
+        physicsBody.body.r = physicsStats.radius.current;
+      }
+    }
+
     const movingEntities = world.getEntitiesWith('transform', 'velocity');
     for (const [id, { transform, velocity }] of movingEntities) {
       if (velocity.currentSpeed > 0) {
@@ -254,8 +191,8 @@ export class PhysicsSystem {
       const p2Stats = world.getComponent(id2, 'physicsStats');
       const weight2 = p2Stats?.weight.current ?? 1;
 
-      const overlapX = response.overlap * response.overlapV.x;
-      const overlapY = response.overlap * response.overlapV.y;
+      const overlapX = response.overlapV.x;
+      const overlapY = response.overlapV.y;
 
       const totalMass = weight1 + weight2;
       const ratio1 = weight2 / totalMass;

@@ -76,14 +76,12 @@ export class AttackSystem {
               atk.totalDuration = castTime;
             } else {
               this.executeHit(id, atk.weaponId, world, physics);
-              health.hitFlashTimer = 0.2;
               atk.phase = 'recovery';
               atk.timer = recoveryTime;
               atk.totalDuration = recoveryTime;
             }
           } else if (atk.phase === 'cast') {
             this.executeHit(id, atk.weaponId, world, physics);
-            health.hitFlashTimer = 0.2;
             atk.phase = 'recovery';
             atk.timer = recoveryTime;
             atk.totalDuration = recoveryTime;

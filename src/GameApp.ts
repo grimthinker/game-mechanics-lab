@@ -214,7 +214,26 @@ export class GameApp {
 
   public pickEntityAt(worldPoint: Point): string | null {
     const isEditor = this.gameMode === GameMode.EDITOR;
-    return this.physics.getEntityAt(worldPoint, this.world, isEditor);
+    const entities = this.world.getEntitiesWith('transform');
+    const hits: { id: string; zIndex: number }[] = [];
+
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const physStats = this.world.getComponent(entityId, 'physicsStats');
+      const gizmo = this.world.getComponent(entityId, 'gizmo');
+      const renderable = this.world.getComponent(entityId, 'renderable');
+
+      if (!isEditor && !physicsBody && !physStats) continue;
+
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+      if (dist <= radius) {
+        hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
+      }
+    }
+
+    if (hits.length === 0) return null;
+    hits.sort((a, b) => b.zIndex - a.zIndex);
+    return hits[0].id;
   }
 
   public pickNearestEntity(
@@ -224,7 +243,38 @@ export class GameApp {
     const isEditor = this.gameMode === GameMode.EDITOR;
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
-    return this.physics.getNearestEntity(worldPoint, maxWorldDist, this.world, isEditor);
+
+    let nearestId: string | null = null;
+    let minDistance = Infinity;
+    let bestZIndex = -Infinity;
+
+    const entities = this.world.getEntitiesWith('transform');
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const physStats = this.world.getComponent(entityId, 'physicsStats');
+      const gizmo = this.world.getComponent(entityId, 'gizmo');
+      const renderable = this.world.getComponent(entityId, 'renderable');
+
+      if (!isEditor && !physicsBody && !physStats) continue;
+
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+      const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+      const distToBoundary = Math.max(0, distToCenter - radius);
+
+      if (distToBoundary <= maxWorldDist) {
+        const zIndex = renderable?.zIndex ?? 0;
+
+        if (distToBoundary < minDistance - 0.001) {
+          minDistance = distToBoundary;
+          nearestId = entityId;
+          bestZIndex = zIndex;
+        } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
+          nearestId = entityId;
+          bestZIndex = zIndex;
+        }
+      }
+    }
+
+    return nearestId;
   }
 
   public startPan(clientX: number, clientY: number): void {
