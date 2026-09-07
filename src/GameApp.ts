@@ -40,8 +40,21 @@ export class GameApp {
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
 
-  public selectedEntity: EntityAdapter | null = null;
-  public hoveredEntity: EntityAdapter | null = null;
+  public selectedEntityId: string | null = null;
+  public hoveredEntityId: string | null = null;
+  private _cachedSelectedEntity: EntityAdapter | null = null;
+
+  public get selectedEntity(): EntityAdapter | null {
+    if (!this.selectedEntityId) return null;
+    if (!this._cachedSelectedEntity || this._cachedSelectedEntity.id !== this.selectedEntityId) {
+      this._cachedSelectedEntity = new EntityAdapter(this.selectedEntityId, this.world);
+    }
+    return this._cachedSelectedEntity;
+  }
+
+  public get hoveredEntity(): EntityAdapter | null {
+    return this.hoveredEntityId ? new EntityAdapter(this.hoveredEntityId, this.world) : null;
+  }
 
   public onFrame: (() => void) | null = null;
 
@@ -95,11 +108,11 @@ export class GameApp {
   }
 
   public deleteSelectedEntity(): void {
-    if (!this.selectedEntity) return;
-    const id = this.selectedEntity.id;
+    if (!this.selectedEntityId) return;
+    const id = this.selectedEntityId;
     this.deleteEntityRecursive(id);
-    if (this.hoveredEntity?.id === id) this.hoveredEntity = null;
-    this.selectedEntity = null;
+    if (this.hoveredEntityId === id) this.hoveredEntityId = null;
+    this.selectEntity(null);
   }
 
   private deleteEntityRecursive(id: string): void {
@@ -129,6 +142,7 @@ export class GameApp {
     }
     const phys = this.world.getComponent(id, 'physicsBody');
     if (phys) this.physics.unregisterBody(phys.body);
+    this.aiSystem.unregisterEntity(id);
     this.world.removeEntity(id);
   }
 
@@ -141,6 +155,7 @@ export class GameApp {
       this.world.removeEntity(id);
     }
     this.physics.loadObstacles([]);
+    this.aiSystem.clear();
     this.selectEntity(null);
     this.hoverEntity(null);
   }
@@ -203,8 +218,8 @@ export class GameApp {
       this.attackSystem.update(dt, this.world, this.physics);
       this.movementSystem.update(dt, this.world);
       this.stealthSystem.update(dt, this.world);
-      this.attachmentSystem.update(this.world, this.physics);
       this.physics.update(dt, this.world);
+      this.attachmentSystem.update(this.world, this.physics);
       this.zoneTriggerSystem.update(dt, this.world, this.physics);
       this.damageSystem.update(dt, this.world);
     }
@@ -215,9 +230,9 @@ export class GameApp {
       this.camera,
       this.world,
       this.physics,
-      this.selectedEntity?.id || null,
+      this.selectedEntityId,
       this.gameMode,
-      this.hoveredEntity?.id || null
+      this.hoveredEntityId
     );
     if (this.onFrame) this.onFrame();
 
@@ -225,19 +240,14 @@ export class GameApp {
   }
 
   public selectEntity(id: string | null): void {
-    if (!id) {
-      this.selectedEntity = null;
-      return;
-    }
-    this.selectedEntity = new EntityAdapter(id, this.world);
+    if (this.selectedEntityId === id) return;
+    this.selectedEntityId = id;
+    this._cachedSelectedEntity = id ? new EntityAdapter(id, this.world) : null;
   }
 
   public hoverEntity(id: string | null): void {
-    if (!id) {
-      this.hoveredEntity = null;
-      return;
-    }
-    this.hoveredEntity = new EntityAdapter(id, this.world);
+    if (this.hoveredEntityId === id) return;
+    this.hoveredEntityId = id;
   }
 
   public pickEntityAt(worldPoint: Point): string | null {
@@ -250,6 +260,7 @@ export class GameApp {
       const gizmo = this.world.getComponent(entityId, 'gizmo');
       const renderable = this.world.getComponent(entityId, 'renderable');
 
+      if (renderable && !renderable.isVisible) continue;
       if (!isEditor && !physicsBody && !physStats) continue;
 
       const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
@@ -282,6 +293,7 @@ export class GameApp {
       const gizmo = this.world.getComponent(entityId, 'gizmo');
       const renderable = this.world.getComponent(entityId, 'renderable');
 
+      if (renderable && !renderable.isVisible) continue;
       if (!isEditor && !physicsBody && !physStats) continue;
 
       const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;

@@ -27,8 +27,10 @@ export class WorldSerializer {
       }
 
       if (comp.brain) {
+        const bbData = { ...comp.brain.blackboard.getData() };
+        delete bbData.pressed_keys;
         data.components.brain = {
-          blackboardData: JSON.parse(JSON.stringify(comp.brain.blackboard.getData())),
+          blackboardData: JSON.parse(JSON.stringify(bbData)),
         };
       }
 
@@ -50,6 +52,26 @@ export class WorldSerializer {
     }
 
     if (Array.isArray(data.entities)) {
+      // Сбор идентификаторов предметов, находящихся во владении (экипировка / инвентарь)
+      const possessedItemIds = new Set<string>();
+      for (const ent of data.entities) {
+        if (ent.components?.ownership) {
+          possessedItemIds.add(ent.id);
+        }
+        if (ent.components?.equip?.slots) {
+          for (const slot of ent.components.equip.slots) {
+            if (slot.itemId) possessedItemIds.add(slot.itemId);
+          }
+        }
+        if (ent.components?.inventory?.slots) {
+          for (const row of ent.components.inventory.slots) {
+            for (const cell of row) {
+              if (cell.itemId) possessedItemIds.add(cell.itemId);
+            }
+          }
+        }
+      }
+
       for (const ent of data.entities) {
         if (!ent.components) continue;
 
@@ -63,6 +85,12 @@ export class WorldSerializer {
           }
         }
 
+        const isPossessedItem = possessedItemIds.has(ent.id);
+
+        if (comps.renderable && isPossessedItem) {
+          comps.renderable.isVisible = false;
+        }
+
         // Инициализация мозга и восстановление памяти (blackboard) для сущностей с ИИ
         if (comps.aiStats) {
           const behaviorId = comps.aiStats.behavior?.current ?? 'IdleTree';
@@ -71,7 +99,10 @@ export class WorldSerializer {
           if (comps.brain?.blackboardData) {
             const brain = this.app.world.getComponent(ent.id, 'brain');
             if (brain && brain.blackboard) {
-              Object.assign(brain.blackboard.getData(), comps.brain.blackboardData);
+              const sanitizedBBData = { ...comps.brain.blackboardData };
+              delete sanitizedBBData.pressed_keys;
+              Object.assign(brain.blackboard.getData(), sanitizedBBData);
+              brain.blackboard.remove('pressed_keys');
             }
           }
         }
@@ -112,6 +143,7 @@ export class WorldSerializer {
         if (comps.weaponStats) {
           normalizeStat(comps.weaponStats.baseDamage);
           normalizeStat(comps.weaponStats.prepTime);
+          normalizeStat(comps.weaponStats.castTime);
           normalizeStat(comps.weaponStats.recoveryTime);
         }
 
@@ -121,7 +153,7 @@ export class WorldSerializer {
         }
 
         // 3. Реставрация физического тела для объектов с физикой
-        if (comps.physicsStats && comps.transform) {
+        if (comps.physicsStats && comps.transform && !isPossessedItem) {
           // Гарантированное определение архетипа, даже если компонент tag поврежден или отсутствует
           const archetype =
             comps.tag?.archetype ?? (comps.zoneTrigger ? 'zone' : comps.item ? 'item' : 'creature');
@@ -145,8 +177,6 @@ export class WorldSerializer {
             }
 
             body.isStatic = isStatic;
-            (body as any).category = category;
-            (body as any).mask = mask;
             this.app.world.addComponent(ent.id, 'physicsBody', {
               body,
               isStatic,

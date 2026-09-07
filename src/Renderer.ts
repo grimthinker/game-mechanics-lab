@@ -295,7 +295,7 @@ export class Renderer {
 
   private isEntityAlive(world: World, id: EntityId): boolean {
     const healthComp = world.getComponent(id, 'health');
-    return healthComp ? healthComp.isAlive && healthComp.current > 0 : true;
+    return healthComp ? healthComp.isAlive : true;
   }
 
   private renderWeaponAttacks(

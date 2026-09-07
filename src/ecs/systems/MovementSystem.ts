@@ -20,7 +20,7 @@ export class MovementSystem {
       id,
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
-      if (!health.isAlive || health.current <= 0) {
+      if (!health.isAlive) {
         if (velocity.currentSpeed !== 0 || velocity.currentTurnSpeed !== 0) {
           velocity.currentSpeed = 0;
           velocity.currentTurnSpeed = 0 as Radians;

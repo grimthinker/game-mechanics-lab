@@ -70,9 +70,18 @@ export class AISystem {
     return result;
   }
 
+  public unregisterEntity(id: EntityId): void {
+    this.adapters.delete(id);
+  }
+
+  public clear(): void {
+    this.adapters.clear();
+  }
+
   private getEntityAdapter(id: EntityId): EntityAdapter | undefined {
     const ent = this.world.getEntity(id);
     if (!ent || !ent.transform || !ent.input || !ent.aiStats || !ent.health) {
+      this.adapters.delete(id);
       return undefined;
     }
 

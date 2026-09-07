@@ -248,7 +248,7 @@ export const App: React.FC = () => {
     updateStats();
   }, [updateStats, setShowBTPanel, setModeSync]);
 
-  const handleSpawnConfirm = () => {
+  const handleSpawnConfirm = useCallback(() => {
     if (!modals.pendingSpawnBehavior) return;
     setPlacementMode({
       kind: 'entity',
@@ -278,31 +278,37 @@ export const App: React.FC = () => {
       },
     });
     modals.closeSpawnModal();
-  };
+  }, [modals]);
 
-  const handleItemSpawnConfirm = (config: EntityConfig) => {
-    setPlacementMode({
-      kind: 'entity',
-      config,
-    });
-    modals.closeItemSpawnModal();
-  };
+  const handleItemSpawnConfirm = useCallback(
+    (config: EntityConfig) => {
+      setPlacementMode({
+        kind: 'entity',
+        config,
+      });
+      modals.closeItemSpawnModal();
+    },
+    [modals]
+  );
 
-  const handleZoneSpawnConfirm = (config: EntityConfig) => {
-    setPlacementMode({
-      kind: 'entity',
-      config,
-    });
-    modals.closeZoneSpawnModal();
-  };
+  const handleZoneSpawnConfirm = useCallback(
+    (config: EntityConfig) => {
+      setPlacementMode({
+        kind: 'entity',
+        config,
+      });
+      modals.closeZoneSpawnModal();
+    },
+    [modals]
+  );
 
-  const handleDeleteEntity = () => {
+  const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
     app.deleteSelectedEntity();
     syncPlayerControls();
     updateStats();
-  };
+  }, [syncPlayerControls, updateStats]);
 
   useGlobalShortcuts({
     mode,

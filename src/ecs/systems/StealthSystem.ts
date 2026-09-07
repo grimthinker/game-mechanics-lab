@@ -7,7 +7,7 @@ export class StealthSystem {
     const entities = world.getEntitiesWith('stealthStats', 'input', 'health');
 
     for (const [_id, { stealthStats, input, health }] of entities) {
-      if (!health.isAlive || health.current <= 0) {
+      if (!health.isAlive) {
         removeModifier(stealthStats.stealthPower, 'state_crouch_stealth');
         removeModifier(stealthStats.stealthPower, 'state_run_stealth');
         addModifier(stealthStats.stealthPower, {

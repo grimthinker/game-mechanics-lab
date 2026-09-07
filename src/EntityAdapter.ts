@@ -16,7 +16,6 @@ import {
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
-import { AISystem } from './ecs/systems/AISystem';
 import { Point } from './types';
 import { Radians } from './utils';
 
@@ -36,7 +35,7 @@ export class EntityAdapter implements IMovable, EntityController {
 
   private getInputIfActive() {
     const health = this.getComponent('health');
-    if (!health?.isAlive || health.current <= 0) return undefined;
+    if (!health?.isAlive) return undefined;
     return this.getComponent('input');
   }
 
@@ -95,8 +94,7 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.getComponent('health')?.max.current ?? 0;
   }
   public get isAlive(): boolean {
-    const h = this.getComponent('health');
-    return h ? h.isAlive && h.current > 0 : false;
+    return this.getComponent('health')?.isAlive ?? false;
   }
   public get maxSpeed(): number {
     return this.getComponent('movementStats')?.maxSpeed.current ?? 0;
@@ -273,20 +271,5 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public getPos(): Point {
     return this.pos;
-  }
-
-  public setBehavior(newBehavior: string, aiSystem: AISystem): void {
-    const aiStats = this.getComponent('aiStats');
-    if (!aiStats || aiStats.behavior.current === newBehavior) return;
-
-    aiStats.behavior.current = newBehavior;
-    aiSystem.initBotBrain(this.world, this.id, newBehavior);
-
-    this.stop();
-    const input = this.getComponent('input');
-    if (input) {
-      input.isRunning = false;
-      input.isCrouching = false;
-    }
   }
 }

@@ -28,6 +28,7 @@ import {
 import { DEFAULT_ZONE_PARAMS, ZoneTypeParams } from '../../Weapon';
 import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 import { setBaseStat } from '../../ecs/stats/StatEvaluator';
+import { killEntity } from '../../ecs/utils/health';
 
 export interface UniversalEditModalProps {
   isOpen: boolean;
@@ -255,7 +256,6 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       if (physBody) {
         physBody.body.r = finalRadius;
         physBody.mask = draftPhysics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-        (physBody.body as any).mask = physBody.mask;
       }
     }
 
@@ -264,8 +264,17 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       const health = world.getComponent(entityId, 'health');
       if (health) {
         setBaseStat(health.max, Math.max(1, draftHealth.maxHp));
-        health.current = Math.min(health.max.current, Math.max(0, draftHealth.hp));
-        health.isAlive = health.current > 0;
+        const targetHp = Math.min(health.max.current, Math.max(0, draftHealth.hp));
+        health.current = targetHp;
+        if (targetHp <= 0) {
+          killEntity(world, entityId);
+        } else {
+          health.isAlive = true;
+          const meta = world.getComponent(entityId, 'meta');
+          if (meta && meta.state === 'dead') {
+            meta.state = 'idle';
+          }
+        }
       }
     }
 
@@ -333,12 +342,21 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
       let newZone: HitZoneConfig;
       if (draftWeapon.hitZoneType === 'radius') {
-        newZone = { hitZoneType: 'radius', radius: draftWeapon.radius };
+        newZone = {
+          hitZoneType: 'radius',
+          radius: draftWeapon.radius,
+          pierceObstacles: draftWeapon.pierceObstacles,
+          pierceCreatures: draftWeapon.pierceCreatures,
+          pierceItems: draftWeapon.pierceItems,
+        };
       } else if (draftWeapon.hitZoneType === 'angle') {
         newZone = {
           hitZoneType: 'angle',
           length: draftWeapon.length,
           angle: deg2Rad(draftWeapon.angle),
+          pierceObstacles: draftWeapon.pierceObstacles,
+          pierceCreatures: draftWeapon.pierceCreatures,
+          pierceItems: draftWeapon.pierceItems,
         };
       } else if (draftWeapon.hitZoneType === 'forward_line') {
         newZone = {

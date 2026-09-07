@@ -1,6 +1,7 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory } from '../types';
+import { applyDamage, applyHeal } from '../utils/health';
 
 export class ZoneTriggerSystem {
   private pulseTimer: number = 0;
@@ -28,8 +29,8 @@ export class ZoneTriggerSystem {
         const targetId = physics.getEntityByBody(otherBody);
         if (!targetId) return;
 
-        const targetCat = (otherBody as any).category ?? CollisionCategory.NONE;
-        if ((targetCat & CollisionCategory.CREATURE) === 0) return;
+        const targetPhys = world.getComponent(targetId, 'physicsBody');
+        if (!targetPhys || (targetPhys.category & CollisionCategory.CREATURE) === 0) return;
 
         // Иммунитет носителя ауры
         if (zoneTrigger.ignoreParent && attachment && attachment.parentId === targetId) {
@@ -37,25 +38,15 @@ export class ZoneTriggerSystem {
         }
 
         const health = world.getComponent(targetId, 'health');
-        if (!health || !health.isAlive || health.current <= 0) return;
+        if (!health || !health.isAlive) return;
 
         // 1. Урон
         if (zoneTrigger.effect === 'damage') {
-          const nextHp = Math.max(0, health.current - deltaValue);
-          health.current = Math.round(nextHp * 100) / 100;
-          if (isPulseTick) {
-            health.hitFlashTimer = 0.2;
-          }
+          applyDamage(world, targetId, deltaValue, isPulseTick);
         }
         // 2. Лечение
         else if (zoneTrigger.effect === 'heal') {
-          if (health.current < health.max.current) {
-            const nextHp = Math.min(health.max.current, health.current + deltaValue);
-            health.current = Math.round(nextHp * 100) / 100;
-            if (isPulseTick) {
-              health.healFlashTimer = 0.2;
-            }
-          }
+          applyHeal(world, targetId, deltaValue, isPulseTick);
         }
         // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и расстояния
         else if (zoneTrigger.effect === 'repel' || zoneTrigger.effect === 'attract') {

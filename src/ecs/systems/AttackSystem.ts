@@ -1,12 +1,13 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
+import { applyDamage } from '../utils/health';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
     const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input');
 
     for (const [id, { equip, activeAttacks, health, input }] of entities) {
-      if (!health.isAlive || health.current <= 0) continue;
+      if (!health.isAlive) continue;
 
       if (input.wantsAttack && !input.isRunning) {
         const busySlots = new Set(activeAttacks.attacks.map((a) => a.slotIndex));
@@ -114,7 +115,7 @@ export class AttackSystem {
 
     for (const targetId of targetIds) {
       const targetHealth = world.getComponent(targetId, 'health');
-      if (!targetHealth || !targetHealth.isAlive || targetHealth.current <= 0) continue;
+      if (!targetHealth || !targetHealth.isAlive) continue;
 
       const mult = minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
       let rawDamage = baseDamage * mult;
@@ -139,8 +140,7 @@ export class AttackSystem {
       const mitigatedDamage = rawDamage * (1 - Math.min(0.9, Math.max(0, defense / 100)));
       const finalDamage = Math.max(0, Math.round(mitigatedDamage - flatReduction));
 
-      targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
-      targetHealth.hitFlashTimer = 0.2;
+      applyDamage(world, targetId, finalDamage);
     }
   }
 }

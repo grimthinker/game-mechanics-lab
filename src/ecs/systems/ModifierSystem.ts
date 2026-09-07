@@ -27,6 +27,7 @@ export class ModifierSystem {
       if (comp.weaponStats) {
         this.tickStatModifiers(comp.weaponStats.baseDamage, dt);
         this.tickStatModifiers(comp.weaponStats.prepTime, dt);
+        this.tickStatModifiers(comp.weaponStats.castTime, dt);
         this.tickStatModifiers(comp.weaponStats.recoveryTime, dt);
       }
       if (comp.armorStats) {

@@ -72,12 +72,18 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
         zone = {
           hitZoneType: 'radius',
           radius: weaponValues.radius,
+          pierceObstacles: weaponValues.pierceObstacles,
+          pierceCreatures: weaponValues.pierceCreatures,
+          pierceItems: weaponValues.pierceItems,
         };
       } else if (zoneType === 'angle') {
         zone = {
           hitZoneType: 'angle',
           length: weaponValues.length,
           angle: deg2Rad(weaponValues.angle),
+          pierceObstacles: weaponValues.pierceObstacles,
+          pierceCreatures: weaponValues.pierceCreatures,
+          pierceItems: weaponValues.pierceItems,
         };
       } else if (zoneType === 'forward_line') {
         zone = {

@@ -246,9 +246,36 @@ export class BTServiceInputListener extends BTService {
     this.params = { ...BTServiceInputListener.defaultParams, ...params };
   }
 
+  protected override onOpen(entity: EntityAdapter): void {
+    super.onOpen(entity);
+    const bb = entity.brain?.blackboard;
+    if (bb) {
+      if (GlobalInput.keys.size > 0) {
+        bb.set('pressed_keys', Array.from(GlobalInput.keys));
+      } else {
+        bb.remove('pressed_keys');
+      }
+    }
+  }
+
+  protected override onAbort(entity: EntityAdapter): void {
+    entity.brain?.blackboard.remove('pressed_keys');
+    super.onAbort(entity);
+  }
+
+  protected override onClose(entity: EntityAdapter): void {
+    entity.brain?.blackboard.remove('pressed_keys');
+    super.onClose(entity);
+  }
+
   protected tickService(entity: EntityAdapter): void {
-    const bb = entity.brain!.blackboard;
-    bb.set('pressed_keys', Array.from(GlobalInput.keys));
+    const bb = entity.brain?.blackboard;
+    if (!bb) return;
+    if (GlobalInput.keys.size > 0) {
+      bb.set('pressed_keys', Array.from(GlobalInput.keys));
+    } else {
+      bb.remove('pressed_keys');
+    }
   }
 }
 
@@ -265,9 +292,23 @@ export class BTServiceInputController extends BTService {
     this.params = { ...BTServiceInputController.defaultParams, ...params };
   }
 
+  protected override onAbort(entity: EntityAdapter): void {
+    entity.stop();
+    entity.stopRunning();
+    entity.stopCrouching();
+    super.onAbort(entity);
+  }
+
+  protected override onClose(entity: EntityAdapter): void {
+    entity.stop();
+    entity.stopRunning();
+    entity.stopCrouching();
+    super.onClose(entity);
+  }
+
   protected tickService(entity: EntityAdapter): void {
-    const bb = entity.brain!.blackboard;
-    const keys = bb.get('pressed_keys') || [];
+    const bb = entity.brain?.blackboard;
+    const keys = bb?.get('pressed_keys') || [];
     const keysSet = new Set(keys);
 
     if (keysSet.has('w')) {

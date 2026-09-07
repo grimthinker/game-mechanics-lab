@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { GameMode } from '../constants';
 
 interface GlobalShortcutsProps {
@@ -10,14 +10,10 @@ interface GlobalShortcutsProps {
   setShowBTPanel: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export const useGlobalShortcuts = ({
-  mode,
-  isPaused,
-  togglePause,
-  modals,
-  handleSpawnConfirm,
-  setShowBTPanel,
-}: GlobalShortcutsProps) => {
+export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
+  const propsRef = useRef(props);
+  propsRef.current = props;
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -27,6 +23,8 @@ export const useGlobalShortcuts = ({
       ) {
         return; // Игнорируем нажатия при вводе текста
       }
+
+      const { mode, togglePause, modals, handleSpawnConfirm, setShowBTPanel } = propsRef.current;
 
       // Обработка Esc и Enter для модалок
       if (e.key === 'Escape' || e.code === 'Escape') {
@@ -84,5 +82,5 @@ export const useGlobalShortcuts = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, isPaused, togglePause, modals, handleSpawnConfirm, setShowBTPanel]);
+  }, []);
 };

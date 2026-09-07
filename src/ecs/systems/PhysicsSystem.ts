@@ -41,6 +41,26 @@ export class PhysicsSystem {
     return this.bodyToEntityMap.get(body);
   }
 
+  public getCollisionFilter(body: object, world: World): { category: number; mask: number } {
+    if (body instanceof Line) {
+      return {
+        category: CollisionCategory.OBSTACLE,
+        mask: COLLISION_MASK_ALL,
+      };
+    }
+    const entityId = this.bodyToEntityMap.get(body);
+    if (entityId) {
+      const phys = world.getComponent(entityId, 'physicsBody');
+      if (phys) {
+        return { category: phys.category, mask: phys.mask };
+      }
+    }
+    return {
+      category: CollisionCategory.NONE,
+      mask: COLLISION_MASK_NONE,
+    };
+  }
+
   public loadObstacles(segments: ObstacleSegment[]): void {
     this.clearObstacles();
     for (const seg of segments) {
@@ -49,8 +69,6 @@ export class PhysicsSystem {
         { x: seg.end.x, y: seg.end.y },
         { isStatic: true }
       );
-      (line as any).category = CollisionCategory.OBSTACLE;
-      (line as any).mask = COLLISION_MASK_ALL;
       this.obstacleLines.push(line);
       if (this.obstaclesEnabled) {
         this.system.insert(line);
@@ -120,15 +138,17 @@ export class PhysicsSystem {
 
   private resolveObstaclesForBody(body: Circle): void {
     if (!this.obstaclesEnabled) return;
-    if (((body as any).mask & CollisionCategory.OBSTACLE) === 0) return;
 
     this.system.checkOne(body, (response) => {
       const wall = response.b === body ? response.a : response.b;
       if (wall instanceof Line) {
-        const pushX = response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x);
-        const pushY = response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y);
+        const sign = response.b === body ? -1 : 1;
+        const pushX =
+          (response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x)) * sign;
+        const pushY =
+          (response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y)) * sign;
 
-        body.setPosition(body.x - pushX, body.y - pushY);
+        body.setPosition(body.x + pushX, body.y + pushY);
       }
     });
   }
@@ -145,7 +165,7 @@ export class PhysicsSystem {
     const movingEntities = world.getEntitiesWith('transform', 'velocity');
     for (const [id, { transform, velocity }] of movingEntities) {
       const health = world.getComponent(id, 'health');
-      if (health && (!health.isAlive || health.current <= 0)) continue;
+      if (health && !health.isAlive) continue;
 
       const selfDx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
       const selfDy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
@@ -179,13 +199,12 @@ export class PhysicsSystem {
       const c2 = response.b;
       if (c1.isStatic || c2.isStatic) return;
 
-      const cat1 = (c1 as any).category ?? CollisionCategory.NONE;
-      const mask1 = (c1 as any).mask ?? 0;
-      const cat2 = (c2 as any).category ?? CollisionCategory.NONE;
-      const mask2 = (c2 as any).mask ?? 0;
+      const filter1 = this.getCollisionFilter(c1, world);
+      const filter2 = this.getCollisionFilter(c2, world);
 
       // Проверяем взаимное столкновение групп
-      if ((mask1 & cat2) === 0 || (mask2 & cat1) === 0) return;
+      if ((filter1.mask & filter2.category) === 0 || (filter2.mask & filter1.category) === 0)
+        return;
 
       const id1 = this.bodyToEntityMap.get(c1);
       const id2 = this.bodyToEntityMap.get(c2);
@@ -199,10 +218,10 @@ export class PhysicsSystem {
       if (p1.isTrigger || p2.isTrigger) return;
 
       const health1 = world.getComponent(id1, 'health');
-      const valid1 = health1 ? health1.isAlive && health1.current > 0 : true;
+      const valid1 = health1 ? health1.isAlive : true;
 
       const health2 = world.getComponent(id2, 'health');
-      const valid2 = health2 ? health2.isAlive && health2.current > 0 : true;
+      const valid2 = health2 ? health2.isAlive : true;
 
       if (!valid1 || !valid2) return;
 
@@ -258,12 +277,6 @@ export class PhysicsSystem {
     }
   }
 
-  private isLineOfSightBlocked(from: Point, to: Point): boolean {
-    if (!this.obstaclesEnabled) return false;
-    const rayResult = this.system.raycast(from, to);
-    return rayResult ? rayResult.body instanceof Line : false;
-  }
-
   private canRayReachTarget(
     from: Point,
     rayEnd: Point,
@@ -311,7 +324,7 @@ export class PhysicsSystem {
           const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
           const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
 
-          const isDead = hitHealth && (!hitHealth.isAlive || hitHealth.current <= 0);
+          const isDead = hitHealth && !hitHealth.isAlive;
           const isNonSolid =
             (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) ||
             (hitPhysStats && !hitPhysStats.isSolid);
@@ -320,7 +333,7 @@ export class PhysicsSystem {
           if (isDead || isNonSolid || hitPhys?.isTrigger) {
             canPierce = true;
           } else {
-            const category = (hitBody as any).category ?? CollisionCategory.NONE;
+            const category = hitPhys?.category ?? CollisionCategory.NONE;
             if (category === CollisionCategory.CREATURE) {
               canPierce = !!zone.pierceCreatures;
             } else if (category === CollisionCategory.ITEM) {
@@ -331,8 +344,7 @@ export class PhysicsSystem {
           }
         } else {
           // Если это тело без Entity (например, статические линии геометрии)
-          const category = (hitBody as any).category ?? CollisionCategory.NONE;
-          if (category === CollisionCategory.OBSTACLE) {
+          if (hitBody instanceof Line) {
             canPierce = !!zone.pierceObstacles;
           }
         }
@@ -382,7 +394,7 @@ export class PhysicsSystem {
     const targets = world.getEntitiesWith('transform', 'physicsBody', 'health');
 
     for (const [targetId, { transform, physicsBody, health }] of targets) {
-      if (targetId === attackerId || !health.isAlive || health.current <= 0) continue;
+      if (targetId === attackerId || !health.isAlive) continue;
 
       const physStats = world.getComponent(targetId, 'physicsStats');
       const isSolid = physStats ? physStats.isSolid : physicsBody.mask !== COLLISION_MASK_NONE;
@@ -400,7 +412,11 @@ export class PhysicsSystem {
         case 'radius': {
           const r = zone.radius ?? 50;
           if (dist <= r + targetRadius) {
-            isHit = !this.isLineOfSightBlocked(pos, targetPos);
+            if (zone.pierceObstacles && zone.pierceCreatures && zone.pierceItems) {
+              isHit = true;
+            } else if (this.canRayReachTarget(pos, targetPos, targetId, zone, attackerId, world)) {
+              isHit = true;
+            }
           }
           break;
         }
@@ -418,7 +434,11 @@ export class PhysicsSystem {
             const angularTolerance = dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;
 
             if (angleDiff <= maxAngle + angularTolerance) {
-              if (!this.isLineOfSightBlocked(pos, targetPos)) {
+              if (zone.pierceObstacles && zone.pierceCreatures && zone.pierceItems) {
+                isHit = true;
+              } else if (
+                this.canRayReachTarget(pos, targetPos, targetId, zone, attackerId, world)
+              ) {
                 isHit = true;
               }
             }

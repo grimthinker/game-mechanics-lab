@@ -118,8 +118,6 @@ export function assembleCreature(
   body.isStatic = false;
   const category = CollisionCategory.CREATURE;
   const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-  (body as any).category = category;
-  (body as any).mask = mask;
   world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
   physics.registerBody(id, body);
 

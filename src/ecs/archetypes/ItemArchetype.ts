@@ -48,6 +48,13 @@ export function assembleItem(
     isSolid,
   });
 
+  // 4.5. Принадлежность (если предмет экипирован или находится в инвентаре)
+  if (config.ownership) {
+    world.addComponent(id, 'ownership', config.ownership);
+  }
+
+  const isPossessed = !!config.ownership;
+
   // 5. Специфические компоненты экипировки
   if (itemData.type === 'weapon') {
     const ws = config.weaponStats ?? {};
@@ -95,14 +102,14 @@ export function assembleItem(
   const posY = position?.y ?? 0;
   world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
 
-  const body = new Circle({ x: posX, y: posY }, radius);
-  body.isStatic = false;
-  const category = CollisionCategory.ITEM;
-  const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-  (body as any).category = category;
-  (body as any).mask = mask;
-  world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
-  physics.registerBody(id, body);
+  if (!isPossessed) {
+    const body = new Circle({ x: posX, y: posY }, radius);
+    body.isStatic = false;
+    const category = CollisionCategory.ITEM;
+    const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+    world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
+    physics.registerBody(id, body);
+  }
 
   // 7. Универсальный компонент отрисовки (Renderable)
   let color = '#7f8c8d';
@@ -113,7 +120,7 @@ export function assembleItem(
   const size = radius * 1.6;
   const renderable: RenderableComponent = {
     zIndex: RENDER_Z_INDEX.ITEMS,
-    isVisible: true,
+    isVisible: !isPossessed,
     syncWithTransform: true,
     primitives: [
       {

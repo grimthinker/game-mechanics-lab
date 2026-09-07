@@ -78,7 +78,7 @@ export class RenderSyncSystem {
         const aiStats = world.getComponent(id, 'aiStats');
         const physStats = world.getComponent(id, 'physicsStats');
 
-        const isAlive = health ? health.isAlive && health.current > 0 : true;
+        const isAlive = health ? health.isAlive : true;
         const state = meta?.state ?? 'idle';
         const radius = physStats ? physStats.radius.current : 16;
 

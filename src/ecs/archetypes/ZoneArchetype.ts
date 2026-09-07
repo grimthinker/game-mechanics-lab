@@ -135,8 +135,6 @@ export function assembleZone(
   body.isStatic = false;
   const category = CollisionCategory.TRIGGER_ZONE;
   const mask = CollisionCategory.CREATURE;
-  (body as any).category = category;
-  (body as any).mask = mask;
   world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask, isTrigger: true });
   physics.registerBody(id, body);
 

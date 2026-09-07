@@ -145,37 +145,35 @@ export const WeaponFormFields: React.FC<{
         />
       </label>
     )}
-    {['forward_line', 'shrapnel'].includes(values.hitZoneType) && (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            disabled={isReadOnly}
-            type="checkbox"
-            checked={values.pierceObstacles}
-            onChange={(e) => onChange({ pierceObstacles: e.target.checked })}
-          />
-          Пробивать препятствия
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            disabled={isReadOnly}
-            type="checkbox"
-            checked={values.pierceCreatures}
-            onChange={(e) => onChange({ pierceCreatures: e.target.checked })}
-          />
-          Пробивать существ
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-          <input
-            disabled={isReadOnly}
-            type="checkbox"
-            checked={values.pierceItems}
-            onChange={(e) => onChange({ pierceItems: e.target.checked })}
-          />
-          Пробивать предметы
-        </label>
-      </div>
-    )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+        <input
+          disabled={isReadOnly}
+          type="checkbox"
+          checked={values.pierceObstacles}
+          onChange={(e) => onChange({ pierceObstacles: e.target.checked })}
+        />
+        Пробивать препятствия
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+        <input
+          disabled={isReadOnly}
+          type="checkbox"
+          checked={values.pierceCreatures}
+          onChange={(e) => onChange({ pierceCreatures: e.target.checked })}
+        />
+        Пробивать существ
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+        <input
+          disabled={isReadOnly}
+          type="checkbox"
+          checked={values.pierceItems}
+          onChange={(e) => onChange({ pierceItems: e.target.checked })}
+        />
+        Пробивать предметы
+      </label>
+    </div>
   </div>
 );
 

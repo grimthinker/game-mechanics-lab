@@ -438,6 +438,7 @@ export interface EntityConfig {
   inventory?: InventorySetup;
   equip?: EquipSlot[];
   meta?: { name?: string; entityType?: string };
+  ownership?: OwnershipComponent;
   weaponStats?: Partial<WeaponCombatConfig>;
   weaponZone?: HitZoneConfig;
   armorStats?: Partial<ArmorCombatConfig>;
