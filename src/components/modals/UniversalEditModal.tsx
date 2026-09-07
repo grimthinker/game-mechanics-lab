@@ -8,6 +8,7 @@ import {
   StandardRadius,
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
+  isValidStandardRadius,
 } from '../../ecs/types';
 import {
   MetaInspector,
@@ -45,7 +46,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   isOpen,
   entityId,
   world,
-  physics,
+  physics: _physics,
   aiSystem,
   isReadOnly,
   onClose,
@@ -54,7 +55,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 }) => {
   const [draftName, setDraftName] = useState('');
   const [draftPhysics, setDraftPhysics] = useState<{
-    radius: StandardRadius;
+    radius: number;
     weight: number;
     isSolid: boolean;
   }>({
@@ -81,7 +82,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     const physStats = world.getComponent(entityId, 'physicsStats');
     const physBody = world.getComponent(entityId, 'physicsBody');
     setDraftPhysics({
-      radius: (physStats?.radius.base ?? physBody?.body.r ?? 16) as StandardRadius,
+      radius: physStats?.radius.base ?? physBody?.body.r ?? 16,
       weight: physStats?.weight.base ?? 10,
       isSolid: physStats?.isSolid ?? (physBody ? physBody.mask !== 0 : true),
     });
@@ -127,7 +128,6 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     if (wStats && wZone) {
       setDraftWeapon({
         name: meta?.name ?? item?.name ?? 'Оружие',
-        weight: physStats?.weight.base ?? 1,
         baseDamage: wStats.baseDamage.base,
         prepTime: wStats.prepTime.base,
         recoveryTime: wStats.recoveryTime.base,
@@ -152,7 +152,6 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       aStats
         ? {
             name: meta?.name ?? item?.name ?? 'Броня',
-            weight: physStats?.weight.base ?? 1,
             defense: aStats.defense.base,
             flatReduction: aStats.flatReduction.base,
           }
@@ -164,7 +163,6 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       inv && item?.type === 'bag'
         ? {
             name: meta?.name ?? item.name,
-            weight: physStats?.weight.current ?? 1,
             width: inv.size.width,
             height: inv.size.height,
           }
@@ -201,6 +199,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   };
 
   const handleApply = () => {
+    const archetype = world.getComponent(entityId, 'tag')?.archetype;
+
     // 1. Мета
     const meta = world.getComponent(entityId, 'meta');
     if (meta) meta.name = draftName;
@@ -209,18 +209,28 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
     // 2. Физика
     const physStats = world.getComponent(entityId, 'physicsStats');
+    const physBody = world.getComponent(entityId, 'physicsBody');
+
     if (physStats) {
-      const cleanWeight = Math.round(Math.max(0.1, draftPhysics.weight) * 10) / 10;
-      setBaseStat(physStats.radius as any, draftPhysics.radius);
+      const targetWeight = draftPhysics.weight;
+      const cleanWeight = Math.round(Math.max(0.1, targetWeight) * 10) / 10;
+
+      let finalRadius = draftPhysics.radius;
+      if (archetype === 'creature') {
+        finalRadius = isValidStandardRadius(draftPhysics.radius)
+          ? draftPhysics.radius
+          : (16 as StandardRadius);
+      }
+
+      setBaseStat(physStats.radius, finalRadius);
       setBaseStat(physStats.weight, cleanWeight);
       physStats.isSolid = draftPhysics.isSolid;
-    }
 
-    const physBody = world.getComponent(entityId, 'physicsBody');
-    if (physBody) {
-      physBody.body.r = draftPhysics.radius;
-      physBody.mask = draftPhysics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-      (physBody.body as any).mask = physBody.mask;
+      if (physBody) {
+        physBody.body.r = finalRadius;
+        physBody.mask = draftPhysics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        (physBody.body as any).mask = physBody.mask;
+      }
     }
 
     // 3. Здоровье
@@ -278,6 +288,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     // 7. Триггерная зона
     if (draftZone) {
       world.addComponent(entityId, 'zoneTrigger', { ...draftZone });
+      if (physStats) {
+        setBaseStat(physStats.radius, draftZone.radius);
+      }
       if (physBody) {
         physBody.body.r = draftZone.radius;
       }
@@ -352,6 +365,10 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   const inv = world.getComponent(entityId, 'inventory');
   const isBagEmpty = !inv || inv.slots.every((r) => r.every((c) => !c.itemId));
 
+  const currentArchetype = world.getComponent(entityId, 'tag')?.archetype;
+  const showPhysicsInspector = currentArchetype === 'creature' || currentArchetype === 'item';
+  const isStandardRadiusOnly = currentArchetype === 'creature';
+
   return (
     <div
       className="modal"
@@ -366,11 +383,14 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <MetaInspector name={draftName} onChange={setDraftName} isReadOnly={isReadOnly} />
 
-          <PhysicsInspector
-            values={draftPhysics}
-            onChange={(patch) => setDraftPhysics((prev) => ({ ...prev, ...patch }))}
-            isReadOnly={isReadOnly}
-          />
+          {showPhysicsInspector && (
+            <PhysicsInspector
+              values={draftPhysics}
+              onChange={(patch) => setDraftPhysics((prev) => ({ ...prev, ...patch }))}
+              isReadOnly={isReadOnly}
+              isStandardRadiusOnly={isStandardRadiusOnly}
+            />
+          )}
 
           {draftHealth && (
             <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #333' }}>

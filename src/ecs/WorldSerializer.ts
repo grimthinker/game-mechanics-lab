@@ -57,33 +57,7 @@ export class WorldSerializer {
           }
         }
 
-        // 2. Реставрация физического тела для объектов с физикой
-        if (comps.physicsStats && comps.transform) {
-          const radius = comps.physicsStats.radius.current;
-          const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
-          body.isStatic = false;
-
-          const isItem = comps.tag?.archetype === 'item' || !!comps.item;
-          const category = isItem ? CollisionCategory.ITEM : CollisionCategory.CREATURE;
-          const mask = comps.physicsStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-
-          (body as any).category = category;
-          (body as any).mask = mask;
-          this.app.world.addComponent(ent.id, 'physicsBody', {
-            body,
-            isStatic: false,
-            category,
-            mask,
-          });
-          this.app.physics.registerBody(ent.id, body);
-        }
-
-        // 3. Реинициализация дерева поведения ИИ
-        if (comps.aiStats) {
-          this.app.aiSystem.initBotBrain(this.app.world, ent.id, comps.aiStats.behavior.current);
-        }
-
-        // 4. Реинициализация транзиентных рантайм-компонентов и нормализация характеристик
+        // 2. Нормализация характеристик до создания физики
         const normalizeStat = (stat: any) => {
           if (stat && typeof stat === 'object' && 'base' in stat) {
             stat.modifiers = Array.isArray(stat.modifiers) ? stat.modifiers : [];
@@ -123,6 +97,44 @@ export class WorldSerializer {
           normalizeStat(comps.armorStats.flatReduction);
         }
 
+        // 3. Реставрация физического тела для объектов с физикой
+        if (comps.physicsStats && comps.transform) {
+          // Гарантированное определение архетипа, даже если компонент tag поврежден или отсутствует
+          const archetype =
+            comps.tag?.archetype ?? (comps.zoneTrigger ? 'zone' : comps.item ? 'item' : 'creature');
+
+          if (archetype !== 'marker') {
+            const radius = comps.physicsStats.radius.current;
+            const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
+
+            let isStatic = false;
+            let isTrigger = false;
+            let category = CollisionCategory.CREATURE;
+            let mask = comps.physicsStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+
+            if (archetype === 'item') {
+              category = CollisionCategory.ITEM;
+            } else if (archetype === 'zone') {
+              category = CollisionCategory.TRIGGER_ZONE;
+              mask = CollisionCategory.CREATURE;
+              isTrigger = true;
+              isStatic = false;
+            }
+
+            body.isStatic = isStatic;
+            (body as any).category = category;
+            (body as any).mask = mask;
+            this.app.world.addComponent(ent.id, 'physicsBody', {
+              body,
+              isStatic,
+              category,
+              mask,
+              isTrigger,
+            });
+            this.app.physics.registerBody(ent.id, body);
+          }
+        }
+
         if (comps.movementStats) {
           this.app.world.addComponent(ent.id, 'velocity', {
             currentSpeed: 0,
@@ -131,7 +143,7 @@ export class WorldSerializer {
           this.app.world.addComponent(ent.id, 'input', {
             isMovingForward: false,
             turnDirection: 0,
-            turnSpeed: 0 as Radians,
+            turnRatio: 0,
             isRunning: false,
             isCrouching: false,
             wantsAttack: false,

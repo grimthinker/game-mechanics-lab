@@ -127,12 +127,21 @@ export interface RenderableComponent {
   syncWithTransform?: boolean;
 }
 
-export type ZoneEffectType = 'damage' | 'heal';
+export type ZoneEffectType = 'damage' | 'heal' | 'repel' | 'attract';
 
 export interface ZoneTriggerComponent {
   effect: ZoneEffectType;
   valuePerSec: number;
   radius: number;
+  ignoreParent?: boolean;
+  destroyOnParentDeath?: boolean;
+  destroyOnParentRemoval?: boolean;
+}
+
+export interface AttachmentComponent {
+  parentId: EntityId;
+  offsetX?: number;
+  offsetY?: number;
 }
 
 export interface GizmoComponent {
@@ -161,10 +170,6 @@ export interface StatValue<T = number> {
   modifiers?: StatModifier[];
 }
 
-export type ComponentStats<T> = {
-  [K in keyof Required<T>]: StatValue<Required<T>[K]>;
-};
-
 export interface VelocityComponent {
   currentSpeed: number;
   currentTurnSpeed: Radians;
@@ -173,7 +178,7 @@ export interface VelocityComponent {
 export interface InputComponent {
   isMovingForward: boolean;
   turnDirection: -1 | 0 | 1;
-  turnSpeed: Radians;
+  turnRatio: number;
   isRunning: boolean;
   isCrouching: boolean;
   wantsAttack: boolean;
@@ -259,6 +264,7 @@ export interface EntityComponents {
   tag?: TagComponent;
   renderable?: RenderableComponent;
   zoneTrigger?: ZoneTriggerComponent;
+  attachment?: AttachmentComponent;
   transform?: TransformComponent;
   physicsBody?: PhysicsBodyComponent;
   velocity?: VelocityComponent;
@@ -285,6 +291,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'tag',
   'renderable',
   'zoneTrigger',
+  'attachment',
   'health',
   'transform',
   'physicsStats',
@@ -305,6 +312,10 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
 
+export function isValidStandardRadius(radius: number): radius is StandardRadius {
+  return (STANDARD_RADII as readonly number[]).includes(radius);
+}
+
 export type CreatureState = 'idle' | 'moving' | 'running' | 'crouching' | 'attacking' | 'dead';
 
 export type HitZoneType = 'radius' | 'angle' | 'forward_line' | 'shrapnel';
@@ -315,13 +326,13 @@ export type InventorySize = {
 };
 
 export interface PhysicsConfig {
-  radius: StandardRadius;
+  radius: number;
   weight: number;
   isSolid?: boolean;
 }
 
 export interface PhysicsStatsComponent {
-  radius: StatValue<StandardRadius>;
+  radius: StatValue<number>;
   weight: StatValue<number>;
   isSolid: boolean;
 }
@@ -433,6 +444,7 @@ export interface EntityConfig {
   tag?: TagComponent;
   renderable?: RenderableComponent;
   zoneTrigger?: ZoneTriggerComponent;
+  attachment?: AttachmentComponent;
   gizmo?: GizmoComponent;
   physics?: PhysicsConfig;
   health?: HealthConfig;

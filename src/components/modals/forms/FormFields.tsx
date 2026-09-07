@@ -5,7 +5,6 @@ import { Degrees } from '../../../utils';
 
 export interface WeaponFormValues {
   name: string;
-  weight: number;
   baseDamage: number;
   prepTime: number;
   recoveryTime: number;
@@ -54,17 +53,6 @@ export const WeaponFormFields: React.FC<{
         <option value="forward_line">{HIT_ZONE_LABELS.forward_line}</option>
         <option value="shrapnel">{HIT_ZONE_LABELS.shrapnel}</option>
       </select>
-    </label>
-    <label>
-      Вес:
-      <input
-        disabled={isReadOnly}
-        type="number"
-        value={values.weight}
-        min={0}
-        max={100}
-        onChange={(e) => onChange({ weight: Number(e.target.value) })}
-      />
     </label>
     <label>
       Базовый урон:
@@ -195,7 +183,6 @@ export interface ArmorFormValues {
   name: string;
   defense: number;
   flatReduction: number;
-  weight: number;
 }
 
 export const ArmorFormFields: React.FC<{
@@ -211,17 +198,6 @@ export const ArmorFormFields: React.FC<{
         type="text"
         value={values.name}
         onChange={(e) => onChange({ name: e.target.value })}
-      />
-    </label>
-    <label>
-      Вес:
-      <input
-        disabled={isReadOnly}
-        type="number"
-        value={values.weight}
-        min={0}
-        max={100}
-        onChange={(e) => onChange({ weight: Number(e.target.value) })}
       />
     </label>
     <label>
@@ -253,7 +229,6 @@ export interface BagFormValues {
   name: string;
   width: number;
   height: number;
-  weight: number;
 }
 
 export const BagFormFields: React.FC<{
@@ -270,17 +245,6 @@ export const BagFormFields: React.FC<{
         type="text"
         value={values.name}
         onChange={(e) => onChange({ name: e.target.value })}
-      />
-    </label>
-    <label>
-      Вес:
-      <input
-        disabled={isReadOnly}
-        type="number"
-        value={values.weight}
-        min={0}
-        max={100}
-        onChange={(e) => onChange({ weight: Number(e.target.value) })}
       />
     </label>
     <label>

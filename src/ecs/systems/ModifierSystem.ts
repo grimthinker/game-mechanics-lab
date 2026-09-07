@@ -8,7 +8,10 @@ export class ModifierSystem {
 
     for (const [_id, comp] of entities) {
       if (comp.health?.max) {
-        this.tickStatModifiers(comp.health.max, dt);
+        const expired = this.tickStatModifiers(comp.health.max, dt);
+        if (expired) {
+          comp.health.current = Math.min(comp.health.current, comp.health.max.current);
+        }
       }
       if (comp.movementStats) {
         this.tickStatModifiers(comp.movementStats.maxSpeed, dt);
@@ -18,7 +21,7 @@ export class ModifierSystem {
         this.tickStatModifiers(comp.stealthStats.stealthPower, dt);
       }
       if (comp.physicsStats) {
-        this.tickStatModifiers(comp.physicsStats.radius as any, dt);
+        this.tickStatModifiers(comp.physicsStats.radius, dt);
         this.tickStatModifiers(comp.physicsStats.weight, dt);
       }
       if (comp.weaponStats) {
@@ -33,8 +36,8 @@ export class ModifierSystem {
     }
   }
 
-  private tickStatModifiers(stat: StatValue<any> | undefined, dt: number): void {
-    if (!stat || !stat.modifiers || stat.modifiers.length === 0) return;
+  private tickStatModifiers(stat: StatValue<any> | undefined, dt: number): boolean {
+    if (!stat || !stat.modifiers || stat.modifiers.length === 0) return false;
 
     let hasExpired = false;
 
@@ -52,5 +55,7 @@ export class ModifierSystem {
     if (hasExpired) {
       stat.current = evaluateStat(stat);
     }
+
+    return hasExpired;
   }
 }

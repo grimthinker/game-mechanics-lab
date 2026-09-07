@@ -88,13 +88,14 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get isAlive(): boolean {
     const h = this.world.getComponent(this.id, 'health');
-    return h ? (h.isAlive && h.current > 0) : false;
+    return h ? h.isAlive && h.current > 0 : false;
   }
   public get maxSpeed(): number {
     return this.world.getComponent(this.id, 'movementStats')?.maxSpeed.current ?? 0;
   }
   public get maxTurnSpeed(): Radians {
-    return (this.world.getComponent(this.id, 'movementStats')?.maxTurnSpeed.current ?? 0) as Radians;
+    return (this.world.getComponent(this.id, 'movementStats')?.maxTurnSpeed.current ??
+      0) as Radians;
   }
   public get currentSpeed(): number {
     return this.world.getComponent(this.id, 'velocity')?.currentSpeed ?? 0;
@@ -177,18 +178,17 @@ export class EntityAdapter implements IMovable, EntityController {
   public startTurning(direction: -1 | 1, ratio = 1): void {
     const input = this.world.getComponent(this.id, 'input');
     const health = this.world.getComponent(this.id, 'health');
-    const moveStats = this.world.getComponent(this.id, 'movementStats');
-    const maxTurnSpeed = moveStats ? moveStats.maxTurnSpeed.current : (0 as Radians);
-    const turnSpeed = (maxTurnSpeed * ratio) as Radians;
     if (input && health?.isAlive && this.hp > 0) {
       input.turnDirection = direction;
-      input.turnSpeed = turnSpeed;
+      input.turnRatio = Math.max(0, Math.min(1, ratio));
     }
   }
   public stopTurning(): void {
     const input = this.world.getComponent(this.id, 'input');
-    if (input) input.turnDirection = 0;
-    if (input) input.turnSpeed = 0 as Radians;
+    if (input) {
+      input.turnDirection = 0;
+      input.turnRatio = 0;
+    }
   }
   public startRunning(): void {
     const input = this.world.getComponent(this.id, 'input');
@@ -220,7 +220,7 @@ export class EntityAdapter implements IMovable, EntityController {
     if (input) {
       input.isMovingForward = false;
       input.turnDirection = 0;
-      input.turnSpeed = 0 as Radians;
+      input.turnRatio = 0;
       input.wantsAttack = false;
       input.attackSlotIndex = undefined;
     }

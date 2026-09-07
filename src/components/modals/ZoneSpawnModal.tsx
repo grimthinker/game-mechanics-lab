@@ -36,11 +36,13 @@ export const ZoneSpawnModal: React.FC<ZoneSpawnModalProps> = ({ isOpen, onClose,
             <select value={effect} onChange={(e) => setEffect(e.target.value as ZoneEffectType)}>
               <option value="damage">Урон (Огонь / Лава / Яд)</option>
               <option value="heal">Лечение (Источник жизни)</option>
+              <option value="repel">Отталкивание (Силовое поле)</option>
+              <option value="attract">Притягивание (Воронка / Гравитация)</option>
             </select>
           </label>
 
           <label>
-            Сила эффекта (HP / сек):
+            Сила эффекта:
             <input
               type="number"
               value={valuePerSec}

@@ -21,7 +21,6 @@ const createInitialWeaponState = () => {
   const preset = createRandomWeaponPreset();
   const values: WeaponFormValues = {
     name: preset.name,
-    weight: preset.weight,
     baseDamage: preset.combat.baseDamage,
     prepTime: preset.combat.prepTime,
     recoveryTime: preset.combat.recoveryTime,
@@ -44,6 +43,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
   const [type, setType] = useState<'weapon' | 'armor' | 'bag'>('weapon');
   const [isSolid, setIsSolid] = useState(true);
   const [radius, setRadius] = useState<StandardRadius>(16);
+  const [weight, setWeight] = useState<number>(1);
 
   const [initialWeapon] = useState(createInitialWeaponState);
   const [weaponValues, setWeaponValues] = useState<WeaponFormValues>(initialWeapon.values);
@@ -52,14 +52,12 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
     name: 'Новая броня',
     defense: 15,
     flatReduction: 3,
-    weight: 3,
   });
 
   const [bagValues, setBagValues] = useState<BagFormValues>({
     name: 'Новый рюкзак',
     width: 6,
     height: 4,
-    weight: 1,
   });
 
   if (!isOpen) return null;
@@ -103,7 +101,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
 
       config = {
         item: { name: weaponValues.name, type: 'weapon', maxStack: 1 },
-        physics: { radius, weight: weaponValues.weight, isSolid },
+        physics: { radius, weight, isSolid },
         weaponStats: {
           baseDamage: weaponValues.baseDamage,
           prepTime: weaponValues.prepTime,
@@ -114,7 +112,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
     } else if (type === 'armor') {
       config = {
         item: { name: armorValues.name, type: 'armor', maxStack: 1 },
-        physics: { radius, weight: armorValues.weight, isSolid },
+        physics: { radius, weight, isSolid },
         armorStats: {
           defense: armorValues.defense,
           flatReduction: armorValues.flatReduction,
@@ -123,7 +121,7 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
     } else {
       config = {
         item: { name: bagValues.name, type: 'bag', maxStack: 1 },
-        physics: { radius, weight: bagValues.weight, isSolid },
+        physics: { radius, weight, isSolid },
         inventory: {
           size: { width: bagValues.width, height: bagValues.height },
         },
@@ -175,19 +173,29 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
 
           {isSolid && (
             <label>
-              Радиус тела:
-              <select
+              Радиус тела (px):
+              <input
+                type="number"
                 value={radius}
-                onChange={(e) => setRadius(Number(e.target.value) as StandardRadius)}
-              >
-                {STANDARD_RADII.map((r) => (
-                  <option key={r} value={r}>
-                    {r} px
-                  </option>
-                ))}
-              </select>
+                min={1}
+                max={500}
+                step={1}
+                onChange={(e) => setRadius(Math.max(1, Number(e.target.value)) as StandardRadius)}
+              />
             </label>
           )}
+
+          <label>
+            Масса (Вес):
+            <input
+              type="number"
+              value={weight}
+              min={0.1}
+              max={100}
+              step={0.5}
+              onChange={(e) => setWeight(Math.round(Number(e.target.value) * 10) / 10)}
+            />
+          </label>
 
           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #333' }}>
             {type === 'weapon' && (

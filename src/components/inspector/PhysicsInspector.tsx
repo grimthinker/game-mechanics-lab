@@ -2,7 +2,7 @@ import React from 'react';
 import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
 
 export interface PhysicsInspectorValues {
-  radius: StandardRadius;
+  radius: number;
   weight: number;
   isSolid: boolean;
 }
@@ -11,12 +11,14 @@ export interface PhysicsInspectorProps {
   values: PhysicsInspectorValues;
   onChange: (patch: Partial<PhysicsInspectorValues>) => void;
   isReadOnly?: boolean;
+  isStandardRadiusOnly?: boolean;
 }
 
 export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   values,
   onChange,
   isReadOnly,
+  isStandardRadiusOnly = false,
 }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
     <label
@@ -37,18 +39,30 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
     </label>
 
     <label>
-      Радиус:
-      <select
-        disabled={isReadOnly}
-        value={values.radius}
-        onChange={(e) => onChange({ radius: Number(e.target.value) as StandardRadius })}
-      >
-        {STANDARD_RADII.map((r) => (
-          <option key={r} value={r}>
-            {r} px
-          </option>
-        ))}
-      </select>
+      Радиус (px):
+      {isStandardRadiusOnly ? (
+        <select
+          disabled={isReadOnly}
+          value={values.radius}
+          onChange={(e) => onChange({ radius: Number(e.target.value) as StandardRadius })}
+        >
+          {STANDARD_RADII.map((r) => (
+            <option key={r} value={r}>
+              {r} px
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          disabled={isReadOnly}
+          type="number"
+          value={values.radius}
+          min={1}
+          max={1000}
+          step={1}
+          onChange={(e) => onChange({ radius: Math.max(1, Number(e.target.value)) })}
+        />
+      )}
     </label>
 
     <label>

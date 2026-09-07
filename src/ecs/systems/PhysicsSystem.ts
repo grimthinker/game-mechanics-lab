@@ -37,6 +37,10 @@ export class PhysicsSystem {
     this.system.remove(body);
   }
 
+  public getEntityByBody(body: object): EntityId | undefined {
+    return this.bodyToEntityMap.get(body);
+  }
+
   public loadObstacles(segments: ObstacleSegment[]): void {
     this.clearObstacles();
     for (const seg of segments) {
@@ -137,35 +141,37 @@ export class PhysicsSystem {
     worldPoint: Point,
     maxWorldDist: number,
     world?: World,
-    isEditor: boolean = false // <-- передаем флаг режима редактора
+    isEditor: boolean = false
   ): EntityId | null {
     if (!world) return null;
 
     let nearestId: EntityId | null = null;
     let minDistance = Infinity;
+    let bestZIndex = -Infinity;
 
     const entities = world.getEntitiesWith('transform');
     for (const [entityId, { transform, physicsBody }] of entities) {
       const physStats = world.getComponent(entityId, 'physicsStats');
       const gizmo = world.getComponent(entityId, 'gizmo');
+      const renderable = world.getComponent(entityId, 'renderable');
 
-      // 1. В ИГРЕ И СИМУЛЯЦИИ:
-      // Полностью игнорируем сущности без реального физ. тела
-      if (!isEditor) {
-        if (!physicsBody && !physStats) continue;
-      }
+      if (!isEditor && !physicsBody && !physStats) continue;
 
-      // 2. В РЕДАКТОРЕ:
-      // Если объект бестелесный, берем радиус его гизмо (или дефолтный 14px).
-      // Если физический — берем его настоящий физический радиус.
       const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
-
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       const distToBoundary = Math.max(0, distToCenter - radius);
 
-      if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
-        minDistance = distToBoundary;
-        nearestId = entityId;
+      if (distToBoundary <= maxWorldDist) {
+        const zIndex = renderable?.zIndex ?? 0;
+
+        if (distToBoundary < minDistance - 0.001) {
+          minDistance = distToBoundary;
+          nearestId = entityId;
+          bestZIndex = zIndex;
+        } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
+          nearestId = entityId;
+          bestZIndex = zIndex;
+        }
       }
     }
 
@@ -176,20 +182,26 @@ export class PhysicsSystem {
     if (!world) return null;
 
     const entities = world.getEntitiesWith('transform');
+    const hits: { id: EntityId; zIndex: number }[] = [];
+
     for (const [entityId, { transform, physicsBody }] of entities) {
       const physStats = world.getComponent(entityId, 'physicsStats');
       const gizmo = world.getComponent(entityId, 'gizmo');
+      const renderable = world.getComponent(entityId, 'renderable');
 
       if (!isEditor && !physicsBody && !physStats) continue;
 
       const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
       const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       if (dist <= radius) {
-        return entityId;
+        hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
       }
     }
 
-    return null;
+    if (hits.length === 0) return null;
+    // Тот, кто выше по zIndex, имеет безусловный приоритет выбора кликом
+    hits.sort((a, b) => b.zIndex - a.zIndex);
+    return hits[0].id;
   }
 
   public update(dt: number, world: World): void {
@@ -278,6 +290,7 @@ export class PhysicsSystem {
       for (const [id, { physicsBody, transform }] of entities) {
         const health = world.getComponent(id, 'health');
         if (health && !health.isAlive) continue;
+        if (physicsBody.isTrigger) continue;
         if ((physicsBody.mask & CollisionCategory.OBSTACLE) === 0) continue;
 
         this.resolveObstaclesForBody(physicsBody.body);
@@ -325,7 +338,9 @@ export class PhysicsSystem {
         const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
         const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
         const isDead = hitHealth && (!hitHealth.isAlive || hitHealth.current <= 0);
-        const isNonSolid = (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) || (hitPhysStats && !hitPhysStats.isSolid);
+        const isNonSolid =
+          (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) ||
+          (hitPhysStats && !hitPhysStats.isSolid);
 
         if (isDead || isNonSolid) {
           currStart = {
@@ -435,7 +450,7 @@ export class PhysicsSystem {
       if (targetId === attackerId || !health.isAlive || health.current <= 0) continue;
 
       const physStats = world.getComponent(targetId, 'physicsStats');
-      const isSolid = physStats ? physStats.isSolid : (physicsBody.mask !== COLLISION_MASK_NONE);
+      const isSolid = physStats ? physStats.isSolid : physicsBody.mask !== COLLISION_MASK_NONE;
       if (!isSolid) continue;
 
       const targetRadius = physStats?.radius.current ?? physicsBody.body.r ?? 16;

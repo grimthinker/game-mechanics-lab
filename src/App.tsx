@@ -149,11 +149,20 @@ export const App: React.FC = () => {
       x: 100 + Math.random() * Math.max(0, canvasRef.current.width - 200),
       y: 100 + Math.random() * Math.max(0, canvasRef.current.height - 200),
     };
-    app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+    const playerId = app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
 
-    // Спавним рядом с игроком зону урона и зону лечения
-    app.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 160, y: spawnPos.y });
-    app.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 160, y: spawnPos.y });
+    // Тестовая аура отталкивания, привязанная к игроку
+    app.spawnEntity(
+      {
+        ...createZoneConfig('repel', 65, 30, 'Аура отталкивания', true, true, true),
+        attachment: { parentId: playerId },
+      },
+      spawnPos
+    );
+
+    // Стационарные зоны на земле
+    app.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 180, y: spawnPos.y });
+    app.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 180, y: spawnPos.y });
 
     updateStats();
 
@@ -369,13 +378,20 @@ export const App: React.FC = () => {
               x: canvas ? canvas.width / 2 : 300,
               y: canvas ? canvas.height / 2 : 300,
             };
-            app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+            const playerId = app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+            app.spawnEntity(
+              {
+                ...createZoneConfig('repel', 65, 30, 'Аура отталкивания', true, true, true),
+                attachment: { parentId: playerId },
+              },
+              spawnPos
+            );
             app.spawnEntity(createZoneConfig('damage', 70, 15), {
-              x: spawnPos.x + 160,
+              x: spawnPos.x + 180,
               y: spawnPos.y,
             });
             app.spawnEntity(createZoneConfig('heal', 70, 15), {
-              x: spawnPos.x - 160,
+              x: spawnPos.x - 180,
               y: spawnPos.y,
             });
           }

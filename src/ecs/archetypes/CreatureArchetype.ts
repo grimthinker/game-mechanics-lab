@@ -10,6 +10,7 @@ import {
   COLLISION_MASK_NONE,
   RENDER_Z_INDEX,
   RenderableComponent,
+  isValidStandardRadius,
 } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
@@ -24,7 +25,8 @@ export function assembleCreature(
   position?: Point
 ): void {
   const behavior = config.ai?.behavior ?? 'IdleTree';
-  const radius = config.physics?.radius ?? 16;
+  const rawRadius = config.physics?.radius ?? 16;
+  const radius = isValidStandardRadius(rawRadius) ? rawRadius : 16;
   const weight = config.physics?.weight ?? 10;
   const isSolid = config.physics?.isSolid ?? true;
   const maxHp = config.health?.maxHp ?? 100;
@@ -42,7 +44,7 @@ export function assembleCreature(
 
   // 3. Физические характеристики
   world.addComponent(id, 'physicsStats', {
-    radius: createStat(radius) as any,
+    radius: createStat(radius),
     weight: createStat(weight),
     isSolid,
   });
@@ -71,7 +73,7 @@ export function assembleCreature(
   world.addComponent(id, 'input', {
     isMovingForward: false,
     turnDirection: 0,
-    turnSpeed: 0 as Radians,
+    turnRatio: 0,
     isRunning: false,
     isCrouching: false,
     wantsAttack: false,

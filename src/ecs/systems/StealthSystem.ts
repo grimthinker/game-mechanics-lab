@@ -10,9 +10,15 @@ export class StealthSystem {
       if (!health.isAlive || health.current <= 0) {
         removeModifier(stealthStats.stealthPower, 'state_crouch_stealth');
         removeModifier(stealthStats.stealthPower, 'state_run_stealth');
-        stealthStats.stealthPower.current = 0;
+        addModifier(stealthStats.stealthPower, {
+          id: 'state_dead_stealth',
+          type: ModifierType.PERCENT_MULT,
+          value: 0,
+        });
         continue;
       }
+
+      removeModifier(stealthStats.stealthPower, 'state_dead_stealth');
 
       if (input.isCrouching) {
         addModifier(stealthStats.stealthPower, {

@@ -20,15 +20,10 @@ export class MovementSystem {
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
       if (!health.isAlive || health.current <= 0) {
-        velocity.currentSpeed = 0;
-        velocity.currentTurnSpeed = 0 as Radians;
-        meta.state = 'dead';
-        removeModifier(movementStats.maxSpeed, 'state_run_speed');
-        removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
-        removeModifier(movementStats.maxSpeed, 'attack_slow_move');
-        removeModifier(movementStats.maxTurnSpeed as any, 'state_run_turn');
-        removeModifier(movementStats.maxTurnSpeed as any, 'state_crouch_turn');
-        removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
+        if (velocity.currentSpeed !== 0 || velocity.currentTurnSpeed !== 0) {
+          velocity.currentSpeed = 0;
+          velocity.currentTurnSpeed = 0 as Radians;
+        }
         continue;
       }
 
@@ -116,8 +111,8 @@ export class MovementSystem {
       // 3. Линейная скорость (maxSpeed.current уже учитывает все модификаторы)
       velocity.currentSpeed = input.isMovingForward ? movementStats.maxSpeed.current : 0;
 
-      // 4. Скорость поворота
-      const turnSpeed = Math.min(movementStats.maxTurnSpeed.current, input.turnSpeed);
+      // 4. Скорость поворота (вычисляется из актуального максимума и намерения ввода turnRatio)
+      const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
       velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
 
       // 5. Поворот

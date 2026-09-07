@@ -8,6 +8,7 @@ import { AISystem } from './ecs/systems/AISystem';
 import { RenderSyncSystem } from './ecs/systems/RenderSyncSystem';
 import { ZoneTriggerSystem } from './ecs/systems/ZoneTriggerSystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
+import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
 import { ObstacleSegment, Point } from './types';
@@ -32,6 +33,7 @@ export class GameApp {
   private renderSyncSystem: RenderSyncSystem;
   private zoneTriggerSystem: ZoneTriggerSystem;
   private modifierSystem: ModifierSystem;
+  private attachmentSystem: AttachmentSystem;
   public camera: Camera;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
@@ -62,6 +64,7 @@ export class GameApp {
     this.renderSyncSystem = new RenderSyncSystem();
     this.zoneTriggerSystem = new ZoneTriggerSystem();
     this.modifierSystem = new ModifierSystem();
+    this.attachmentSystem = new AttachmentSystem();
     this.camera = new Camera();
     this.entityFactory = new EntityFactory();
     this.serializer = new WorldSerializer(this);
@@ -162,8 +165,9 @@ export class GameApp {
       this.attackSystem.update(dt, this.world, this.physics);
       this.movementSystem.update(dt, this.world);
       this.stealthSystem.update(dt, this.world);
-      this.zoneTriggerSystem.update(dt, this.world);
+      this.attachmentSystem.update(this.world, this.physics);
       this.physics.update(dt, this.world);
+      this.zoneTriggerSystem.update(dt, this.world, this.physics);
       this.damageSystem.update(dt, this.world);
     }
 
@@ -267,6 +271,7 @@ export class GameApp {
     if (phys && phys.body) {
       phys.body.setPosition(newX, newY);
     }
+    this.attachmentSystem.update(this.world, this.physics);
   }
 
   public cancelEntityDrag(): void {
@@ -285,6 +290,7 @@ export class GameApp {
     if (phys && phys.body) {
       phys.body.setPosition(this.draggedEntityOriginalPos.x, this.draggedEntityOriginalPos.y);
     }
+    this.attachmentSystem.update(this.world, this.physics);
     this.draggedEntityId = null;
     this.draggedEntityOriginalPos = null;
   }

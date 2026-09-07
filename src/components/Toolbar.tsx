@@ -79,6 +79,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     selectedEntityId && world ? world.getComponent(selectedEntityId, 'aiStats') : undefined;
   const zoneTrigger =
     selectedEntityId && world ? world.getComponent(selectedEntityId, 'zoneTrigger') : undefined;
+  const attachment =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'attachment') : undefined;
   const weaponStats =
     selectedEntityId && world ? world.getComponent(selectedEntityId, 'weaponStats') : undefined;
   const armorStats =
@@ -298,16 +300,37 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Тип эффекта:</dt>
-                    <dd>{zoneTrigger.effect === 'damage' ? 'Урон' : 'Лечение'}</dd>
+                    <dd>
+                      {zoneTrigger.effect === 'damage'
+                        ? 'Урон'
+                        : zoneTrigger.effect === 'heal'
+                          ? 'Лечение'
+                          : zoneTrigger.effect === 'repel'
+                            ? 'Отталкивание (Силовое поле)'
+                            : 'Притягивание (Воронка)'}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Сила эффекта:</dt>
-                    <dd>{zoneTrigger.valuePerSec} HP/с</dd>
+                    <dd>
+                      {zoneTrigger.valuePerSec}{' '}
+                      {zoneTrigger.effect === 'damage' || zoneTrigger.effect === 'heal'
+                        ? 'HP/с'
+                        : 'px/с'}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Радиус зоны:</dt>
                     <dd>{zoneTrigger.radius} px</dd>
                   </div>
+                  {attachment && (
+                    <div className="stat-row">
+                      <dt>Привязана к:</dt>
+                      <dd style={{ fontSize: '11px', wordBreak: 'break-all' }}>
+                        {attachment.parentId}
+                      </dd>
+                    </div>
+                  )}
                 </>
               )}
               {health && (
