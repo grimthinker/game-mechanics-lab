@@ -57,44 +57,41 @@ export class ZoneTriggerSystem {
             }
           }
         }
-        // 3. Отталкивание (Repel) с учетом массы
-        else if (zoneTrigger.effect === 'repel') {
+        // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и расстояния
+        else if (zoneTrigger.effect === 'repel' || zoneTrigger.effect === 'attract') {
           const targetTransform = world.getComponent(targetId, 'transform');
           const targetPhysStats = world.getComponent(targetId, 'physicsStats');
-          if (!targetTransform) return;
+          const velocity = world.getComponent(targetId, 'velocity');
+          if (!targetTransform || !velocity) return;
 
           const dx = targetTransform.x - zoneTransform.x;
           const dy = targetTransform.y - zoneTransform.y;
           const dist = Math.hypot(dx, dy);
+
+          if (zoneTrigger.effect === 'attract' && dist <= 4) return;
 
           const ux = dist > 0.001 ? dx / dist : Math.random() - 0.5;
           const uy = dist > 0.001 ? dy / dist : Math.random() - 0.5;
           const len = Math.hypot(ux, uy) || 1;
 
-          const weight = targetPhysStats?.weight.current ?? 1;
-          const forceSpeed = (zoneTrigger.valuePerSec / Math.max(0.1, weight)) * dt;
-
-          physics.moveEntitySafe(world, targetId, (ux / len) * forceSpeed, (uy / len) * forceSpeed);
-        }
-        // 4. Притягивание (Attract) с учетом массы
-        else if (zoneTrigger.effect === 'attract') {
-          const targetTransform = world.getComponent(targetId, 'transform');
-          const targetPhysStats = world.getComponent(targetId, 'physicsStats');
-          if (!targetTransform) return;
-
-          const dx = targetTransform.x - zoneTransform.x;
-          const dy = targetTransform.y - zoneTransform.y;
-          const dist = Math.hypot(dx, dy);
-
-          if (dist <= 4) return; // В эпицентре прекращаем дергать цель
-
-          const ux = dx / dist;
-          const uy = dy / dist;
+          let forceMagnitude = zoneTrigger.valuePerSec;
+          if (
+            zoneTrigger.distanceAttenuation &&
+            zoneTrigger.centerValue !== undefined &&
+            zoneTrigger.boundaryValue !== undefined
+          ) {
+            const radius = zoneTrigger.radius;
+            const t = Math.min(1, Math.max(0, dist / radius));
+            forceMagnitude =
+              zoneTrigger.centerValue + (zoneTrigger.boundaryValue - zoneTrigger.centerValue) * t;
+          }
 
           const weight = targetPhysStats?.weight.current ?? 1;
-          const forceSpeed = Math.min(dist, (zoneTrigger.valuePerSec / Math.max(0.1, weight)) * dt);
+          const acceleration = forceMagnitude / Math.max(0.1, weight);
 
-          physics.moveEntitySafe(world, targetId, -ux * forceSpeed, -uy * forceSpeed);
+          const sign = zoneTrigger.effect === 'repel' ? 1 : -1;
+          velocity.externalVx = (velocity.externalVx ?? 0) + sign * (ux / len) * acceleration * dt;
+          velocity.externalVy = (velocity.externalVy ?? 0) + sign * (uy / len) * acceleration * dt;
         }
       });
     }

@@ -162,6 +162,8 @@ export class WorldSerializer {
           this.app.world.addComponent(ent.id, 'velocity', {
             currentSpeed: 0,
             currentTurnSpeed: 0 as Radians,
+            externalVx: 0,
+            externalVy: 0,
           });
           this.app.world.addComponent(ent.id, 'input', {
             isMovingForward: false,

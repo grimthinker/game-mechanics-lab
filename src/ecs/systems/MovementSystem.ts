@@ -2,6 +2,7 @@ import { Radians } from '../../utils';
 import { World } from '../World';
 import { ModifierType } from '../types';
 import { addModifier, removeModifier } from '../stats/StatEvaluator';
+import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
 
 export class MovementSystem {
   public update(dt: number, world: World): void {
@@ -108,8 +109,17 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
       }
 
-      // 3. Линейная скорость (maxSpeed.current уже учитывает все модификаторы)
-      velocity.currentSpeed = input.isMovingForward ? movementStats.maxSpeed.current : 0;
+      // 3. Линейная скорость с плавным разгоном и торможением за заданное время из конфига
+      const targetSpeed = input.isMovingForward ? movementStats.maxSpeed.current : 0;
+      const maxSpd = movementStats.maxSpeed.current > 0 ? movementStats.maxSpeed.current : 1;
+
+      if (velocity.currentSpeed < targetSpeed) {
+        const accelRate = maxSpd / GAMEPLAY_CONFIG.accelerationTime;
+        velocity.currentSpeed = Math.min(targetSpeed, velocity.currentSpeed + accelRate * dt);
+      } else if (velocity.currentSpeed > targetSpeed) {
+        const decelRate = maxSpd / GAMEPLAY_CONFIG.decelerationTime;
+        velocity.currentSpeed = Math.max(targetSpeed, velocity.currentSpeed - decelRate * dt);
+      }
 
       // 4. Скорость поворота (вычисляется из актуального максимума и намерения ввода turnRatio)
       const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;

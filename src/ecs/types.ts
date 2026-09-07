@@ -135,6 +135,9 @@ export interface ZoneTriggerComponent {
   ignoreParent?: boolean;
   destroyOnParentDeath?: boolean;
   destroyOnParentRemoval?: boolean;
+  distanceAttenuation?: boolean;
+  centerValue?: number;
+  boundaryValue?: number;
 }
 
 export interface AttachmentComponent {
@@ -172,6 +175,8 @@ export interface StatValue<T = number> {
 export interface VelocityComponent {
   currentSpeed: number;
   currentTurnSpeed: Radians;
+  externalVx?: number;
+  externalVy?: number;
 }
 
 export interface InputComponent {

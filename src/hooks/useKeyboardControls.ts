@@ -37,7 +37,13 @@ export const useKeyboardControls = ({
   isEditModalOpen,
   mode,
 }: UseKeyboardControlsProps) => {
+  // Стабильная ссылка: очистка ввода безопасна в любой момент
   const syncPlayerControls = useCallback(() => {
+    GlobalInput.keys.clear();
+  }, []);
+
+  // Автоматический сброс зажатых клавиш при открытии любого модального окна
+  useEffect(() => {
     if (isModalOpen || isEditModalOpen) {
       GlobalInput.keys.clear();
     }

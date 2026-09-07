@@ -69,7 +69,12 @@ export function assembleCreature(
     runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
     crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 1.2,
   });
-  world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 as Radians });
+  world.addComponent(id, 'velocity', {
+    currentSpeed: 0,
+    currentTurnSpeed: 0 as Radians,
+    externalVx: 0,
+    externalVy: 0,
+  });
   world.addComponent(id, 'input', {
     isMovingForward: false,
     turnDirection: 0,

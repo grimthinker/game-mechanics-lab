@@ -12,11 +12,25 @@ export const ZoneSpawnModal: React.FC<ZoneSpawnModalProps> = ({ isOpen, onClose,
   const [effect, setEffect] = useState<ZoneEffectType>('damage');
   const [radius, setRadius] = useState<number>(70);
   const [valuePerSec, setValuePerSec] = useState<number>(15);
+  const [distanceAttenuation, setDistanceAttenuation] = useState<boolean>(false);
+  const [centerValue, setCenterValue] = useState<number>(150);
+  const [boundaryValue, setBoundaryValue] = useState<number>(30);
 
   if (!isOpen) return null;
 
   const handleConfirm = () => {
-    const config = createZoneConfig(effect, radius, valuePerSec);
+    const config = createZoneConfig(
+      effect,
+      radius,
+      valuePerSec,
+      undefined,
+      true,
+      false,
+      true,
+      distanceAttenuation,
+      centerValue,
+      boundaryValue
+    );
     onConfirm(config);
   };
 
@@ -64,6 +78,54 @@ export const ZoneSpawnModal: React.FC<ZoneSpawnModalProps> = ({ isOpen, onClose,
               onChange={(e) => setRadius(Number(e.target.value))}
             />
           </label>
+
+          {(effect === 'repel' || effect === 'attract') && (
+            <>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  margin: '8px 0',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={distanceAttenuation}
+                  onChange={(e) => setDistanceAttenuation(e.target.checked)}
+                />
+                Зависимость силы от расстояния (Линейная)
+              </label>
+
+              {distanceAttenuation && (
+                <>
+                  <label>
+                    Сила в центре:
+                    <input
+                      type="number"
+                      value={centerValue}
+                      min={1}
+                      max={2000}
+                      step={10}
+                      onChange={(e) => setCenterValue(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    Сила на границе:
+                    <input
+                      type="number"
+                      value={boundaryValue}
+                      min={0}
+                      max={2000}
+                      step={10}
+                      onChange={(e) => setBoundaryValue(Number(e.target.value))}
+                    />
+                  </label>
+                </>
+              )}
+            </>
+          )}
         </form>
         <div className="modal-actions">
           <button type="button" className="btn" onClick={onClose}>

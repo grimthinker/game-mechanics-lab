@@ -4,8 +4,6 @@ import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
 import { BTLogicComponent, BTNodeDTO } from './ai/core';
-import { createDefaultCreatureConfig } from './Creature';
-import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, rad2Deg } from './utils';
 import { serializeBTNode } from './ai/serializer';
 import {
@@ -19,7 +17,6 @@ import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
 import { PlacementMode } from './types';
-import { EntityAdapter } from './EntityAdapter';
 import { GameMode } from './constants';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 
@@ -126,6 +123,9 @@ export const App: React.FC = () => {
     }
   }, [setModeSync]);
 
+  const updateStatsRef = useRef(updateStats);
+  updateStatsRef.current = updateStats;
+
   const { syncPlayerControls } = useKeyboardControls({
     isModalOpen:
       modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || isPaused,
@@ -143,6 +143,23 @@ export const App: React.FC = () => {
       mode,
     });
 
+  const createNewWorld = useCallback(() => {
+    setSnapshot(null);
+    const app = appRef.current;
+    if (!app) return;
+
+    const canvas = canvasRef.current;
+    const spawnPos = {
+      x: canvas ? canvas.width / 2 : 300,
+      y: canvas ? canvas.height / 2 : 300,
+    };
+
+    app.initDefaultWorld(spawnPos);
+    syncPlayerControls();
+    updateStats();
+  }, [canvasRef, syncPlayerControls, updateStats]);
+
+  // Инициализация движка строго 1 раз при монтировании канваса
   useEffect(() => {
     if (!canvasRef.current) return;
     const app = new GameApp(canvasRef.current);
@@ -153,33 +170,23 @@ export const App: React.FC = () => {
     setIsPaused(true);
 
     app.start();
-    app.onFrame = updateStats;
+    app.onFrame = () => updateStatsRef.current();
+
+    // Создание начального мира при первом запуске
+    const canvas = canvasRef.current;
     const spawnPos = {
-      x: 100 + Math.random() * Math.max(0, canvasRef.current.width - 200),
-      y: 100 + Math.random() * Math.max(0, canvasRef.current.height - 200),
+      x: canvas ? canvas.width / 2 : 300,
+      y: canvas ? canvas.height / 2 : 300,
     };
-    const playerId = app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
-
-    // Тестовая аура отталкивания, привязанная к игроку
-    app.spawnEntity(
-      {
-        ...createZoneConfig('repel', 65, 30, 'Аура отталкивания', true, true, true),
-        attachment: { parentId: playerId },
-      },
-      spawnPos
-    );
-
-    // Стационарные зоны на земле
-    app.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 180, y: spawnPos.y });
-    app.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 180, y: spawnPos.y });
-
-    updateStats();
+    app.initDefaultWorld(spawnPos);
+    updateStatsRef.current();
 
     return () => {
       app.destroy();
       appRef.current = null;
     };
-  }, [canvasRef, updateStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const togglePause = useCallback(() => {
     const app = appRef.current;
@@ -377,36 +384,7 @@ export const App: React.FC = () => {
         world={appRef.current?.world}
         fileInputRef={fileInputRef}
         worldFileInputRef={worldFileInputRef}
-        onNewWorld={() => {
-          setSnapshot(null);
-          const app = appRef.current;
-          if (app) {
-            app.clearWorld();
-            const canvas = canvasRef.current;
-            const spawnPos = {
-              x: canvas ? canvas.width / 2 : 300,
-              y: canvas ? canvas.height / 2 : 300,
-            };
-            const playerId = app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
-            app.spawnEntity(
-              {
-                ...createZoneConfig('repel', 65, 30, 'Аура отталкивания', true, true, true),
-                attachment: { parentId: playerId },
-              },
-              spawnPos
-            );
-            app.spawnEntity(createZoneConfig('damage', 70, 15), {
-              x: spawnPos.x + 180,
-              y: spawnPos.y,
-            });
-            app.spawnEntity(createZoneConfig('heal', 70, 15), {
-              x: spawnPos.x - 180,
-              y: spawnPos.y,
-            });
-          }
-          syncPlayerControls();
-          updateStats();
-        }}
+        onNewWorld={createNewWorld}
         onSaveWorld={() => {
           const app = appRef.current;
           if (!app) return;

@@ -17,6 +17,8 @@ import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
 import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
+import { createDefaultCreatureConfig } from './Creature';
+import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -141,6 +143,32 @@ export class GameApp {
     this.physics.loadObstacles([]);
     this.selectEntity(null);
     this.hoverEntity(null);
+  }
+
+  public initDefaultWorld(center?: Point): void {
+    this.clearWorld();
+    const spawnPos: Point = center ?? {
+      x: this.canvas.width / 2,
+      y: this.canvas.height / 2,
+    };
+
+    this.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+    this.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 180, y: spawnPos.y });
+    this.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 180, y: spawnPos.y });
+    this.spawnEntity(
+      createZoneConfig('repel', 70, 200, 'Зона отталкивания', false, false, false, true, 7000, 0),
+      {
+        x: spawnPos.x - 180,
+        y: spawnPos.y - 180,
+      }
+    );
+    this.spawnEntity(
+      createZoneConfig('attract', 70, 200, 'Зона притягивания', false, false, false, true, 7000, 0),
+      {
+        x: spawnPos.x + 180,
+        y: spawnPos.y - 180,
+      }
+    );
   }
 
   public serializeWorld(): any {

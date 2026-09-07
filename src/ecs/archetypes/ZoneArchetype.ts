@@ -52,7 +52,10 @@ export function createZoneConfig(
   name?: string,
   ignoreParent: boolean = true,
   destroyOnParentDeath: boolean = false,
-  destroyOnParentRemoval: boolean = true
+  destroyOnParentRemoval: boolean = true,
+  distanceAttenuation: boolean = false,
+  centerValue: number = 150,
+  boundaryValue: number = 30
 ): EntityConfig {
   return {
     tag: { archetype: 'zone', subType: effect },
@@ -67,6 +70,9 @@ export function createZoneConfig(
       ignoreParent,
       destroyOnParentDeath,
       destroyOnParentRemoval,
+      distanceAttenuation,
+      centerValue,
+      boundaryValue,
     },
     physics: {
       radius,

@@ -144,10 +144,31 @@ export class PhysicsSystem {
 
     const movingEntities = world.getEntitiesWith('transform', 'velocity');
     for (const [id, { transform, velocity }] of movingEntities) {
-      if (velocity.currentSpeed > 0) {
-        const dx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
-        const dy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
-        this.moveEntitySafe(world, id, dx, dy);
+      const health = world.getComponent(id, 'health');
+      if (health && (!health.isAlive || health.current <= 0)) continue;
+
+      const selfDx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
+      const selfDy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
+
+      const extVx = velocity.externalVx ?? 0;
+      const extVy = velocity.externalVy ?? 0;
+
+      const totalDx = selfDx + extVx * dt;
+      const totalDy = selfDy + extVy * dt;
+
+      if (totalDx !== 0 || totalDy !== 0) {
+        this.moveEntitySafe(world, id, totalDx, totalDy);
+      }
+
+      // Затухание внешнего импульса (трение / инерция)
+      if (extVx !== 0 || extVy !== 0) {
+        const damping = 5.0; // Коэффициент затухания инерции
+        const factor = Math.max(0, 1 - damping * dt);
+        velocity.externalVx = extVx * factor;
+        velocity.externalVy = extVy * factor;
+
+        if (Math.abs(velocity.externalVx) < 0.01) velocity.externalVx = 0;
+        if (Math.abs(velocity.externalVy) < 0.01) velocity.externalVy = 0;
       }
     }
 

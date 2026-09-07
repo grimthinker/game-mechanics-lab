@@ -30,7 +30,7 @@ export const TriggerZoneInspector: React.FC<TriggerZoneInspectorProps> = ({
     <label>
       {values.effect === 'damage' || values.effect === 'heal'
         ? 'Сила эффекта (HP / сек):'
-        : 'Сила импульса (px / сек):'}
+        : 'Базовая сила импульса:'}
       <input
         disabled={isReadOnly}
         type="number"
@@ -41,6 +41,56 @@ export const TriggerZoneInspector: React.FC<TriggerZoneInspectorProps> = ({
         onChange={(e) => onChange({ valuePerSec: Number(e.target.value) })}
       />
     </label>
+
+    {(values.effect === 'repel' || values.effect === 'attract') && (
+      <>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            cursor: isReadOnly ? 'default' : 'pointer',
+          }}
+        >
+          <input
+            type="checkbox"
+            disabled={isReadOnly}
+            checked={values.distanceAttenuation ?? false}
+            onChange={(e) => onChange({ distanceAttenuation: e.target.checked })}
+          />
+          Зависимость силы от расстояния (Линейная)
+        </label>
+
+        {values.distanceAttenuation && (
+          <>
+            <label>
+              Сила в центре:
+              <input
+                disabled={isReadOnly}
+                type="number"
+                value={values.centerValue ?? 150}
+                min={1}
+                max={2000}
+                step={10}
+                onChange={(e) => onChange({ centerValue: Number(e.target.value) })}
+              />
+            </label>
+            <label>
+              Сила на границе:
+              <input
+                disabled={isReadOnly}
+                type="number"
+                value={values.boundaryValue ?? 30}
+                min={0}
+                max={2000}
+                step={10}
+                onChange={(e) => onChange({ boundaryValue: Number(e.target.value) })}
+              />
+            </label>
+          </>
+        )}
+      </>
+    )}
 
     <label>
       Радиус зоны (px):
