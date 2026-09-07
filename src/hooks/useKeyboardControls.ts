@@ -12,15 +12,23 @@ const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c']);
 
 const getKeyName = (e: KeyboardEvent): string => {
   switch (e.code) {
-    case 'KeyW': return 'w';
-    case 'KeyA': return 'a';
-    case 'KeyS': return 's';
-    case 'KeyD': return 'd';
+    case 'KeyW':
+      return 'w';
+    case 'KeyA':
+      return 'a';
+    case 'KeyS':
+      return 's';
+    case 'KeyD':
+      return 'd';
     case 'ShiftLeft':
-    case 'ShiftRight': return 'shift';
-    case 'KeyC': return 'c';
-    case 'Space': return ' ';
-    default: return e.key.toLowerCase();
+    case 'ShiftRight':
+      return 'shift';
+    case 'KeyC':
+      return 'c';
+    case 'Space':
+      return ' ';
+    default:
+      return e.key.toLowerCase();
   }
 };
 
@@ -29,10 +37,9 @@ export const useKeyboardControls = ({
   isEditModalOpen,
   mode,
 }: UseKeyboardControlsProps) => {
-
   const syncPlayerControls = useCallback(() => {
     if (isModalOpen || isEditModalOpen) {
-       GlobalInput.keys.clear();
+      GlobalInput.keys.clear();
     }
   }, [isModalOpen, isEditModalOpen]);
 
@@ -48,9 +55,9 @@ export const useKeyboardControls = ({
       const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
         if (!e.ctrlKey && !e.metaKey && mode === GameMode.GAME) {
-            GlobalInput.keys.add(' ');
-            e.preventDefault();
-            return;
+          GlobalInput.keys.add(' ');
+          e.preventDefault();
+          return;
         }
       }
 

@@ -3,7 +3,7 @@ export type MobTypeId = string;
 
 export const LOGIC_CONFIG = {
   min_path_request_interval: 0.5,
-  
+
   detect_dist: 400,
   lose_target_dist: 600,
   follow_up_dist: 50,
@@ -32,5 +32,5 @@ export const LOGIC_CONFIG = {
     pushedDistance: 5,
     minTargetMoveThreshold: 1.0,
     maxTargetMoveThreshold: 10.0,
-  }
+  },
 };

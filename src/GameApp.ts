@@ -7,6 +7,7 @@ import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
 import { RenderSyncSystem } from './ecs/systems/RenderSyncSystem';
 import { ZoneTriggerSystem } from './ecs/systems/ZoneTriggerSystem';
+import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
 import { ObstacleSegment, Point } from './types';
@@ -30,6 +31,7 @@ export class GameApp {
   public aiSystem: AISystem;
   private renderSyncSystem: RenderSyncSystem;
   private zoneTriggerSystem: ZoneTriggerSystem;
+  private modifierSystem: ModifierSystem;
   public camera: Camera;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
@@ -42,7 +44,7 @@ export class GameApp {
   private lastTime: number = 0;
   private isRunning: boolean = false;
   public isPaused: boolean = false;
-  
+
   public gameMode: GameMode = GameMode.EDITOR;
 
   private handleResize = () => this.resizeCanvas();
@@ -59,6 +61,7 @@ export class GameApp {
     this.aiSystem = new AISystem();
     this.renderSyncSystem = new RenderSyncSystem();
     this.zoneTriggerSystem = new ZoneTriggerSystem();
+    this.modifierSystem = new ModifierSystem();
     this.camera = new Camera();
     this.entityFactory = new EntityFactory();
     this.serializer = new WorldSerializer(this);
@@ -76,7 +79,14 @@ export class GameApp {
   }
 
   public spawnEntity(config: EntityConfig, position?: Point, forcedId?: string): string {
-    return this.entityFactory.spawnEntity(this.world, this.physics, this.aiSystem, config, position, forcedId);
+    return this.entityFactory.spawnEntity(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      config,
+      position,
+      forcedId
+    );
   }
 
   public deleteSelectedEntity(): void {
@@ -147,6 +157,7 @@ export class GameApp {
     this.lastTime = time;
 
     if (!this.isPaused) {
+      this.modifierSystem.update(dt, this.world);
       this.aiSystem.update(dt, this.world);
       this.attackSystem.update(dt, this.world, this.physics);
       this.movementSystem.update(dt, this.world);
@@ -191,8 +202,11 @@ export class GameApp {
     const isEditor = this.gameMode === GameMode.EDITOR;
     return this.physics.getEntityAt(worldPoint, this.world, isEditor);
   }
-  
-  public pickNearestEntity(worldPoint: Point, maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO): string | null {
+
+  public pickNearestEntity(
+    worldPoint: Point,
+    maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO
+  ): string | null {
     const isEditor = this.gameMode === GameMode.EDITOR;
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
@@ -239,7 +253,7 @@ export class GameApp {
   public updateDraggedEntityPosition(worldPoint: Point): void {
     if (!this.draggedEntityId) return;
     const id = this.draggedEntityId;
-    
+
     const transform = this.world.getComponent(id, 'transform');
     const phys = this.world.getComponent(id, 'physicsBody');
 

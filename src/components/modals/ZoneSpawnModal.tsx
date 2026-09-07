@@ -8,11 +8,7 @@ export interface ZoneSpawnModalProps {
   onConfirm: (config: EntityConfig) => void;
 }
 
-export const ZoneSpawnModal: React.FC<ZoneSpawnModalProps> = ({
-  isOpen,
-  onClose,
-  onConfirm,
-}) => {
+export const ZoneSpawnModal: React.FC<ZoneSpawnModalProps> = ({ isOpen, onClose, onConfirm }) => {
   const [effect, setEffect] = useState<ZoneEffectType>('damage');
   const [radius, setRadius] = useState<number>(70);
   const [valuePerSec, setValuePerSec] = useState<number>(15);
@@ -37,10 +33,7 @@ export const ZoneSpawnModal: React.FC<ZoneSpawnModalProps> = ({
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Тип эффекта зоны:
-            <select
-              value={effect}
-              onChange={(e) => setEffect(e.target.value as ZoneEffectType)}
-            >
+            <select value={effect} onChange={(e) => setEffect(e.target.value as ZoneEffectType)}>
               <option value="damage">Урон (Огонь / Лава / Яд)</option>
               <option value="heal">Лечение (Источник жизни)</option>
             </select>

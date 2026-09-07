@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
+import { createStat } from '../stats/StatEvaluator';
 
 export function createZoneConfig(
   effect: ZoneEffectType,
@@ -72,9 +73,9 @@ export function assembleZone(
 
   // 4. Физические характеристики
   world.addComponent(id, 'physicsStats', {
-    radius: { base: radius as any, current: radius as any },
-    weight: { base: 1, current: 1 },
-    isSolid: { base: false, current: false },
+    radius: createStat(radius) as any,
+    weight: createStat(1),
+    isSolid: false,
   });
 
   // 5. Трансформация и тело-сенсор

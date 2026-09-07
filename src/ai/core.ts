@@ -19,29 +19,24 @@ export const ALL_NODE_CATEGORIES = [
   'condition',
 ] as const;
 
-export type NodeCategory = typeof ALL_NODE_CATEGORIES[number];
+export type NodeCategory = (typeof ALL_NODE_CATEGORIES)[number];
 
 export interface BTNodeDTO {
-    id?: string;
-    name: string;
-    category: NodeCategory;
-    status?: NodeStatus;
-    description?: string;
-    parameters?: Record<string, any>;
-    timeToNextTick?: number; 
-    children: BTNodeDTO[];
+  id?: string;
+  name: string;
+  category: NodeCategory;
+  status?: NodeStatus;
+  description?: string;
+  parameters?: Record<string, any>;
+  timeToNextTick?: number;
+  children: BTNodeDTO[];
 }
 
 export interface EntityUtils {
   get_all_entities: () => EntityAdapter[];
   get_entity: (id: string) => EntityAdapter | undefined;
-  get_path: (
-    start: Point,
-    end: Point,
-    navmesh_radius_type?: StandardRadius
-  ) => Promise<Point[]>;
+  get_path: (start: Point, end: Point, navmesh_radius_type?: StandardRadius) => Promise<Point[]>;
 }
-
 
 export type AttackStatus = 'idle' | 'attacking' | 'cooldown';
 

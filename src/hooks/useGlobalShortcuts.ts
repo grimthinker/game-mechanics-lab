@@ -16,12 +16,15 @@ export const useGlobalShortcuts = ({
   togglePause,
   modals,
   handleSpawnConfirm,
-  setShowBTPanel
+  setShowBTPanel,
 }: GlobalShortcutsProps) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')) {
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')
+      ) {
         return; // Игнорируем нажатия при вводе текста
       }
 
@@ -33,7 +36,7 @@ export const useGlobalShortcuts = ({
         else if (modals.isZoneSpawnModalOpen) modals.closeZoneSpawnModal();
         return;
       }
-      
+
       if (e.key === 'Enter' || e.code === 'Enter') {
         if (modals.isModalOpen) {
           e.preventDefault();
@@ -43,7 +46,12 @@ export const useGlobalShortcuts = ({
       }
 
       // Если открыта любая модалка, блокируем остальные хоткеи
-      if (modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || modals.isEditModalOpen) {
+      if (
+        modals.isModalOpen ||
+        modals.isItemSpawnModalOpen ||
+        modals.isZoneSpawnModalOpen ||
+        modals.isEditModalOpen
+      ) {
         return;
       }
 

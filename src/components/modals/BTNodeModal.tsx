@@ -6,14 +6,10 @@ export interface BTNodeModalProps {
   onClose: () => void;
 }
 
-export const BTNodeModal: React.FC<BTNodeModalProps> = ({
-  selectedNode,
-  onClose,
-}) => {
+export const BTNodeModal: React.FC<BTNodeModalProps> = ({ selectedNode, onClose }) => {
   if (!selectedNode) return null;
 
-  const hasParameters =
-    selectedNode.parameters && Object.keys(selectedNode.parameters).length > 0;
+  const hasParameters = selectedNode.parameters && Object.keys(selectedNode.parameters).length > 0;
 
   return (
     <div
@@ -31,9 +27,7 @@ export const BTNodeModal: React.FC<BTNodeModalProps> = ({
         </p>
 
         <div style={{ margin: '12px 0', fontSize: '14px', lineHeight: '1.5' }}>
-          <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '6px' }}>
-            Описание:
-          </h4>
+          <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '6px' }}>Описание:</h4>
           <p style={{ color: '#ecf0f1', margin: 0 }}>
             {selectedNode.description || 'Описание отсутствует.'}
           </p>
@@ -49,9 +43,7 @@ export const BTNodeModal: React.FC<BTNodeModalProps> = ({
 
         {hasParameters && (
           <div style={{ marginTop: '12px' }}>
-            <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>
-              Параметры:
-            </h4>
+            <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>Параметры:</h4>
             <div
               style={{
                 backgroundColor: '#111',

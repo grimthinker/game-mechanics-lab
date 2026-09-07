@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { EntityConfig, STANDARD_RADII, StandardRadius, HitZoneConfig } from '../../ecs/types';
-import { WeaponFormFields, ArmorFormFields, BagFormFields, WeaponFormValues, ArmorFormValues, BagFormValues } from './forms/FormFields';
+import {
+  WeaponFormFields,
+  ArmorFormFields,
+  BagFormFields,
+  WeaponFormValues,
+  ArmorFormValues,
+  BagFormValues,
+} from './forms/FormFields';
 import { createRandomWeaponPreset } from '../../Weapon';
 import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 
@@ -21,7 +28,10 @@ const createInitialWeaponState = () => {
     length: preset.zone.length ?? 150,
     radius: preset.zone.radius ?? 50,
     rayCount: preset.zone.rayCount ?? 5,
-    angle: preset.zone.angle !== undefined ? (Math.round(rad2Deg(preset.zone.angle)) as Degrees) : (30 as Degrees),
+    angle:
+      preset.zone.angle !== undefined
+        ? (Math.round(rad2Deg(preset.zone.angle)) as Degrees)
+        : (30 as Degrees),
     pierceObstacles: !!preset.zone.pierceObstacles,
     piercePlayers: !!preset.zone.piercePlayers,
     pierceBots: !!preset.zone.pierceBots,
@@ -136,22 +146,40 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <label>
             Тип предмета:
-            <select value={type} onChange={(e) => setType(e.target.value as 'weapon' | 'armor' | 'bag')}>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as 'weapon' | 'armor' | 'bag')}
+            >
               <option value="weapon">Оружие</option>
               <option value="armor">Броня</option>
               <option value="bag">Сумка</option>
             </select>
           </label>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: '8px 0' }}>
-            <input type="checkbox" checked={isSolid} onChange={(e) => setIsSolid(e.target.checked)} />
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              margin: '8px 0',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={isSolid}
+              onChange={(e) => setIsSolid(e.target.checked)}
+            />
             Участвует в коллизии
           </label>
 
           {isSolid && (
             <label>
               Радиус тела:
-              <select value={radius} onChange={(e) => setRadius(Number(e.target.value) as StandardRadius)}>
+              <select
+                value={radius}
+                onChange={(e) => setRadius(Number(e.target.value) as StandardRadius)}
+              >
                 {STANDARD_RADII.map((r) => (
                   <option key={r} value={r}>
                     {r} px
@@ -163,13 +191,22 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
 
           <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #333' }}>
             {type === 'weapon' && (
-              <WeaponFormFields values={weaponValues} onChange={(v) => setWeaponValues({ ...weaponValues, ...v })} />
+              <WeaponFormFields
+                values={weaponValues}
+                onChange={(v) => setWeaponValues({ ...weaponValues, ...v })}
+              />
             )}
             {type === 'armor' && (
-              <ArmorFormFields values={armorValues} onChange={(v) => setArmorValues({ ...armorValues, ...v })} />
+              <ArmorFormFields
+                values={armorValues}
+                onChange={(v) => setArmorValues({ ...armorValues, ...v })}
+              />
             )}
             {type === 'bag' && (
-              <BagFormFields values={bagValues} onChange={(v) => setBagValues({ ...bagValues, ...v })} />
+              <BagFormFields
+                values={bagValues}
+                onChange={(v) => setBagValues({ ...bagValues, ...v })}
+              />
             )}
           </div>
         </form>

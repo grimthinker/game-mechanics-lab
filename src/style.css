@@ -1,21 +1,24 @@
-CSS
-
-* {
+CSS * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-body, html {
+body,
+html {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   background-color: #1a1a1a;
   color: #ecf0f1;
 }
 
-#root, #app {
+#root,
+#app {
   display: flex;
   width: 100vw;
   height: 100vh;
@@ -73,7 +76,8 @@ label {
   font-size: 13px;
 }
 
-input[type="number"], select {
+input[type='number'],
+select {
   background-color: #1a1a1a;
   color: #fff;
   border: 1px solid #444;
@@ -92,12 +96,25 @@ input[type="number"], select {
   transition: background 0.2s;
 }
 
-.btn:hover { background-color: #415b76; }
-.btn-primary { background-color: #2980b9; }
-.btn-primary:hover { background-color: #3498db; }
-.btn-secondary { background-color: #8e44ad; }
-.btn-secondary:hover { background-color: #9b59b6; }
-.btn-sm { font-size: 11px; padding: 6px; }
+.btn:hover {
+  background-color: #415b76;
+}
+.btn-primary {
+  background-color: #2980b9;
+}
+.btn-primary:hover {
+  background-color: #3498db;
+}
+.btn-secondary {
+  background-color: #8e44ad;
+}
+.btn-secondary:hover {
+  background-color: #9b59b6;
+}
+.btn-sm {
+  font-size: 11px;
+  padding: 6px;
+}
 
 .test-controls {
   display: grid;

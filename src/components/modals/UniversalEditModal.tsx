@@ -10,13 +10,13 @@ import {
   COLLISION_MASK_NONE,
 } from '../../ecs/types';
 import {
-    MetaInspector,
-    PhysicsInspector,
-    HealthInspector,
-    MovementInspector,
-    StealthInspector,
-    AIInspector,
-  } from '../inspector';
+  MetaInspector,
+  PhysicsInspector,
+  HealthInspector,
+  MovementInspector,
+  StealthInspector,
+  AIInspector,
+} from '../inspector';
 import { TriggerZoneInspector } from '../inspector/TriggerZoneInspector';
 import {
   WeaponFormFields,
@@ -27,6 +27,7 @@ import {
 import { DEFAULT_ZONE_PARAMS } from '../../Weapon';
 import { weaponModalState } from './weaponModalState';
 import { deg2Rad, rad2Deg, Degrees } from '../../utils';
+import { setBaseStat } from '../../ecs/stats/StatEvaluator';
 
 export interface UniversalEditModalProps {
   isOpen: boolean;
@@ -52,7 +53,11 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   onInspectItem,
 }) => {
   const [draftName, setDraftName] = useState('');
-  const [draftPhysics, setDraftPhysics] = useState<{ radius: StandardRadius; weight: number; isSolid: boolean }>({
+  const [draftPhysics, setDraftPhysics] = useState<{
+    radius: StandardRadius;
+    weight: number;
+    isSolid: boolean;
+  }>({
     radius: 16,
     weight: 10,
     isSolid: true,
@@ -76,28 +81,26 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     const physStats = world.getComponent(entityId, 'physicsStats');
     const physBody = world.getComponent(entityId, 'physicsBody');
     setDraftPhysics({
-      radius: (physStats?.radius.current ?? physBody?.body.r ?? 16) as StandardRadius,
-      weight: physStats?.weight.current ?? 10,
-      isSolid: physStats?.isSolid.current ?? (physBody ? physBody.mask !== 0 : true),
+      radius: (physStats?.radius.base ?? physBody?.body.r ?? 16) as StandardRadius,
+      weight: physStats?.weight.base ?? 10,
+      isSolid: physStats?.isSolid ?? (physBody ? physBody.mask !== 0 : true),
     });
 
-    const healthStats = world.getComponent(entityId, 'healthStats');
+    const health = world.getComponent(entityId, 'health');
     setDraftHealth(
-      healthStats
-        ? { hp: Math.round(healthStats.hp.current), maxHp: healthStats.maxHp.current }
-        : null
+      health ? { hp: Math.round(health.current), maxHp: Math.round(health.max.base) } : null
     );
 
     const moveStats = world.getComponent(entityId, 'movementStats');
     setDraftMovement(
       moveStats
         ? {
-            maxSpeed: Math.round(moveStats.maxSpeed.current),
-            maxTurnSpeed: Math.round(rad2Deg(moveStats.maxTurnSpeed.current)) as Degrees,
-            runSpeedMultiplier: Math.round(moveStats.runSpeedMultiplier.current * 100) / 100,
-            crouchSpeedMultiplier: Math.round(moveStats.crouchSpeedMultiplier.current * 100) / 100,
-            runTurnMultiplier: Math.round(moveStats.runTurnMultiplier.current * 100) / 100,
-            crouchTurnMultiplier: Math.round(moveStats.crouchTurnMultiplier.current * 100) / 100,
+            maxSpeed: Math.round(moveStats.maxSpeed.base),
+            maxTurnSpeed: Math.round(rad2Deg(moveStats.maxTurnSpeed.base)) as Degrees,
+            runSpeedMultiplier: Math.round(moveStats.runSpeedMultiplier * 100) / 100,
+            crouchSpeedMultiplier: Math.round(moveStats.crouchSpeedMultiplier * 100) / 100,
+            runTurnMultiplier: Math.round(moveStats.runTurnMultiplier * 100) / 100,
+            crouchTurnMultiplier: Math.round(moveStats.crouchTurnMultiplier * 100) / 100,
           }
         : null
     );
@@ -106,9 +109,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     setDraftStealth(
       stealthStats
         ? {
-            stealthPower: Math.round(stealthStats.stealthPower.current),
-            crouchStealthMultiplier: Math.round(stealthStats.crouchStealthMultiplier.current * 100) / 100,
-            runStealthMultiplier: Math.round(stealthStats.runStealthMultiplier.current * 100) / 100,
+            stealthPower: Math.round(stealthStats.stealthPower.base),
+            crouchStealthMultiplier: Math.round(stealthStats.crouchStealthMultiplier * 100) / 100,
+            runStealthMultiplier: Math.round(stealthStats.runStealthMultiplier * 100) / 100,
           }
         : null
     );
@@ -124,14 +127,17 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     if (wStats && wZone) {
       setDraftWeapon({
         name: meta?.name ?? item?.name ?? 'Оружие',
-        weight: physStats?.weight.current ?? 1,
-        baseDamage: wStats.baseDamage.current,
-        prepTime: wStats.prepTime.current,
-        recoveryTime: wStats.recoveryTime.current,
+        weight: physStats?.weight.base ?? 1,
+        baseDamage: wStats.baseDamage.base,
+        prepTime: wStats.prepTime.base,
+        recoveryTime: wStats.recoveryTime.base,
         length: wZone.length ?? 150,
         radius: wZone.radius ?? 50,
         rayCount: wZone.rayCount ?? 5,
-        angle: wZone.angle !== undefined ? (Math.round(rad2Deg(wZone.angle)) as Degrees) : (30 as Degrees),
+        angle:
+          wZone.angle !== undefined
+            ? (Math.round(rad2Deg(wZone.angle)) as Degrees)
+            : (30 as Degrees),
         pierceObstacles: !!wZone.pierceObstacles,
         piercePlayers: !!wZone.piercePlayers,
         pierceBots: !!wZone.pierceBots,
@@ -146,9 +152,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       aStats
         ? {
             name: meta?.name ?? item?.name ?? 'Броня',
-            weight: physStats?.weight.current ?? 1,
-            defense: aStats.defense.current,
-            flatReduction: aStats.flatReduction.current,
+            weight: physStats?.weight.base ?? 1,
+            defense: aStats.defense.base,
+            flatReduction: aStats.flatReduction.base,
           }
         : null
     );
@@ -205,12 +211,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     const physStats = world.getComponent(entityId, 'physicsStats');
     if (physStats) {
       const cleanWeight = Math.round(Math.max(0.1, draftPhysics.weight) * 10) / 10;
-      physStats.radius.current = draftPhysics.radius;
-      physStats.radius.base = draftPhysics.radius;
-      physStats.weight.current = cleanWeight;
-      physStats.weight.base = cleanWeight;
-      physStats.isSolid.current = draftPhysics.isSolid;
-      physStats.isSolid.base = draftPhysics.isSolid;
+      setBaseStat(physStats.radius as any, draftPhysics.radius);
+      setBaseStat(physStats.weight, cleanWeight);
+      physStats.isSolid = draftPhysics.isSolid;
     }
 
     const physBody = world.getComponent(entityId, 'physicsBody');
@@ -222,84 +225,82 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
     // 3. Здоровье
     if (draftHealth) {
-      const healthStats = world.getComponent(entityId, 'healthStats');
       const health = world.getComponent(entityId, 'health');
-      if (healthStats) {
-        healthStats.maxHp.current = Math.max(1, draftHealth.maxHp);
-        healthStats.maxHp.base = Math.max(1, draftHealth.maxHp);
-        healthStats.hp.current = Math.min(healthStats.maxHp.current, Math.max(0, draftHealth.hp));
-        healthStats.hp.base = healthStats.hp.current;
-        if (health) health.isAlive = healthStats.hp.current > 0;
+      if (health) {
+        setBaseStat(health.max, Math.max(1, draftHealth.maxHp));
+        health.current = Math.min(health.max.current, Math.max(0, draftHealth.hp));
+        health.isAlive = health.current > 0;
       }
     }
 
     // 4. Движение
     if (draftMovement) {
-        const moveStats = world.getComponent(entityId, 'movementStats');
-        if (moveStats) {
-          moveStats.maxSpeed.current = Math.max(0, Math.round(draftMovement.maxSpeed));
-          moveStats.maxSpeed.base = moveStats.maxSpeed.current;
-          moveStats.maxTurnSpeed.current = deg2Rad(Math.max(0, Math.round(draftMovement.maxTurnSpeed)));
-          moveStats.maxTurnSpeed.base = moveStats.maxTurnSpeed.current;
-          moveStats.runSpeedMultiplier.current = Math.round(Math.max(0.1, draftMovement.runSpeedMultiplier) * 100) / 100;
-          moveStats.runSpeedMultiplier.base = moveStats.runSpeedMultiplier.current;
-          moveStats.crouchSpeedMultiplier.current = Math.round(Math.max(0.1, draftMovement.crouchSpeedMultiplier) * 100) / 100;
-          moveStats.crouchSpeedMultiplier.base = moveStats.crouchSpeedMultiplier.current;
-          moveStats.runTurnMultiplier.current = Math.round(Math.max(0.1, draftMovement.runTurnMultiplier) * 100) / 100;
-          moveStats.runTurnMultiplier.base = moveStats.runTurnMultiplier.current;
-          moveStats.crouchTurnMultiplier.current = Math.round(Math.max(0.1, draftMovement.crouchTurnMultiplier) * 100) / 100;
-          moveStats.crouchTurnMultiplier.base = moveStats.crouchTurnMultiplier.current;
-        }
+      const moveStats = world.getComponent(entityId, 'movementStats');
+      if (moveStats) {
+        setBaseStat(moveStats.maxSpeed, Math.max(0, Math.round(draftMovement.maxSpeed)));
+        setBaseStat(
+          moveStats.maxTurnSpeed as any,
+          deg2Rad(Math.max(0, Math.round(draftMovement.maxTurnSpeed)))
+        );
+        moveStats.runSpeedMultiplier =
+          Math.round(Math.max(0.1, draftMovement.runSpeedMultiplier) * 100) / 100;
+        moveStats.crouchSpeedMultiplier =
+          Math.round(Math.max(0.1, draftMovement.crouchSpeedMultiplier) * 100) / 100;
+        moveStats.runTurnMultiplier =
+          Math.round(Math.max(0.1, draftMovement.runTurnMultiplier) * 100) / 100;
+        moveStats.crouchTurnMultiplier =
+          Math.round(Math.max(0.1, draftMovement.crouchTurnMultiplier) * 100) / 100;
       }
-  
-      // 5. Скрытность
-      if (draftStealth) {
-        const stealthStats = world.getComponent(entityId, 'stealthStats');
-        if (stealthStats) {
-          stealthStats.stealthPower.current = Math.max(0, Math.round(draftStealth.stealthPower));
-          stealthStats.stealthPower.base = stealthStats.stealthPower.current;
-          stealthStats.crouchStealthMultiplier.current = Math.round(Math.max(1, draftStealth.crouchStealthMultiplier) * 100) / 100;
-          stealthStats.crouchStealthMultiplier.base = stealthStats.crouchStealthMultiplier.current;
-          stealthStats.runStealthMultiplier.current = Math.round(Math.max(0, draftStealth.runStealthMultiplier) * 100) / 100;
-          stealthStats.runStealthMultiplier.base = stealthStats.runStealthMultiplier.current;
-        }
+    }
+
+    // 5. Скрытность
+    if (draftStealth) {
+      const stealthStats = world.getComponent(entityId, 'stealthStats');
+      if (stealthStats) {
+        setBaseStat(stealthStats.stealthPower, Math.max(0, Math.round(draftStealth.stealthPower)));
+        stealthStats.crouchStealthMultiplier =
+          Math.round(Math.max(1, draftStealth.crouchStealthMultiplier) * 100) / 100;
+        stealthStats.runStealthMultiplier =
+          Math.round(Math.max(0, draftStealth.runStealthMultiplier) * 100) / 100;
       }
+    }
 
     // 6. ИИ
     if (draftAI && aiSystem) {
-        const aiStats = world.getComponent(entityId, 'aiStats');
-        if (aiStats && aiStats.behavior.current !== draftAI) {
-          aiStats.behavior.current = draftAI;
-          aiStats.behavior.base = draftAI;
-          aiSystem.initBotBrain(world, entityId, draftAI);
-        }
+      const aiStats = world.getComponent(entityId, 'aiStats');
+      if (aiStats && aiStats.behavior.current !== draftAI) {
+        aiStats.behavior.current = draftAI;
+        aiStats.behavior.base = draftAI;
+        aiSystem.initBotBrain(world, entityId, draftAI);
       }
-  
-      // 7. Триггерная зона
-      if (draftZone) {
-        world.addComponent(entityId, 'zoneTrigger', { ...draftZone });
-        if (physBody) {
-          physBody.body.r = draftZone.radius;
-        }
+    }
+
+    // 7. Триггерная зона
+    if (draftZone) {
+      world.addComponent(entityId, 'zoneTrigger', { ...draftZone });
+      if (physBody) {
+        physBody.body.r = draftZone.radius;
       }
-  
-      // 8. Оружие
-      if (draftWeapon) {
+    }
+
+    // 8. Оружие
+    if (draftWeapon) {
       const wStats = world.getComponent(entityId, 'weaponStats');
       if (wStats) {
-        wStats.baseDamage.current = draftWeapon.baseDamage;
-        wStats.baseDamage.base = draftWeapon.baseDamage;
-        wStats.prepTime.current = draftWeapon.prepTime;
-        wStats.prepTime.base = draftWeapon.prepTime;
-        wStats.recoveryTime.current = draftWeapon.recoveryTime;
-        wStats.recoveryTime.base = draftWeapon.recoveryTime;
+        setBaseStat(wStats.baseDamage, draftWeapon.baseDamage);
+        setBaseStat(wStats.prepTime, draftWeapon.prepTime);
+        setBaseStat(wStats.recoveryTime, draftWeapon.recoveryTime);
       }
 
       let newZone: HitZoneConfig;
       if (draftWeapon.hitZoneType === 'radius') {
         newZone = { hitZoneType: 'radius', radius: draftWeapon.radius };
       } else if (draftWeapon.hitZoneType === 'angle') {
-        newZone = { hitZoneType: 'angle', length: draftWeapon.length, angle: deg2Rad(draftWeapon.angle) };
+        newZone = {
+          hitZoneType: 'angle',
+          length: draftWeapon.length,
+          angle: deg2Rad(draftWeapon.angle),
+        };
       } else if (draftWeapon.hitZoneType === 'forward_line') {
         newZone = {
           hitZoneType: 'forward_line',
@@ -322,18 +323,16 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       world.addComponent(entityId, 'weaponZone', newZone);
     }
 
-    // 8. Броня
+    // 9. Броня
     if (draftArmor) {
       const aStats = world.getComponent(entityId, 'armorStats');
       if (aStats) {
-        aStats.defense.current = draftArmor.defense;
-        aStats.defense.base = draftArmor.defense;
-        aStats.flatReduction.current = draftArmor.flatReduction;
-        aStats.flatReduction.base = draftArmor.flatReduction;
+        setBaseStat(aStats.defense, draftArmor.defense);
+        setBaseStat(aStats.flatReduction, draftArmor.flatReduction);
       }
     }
 
-    // 9. Сумка
+    // 10. Сумка
     if (draftBag) {
       const inv = world.getComponent(entityId, 'inventory');
       if (inv) {
@@ -403,7 +402,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             </div>
           )}
 
-        {draftAI && (
+          {draftAI && (
             <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #333' }}>
               <AIInspector behavior={draftAI} onChange={setDraftAI} isReadOnly={isReadOnly} />
             </div>
@@ -423,7 +422,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #333' }}>
               <WeaponFormFields
                 values={draftWeapon}
-                onChange={(patch) => setDraftWeapon((prev) => (prev ? { ...prev, ...patch } : null))}
+                onChange={(patch) =>
+                  setDraftWeapon((prev) => (prev ? { ...prev, ...patch } : null))
+                }
                 onZoneTypeChange={handleZoneTypeChange}
                 isReadOnly={isReadOnly}
               />

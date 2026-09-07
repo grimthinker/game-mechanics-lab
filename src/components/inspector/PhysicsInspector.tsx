@@ -13,9 +13,20 @@ export interface PhysicsInspectorProps {
   isReadOnly?: boolean;
 }
 
-export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({ values, onChange, isReadOnly }) => (
+export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
+  values,
+  onChange,
+  isReadOnly,
+}) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isReadOnly ? 'default' : 'pointer' }}>
+    <label
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        cursor: isReadOnly ? 'default' : 'pointer',
+      }}
+    >
       <input
         type="checkbox"
         disabled={isReadOnly}

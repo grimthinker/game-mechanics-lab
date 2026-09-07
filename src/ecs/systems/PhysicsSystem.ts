@@ -140,60 +140,57 @@ export class PhysicsSystem {
     isEditor: boolean = false // <-- передаем флаг режима редактора
   ): EntityId | null {
     if (!world) return null;
-  
+
     let nearestId: EntityId | null = null;
     let minDistance = Infinity;
-  
+
     const entities = world.getEntitiesWith('transform');
     for (const [entityId, { transform, physicsBody }] of entities) {
       const physStats = world.getComponent(entityId, 'physicsStats');
       const gizmo = world.getComponent(entityId, 'gizmo');
-  
+
       // 1. В ИГРЕ И СИМУЛЯЦИИ:
       // Полностью игнорируем сущности без реального физ. тела
       if (!isEditor) {
         if (!physicsBody && !physStats) continue;
       }
-  
+
       // 2. В РЕДАКТОРЕ:
       // Если объект бестелесный, берем радиус его гизмо (или дефолтный 14px).
       // Если физический — берем его настоящий физический радиус.
-      const radius = physStats?.radius.current 
-        ?? physicsBody?.body.r 
-        ?? gizmo?.radius 
-        ?? 14;
-  
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       const distToBoundary = Math.max(0, distToCenter - radius);
-  
+
       if (distToBoundary <= maxWorldDist && distToBoundary < minDistance) {
         minDistance = distToBoundary;
         nearestId = entityId;
       }
     }
-  
+
     return nearestId;
   }
 
-public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false): EntityId | null {
-  if (!world) return null;
+  public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false): EntityId | null {
+    if (!world) return null;
 
-  const entities = world.getEntitiesWith('transform');
-  for (const [entityId, { transform, physicsBody }] of entities) {
-    const physStats = world.getComponent(entityId, 'physicsStats');
-    const gizmo = world.getComponent(entityId, 'gizmo');
+    const entities = world.getEntitiesWith('transform');
+    for (const [entityId, { transform, physicsBody }] of entities) {
+      const physStats = world.getComponent(entityId, 'physicsStats');
+      const gizmo = world.getComponent(entityId, 'gizmo');
 
-    if (!isEditor && !physicsBody && !physStats) continue;
+      if (!isEditor && !physicsBody && !physStats) continue;
 
-    const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
-    const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-    if (dist <= radius) {
-      return entityId;
+      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
+      if (dist <= radius) {
+        return entityId;
+      }
     }
-  }
 
-  return null;
-}
+    return null;
+  }
 
   public update(dt: number, world: World): void {
     const movingEntities = world.getEntitiesWith('transform', 'velocity');
@@ -232,12 +229,10 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
       if (p1.isTrigger || p2.isTrigger) return;
 
       const health1 = world.getComponent(id1, 'health');
-      const healthStats1 = world.getComponent(id1, 'healthStats');
-      const valid1 = healthStats1 ? (health1?.isAlive && healthStats1.hp.current > 0) : true;
+      const valid1 = health1 ? health1.isAlive && health1.current > 0 : true;
 
       const health2 = world.getComponent(id2, 'health');
-      const healthStats2 = world.getComponent(id2, 'healthStats');
-      const valid2 = healthStats2 ? (health2?.isAlive && healthStats2.hp.current > 0) : true;
+      const valid2 = health2 ? health2.isAlive && health2.current > 0 : true;
 
       if (!valid1 || !valid2) return;
 
@@ -284,7 +279,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
         const health = world.getComponent(id, 'health');
         if (health && !health.isAlive) continue;
         if ((physicsBody.mask & CollisionCategory.OBSTACLE) === 0) continue;
-        
+
         this.resolveObstaclesForBody(physicsBody.body);
         transform.x = physicsBody.body.x;
         transform.y = physicsBody.body.y;
@@ -327,11 +322,10 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
 
       if (hitEntityId) {
         const hitHealth = world.getComponent(hitEntityId, 'health');
-        const hitStats = world.getComponent(hitEntityId, 'healthStats');
         const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
         const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
-        const isDead = hitHealth && (!hitHealth.isAlive || (hitStats && hitStats.hp.current <= 0));
-        const isNonSolid = (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) || (hitPhysStats && !hitPhysStats.isSolid.current);
+        const isDead = hitHealth && (!hitHealth.isAlive || hitHealth.current <= 0);
+        const isNonSolid = (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) || (hitPhysStats && !hitPhysStats.isSolid);
 
         if (isDead || isNonSolid) {
           currStart = {
@@ -377,12 +371,10 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
         if (hitTransform) {
           const hitAiStats = world.getComponent(hitEntityId, 'aiStats');
           const hitBehavior = hitAiStats?.behavior?.current ?? 'IdleTree';
-          
+
           if (hitBehavior === 'PlayerTree') {
             if (zone.piercePlayers) {
-              const distToCenter =
-                (hitTransform.x - from.x) * ux +
-                (hitTransform.y - from.y) * uy;
+              const distToCenter = (hitTransform.x - from.x) * ux + (hitTransform.y - from.y) * uy;
               const stepDist = Math.max(0, distToCenter) + r + 1;
               if (stepDist >= len) return false;
               currStart = {
@@ -394,9 +386,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
             }
           } else {
             if (zone.pierceBots) {
-              const distToCenter =
-                (hitTransform.x - from.x) * ux +
-                (hitTransform.y - from.y) * uy;
+              const distToCenter = (hitTransform.x - from.x) * ux + (hitTransform.y - from.y) * uy;
               const stepDist = Math.max(0, distToCenter) + r + 1;
               if (stepDist >= len) return false;
               currStart = {
@@ -431,11 +421,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
     return Math.hypot(p.x - projX, p.y - projY);
   }
 
-  public checkWeaponHits(
-    attackerId: EntityId,
-    zone: HitZoneConfig,
-    world: World
-  ): EntityId[] {
+  public checkWeaponHits(attackerId: EntityId, zone: HitZoneConfig, world: World): EntityId[] {
     const hitEntities: EntityId[] = [];
     const attackerTransform = world.getComponent(attackerId, 'transform');
     if (!attackerTransform) return hitEntities;
@@ -443,13 +429,13 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
     const pos = { x: attackerTransform.x, y: attackerTransform.y };
     const angle = attackerTransform.angle;
 
-    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health', 'healthStats');
+    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health');
 
-    for (const [targetId, { transform, physicsBody, health, healthStats }] of targets) {
-      if (targetId === attackerId || !health.isAlive || healthStats.hp.current <= 0) continue;
+    for (const [targetId, { transform, physicsBody, health }] of targets) {
+      if (targetId === attackerId || !health.isAlive || health.current <= 0) continue;
 
       const physStats = world.getComponent(targetId, 'physicsStats');
-      const isSolid = physStats ? physStats.isSolid.current : (physicsBody.mask !== COLLISION_MASK_NONE);
+      const isSolid = physStats ? physStats.isSolid : (physicsBody.mask !== COLLISION_MASK_NONE);
       if (!isSolid) continue;
 
       const targetRadius = physStats?.radius.current ?? physicsBody.body.r ?? 16;
@@ -480,8 +466,7 @@ public getEntityAt(worldPoint: Point, world?: World, isEditor: boolean = false):
             while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
             angleDiff = Math.abs(angleDiff);
 
-            const angularTolerance =
-              dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;
+            const angularTolerance = dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;
 
             if (angleDiff <= maxAngle + angularTolerance) {
               if (!this.isLineOfSightBlocked(pos, targetPos)) {

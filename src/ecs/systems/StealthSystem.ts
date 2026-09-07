@@ -1,24 +1,36 @@
 import { World } from '../World';
+import { ModifierType } from '../types';
+import { addModifier, removeModifier } from '../stats/StatEvaluator';
 
 export class StealthSystem {
   public update(_dt: number, world: World): void {
     const entities = world.getEntitiesWith('stealthStats', 'input', 'health');
 
-    for (const [id, { stealthStats, input, health }] of entities) {
-      const healthStats = world.getComponent(id, 'healthStats');
-      if (!health.isAlive || (healthStats && healthStats.hp.current <= 0)) {
+    for (const [_id, { stealthStats, input, health }] of entities) {
+      if (!health.isAlive || health.current <= 0) {
+        removeModifier(stealthStats.stealthPower, 'state_crouch_stealth');
+        removeModifier(stealthStats.stealthPower, 'state_run_stealth');
         stealthStats.stealthPower.current = 0;
         continue;
       }
 
       if (input.isCrouching) {
-        stealthStats.stealthPower.current =
-          stealthStats.stealthPower.base * stealthStats.crouchStealthMultiplier.current;
+        addModifier(stealthStats.stealthPower, {
+          id: 'state_crouch_stealth',
+          type: ModifierType.PERCENT_MULT,
+          value: stealthStats.crouchStealthMultiplier,
+        });
+        removeModifier(stealthStats.stealthPower, 'state_run_stealth');
       } else if (input.isRunning) {
-        stealthStats.stealthPower.current =
-          stealthStats.stealthPower.base * stealthStats.runStealthMultiplier.current;
+        addModifier(stealthStats.stealthPower, {
+          id: 'state_run_stealth',
+          type: ModifierType.PERCENT_MULT,
+          value: stealthStats.runStealthMultiplier,
+        });
+        removeModifier(stealthStats.stealthPower, 'state_crouch_stealth');
       } else {
-        stealthStats.stealthPower.current = stealthStats.stealthPower.base;
+        removeModifier(stealthStats.stealthPower, 'state_crouch_stealth');
+        removeModifier(stealthStats.stealthPower, 'state_run_stealth');
       }
     }
   }

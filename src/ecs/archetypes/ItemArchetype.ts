@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
+import { createStat } from '../stats/StatEvaluator';
 
 export function assembleItem(
   world: World,
@@ -42,28 +43,28 @@ export function assembleItem(
 
   // 4. Физические характеристики
   world.addComponent(id, 'physicsStats', {
-    radius: { base: radius, current: radius },
-    weight: { base: weight, current: weight },
-    isSolid: { base: isSolid, current: isSolid },
+    radius: createStat(radius) as any,
+    weight: createStat(weight),
+    isSolid,
   });
 
   // 5. Специфические компоненты экипировки
   if (itemData.type === 'weapon') {
     const ws = config.weaponStats ?? {};
     world.addComponent(id, 'weaponStats', {
-      baseDamage: { base: ws.baseDamage ?? 20, current: ws.baseDamage ?? 20 },
-      prepTime: { base: ws.prepTime ?? 0.2, current: ws.prepTime ?? 0.2 },
-      castTime: { base: ws.castTime ?? 0, current: ws.castTime ?? 0 },
-      recoveryTime: { base: ws.recoveryTime ?? 0.3, current: ws.recoveryTime ?? 0.3 },
-      prepTurnSlow: { base: ws.prepTurnSlow ?? 0.5, current: ws.prepTurnSlow ?? 0.5 },
-      recoveryTurnSlow: { base: ws.recoveryTurnSlow ?? 0.8, current: ws.recoveryTurnSlow ?? 0.8 },
-      prepMoveSlow: { base: ws.prepMoveSlow ?? 0.5, current: ws.prepMoveSlow ?? 0.5 },
-      recoveryMoveSlow: { base: ws.recoveryMoveSlow ?? 0.8, current: ws.recoveryMoveSlow ?? 0.8 },
-      castMoveSlow: { base: ws.castMoveSlow ?? 0.5, current: ws.castMoveSlow ?? 0.5 },
-      minMultiplier: { base: ws.minMultiplier ?? 0.8, current: ws.minMultiplier ?? 0.8 },
-      maxMultiplier: { base: ws.maxMultiplier ?? 1.2, current: ws.maxMultiplier ?? 1.2 },
-      critChance: { base: ws.critChance ?? 0.1, current: ws.critChance ?? 0.1 },
-      critMultiplier: { base: ws.critMultiplier ?? 2.0, current: ws.critMultiplier ?? 2.0 },
+      baseDamage: createStat(ws.baseDamage ?? 20),
+      prepTime: createStat(ws.prepTime ?? 0.2),
+      castTime: createStat(ws.castTime ?? 0),
+      recoveryTime: createStat(ws.recoveryTime ?? 0.3),
+      prepTurnSlow: ws.prepTurnSlow ?? 0.5,
+      recoveryTurnSlow: ws.recoveryTurnSlow ?? 0.8,
+      prepMoveSlow: ws.prepMoveSlow ?? 0.5,
+      recoveryMoveSlow: ws.recoveryMoveSlow ?? 0.8,
+      castMoveSlow: ws.castMoveSlow ?? 0.5,
+      minMultiplier: ws.minMultiplier ?? 0.8,
+      maxMultiplier: ws.maxMultiplier ?? 1.2,
+      critChance: ws.critChance ?? 0.1,
+      critMultiplier: ws.critMultiplier ?? 2.0,
     });
 
     if (config.weaponZone) {
@@ -72,15 +73,17 @@ export function assembleItem(
   } else if (itemData.type === 'armor') {
     const as = config.armorStats ?? {};
     world.addComponent(id, 'armorStats', {
-      defense: { base: as.defense ?? 0, current: as.defense ?? 0 },
-      flatReduction: { base: as.flatReduction ?? 0, current: as.flatReduction ?? 0 },
+      defense: createStat(as.defense ?? 0),
+      flatReduction: createStat(as.flatReduction ?? 0),
     });
   } else if (itemData.type === 'bag') {
     const w = config.inventory?.size.width ?? 6;
     const h = config.inventory?.size.height ?? 4;
-    const slots = config.inventory?.slots ?? Array.from({ length: h }, () =>
-      Array.from({ length: w }, () => ({ itemId: null, count: 0 }))
-    );
+    const slots =
+      config.inventory?.slots ??
+      Array.from({ length: h }, () =>
+        Array.from({ length: w }, () => ({ itemId: null, count: 0 }))
+      );
     world.addComponent(id, 'inventory', {
       size: { width: w, height: h },
       slots,

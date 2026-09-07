@@ -1,10 +1,6 @@
 import { World } from '../World';
 import { EntityId } from '../types';
-import {
-  EntityUtils,
-  Blackboard,
-  BTLogicComponent,
-} from '../../ai/core';
+import { EntityUtils, Blackboard, BTLogicComponent } from '../../ai/core';
 import { createBTAISystem } from '../../ai/system';
 import { BEHAVIOR_TREES } from '../../ai/trees_library';
 import { EntityAdapter } from '../../EntityAdapter';
@@ -47,8 +43,15 @@ export class AISystem {
 
   private getAllAIEntities(): EntityAdapter[] {
     const result: EntityAdapter[] = [];
-    const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'aiStats', 'health', 'brain');
-  
+    const entities = this.world.getEntitiesWith(
+      'meta',
+      'transform',
+      'input',
+      'aiStats',
+      'health',
+      'brain'
+    );
+
     for (const [id] of entities) {
       const adapter = this.getEntityAdapter(id);
       if (adapter) result.push(adapter);

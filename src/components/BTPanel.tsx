@@ -58,7 +58,13 @@ export const BTPanel: React.FC<BTPanelProps> = ({
         <span>🌳 Дерево поведения (BT)</span>
         <button
           onClick={onClose}
-          style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '16px' }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#aaa',
+            cursor: 'pointer',
+            fontSize: '16px',
+          }}
         >
           ✕
         </button>
@@ -129,7 +135,9 @@ export const BTPanel: React.FC<BTPanelProps> = ({
             </div>
           ))
         ) : (
-          <div style={{ color: '#777', fontStyle: 'italic', padding: '4px 0' }}>Память пуста или недоступна</div>
+          <div style={{ color: '#777', fontStyle: 'italic', padding: '4px 0' }}>
+            Память пуста или недоступна
+          </div>
         )}
       </div>
 

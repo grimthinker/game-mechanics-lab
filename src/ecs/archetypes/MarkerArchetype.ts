@@ -1,12 +1,7 @@
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
-import {
-  EntityId,
-  EntityConfig,
-  RENDER_Z_INDEX,
-  RenderableComponent,
-} from '../types';
+import { EntityId, EntityConfig, RENDER_Z_INDEX, RenderableComponent } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
 

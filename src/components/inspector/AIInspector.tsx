@@ -10,11 +10,7 @@ export interface AIInspectorProps {
 export const AIInspector: React.FC<AIInspectorProps> = ({ behavior, onChange, isReadOnly }) => (
   <label>
     Поведение (AI):
-    <select
-      disabled={isReadOnly}
-      value={behavior}
-      onChange={(e) => onChange(e.target.value)}
-    >
+    <select disabled={isReadOnly} value={behavior} onChange={(e) => onChange(e.target.value)}>
       {Object.entries(BEHAVIOR_TREE_NAMES).map(([id, name]) => (
         <option key={id} value={id}>
           {name}

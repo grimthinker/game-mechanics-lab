@@ -34,8 +34,8 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       { type: 'weapon', itemId: null },
     ],
     meta: {
-        name: 'Существо',
-        entityType: 'creature',
-      },
+      name: 'Существо',
+      entityType: 'creature',
+    },
   };
 }

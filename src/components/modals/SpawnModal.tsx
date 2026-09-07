@@ -1,8 +1,5 @@
 import React from 'react';
-import {
-  STANDARD_RADII,
-  StandardRadius,
-} from '../../ecs/types';
+import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
 import { BEHAVIOR_TREE_NAMES } from '../../ai/trees_library';
 
 export interface SpawnModalProps {
@@ -88,12 +85,26 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
               onChange={(e) => setPendingSpawnBehavior(e.target.value)}
             >
               {Object.entries(BEHAVIOR_TREE_NAMES).map(([id, name]) => (
-                <option key={id} value={id}>{name}</option>
+                <option key={id} value={id}>
+                  {name}
+                </option>
               ))}
             </select>
           </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: '8px 0' }}>
-            <input type="checkbox" checked={isSolid} onChange={(e) => setIsSolid(e.target.checked)} />
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              cursor: 'pointer',
+              margin: '8px 0',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={isSolid}
+              onChange={(e) => setIsSolid(e.target.checked)}
+            />
             Участвует в коллизии
           </label>
           <label>

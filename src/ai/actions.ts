@@ -2,12 +2,7 @@ import { EntityAdapter } from '../EntityAdapter';
 import { Point } from '../types';
 import { vec2_distance_to, now_with_ms } from '../utils';
 import { LOGIC_CONFIG } from './config';
-import {
-  NodeStatus,
-  BTAction,
-  PathKeys,
-  BTSimpleAction,
-} from './core';
+import { NodeStatus, BTAction, PathKeys, BTSimpleAction } from './core';
 
 export class BTConditionValidTarget extends BTSimpleAction {
   public static readonly nodeName = 'Проверка валидности цели';
@@ -64,8 +59,7 @@ export class BTActionPursue extends BTAction {
   private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('current_path');
   private readonly stopDistSq: number = LOGIC_CONFIG.follow_stop_dist ** 2;
   public static readonly nodeName = 'Преследовать цель';
-  public static readonly description =
-    'Преследовать цель, если она есть и есть путь current_path';
+  public static readonly description = 'Преследовать цель, если она есть и есть путь current_path';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
@@ -157,9 +151,10 @@ export class BTActionAttack extends BTAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     // 1. Атака активна и обрабатывается в ECS (для конкретного слота или общая)
-    const isAttackingInECS = this.params.slotIndex !== undefined
-      ? entity.isSlotBusy(this.params.slotIndex)
-      : entity.attack_status !== 'idle';
+    const isAttackingInECS =
+      this.params.slotIndex !== undefined
+        ? entity.isSlotBusy(this.params.slotIndex)
+        : entity.attack_status !== 'idle';
 
     if (isAttackingInECS) {
       this.hasStarted = true;
@@ -188,8 +183,7 @@ export class BTActionAttack extends BTAction {
 
 export class BTCommandForgetTarget extends BTSimpleAction {
   public static readonly nodeName = 'Забыть цель';
-  public static readonly description =
-    'Сбрасывает цель, состояние is_engaged и текущий путь';
+  public static readonly description = 'Сбрасывает цель, состояние is_engaged и текущий путь';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
@@ -203,8 +197,7 @@ export class BTCommandForgetTarget extends BTSimpleAction {
 
 export class BTCommandAcceptCandidate extends BTSimpleAction {
   public static readonly nodeName = 'Принять цель';
-  public static readonly description =
-    'Принять цель, указанную в best_candidate_id, если она есть';
+  public static readonly description = 'Принять цель, указанную в best_candidate_id, если она есть';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
@@ -223,8 +216,7 @@ export class BTCommandAcceptCandidate extends BTSimpleAction {
 
 export class BTSucceedImmediately extends BTSimpleAction {
   public static readonly nodeName = 'Мгновенный успех';
-  public static readonly description =
-    'Ничего не делает и сразу возвращает SUCCESS';
+  public static readonly description = 'Ничего не делает и сразу возвращает SUCCESS';
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
     return NodeStatus.SUCCESS;
@@ -233,8 +225,7 @@ export class BTSucceedImmediately extends BTSimpleAction {
 
 export class BTWait extends BTAction {
   public static readonly nodeName = 'Ожидание времени';
-  public static readonly description =
-    'Ждёт заданное количество секунд и возвращает SUCCESS';
+  public static readonly description = 'Ждёт заданное количество секунд и возвращает SUCCESS';
   public static readonly defaultParams = { duration: 1 };
 
   private startTime: number = 0;
@@ -303,7 +294,7 @@ export class BTActionRotateToPos extends BTAction {
     const direction: -1 | 1 = diff > 0 ? 1 : -1;
 
     // Вычисляем ratio (долю скорости) на основе оставшегося угла.
-    // Чем ближе к цели, тем ниже скорость поворота (плавное замедление), 
+    // Чем ближе к цели, тем ниже скорость поворота (плавное замедление),
     // но держим минимальный порог, чтобы бот гарантированно докрутился.
     let ratio = Math.min(1, Math.abs(diff) / LOGIC_CONFIG.slowDownAngle);
     ratio = Math.max(LOGIC_CONFIG.minRotationSpeed, ratio);
@@ -326,14 +317,14 @@ export class BTActionStopTurn extends BTSimpleAction {
     entity.stopTurning();
     return NodeStatus.SUCCESS;
   }
-  
-  protected stopAction(entity: EntityAdapter): void {
-  }
+
+  protected stopAction(entity: EntityAdapter): void {}
 }
 
 export class BTActionFollowPathSmooth extends BTAction {
   public static readonly nodeName = 'Двигаться по пути (плавно)';
-  public static readonly description = 'Двигаться по пути current_path с одновременным плавным поворотом';
+  public static readonly description =
+    'Двигаться по пути current_path с одновременным плавным поворотом';
 
   constructor(private path_key: PathKeys = 'current_path') {
     super();
@@ -370,7 +361,7 @@ export class BTActionFollowPathSmooth extends BTAction {
     // Управляем поворотом во время движения
     if (Math.abs(diff) > LOGIC_CONFIG.angleDiffTolerance) {
       const direction: -1 | 1 = diff > 0 ? 1 : -1;
-      // Если угол большой (> 45°), можно снизить линейную скорость/замедлить поворот, 
+      // Если угол большой (> 45°), можно снизить линейную скорость/замедлить поворот,
       // либо просто передать ratio для поворота:
       const ratio = Math.min(1, Math.abs(diff) / (Math.PI / 4));
       entity.startTurning(direction, Math.max(0.3, ratio));

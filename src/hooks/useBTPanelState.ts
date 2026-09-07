@@ -54,7 +54,10 @@ export function useBTPanelState() {
   useEffect(() => {
     const handleMouseMoveBBResize = (e: MouseEvent) => {
       if (!isResizingBB) return;
-      const newHeight = Math.max(120, Math.min(window.innerHeight - 150, window.innerHeight - e.clientY));
+      const newHeight = Math.max(
+        120,
+        Math.min(window.innerHeight - 150, window.innerHeight - e.clientY)
+      );
       setBlackboardHeight(newHeight);
     };
 

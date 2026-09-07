@@ -4,192 +4,192 @@ import { HIT_ZONE_LABELS } from '../../../Weapon';
 import { Degrees } from '../../../utils';
 
 export interface WeaponFormValues {
-    name: string;
-    weight: number;
-    baseDamage: number;
-    prepTime: number;
-    recoveryTime: number;
-    length: number;
-    radius: number;
-    rayCount: number;
-    angle: Degrees;
-    pierceObstacles: boolean;
-    piercePlayers: boolean;
-    pierceBots: boolean;
-    hitZoneType: HitZoneType;
-  }
-  
-  export const WeaponFormFields: React.FC<{
-    values: WeaponFormValues;
-    onChange: (v: Partial<WeaponFormValues>) => void;
-    onZoneTypeChange?: (newType: HitZoneType) => void;
-    isReadOnly?: boolean;
-  }> = ({ values, onChange, onZoneTypeChange, isReadOnly }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+  name: string;
+  weight: number;
+  baseDamage: number;
+  prepTime: number;
+  recoveryTime: number;
+  length: number;
+  radius: number;
+  rayCount: number;
+  angle: Degrees;
+  pierceObstacles: boolean;
+  piercePlayers: boolean;
+  pierceBots: boolean;
+  hitZoneType: HitZoneType;
+}
+
+export const WeaponFormFields: React.FC<{
+  values: WeaponFormValues;
+  onChange: (v: Partial<WeaponFormValues>) => void;
+  onZoneTypeChange?: (newType: HitZoneType) => void;
+  isReadOnly?: boolean;
+}> = ({ values, onChange, onZoneTypeChange, isReadOnly }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <label>
+      Название:
+      <input
+        disabled={isReadOnly}
+        type="text"
+        value={values.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+      />
+    </label>
+    <label>
+      Вид зоны поражения:
+      <select
+        disabled={isReadOnly}
+        value={values.hitZoneType}
+        onChange={(e) => {
+          const newType = e.target.value as HitZoneType;
+          if (onZoneTypeChange) {
+            onZoneTypeChange(newType);
+          } else {
+            onChange({ hitZoneType: newType });
+          }
+        }}
+      >
+        <option value="angle">{HIT_ZONE_LABELS.angle}</option>
+        <option value="radius">{HIT_ZONE_LABELS.radius}</option>
+        <option value="forward_line">{HIT_ZONE_LABELS.forward_line}</option>
+        <option value="shrapnel">{HIT_ZONE_LABELS.shrapnel}</option>
+      </select>
+    </label>
+    <label>
+      Вес:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.weight}
+        min={0}
+        max={100}
+        onChange={(e) => onChange({ weight: Number(e.target.value) })}
+      />
+    </label>
+    <label>
+      Базовый урон:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.baseDamage}
+        min={0}
+        max={500}
+        onChange={(e) => onChange({ baseDamage: Number(e.target.value) })}
+      />
+    </label>
+    <label>
+      Подготовка (сек):
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.prepTime}
+        min={0.05}
+        max={5}
+        step={0.05}
+        onChange={(e) => onChange({ prepTime: Number(e.target.value) })}
+      />
+    </label>
+    <label>
+      Восстановление (сек):
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.recoveryTime}
+        min={0.05}
+        max={5}
+        step={0.05}
+        onChange={(e) => onChange({ recoveryTime: Number(e.target.value) })}
+      />
+    </label>
+
+    {/* Специфические поля для зоны */}
+    {['forward_line', 'angle', 'shrapnel'].includes(values.hitZoneType) && (
       <label>
-        Название:
-        <input
-          disabled={isReadOnly}
-          type="text"
-          value={values.name}
-          onChange={(e) => onChange({ name: e.target.value })}
-        />
-      </label>
-      <label>
-        Вид зоны поражения:
-        <select
-          disabled={isReadOnly}
-          value={values.hitZoneType}
-          onChange={(e) => {
-            const newType = e.target.value as HitZoneType;
-            if (onZoneTypeChange) {
-              onZoneTypeChange(newType);
-            } else {
-              onChange({ hitZoneType: newType });
-            }
-          }}
-        >
-          <option value="angle">{HIT_ZONE_LABELS.angle}</option>
-          <option value="radius">{HIT_ZONE_LABELS.radius}</option>
-          <option value="forward_line">{HIT_ZONE_LABELS.forward_line}</option>
-          <option value="shrapnel">{HIT_ZONE_LABELS.shrapnel}</option>
-        </select>
-      </label>
-      <label>
-        Вес:
+        Дальность / Длина:
         <input
           disabled={isReadOnly}
           type="number"
-          value={values.weight}
+          value={values.length}
           min={0}
-          max={100}
-          onChange={(e) => onChange({ weight: Number(e.target.value) })}
+          max={2000}
+          step={10}
+          onChange={(e) => onChange({ length: Number(e.target.value) })}
         />
       </label>
+    )}
+    {values.hitZoneType === 'radius' && (
       <label>
-        Базовый урон:
+        Радиус:
         <input
           disabled={isReadOnly}
           type="number"
-          value={values.baseDamage}
+          value={values.radius}
           min={0}
           max={500}
-          onChange={(e) => onChange({ baseDamage: Number(e.target.value) })}
+          step={5}
+          onChange={(e) => onChange({ radius: Number(e.target.value) })}
         />
       </label>
+    )}
+    {values.hitZoneType === 'shrapnel' && (
       <label>
-        Подготовка (сек):
+        Количество лучей:
         <input
           disabled={isReadOnly}
           type="number"
-          value={values.prepTime}
-          min={0.05}
-          max={5}
-          step={0.05}
-          onChange={(e) => onChange({ prepTime: Number(e.target.value) })}
+          value={values.rayCount}
+          min={1}
+          max={50}
+          onChange={(e) => onChange({ rayCount: Number(e.target.value) })}
         />
       </label>
+    )}
+    {['angle', 'shrapnel'].includes(values.hitZoneType) && (
       <label>
-        Восстановление (сек):
+        Угол (°):
         <input
           disabled={isReadOnly}
           type="number"
-          value={values.recoveryTime}
-          min={0.05}
-          max={5}
-          step={0.05}
-          onChange={(e) => onChange({ recoveryTime: Number(e.target.value) })}
+          value={values.angle}
+          min={0}
+          max={360}
+          onChange={(e) => onChange({ angle: Number(e.target.value) as Degrees })}
         />
       </label>
-  
-      {/* Специфические поля для зоны */}
-      {['forward_line', 'angle', 'shrapnel'].includes(values.hitZoneType) && (
-        <label>
-          Дальность / Длина:
+    )}
+    {['forward_line', 'shrapnel'].includes(values.hitZoneType) && (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             disabled={isReadOnly}
-            type="number"
-            value={values.length}
-            min={0}
-            max={2000}
-            step={10}
-            onChange={(e) => onChange({ length: Number(e.target.value) })}
+            type="checkbox"
+            checked={values.pierceObstacles}
+            onChange={(e) => onChange({ pierceObstacles: e.target.checked })}
           />
+          Пробивать препятствия
         </label>
-      )}
-      {values.hitZoneType === 'radius' && (
-        <label>
-          Радиус:
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             disabled={isReadOnly}
-            type="number"
-            value={values.radius}
-            min={0}
-            max={500}
-            step={5}
-            onChange={(e) => onChange({ radius: Number(e.target.value) })}
+            type="checkbox"
+            checked={values.piercePlayers}
+            onChange={(e) => onChange({ piercePlayers: e.target.checked })}
           />
+          Пробивать игроков
         </label>
-      )}
-      {values.hitZoneType === 'shrapnel' && (
-        <label>
-          Количество лучей:
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             disabled={isReadOnly}
-            type="number"
-            value={values.rayCount}
-            min={1}
-            max={50}
-            onChange={(e) => onChange({ rayCount: Number(e.target.value) })}
+            type="checkbox"
+            checked={values.pierceBots}
+            onChange={(e) => onChange({ pierceBots: e.target.checked })}
           />
+          Пробивать ботов
         </label>
-      )}
-      {['angle', 'shrapnel'].includes(values.hitZoneType) && (
-        <label>
-          Угол (°):
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.angle}
-            min={0}
-            max={360}
-            onChange={(e) => onChange({ angle: Number(e.target.value) as Degrees })}
-          />
-        </label>
-      )}
-      {['forward_line', 'shrapnel'].includes(values.hitZoneType) && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <input
-              disabled={isReadOnly}
-              type="checkbox"
-              checked={values.pierceObstacles}
-              onChange={(e) => onChange({ pierceObstacles: e.target.checked })}
-            />
-            Пробивать препятствия
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <input
-              disabled={isReadOnly}
-              type="checkbox"
-              checked={values.piercePlayers}
-              onChange={(e) => onChange({ piercePlayers: e.target.checked })}
-            />
-            Пробивать игроков
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-            <input
-              disabled={isReadOnly}
-              type="checkbox"
-              checked={values.pierceBots}
-              onChange={(e) => onChange({ pierceBots: e.target.checked })}
-            />
-            Пробивать ботов
-          </label>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 
 export interface ArmorFormValues {
   name: string;

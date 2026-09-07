@@ -11,7 +11,11 @@ export interface HealthInspectorProps {
   isReadOnly?: boolean;
 }
 
-export const HealthInspector: React.FC<HealthInspectorProps> = ({ values, onChange, isReadOnly }) => (
+export const HealthInspector: React.FC<HealthInspectorProps> = ({
+  values,
+  onChange,
+  isReadOnly,
+}) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
     <label>
       Текущее HP:
@@ -25,7 +29,7 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({ values, onChan
       />
     </label>
     <label>
-      Макс. HP:
+      Базовое макс. HP:
       <input
         disabled={isReadOnly}
         type="number"

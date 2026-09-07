@@ -3,10 +3,10 @@ import { PhysicsSystem } from './PhysicsSystem';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
-    const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input', 'healthStats');
+    const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input');
 
-    for (const [id, { equip, activeAttacks, health, input, healthStats }] of entities) {
-      if (!health.isAlive || healthStats.hp.current <= 0) continue;
+    for (const [id, { equip, activeAttacks, health, input }] of entities) {
+      if (!health.isAlive || health.current <= 0) continue;
 
       if (input.wantsAttack && !input.isRunning) {
         const busySlots = new Set(activeAttacks.attacks.map((a) => a.slotIndex));
@@ -14,7 +14,12 @@ export class AttackSystem {
 
         if (input.attackSlotIndex !== undefined) {
           const slot = equip.slots[input.attackSlotIndex];
-          if (slot && slot.type === 'weapon' && slot.itemId !== null && !busySlots.has(input.attackSlotIndex)) {
+          if (
+            slot &&
+            slot.type === 'weapon' &&
+            slot.itemId !== null &&
+            !busySlots.has(input.attackSlotIndex)
+          ) {
             chosenSlotIndex = input.attackSlotIndex;
           }
         } else {
@@ -49,7 +54,9 @@ export class AttackSystem {
 
         const slot = equip.slots[atk.slotIndex];
         const isStillEquipped = slot && slot.type === 'weapon' && slot.itemId === atk.weaponId;
-        const wStats = isStillEquipped ? world.getComponent(atk.weaponId, 'weaponStats') : undefined;
+        const wStats = isStillEquipped
+          ? world.getComponent(atk.weaponId, 'weaponStats')
+          : undefined;
 
         if (!isStillEquipped || !wStats) {
           activeAttacks.attacks.splice(i, 1);
@@ -102,15 +109,14 @@ export class AttackSystem {
     const targetIds = physics.checkWeaponHits(attackerId, wZone, world);
 
     const baseDamage = wStats.baseDamage.current;
-    const minMultiplier = wStats.minMultiplier.current;
-    const maxMultiplier = wStats.maxMultiplier.current;
-    const critChance = wStats.critChance.current;
-    const critMultiplier = wStats.critMultiplier.current;
+    const minMultiplier = wStats.minMultiplier;
+    const maxMultiplier = wStats.maxMultiplier;
+    const critChance = wStats.critChance;
+    const critMultiplier = wStats.critMultiplier;
 
     for (const targetId of targetIds) {
       const targetHealth = world.getComponent(targetId, 'health');
-      const targetStats = world.getComponent(targetId, 'healthStats');
-      if (!targetHealth || !targetHealth.isAlive || !targetStats) continue;
+      if (!targetHealth || !targetHealth.isAlive || targetHealth.current <= 0) continue;
 
       const mult = minMultiplier + Math.random() * (maxMultiplier - minMultiplier);
       let rawDamage = baseDamage * mult;
@@ -135,7 +141,7 @@ export class AttackSystem {
       const mitigatedDamage = rawDamage * (1 - Math.min(0.9, Math.max(0, defense / 100)));
       const finalDamage = Math.max(0, Math.round(mitigatedDamage - flatReduction));
 
-      targetStats.hp.current = Math.max(0, targetStats.hp.current - finalDamage);
+      targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
       targetHealth.hitFlashTimer = 6;
     }
   }

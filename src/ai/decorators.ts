@@ -75,10 +75,7 @@ export class BTCooldown extends BTDecorator {
   private params: typeof BTCooldown.defaultParams;
   private lastExecutionTime: number = -Infinity;
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTCooldown.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTCooldown.defaultParams>) {
     super(child);
     this.params = { ...BTCooldown.defaultParams, ...params };
   }
@@ -128,10 +125,7 @@ export class BTDecoratorCheckEngaged extends BTDecorator {
 
   private params: typeof BTDecoratorCheckEngaged.defaultParams;
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTDecoratorCheckEngaged.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTDecoratorCheckEngaged.defaultParams>) {
     super(child);
     this.params = { ...BTDecoratorCheckEngaged.defaultParams, ...params };
   }
@@ -146,10 +140,7 @@ export class BTDecoratorCheckEngaged extends BTDecorator {
 
     if (!target?.getPos()) return NodeStatus.FAILURE;
 
-    const dist = vec2_distance_to(
-      ctx.getPos(),
-      target.getPos()
-    );
+    const dist = vec2_distance_to(ctx.getPos(), target.getPos());
     const is_engaged = dist <= this.params.engage_dist;
 
     if (!is_engaged) {

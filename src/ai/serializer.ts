@@ -1,16 +1,14 @@
 import { BTNode, BTNodeDTO, NodeStatus, BTService } from './core';
 
-
 interface NodeWithChild extends BTNode {
   child: BTNode;
 }
-
 
 export function serializeBTNode(node: BTNode, path: string = 'root'): BTNodeDTO {
   const children: BTNodeDTO[] = [];
 
   if ('children' in node && Array.isArray(node.children)) {
-      node.children.forEach((child, index) => {
+    node.children.forEach((child, index) => {
       children.push(serializeBTNode(child, `${path}_${index}`));
     });
   } else if ('child' in node) {
@@ -29,13 +27,12 @@ export function serializeBTNode(node: BTNode, path: string = 'root'): BTNodeDTO 
     Object.assign(parameters, node.params);
   }
 
-
   let timeToNextTick: number | undefined = undefined;
 
   if (node instanceof BTService) {
-    timeToNextTick = node.timeRemains
+    timeToNextTick = node.timeRemains;
     // console.log(timeToNextTick)
-  } 
+  }
 
   return {
     id: node.id || path,

@@ -1,3 +1,3 @@
 export const GlobalInput = {
-    keys: new Set<string>()
+  keys: new Set<string>(),
 };

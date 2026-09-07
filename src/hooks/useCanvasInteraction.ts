@@ -1,4 +1,11 @@
-import { useRef, useEffect, MutableRefObject, Dispatch, SetStateAction, MouseEvent as ReactMouseEvent } from 'react';
+import {
+  useRef,
+  useEffect,
+  MutableRefObject,
+  Dispatch,
+  SetStateAction,
+  MouseEvent as ReactMouseEvent,
+} from 'react';
 import { GameApp } from '../GameApp';
 import { GameMode } from '../constants';
 import { PlacementMode } from '../types';
@@ -85,11 +92,19 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    if (app.isPaused && mode === GameMode.EDITOR && clickedEntityIdRef.current && dragStartPosRef.current) {
+    if (
+      app.isPaused &&
+      mode === GameMode.EDITOR &&
+      clickedEntityIdRef.current &&
+      dragStartPosRef.current
+    ) {
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
       if (Math.hypot(dx, dy) > 5) {
-        const clickWorldPoint = app.getCanvasPoint(dragStartPosRef.current.x, dragStartPosRef.current.y);
+        const clickWorldPoint = app.getCanvasPoint(
+          dragStartPosRef.current.x,
+          dragStartPosRef.current.y
+        );
         app.startDraggingEntity(clickedEntityIdRef.current, clickWorldPoint);
         app.updateDraggedEntityPosition(point);
         e.currentTarget.style.cursor = 'grabbing';
@@ -134,7 +149,7 @@ export const useCanvasInteraction = ({
       const wasDragging = app.endPan();
       if (!wasDragging) {
         if (placementMode.kind === 'entity') {
-           app.spawnEntity(placementMode.config, point);
+          app.spawnEntity(placementMode.config, point);
         }
         setPlacementMode(null);
         syncPlayerControls();

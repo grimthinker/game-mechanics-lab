@@ -8,7 +8,12 @@ import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, rad2Deg } from './utils';
 import { serializeBTNode } from './ai/serializer';
-import { SpawnModal, UniversalEditModal, ItemSpawnModal, ZoneSpawnModal } from './components/modals';
+import {
+  SpawnModal,
+  UniversalEditModal,
+  ItemSpawnModal,
+  ZoneSpawnModal,
+} from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
@@ -76,9 +81,11 @@ export const App: React.FC = () => {
     const currentMode = modeRef.current;
 
     if (currentMode === GameMode.GAME) {
-      const isAnyPlayerAlive = app.world.getAllEntities().some(([_, comp]) => 
-        comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
-      );
+      const isAnyPlayerAlive = app.world
+        .getAllEntities()
+        .some(
+          ([_, comp]) => comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
+        );
       if (!isAnyPlayerAlive) {
         setModeSync(GameMode.SIMULATION);
         app.isPaused = true;
@@ -111,7 +118,8 @@ export const App: React.FC = () => {
   }, [setModeSync]);
 
   const { syncPlayerControls } = useKeyboardControls({
-    isModalOpen: modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || isPaused,
+    isModalOpen:
+      modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || isPaused,
     isEditModalOpen: modals.isEditModalOpen,
     mode,
   });
@@ -202,21 +210,18 @@ export const App: React.FC = () => {
     updateStats();
   }, [updateStats, setModeSync]);
 
-  const goToGame = useCallback(
-    () => {
-      const app = appRef.current;
-      if (!app) return;
-      if (modeRef.current === GameMode.EDITOR) {
-        setSnapshot(app.serializeWorld());
-      }
-      setModeSync(GameMode.GAME);
-      app.isPaused = false;
-      setIsPaused(false);
-      setShowBTPanel(false);
-      updateStats();
-    },
-    [updateStats, setShowBTPanel, setModeSync]
-  );
+  const goToGame = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (modeRef.current === GameMode.EDITOR) {
+      setSnapshot(app.serializeWorld());
+    }
+    setModeSync(GameMode.GAME);
+    app.isPaused = false;
+    setIsPaused(false);
+    setShowBTPanel(false);
+    updateStats();
+  }, [updateStats, setShowBTPanel, setModeSync]);
 
   const handleSpawnConfirm = () => {
     if (!modals.pendingSpawnBehavior) return;
@@ -225,12 +230,27 @@ export const App: React.FC = () => {
       config: {
         physics: { radius: modals.radius, weight: modals.weight, isSolid: modals.isSolid },
         health: { hp: 100, maxHp: 100 },
-        movement: { maxSpeed: modals.maxSpeed, maxTurnSpeed: deg2Rad(modals.maxTurnSpeed), runSpeedMultiplier: modals.runSpeedMultiplier, crouchSpeedMultiplier: modals.crouchSpeedMultiplier, runTurnMultiplier: modals.runTurnMultiplier, crouchTurnMultiplier: modals.crouchTurnMultiplier },
-        stealth: { stealthPower: modals.stealthPower, runStealthMultiplier: modals.runStealthMultiplier, crouchStealthMultiplier: modals.crouchStealthMultiplier },
+        movement: {
+          maxSpeed: modals.maxSpeed,
+          maxTurnSpeed: deg2Rad(modals.maxTurnSpeed),
+          runSpeedMultiplier: modals.runSpeedMultiplier,
+          crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
+          runTurnMultiplier: modals.runTurnMultiplier,
+          crouchTurnMultiplier: modals.crouchTurnMultiplier,
+        },
+        stealth: {
+          stealthPower: modals.stealthPower,
+          runStealthMultiplier: modals.runStealthMultiplier,
+          crouchStealthMultiplier: modals.crouchStealthMultiplier,
+        },
         ai: { behavior: modals.pendingSpawnBehavior },
-        equip: [ { type: 'armor', itemId: null }, { type: 'bag', itemId: null }, { type: 'weapon', itemId: null } ],
-        meta: { name: 'Существо', entityType: 'creature' }
-      }
+        equip: [
+          { type: 'armor', itemId: null },
+          { type: 'bag', itemId: null },
+          { type: 'weapon', itemId: null },
+        ],
+        meta: { name: 'Существо', entityType: 'creature' },
+      },
     });
     modals.closeSpawnModal();
   };
@@ -238,7 +258,7 @@ export const App: React.FC = () => {
   const handleItemSpawnConfirm = (config: EntityConfig) => {
     setPlacementMode({
       kind: 'entity',
-      config
+      config,
     });
     modals.closeItemSpawnModal();
   };
@@ -246,7 +266,7 @@ export const App: React.FC = () => {
   const handleZoneSpawnConfirm = (config: EntityConfig) => {
     setPlacementMode({
       kind: 'entity',
-      config
+      config,
     });
     modals.closeZoneSpawnModal();
   };
@@ -265,7 +285,7 @@ export const App: React.FC = () => {
     togglePause,
     modals,
     handleSpawnConfirm,
-    setShowBTPanel
+    setShowBTPanel,
   });
 
   const isReadOnly = mode !== GameMode.EDITOR;
@@ -299,7 +319,11 @@ export const App: React.FC = () => {
             }}
           >
             <span>Выберите место для спавна на поле</span>
-            <button className="btn btn-sm" style={{ backgroundColor: '#c0392b' }} onClick={() => setPlacementMode(null)}>
+            <button
+              className="btn btn-sm"
+              style={{ backgroundColor: '#c0392b' }}
+              onClick={() => setPlacementMode(null)}
+            >
               Отмена
             </button>
           </div>
@@ -320,7 +344,7 @@ export const App: React.FC = () => {
         />
       )}
 
-<Toolbar
+      <Toolbar
         mode={mode}
         goToEditor={goToEditor}
         goToSimulation={goToSimulation}
@@ -346,8 +370,14 @@ export const App: React.FC = () => {
               y: canvas ? canvas.height / 2 : 300,
             };
             app.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
-            app.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 160, y: spawnPos.y });
-            app.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 160, y: spawnPos.y });
+            app.spawnEntity(createZoneConfig('damage', 70, 15), {
+              x: spawnPos.x + 160,
+              y: spawnPos.y,
+            });
+            app.spawnEntity(createZoneConfig('heal', 70, 15), {
+              x: spawnPos.x - 160,
+              y: spawnPos.y,
+            });
           }
           syncPlayerControls();
           updateStats();

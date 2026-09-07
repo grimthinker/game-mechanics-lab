@@ -13,12 +13,7 @@ import {
   WeaponStatsComponent,
   HitZoneConfig,
 } from './ecs/types';
-import {
-  EntityUtils,
-  BTLogicComponent,
-  AttackStatus,
-  BehaviorStatsConfig,
-} from './ai/core';
+import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
 import { AISystem } from './ecs/systems/AISystem';
 import { Point } from './types';
@@ -66,10 +61,15 @@ export class EntityAdapter implements IMovable, EntityController {
     return (transform ? transform.angle : 0) as Radians;
   }
   public get radius(): StandardRadius {
-    return (this.world.getComponent(this.id, 'physicsStats')?.radius.current as StandardRadius) ?? 16;
+    return (
+      (this.world.getComponent(this.id, 'physicsStats')?.radius.current as StandardRadius) ?? 16
+    );
   }
   public get baseRadius(): StandardRadius {
-    return (this.world.getComponent(this.id, 'physicsStats')?.radius.base as StandardRadius) ?? this.radius;
+    return (
+      (this.world.getComponent(this.id, 'physicsStats')?.radius.base as StandardRadius) ??
+      this.radius
+    );
   }
   public get weight(): number {
     return this.world.getComponent(this.id, 'physicsStats')?.weight.current ?? 1;
@@ -78,16 +78,17 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.world.getComponent(this.id, 'physicsStats')?.weight.base ?? this.weight;
   }
   public get isSolid(): boolean {
-    return this.world.getComponent(this.id, 'physicsStats')?.isSolid.current ?? true;
+    return this.world.getComponent(this.id, 'physicsStats')?.isSolid ?? true;
   }
   public get hp(): number {
-    return this.world.getComponent(this.id, 'healthStats')?.hp.current ?? 0;
+    return this.world.getComponent(this.id, 'health')?.current ?? 0;
   }
   public get maxHp(): number {
-    return this.world.getComponent(this.id, 'healthStats')?.maxHp.current ?? 0;
+    return this.world.getComponent(this.id, 'health')?.max.current ?? 0;
   }
   public get isAlive(): boolean {
-    return this.world.getComponent(this.id, 'health')?.isAlive ?? (this.hp > 0);
+    const h = this.world.getComponent(this.id, 'health');
+    return h ? (h.isAlive && h.current > 0) : false;
   }
   public get maxSpeed(): number {
     return this.world.getComponent(this.id, 'movementStats')?.maxSpeed.current ?? 0;
@@ -102,13 +103,13 @@ export class EntityAdapter implements IMovable, EntityController {
     return (this.world.getComponent(this.id, 'velocity')?.currentTurnSpeed ?? 0) as Radians;
   }
   public get runSpeedMultiplier(): number {
-    return this.world.getComponent(this.id, 'movementStats')?.runSpeedMultiplier.current ?? 1.5;
+    return this.world.getComponent(this.id, 'movementStats')?.runSpeedMultiplier ?? 1.5;
   }
   public get crouchSpeedMultiplier(): number {
-    return this.world.getComponent(this.id, 'movementStats')?.crouchSpeedMultiplier.current ?? 0.5;
+    return this.world.getComponent(this.id, 'movementStats')?.crouchSpeedMultiplier ?? 0.5;
   }
   public get crouchStealthMultiplier(): number {
-    return this.world.getComponent(this.id, 'stealthStats')?.crouchStealthMultiplier.current ?? 1.5;
+    return this.world.getComponent(this.id, 'stealthStats')?.crouchStealthMultiplier ?? 1.5;
   }
   public get stealthPower(): number {
     return this.world.getComponent(this.id, 'stealthStats')?.stealthPower.current ?? 10;
@@ -117,13 +118,13 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.world.getComponent(this.id, 'stealthStats')?.stealthPower.base ?? this.stealthPower;
   }
   public get runStealthMultiplier(): number {
-    return this.world.getComponent(this.id, 'stealthStats')?.runStealthMultiplier.current ?? 0.5;
+    return this.world.getComponent(this.id, 'stealthStats')?.runStealthMultiplier ?? 0.5;
   }
   public get runTurnMultiplier(): number {
-    return this.world.getComponent(this.id, 'movementStats')?.runTurnMultiplier?.current ?? 0.8;
+    return this.world.getComponent(this.id, 'movementStats')?.runTurnMultiplier ?? 0.8;
   }
   public get crouchTurnMultiplier(): number {
-    return this.world.getComponent(this.id, 'movementStats')?.crouchTurnMultiplier?.current ?? 1.2;
+    return this.world.getComponent(this.id, 'movementStats')?.crouchTurnMultiplier ?? 1.2;
   }
   public get equip(): EquipComponent | undefined {
     return this.world.getComponent(this.id, 'equip');

@@ -13,6 +13,7 @@ import {
 } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
+import { createStat } from '../stats/StatEvaluator';
 
 export function assembleCreature(
   world: World,
@@ -41,28 +42,30 @@ export function assembleCreature(
 
   // 3. Физические характеристики
   world.addComponent(id, 'physicsStats', {
-    radius: { base: radius, current: radius },
-    weight: { base: weight, current: weight },
-    isSolid: { base: isSolid, current: isSolid },
+    radius: createStat(radius) as any,
+    weight: createStat(weight),
+    isSolid,
   });
 
-// 4. Здоровье
-world.addComponent(id, 'health', { isAlive: hp > 0, hitFlashTimer: 0, healFlashTimer: 0 });
-    world.addComponent(id, 'healthStats', {
-    hp: { base: hp, current: hp },
-    maxHp: { base: maxHp, current: maxHp },
+  // 4. Здоровье
+  world.addComponent(id, 'health', {
+    current: hp,
+    max: createStat(maxHp),
+    isAlive: hp > 0,
+    hitFlashTimer: 0,
+    healFlashTimer: 0,
   });
 
   // 5. Передвижение
   const maxSpeed = config.movement?.maxSpeed ?? 150;
   const maxTurnSpeed = config.movement?.maxTurnSpeed ?? ((Math.PI * 1.5) as Radians);
   world.addComponent(id, 'movementStats', {
-    maxSpeed: { base: maxSpeed, current: maxSpeed },
-    maxTurnSpeed: { base: maxTurnSpeed, current: maxTurnSpeed },
-    runSpeedMultiplier: { base: config.movement?.runSpeedMultiplier ?? 1.5, current: config.movement?.runSpeedMultiplier ?? 1.5 },
-    crouchSpeedMultiplier: { base: config.movement?.crouchSpeedMultiplier ?? 0.5, current: config.movement?.crouchSpeedMultiplier ?? 0.5 },
-    runTurnMultiplier: { base: config.movement?.runTurnMultiplier ?? 0.8, current: config.movement?.runTurnMultiplier ?? 0.8 },
-    crouchTurnMultiplier: { base: config.movement?.crouchTurnMultiplier ?? 1.2, current: config.movement?.crouchTurnMultiplier ?? 1.2 },
+    maxSpeed: createStat(maxSpeed),
+    maxTurnSpeed: createStat(maxTurnSpeed) as any,
+    runSpeedMultiplier: config.movement?.runSpeedMultiplier ?? 1.5,
+    crouchSpeedMultiplier: config.movement?.crouchSpeedMultiplier ?? 0.5,
+    runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
+    crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 1.2,
   });
   world.addComponent(id, 'velocity', { currentSpeed: 0, currentTurnSpeed: 0 as Radians });
   world.addComponent(id, 'input', {
@@ -78,9 +81,9 @@ world.addComponent(id, 'health', { isAlive: hp > 0, hitFlashTimer: 0, healFlashT
   // 6. Скрытность
   const stealthPower = config.stealth?.stealthPower ?? 10;
   world.addComponent(id, 'stealthStats', {
-    stealthPower: { base: stealthPower, current: stealthPower },
-    runStealthMultiplier: { base: config.stealth?.runStealthMultiplier ?? 0.5, current: config.stealth?.runStealthMultiplier ?? 0.5 },
-    crouchStealthMultiplier: { base: config.stealth?.crouchStealthMultiplier ?? 1.5, current: config.stealth?.crouchStealthMultiplier ?? 1.5 },
+    stealthPower: createStat(stealthPower),
+    runStealthMultiplier: config.stealth?.runStealthMultiplier ?? 0.5,
+    crouchStealthMultiplier: config.stealth?.crouchStealthMultiplier ?? 1.5,
   });
 
   // 7. ИИ и поведение

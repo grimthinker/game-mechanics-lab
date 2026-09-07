@@ -17,10 +17,7 @@ export class BTServiceFindNearestTarget extends BTService {
     interval: LOGIC_CONFIG.findNewTargetInterval,
   };
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTServiceFindNearestTarget.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTServiceFindNearestTarget.defaultParams>) {
     super(child, params);
     this.params = { ...BTServiceFindNearestTarget.defaultParams, ...params };
   }
@@ -105,15 +102,12 @@ export class BTServicePathUpdater extends BTService {
 
   public static readonly defaultParams = {
     ...BTService.defaultParams,
-    ...LOGIC_CONFIG.pathUpdaterParams
+    ...LOGIC_CONFIG.pathUpdaterParams,
   };
 
   protected override params: typeof BTServicePathUpdater.defaultParams;
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTServicePathUpdater.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTServicePathUpdater.defaultParams>) {
     super(child, params);
     this.params = { ...BTServicePathUpdater.defaultParams, ...params };
     this.pushedDistanceSq = this.params.pushedDistance ** 2;
@@ -164,15 +158,12 @@ export class BTServicePathUpdater extends BTService {
     const dist = Math.sqrt(distSq);
     const t = Math.min(dist / this.params.maxDistanceCalc, 1.0);
     const currentInterval =
-      this.params.minIntervalDt +
-      t * (this.params.maxIntervalDt - this.params.minIntervalDt);
+      this.params.minIntervalDt + t * (this.params.maxIntervalDt - this.params.minIntervalDt);
 
     if (this.requestTimer >= currentInterval) {
       const currentThreshold =
         this.params.minTargetMoveThreshold +
-        t *
-          (this.params.maxTargetMoveThreshold -
-            this.params.minTargetMoveThreshold);
+        t * (this.params.maxTargetMoveThreshold - this.params.minTargetMoveThreshold);
       const tdx = target_pos.x - this.lastTargetPos.x;
       const tdy = target_pos.y - this.lastTargetPos.y;
 
@@ -186,19 +177,12 @@ export class BTServicePathUpdater extends BTService {
       this.requestTimer = 0;
       this.lastStartPos = { ...self_pos };
       this.lastTargetPos = { ...target_pos };
-      const path_promise = entity.utils.get_path(
-        self_pos,
-        target_pos,
-        entity.radius
-      );
+      const path_promise = entity.utils.get_path(self_pos, target_pos, entity.radius);
       this.handlePathPromise(entity, path_promise);
     }
   }
 
-  private handlePathPromise(
-    entity: EntityAdapter,
-    promise: Promise<Point[]>
-  ) {
+  private handlePathPromise(entity: EntityAdapter, promise: Promise<Point[]>) {
     promise
       .then((new_path) => {
         this.isRequesting = false;
@@ -221,10 +205,7 @@ export class BTServiceSyncStats extends BTService {
 
   protected override params: typeof BTServiceSyncStats.defaultParams;
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTServiceSyncStats.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTServiceSyncStats.defaultParams>) {
     super(child, params);
     this.params = { ...BTServiceSyncStats.defaultParams, ...params };
   }
@@ -256,14 +237,11 @@ export class BTServiceSyncStats extends BTService {
 export class BTServiceInputListener extends BTService {
   public static readonly nodeName = 'Слушатель ввода';
   public static readonly description = 'Слушает глобальный ввод и пишет нажатые клавиши в память';
-  
+
   public static readonly defaultParams = { interval: 0 };
   protected override params: typeof BTServiceInputListener.defaultParams = { interval: 0 };
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTServiceInputListener.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTServiceInputListener.defaultParams>) {
     super(child, params);
     this.params = { ...BTServiceInputListener.defaultParams, ...params };
   }
@@ -276,15 +254,13 @@ export class BTServiceInputListener extends BTService {
 
 export class BTServiceInputController extends BTService {
   public static readonly nodeName = 'Контроллер ввода';
-  public static readonly description = 'Читает нажатые клавиши из памяти и управляет input компонентом';
-  
+  public static readonly description =
+    'Читает нажатые клавиши из памяти и управляет input компонентом';
+
   public static readonly defaultParams = { interval: 0 };
   protected override params: typeof BTServiceInputController.defaultParams = { interval: 0 };
 
-  constructor(
-    child: BTNode,
-    params?: Partial<typeof BTServiceInputController.defaultParams>
-  ) {
+  constructor(child: BTNode, params?: Partial<typeof BTServiceInputController.defaultParams>) {
     super(child, params);
     this.params = { ...BTServiceInputController.defaultParams, ...params };
   }
@@ -319,7 +295,7 @@ export class BTServiceInputController extends BTService {
     } else {
       entity.stopCrouching();
     }
-    
+
     if (keysSet.has(' ')) {
       entity.attack();
     }

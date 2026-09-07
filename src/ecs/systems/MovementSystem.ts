@@ -1,5 +1,7 @@
 import { Radians } from '../../utils';
 import { World } from '../World';
+import { ModifierType } from '../types';
+import { addModifier, removeModifier } from '../stats/StatEvaluator';
 
 export class MovementSystem {
   public update(dt: number, world: World): void {
@@ -13,74 +15,117 @@ export class MovementSystem {
       'movementStats'
     );
 
-    for (const [id, { transform, velocity, input, health, activeAttacks, meta, movementStats }] of entities) {
-      const healthStats = world.getComponent(id, 'healthStats');
-      if (!health.isAlive || (healthStats && healthStats.hp.current <= 0)) {
+    for (const [
+      id,
+      { transform, velocity, input, health, activeAttacks, meta, movementStats },
+    ] of entities) {
+      if (!health.isAlive || health.current <= 0) {
         velocity.currentSpeed = 0;
         velocity.currentTurnSpeed = 0 as Radians;
         meta.state = 'dead';
+        removeModifier(movementStats.maxSpeed, 'state_run_speed');
+        removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
+        removeModifier(movementStats.maxSpeed, 'attack_slow_move');
+        removeModifier(movementStats.maxTurnSpeed as any, 'state_run_turn');
+        removeModifier(movementStats.maxTurnSpeed as any, 'state_crouch_turn');
+        removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
         continue;
       }
 
-      // 1. Расчет замедления от атак
+      // 1. Модификаторы состояний бега и присяда
+      if (input.isRunning) {
+        addModifier(movementStats.maxSpeed, {
+          id: 'state_run_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.runSpeedMultiplier,
+        });
+        removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
+
+        addModifier(movementStats.maxTurnSpeed as any, {
+          id: 'state_run_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.runTurnMultiplier,
+        });
+        removeModifier(movementStats.maxTurnSpeed as any, 'state_crouch_turn');
+      } else if (input.isCrouching) {
+        addModifier(movementStats.maxSpeed, {
+          id: 'state_crouch_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.crouchSpeedMultiplier,
+        });
+        removeModifier(movementStats.maxSpeed, 'state_run_speed');
+
+        addModifier(movementStats.maxTurnSpeed as any, {
+          id: 'state_crouch_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.crouchTurnMultiplier,
+        });
+        removeModifier(movementStats.maxTurnSpeed as any, 'state_run_turn');
+      } else {
+        removeModifier(movementStats.maxSpeed, 'state_run_speed');
+        removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
+        removeModifier(movementStats.maxTurnSpeed as any, 'state_run_turn');
+        removeModifier(movementStats.maxTurnSpeed as any, 'state_crouch_turn');
+      }
+
+      // 2. Модификаторы замедления от активных атак оружия
       let moveSlow = 1;
       let turnSlow = 1;
       for (const atk of activeAttacks.attacks) {
-        let mMove = 1;
-        let mTurn = 1;
-
         const wStats = world.getComponent(atk.weaponId, 'weaponStats');
         if (!wStats) continue;
 
-        const prepMoveSlow = wStats.prepMoveSlow.current;
-        const prepTurnSlow = wStats.prepTurnSlow.current;
-        const castMoveSlow = wStats.castMoveSlow.current;
-        const recoveryMoveSlow = wStats.recoveryMoveSlow.current;
-        const recoveryTurnSlow = wStats.recoveryTurnSlow.current;
+        let mMove = 1;
+        let mTurn = 1;
 
         if (atk.phase === 'prep') {
-          mMove = prepMoveSlow;
-          mTurn = prepTurnSlow;
+          mMove = wStats.prepMoveSlow;
+          mTurn = wStats.prepTurnSlow;
         } else if (atk.phase === 'cast') {
-          mMove = castMoveSlow;
-          mTurn = 0; // Во время задержки перед ударом поворот запрещен
+          mMove = wStats.castMoveSlow;
+          mTurn = 0;
         } else {
-          mMove = recoveryMoveSlow;
-          mTurn = recoveryTurnSlow;
+          mMove = wStats.recoveryMoveSlow;
+          mTurn = wStats.recoveryTurnSlow;
         }
 
         if (mMove < moveSlow) moveSlow = mMove;
         if (mTurn < turnSlow) turnSlow = mTurn;
       }
 
-      // 3. Множитель скорости
-      let speedMult = 1;
-      if (input.isRunning) {
-        speedMult = movementStats.runSpeedMultiplier.current;
-      } else if (input.isCrouching) {
-        speedMult = movementStats.crouchSpeedMultiplier.current;
-      }
-      velocity.currentSpeed = (input.isMovingForward ? movementStats.maxSpeed.current * speedMult : 0) * moveSlow;
-
-      // 4. Множитель поворота
-      let turnMult = 1;
-      if (input.isRunning) {
-        turnMult = movementStats.runTurnMultiplier.current;
-      } else if (input.isCrouching) {
-        turnMult = movementStats.crouchTurnMultiplier.current;
+      if (moveSlow < 1) {
+        addModifier(movementStats.maxSpeed, {
+          id: 'attack_slow_move',
+          type: ModifierType.PERCENT_MULT,
+          value: moveSlow,
+        });
+      } else {
+        removeModifier(movementStats.maxSpeed, 'attack_slow_move');
       }
 
-      // 5. Ограничение скорости поворота максимальным значением скорости поворота игрока
+      if (turnSlow < 1) {
+        addModifier(movementStats.maxTurnSpeed as any, {
+          id: 'attack_slow_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: turnSlow,
+        });
+      } else {
+        removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
+      }
+
+      // 3. Линейная скорость (maxSpeed.current уже учитывает все модификаторы)
+      velocity.currentSpeed = input.isMovingForward ? movementStats.maxSpeed.current : 0;
+
+      // 4. Скорость поворота
       const turnSpeed = Math.min(movementStats.maxTurnSpeed.current, input.turnSpeed);
+      velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
 
-      velocity.currentTurnSpeed = (input.turnDirection * turnSpeed * turnSlow * turnMult) as Radians;
-
-      // 6. Поворот
+      // 5. Поворот
       if (velocity.currentTurnSpeed !== 0) {
         transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
       }
 
-      // 7. Обновление состояния
+      // 6. Обновление состояния сущности
       if (activeAttacks.attacks.length > 0) {
         meta.state = 'attacking';
       } else if (input.isRunning && (input.isMovingForward || input.turnDirection !== 0)) {

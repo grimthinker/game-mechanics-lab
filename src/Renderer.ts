@@ -95,7 +95,11 @@ export class Renderer {
 
       // Отрисовка зон удара оружия перед живыми существами (zIndex >= 40)
       if (!attacksRendered && renderable.zIndex >= 40) {
-        this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
+        this.renderWeaponAttacks(
+          world.getEntitiesWith('transform', 'activeAttacks'),
+          world,
+          camera
+        );
         attacksRendered = true;
       }
 
@@ -107,7 +111,7 @@ export class Renderer {
     }
 
     // Отрисовка Healthbars и ID-текстов
-    this.renderUIOverlays(world.getEntitiesWith('transform', 'healthStats'), world, camera);
+    this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera);
 
     // Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
@@ -137,18 +141,26 @@ export class Renderer {
     const radius = physStats?.radius.current ?? physBody?.body.r ?? 16;
 
     if (health?.hitFlashTimer && health.hitFlashTimer > 0) {
+      const progress = Math.min(1, Math.max(0, (6 - health.hitFlashTimer) / 6));
+      const ringRadius = radius + 2 / camera.scale + (progress * 6) / camera.scale;
+      const alpha = Math.max(0.1, 1 - progress * 0.7);
+
       this.ctx.beginPath();
       this.ctx.setLineDash([]);
-      this.ctx.arc(0, 0, radius + 4 / camera.scale, 0, Math.PI * 2);
-      this.ctx.strokeStyle = '#e74c3c';
-      this.ctx.lineWidth = 2.5 / camera.scale;
+      this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      this.ctx.strokeStyle = `rgba(231, 76, 60, ${alpha})`;
+      this.ctx.lineWidth = Math.max(1, 2.5 - progress * 1.5) / camera.scale;
       this.ctx.stroke();
     } else if (health?.healFlashTimer && health.healFlashTimer > 0) {
+      const progress = Math.min(1, Math.max(0, (6 - health.healFlashTimer) / 6));
+      const ringRadius = radius + 2 / camera.scale + (progress * 6) / camera.scale;
+      const alpha = Math.max(0.1, 1 - progress * 0.7);
+
       this.ctx.beginPath();
       this.ctx.setLineDash([]);
-      this.ctx.arc(0, 0, radius + 4 / camera.scale, 0, Math.PI * 2);
-      this.ctx.strokeStyle = '#2ecc71';
-      this.ctx.lineWidth = 2.5 / camera.scale;
+      this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      this.ctx.strokeStyle = `rgba(46, 204, 113, ${alpha})`;
+      this.ctx.lineWidth = Math.max(1, 2.5 - progress * 1.5) / camera.scale;
       this.ctx.stroke();
     }
 
@@ -254,7 +266,11 @@ export class Renderer {
     }
   }
 
-  private drawSelectionOutline(firstPrim: RenderPrimitive | undefined, strokeColor: string, lineWidth: number): void {
+  private drawSelectionOutline(
+    firstPrim: RenderPrimitive | undefined,
+    strokeColor: string,
+    lineWidth: number
+  ): void {
     if (!firstPrim) return;
 
     this.ctx.setLineDash([]);
@@ -266,7 +282,12 @@ export class Renderer {
       this.ctx.arc(0, 0, firstPrim.radius, 0, Math.PI * 2);
       this.ctx.stroke();
     } else if (firstPrim.kind === 'rect') {
-      this.ctx.strokeRect(-firstPrim.width / 2, -firstPrim.height / 2, firstPrim.width, firstPrim.height);
+      this.ctx.strokeRect(
+        -firstPrim.width / 2,
+        -firstPrim.height / 2,
+        firstPrim.width,
+        firstPrim.height
+      );
     }
   }
 
@@ -274,9 +295,7 @@ export class Renderer {
 
   private isEntityAlive(world: World, id: EntityId): boolean {
     const healthComp = world.getComponent(id, 'health');
-    const healthStats = world.getComponent(id, 'healthStats');
-    const hp = healthStats?.hp.current ?? 0;
-    return healthStats ? hp > 0 : (healthComp?.isAlive ?? hp > 0);
+    return healthComp ? healthComp.isAlive && healthComp.current > 0 : true;
   }
 
   private renderWeaponAttacks(
@@ -370,21 +389,17 @@ export class Renderer {
     }
   }
 
-  private renderUIOverlays(
-    entities: Array<[EntityId, any]>,
-    world: World,
-    camera: Camera
-  ): void {
+  private renderUIOverlays(entities: Array<[EntityId, any]>, world: World, camera: Camera): void {
     // Healthbars & ID texts
     for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) continue;
 
       const transform = entity.transform;
       const meta = entity.meta;
-      const healthStats = world.getComponent(id, 'healthStats');
-      const hp = healthStats?.hp.current ?? 0;
-      const maxHp = healthStats?.maxHp.current ?? 100;
-      
+      const health = world.getComponent(id, 'health');
+      const hp = health?.current ?? 0;
+      const maxHp = health?.max.current ?? 100;
+
       const physStats = world.getComponent(id, 'physicsStats');
       const phys = world.getComponent(id, 'physicsBody');
       const radius = physStats?.radius.current ?? phys?.body.r ?? 16;
@@ -414,11 +429,7 @@ export class Renderer {
     }
   }
 
-  private renderItemTooltips(
-    world: World,
-    camera: Camera,
-    hoveredId: EntityId | null
-  ): void {
+  private renderItemTooltips(world: World, camera: Camera, hoveredId: EntityId | null): void {
     if (!hoveredId) return;
 
     const hoverComp = world.getEntity(hoveredId);
@@ -426,7 +437,7 @@ export class Renderer {
       this.ctx.save();
       this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
       const radius = hoverComp.physicsBody ? hoverComp.physicsBody.body.r : 16;
-      
+
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
       this.ctx.textAlign = 'center';

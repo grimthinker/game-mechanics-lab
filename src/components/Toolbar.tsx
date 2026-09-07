@@ -65,17 +65,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const tag = selectedEntityId && world ? world.getComponent(selectedEntityId, 'tag') : undefined;
   const meta = selectedEntityId && world ? world.getComponent(selectedEntityId, 'meta') : undefined;
   const item = selectedEntityId && world ? world.getComponent(selectedEntityId, 'item') : undefined;
-  const healthStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'healthStats') : undefined;
-  const physicsStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'physicsStats') : undefined;
-  const movementStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'movementStats') : undefined;
-  const velocity = selectedEntityId && world ? world.getComponent(selectedEntityId, 'velocity') : undefined;
-  const stealthStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'stealthStats') : undefined;
-  const aiStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'aiStats') : undefined;
-  const zoneTrigger = selectedEntityId && world ? world.getComponent(selectedEntityId, 'zoneTrigger') : undefined;
-  const weaponStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'weaponStats') : undefined;
-  const armorStats = selectedEntityId && world ? world.getComponent(selectedEntityId, 'armorStats') : undefined;
-  const inventory = selectedEntityId && world ? world.getComponent(selectedEntityId, 'inventory') : undefined;
-  const equip = selectedEntityId && world ? world.getComponent(selectedEntityId, 'equip') : undefined;
+  const health =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'health') : undefined;
+  const physicsStats =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'physicsStats') : undefined;
+  const movementStats =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'movementStats') : undefined;
+  const velocity =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'velocity') : undefined;
+  const stealthStats =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'stealthStats') : undefined;
+  const aiStats =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'aiStats') : undefined;
+  const zoneTrigger =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'zoneTrigger') : undefined;
+  const weaponStats =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'weaponStats') : undefined;
+  const armorStats =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'armorStats') : undefined;
+  const inventory =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'inventory') : undefined;
+  const equip =
+    selectedEntityId && world ? world.getComponent(selectedEntityId, 'equip') : undefined;
 
   const getCardTitle = () => {
     switch (tag?.archetype) {
@@ -153,17 +164,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </>
           )}
           {mode !== GameMode.EDITOR && (
-            <button className="btn" style={{ backgroundColor: '#2980b9', color: '#fff' }} onClick={goToEditor}>
+            <button
+              className="btn"
+              style={{ backgroundColor: '#2980b9', color: '#fff' }}
+              onClick={goToEditor}
+            >
               Редактор
             </button>
           )}
           {mode !== GameMode.SIMULATION && (
-            <button className="btn" style={{ backgroundColor: '#27ae60', color: '#fff' }} onClick={goToSimulation}>
+            <button
+              className="btn"
+              style={{ backgroundColor: '#27ae60', color: '#fff' }}
+              onClick={goToSimulation}
+            >
               Симуляция
             </button>
           )}
           {mode !== GameMode.GAME && (
-            <button className="btn" style={{ backgroundColor: '#8e44ad', color: '#fff' }} onClick={goToGame}>
+            <button
+              className="btn"
+              style={{ backgroundColor: '#8e44ad', color: '#fff' }}
+              onClick={goToGame}
+            >
               Играть
             </button>
           )}
@@ -174,13 +197,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
           <h3>Управление спавном</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => openSpawnModal()}>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+              onClick={() => openSpawnModal()}
+            >
               Добавить Существо
             </button>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={openItemSpawnModal}>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+              onClick={openItemSpawnModal}
+            >
               Добавить Предмет
             </button>
-            <button className="btn btn-primary" style={{ width: '100%' }} onClick={openZoneSpawnModal}>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+              onClick={openZoneSpawnModal}
+            >
               Добавить Зону
             </button>
           </div>
@@ -254,7 +289,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               {aiStats && (
                 <div className="stat-row">
                   <dt>Поведение:</dt>
-                  <dd>{BEHAVIOR_TREE_NAMES[aiStats.behavior.current] ?? aiStats.behavior.current}</dd>
+                  <dd>
+                    {BEHAVIOR_TREE_NAMES[aiStats.behavior.current] ?? aiStats.behavior.current}
+                  </dd>
                 </div>
               )}
               {zoneTrigger && (
@@ -273,11 +310,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                 </>
               )}
-              {healthStats && (
+              {health && (
                 <div className="stat-row">
                   <dt>Здоровье (HP):</dt>
                   <dd>
-                    {Math.round(healthStats.hp.current)} / {healthStats.maxHp.current}
+                    <span
+                      style={{
+                        color:
+                          health.max.current > health.max.base
+                            ? '#2ecc71'
+                            : health.max.current < health.max.base
+                              ? '#e74c3c'
+                              : undefined,
+                      }}
+                    >
+                      {Math.round(health.current)} / {Math.round(health.max.current)}
+                    </span>
+                    {health.max.current !== health.max.base && (
+                      <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                        (база {health.max.base})
+                      </span>
+                    )}
                   </dd>
                 </div>
               )}
@@ -285,15 +338,51 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Радиус:</dt>
-                    <dd>{physicsStats.radius.current} px</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            physicsStats.radius.current > physicsStats.radius.base
+                              ? '#2ecc71'
+                              : physicsStats.radius.current < physicsStats.radius.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {physicsStats.radius.current} px
+                      </span>
+                      {physicsStats.radius.current !== physicsStats.radius.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {physicsStats.radius.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Масса (Вес):</dt>
-                    <dd>{Number(physicsStats.weight.current.toFixed(1))}</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            physicsStats.weight.current > physicsStats.weight.base
+                              ? '#2ecc71'
+                              : physicsStats.weight.current < physicsStats.weight.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {Number(physicsStats.weight.current.toFixed(1))}
+                      </span>
+                      {physicsStats.weight.current !== physicsStats.weight.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {physicsStats.weight.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Коллизия:</dt>
-                    <dd>{physicsStats.isSolid.current ? 'Да' : 'Нет'}</dd>
+                    <dd>{physicsStats.isSolid ? 'Да' : 'Нет'}</dd>
                   </div>
                 </>
               )}
@@ -309,11 +398,48 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </div>
                   <div className="stat-row">
                     <dt>Макс. скорость:</dt>
-                    <dd>{movementStats.maxSpeed.current} px/с</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            movementStats.maxSpeed.current > movementStats.maxSpeed.base
+                              ? '#2ecc71'
+                              : movementStats.maxSpeed.current < movementStats.maxSpeed.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {Math.round(movementStats.maxSpeed.current)} px/с
+                      </span>
+                      {movementStats.maxSpeed.current !== movementStats.maxSpeed.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {movementStats.maxSpeed.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Макс. поворот:</dt>
-                    <dd>{Math.round(rad2Deg(movementStats.maxTurnSpeed.current))} °/с</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            movementStats.maxTurnSpeed.current > movementStats.maxTurnSpeed.base
+                              ? '#2ecc71'
+                              : movementStats.maxTurnSpeed.current < movementStats.maxTurnSpeed.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {Math.round(rad2Deg(movementStats.maxTurnSpeed.current))} °/с
+                      </span>
+                      {Math.round(rad2Deg(movementStats.maxTurnSpeed.current)) !==
+                        Math.round(rad2Deg(movementStats.maxTurnSpeed.base)) && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {Math.round(rad2Deg(movementStats.maxTurnSpeed.base))})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                 </>
               )}
@@ -321,15 +447,33 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Скрытность:</dt>
-                    <dd>{Math.round(stealthStats.stealthPower.current)}</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            stealthStats.stealthPower.current > stealthStats.stealthPower.base
+                              ? '#2ecc71'
+                              : stealthStats.stealthPower.current < stealthStats.stealthPower.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {Math.round(stealthStats.stealthPower.current)}
+                      </span>
+                      {stealthStats.stealthPower.current !== stealthStats.stealthPower.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {stealthStats.stealthPower.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Скрытность (присяд):</dt>
-                    <dd>x{stealthStats.crouchStealthMultiplier.current.toFixed(1)}</dd>
+                    <dd>x{stealthStats.crouchStealthMultiplier.toFixed(1)}</dd>
                   </div>
                   <div className="stat-row">
                     <dt>Скрытность (бег):</dt>
-                    <dd>x{stealthStats.runStealthMultiplier.current.toFixed(1)}</dd>
+                    <dd>x{stealthStats.runStealthMultiplier.toFixed(1)}</dd>
                   </div>
                 </>
               )}
@@ -337,12 +481,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Базовый урон:</dt>
-                    <dd>{Math.round(weaponStats.baseDamage.current)}</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            weaponStats.baseDamage.current > weaponStats.baseDamage.base
+                              ? '#2ecc71'
+                              : weaponStats.baseDamage.current < weaponStats.baseDamage.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {Math.round(weaponStats.baseDamage.current)}
+                      </span>
+                      {weaponStats.baseDamage.current !== weaponStats.baseDamage.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {weaponStats.baseDamage.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Подготовка / Восст.:</dt>
                     <dd>
-                      {weaponStats.prepTime.current.toFixed(2)}с / {weaponStats.recoveryTime.current.toFixed(2)}с
+                      {weaponStats.prepTime.current.toFixed(2)}с /{' '}
+                      {weaponStats.recoveryTime.current.toFixed(2)}с
                     </dd>
                   </div>
                 </>
@@ -351,11 +514,47 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <>
                   <div className="stat-row">
                     <dt>Защита:</dt>
-                    <dd>{armorStats.defense.current}</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            armorStats.defense.current > armorStats.defense.base
+                              ? '#2ecc71'
+                              : armorStats.defense.current < armorStats.defense.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {armorStats.defense.current}
+                      </span>
+                      {armorStats.defense.current !== armorStats.defense.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {armorStats.defense.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                   <div className="stat-row">
                     <dt>Поглощение:</dt>
-                    <dd>{armorStats.flatReduction.current}</dd>
+                    <dd>
+                      <span
+                        style={{
+                          color:
+                            armorStats.flatReduction.current > armorStats.flatReduction.base
+                              ? '#2ecc71'
+                              : armorStats.flatReduction.current < armorStats.flatReduction.base
+                                ? '#e74c3c'
+                                : undefined,
+                        }}
+                      >
+                        {armorStats.flatReduction.current}
+                      </span>
+                      {armorStats.flatReduction.current !== armorStats.flatReduction.base && (
+                        <span style={{ color: '#888', marginLeft: '4px', fontSize: '11px' }}>
+                          (база {armorStats.flatReduction.base})
+                        </span>
+                      )}
+                    </dd>
                   </div>
                 </>
               )}
@@ -371,13 +570,23 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
             {equip && equip.slots.length > 0 && (
               <>
-                <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>Экипировка:</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
+                  Экипировка:
+                </h4>
+                <div
+                  style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}
+                >
                   {equip.slots.map((slot, index) => {
                     const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
-                    const slotWeapon = slot.itemId ? world.getComponent(slot.itemId, 'weaponStats') : null;
-                    const slotArmor = slot.itemId ? world.getComponent(slot.itemId, 'armorStats') : null;
-                    const slotInv = slot.itemId ? world.getComponent(slot.itemId, 'inventory') : null;
+                    const slotWeapon = slot.itemId
+                      ? world.getComponent(slot.itemId, 'weaponStats')
+                      : null;
+                    const slotArmor = slot.itemId
+                      ? world.getComponent(slot.itemId, 'armorStats')
+                      : null;
+                    const slotInv = slot.itemId
+                      ? world.getComponent(slot.itemId, 'inventory')
+                      : null;
 
                     return (
                       <div
@@ -462,23 +671,45 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <h3>Управление</h3>
         {mode === GameMode.GAME ? (
           <ul className="control-keys">
-            <li><kbd>W</kbd> Движение вперед</li>
-            <li><kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо</li>
-            <li><kbd>LShift</kbd> Бег (удержание)</li>
-            <li><kbd>C</kbd> Полуприсяд (удержание)</li>
-            <li><kbd>Пробел</kbd> Атака оружием</li>
+            <li>
+              <kbd>W</kbd> Движение вперед
+            </li>
+            <li>
+              <kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо
+            </li>
+            <li>
+              <kbd>LShift</kbd> Бег (удержание)
+            </li>
+            <li>
+              <kbd>C</kbd> Полуприсяд (удержание)
+            </li>
+            <li>
+              <kbd>Пробел</kbd> Атака оружием
+            </li>
           </ul>
         ) : mode === GameMode.SIMULATION ? (
           <ul className="control-keys">
-            <li><kbd>Пробел</kbd> Пауза / Возобновление симуляции</li>
-            <li><kbd>U</kbd> Дерево поведения (BT)</li>
+            <li>
+              <kbd>Пробел</kbd> Пауза / Возобновление симуляции
+            </li>
+            <li>
+              <kbd>U</kbd> Дерево поведения (BT)
+            </li>
           </ul>
         ) : (
           <ul className="control-keys">
-            <li><kbd>U</kbd> Дерево поведения (BT)</li>
-            <li><kbd>Ctrl+P</kbd> Быстрый спавн игрока</li>
-            <li><kbd>Ctrl+B</kbd> Быстрый спавн бота</li>
-            <li><kbd>Ctrl+I</kbd> Добавить предмет</li>
+            <li>
+              <kbd>U</kbd> Дерево поведения (BT)
+            </li>
+            <li>
+              <kbd>Ctrl+P</kbd> Быстрый спавн игрока
+            </li>
+            <li>
+              <kbd>Ctrl+B</kbd> Быстрый спавн бота
+            </li>
+            <li>
+              <kbd>Ctrl+I</kbd> Добавить предмет
+            </li>
           </ul>
         )}
       </div>

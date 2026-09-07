@@ -13,12 +13,12 @@ export interface TransformComponent {
 
 export const enum CollisionCategory {
   NONE = 0,
-  OBSTACLE = 1 << 0,     // 1
-  CREATURE = 1 << 1,     // 2
-  ITEM = 1 << 2,         // 4
-  PROJECTILE = 1 << 3,   // 8
+  OBSTACLE = 1 << 0, // 1
+  CREATURE = 1 << 1, // 2
+  ITEM = 1 << 2, // 4
+  PROJECTILE = 1 << 3, // 8
   TRIGGER_ZONE = 1 << 4, // 16
-  PARTICLE = 1 << 5,     // 32
+  PARTICLE = 1 << 5, // 32
 }
 
 export const COLLISION_MASK_PHYSICAL =
@@ -43,13 +43,7 @@ export interface PhysicsBodyComponent {
 }
 
 export type EntityArchetype =
-  | 'creature'
-  | 'item'
-  | 'projectile'
-  | 'zone'
-  | 'marker'
-  | 'obstacle'
-  | 'particles';
+  'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'obstacle' | 'particles';
 
 export interface TagComponent {
   archetype: EntityArchetype;
@@ -143,14 +137,28 @@ export interface ZoneTriggerComponent {
 
 export interface GizmoComponent {
   type: 'spawner' | 'waypoint' | 'trigger' | 'sound' | 'marker';
-  color?: string;       // Цвет отрисовки в редакторе (например, '#e67e22')
-  icon?: string;        // Иконка (например, '🚩', '🔊', '⚙️', '📍')
-  radius?: number;      // Радиус кликабельной зоны в редакторе (по умолчанию, например, 14px)
+  color?: string; // Цвет отрисовки в редакторе (например, '#e67e22')
+  icon?: string; // Иконка (например, '🚩', '🔊', '⚙️', '📍')
+  radius?: number; // Радиус кликабельной зоны в редакторе (по умолчанию, например, 14px)
+}
+
+export const enum ModifierType {
+  FLAT = 'flat',
+  PERCENT_ADD = 'percent_add',
+  PERCENT_MULT = 'percent_mult',
+}
+
+export interface StatModifier {
+  id: string;
+  type: ModifierType;
+  value: number;
+  duration?: number;
 }
 
 export interface StatValue<T = number> {
   base: T;
   current: T;
+  modifiers?: StatModifier[];
 }
 
 export type ComponentStats<T> = {
@@ -173,6 +181,8 @@ export interface InputComponent {
 }
 
 export interface HealthComponent {
+  current: number;
+  max: StatValue<number>;
   isAlive: boolean;
   hitFlashTimer: number;
   healFlashTimer?: number;
@@ -240,14 +250,10 @@ export interface WeaponCombatConfig {
   critMultiplier: number;
 }
 
-export type WeaponStatsComponent = ComponentStats<WeaponCombatConfig>;
-
 export interface ArmorCombatConfig {
   defense: number;
   flatReduction: number;
 }
-
-export type ArmorStatsComponent = ComponentStats<ArmorCombatConfig>;
 
 export interface EntityComponents {
   tag?: TagComponent;
@@ -259,7 +265,6 @@ export interface EntityComponents {
   input?: InputComponent;
   health?: HealthComponent;
   physicsStats?: PhysicsStatsComponent;
-  healthStats?: HealthStatsComponent;
   movementStats?: MovementStatsComponent;
   stealthStats?: StealthStatsComponent;
   aiStats?: AIStatsComponent;
@@ -280,9 +285,9 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'tag',
   'renderable',
   'zoneTrigger',
+  'health',
   'transform',
   'physicsStats',
-  'healthStats',
   'movementStats',
   'stealthStats',
   'aiStats',
@@ -315,6 +320,12 @@ export interface PhysicsConfig {
   isSolid?: boolean;
 }
 
+export interface PhysicsStatsComponent {
+  radius: StatValue<StandardRadius>;
+  weight: StatValue<number>;
+  isSolid: boolean;
+}
+
 export type HitZoneConfig = {
   hitZoneType: HitZoneType;
   radius?: number;
@@ -330,6 +341,7 @@ export interface HealthConfig {
   maxHp: number;
   hp?: number;
 }
+
 export interface MovementConfig {
   maxSpeed: number;
   maxTurnSpeed: Radians;
@@ -338,22 +350,77 @@ export interface MovementConfig {
   runTurnMultiplier?: number;
   crouchTurnMultiplier?: number;
 }
+
+export interface MovementStatsComponent {
+  maxSpeed: StatValue<number>;
+  maxTurnSpeed: StatValue<Radians>;
+  runSpeedMultiplier: number;
+  crouchSpeedMultiplier: number;
+  runTurnMultiplier: number;
+  crouchTurnMultiplier: number;
+}
+
 export interface StealthConfig {
   stealthPower: number;
   runStealthMultiplier: number;
   crouchStealthMultiplier?: number;
 }
+
+export interface StealthStatsComponent {
+  stealthPower: StatValue<number>;
+  runStealthMultiplier: number;
+  crouchStealthMultiplier: number;
+}
+
 export interface AIConfig {
   behavior: string;
   stats?: Partial<BehaviorStatsConfig>;
 }
 
-export type PhysicsStatsComponent = ComponentStats<PhysicsConfig>;
-export type HealthStatsComponent = ComponentStats<HealthConfig>;
-export type MovementStatsComponent = ComponentStats<MovementConfig>;
-export type StealthStatsComponent = ComponentStats<StealthConfig>;
+export interface ArmorCombatConfig {
+  defense: number;
+  flatReduction: number;
+}
+
+export interface ArmorStatsComponent {
+  defense: StatValue<number>;
+  flatReduction: StatValue<number>;
+}
+
+export interface WeaponCombatConfig {
+  baseDamage: number;
+  prepTime: number;
+  castTime: number;
+  recoveryTime: number;
+  prepTurnSlow: number;
+  recoveryTurnSlow: number;
+  prepMoveSlow: number;
+  recoveryMoveSlow: number;
+  castMoveSlow: number;
+  minMultiplier: number;
+  maxMultiplier: number;
+  critChance: number;
+  critMultiplier: number;
+}
+
+export interface WeaponStatsComponent {
+  baseDamage: StatValue<number>;
+  prepTime: StatValue<number>;
+  castTime: StatValue<number>;
+  recoveryTime: StatValue<number>;
+  prepTurnSlow: number;
+  recoveryTurnSlow: number;
+  prepMoveSlow: number;
+  recoveryMoveSlow: number;
+  castMoveSlow: number;
+  minMultiplier: number;
+  maxMultiplier: number;
+  critChance: number;
+  critMultiplier: number;
+}
+
 export interface AIStatsComponent {
-  behavior: StatValue<string>;
+  behavior: { base: string; current: string };
   stats?: Partial<BehaviorStatsConfig>;
 }
 

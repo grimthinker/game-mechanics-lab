@@ -27,12 +27,11 @@ export class RenderSyncSystem {
 
       // 3. Синхронизация визуального состояния существ
       if (archetype === 'creature') {
-        const healthStats = world.getComponent(id, 'healthStats');
         const health = world.getComponent(id, 'health');
         const meta = world.getComponent(id, 'meta');
         const aiStats = world.getComponent(id, 'aiStats');
 
-        const isAlive = healthStats ? healthStats.hp.current > 0 : (health?.isAlive ?? true);
+        const isAlive = health ? health.isAlive && health.current > 0 : true;
         const state = meta?.state ?? 'idle';
 
         // Первым примитивом существа является тело (круг)
