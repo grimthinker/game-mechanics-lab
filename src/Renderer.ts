@@ -141,7 +141,7 @@ export class Renderer {
     const radius = physStats?.radius.current ?? physBody?.body.r ?? 16;
 
     if (health?.hitFlashTimer && health.hitFlashTimer > 0) {
-      const progress = Math.min(1, Math.max(0, (6 - health.hitFlashTimer) / 6));
+      const progress = Math.min(1, Math.max(0, (0.2 - health.hitFlashTimer) / 0.2));
       const ringRadius = radius + 2 / camera.scale + (progress * 6) / camera.scale;
       const alpha = Math.max(0.1, 1 - progress * 0.7);
 
@@ -152,7 +152,7 @@ export class Renderer {
       this.ctx.lineWidth = Math.max(1, 2.5 - progress * 1.5) / camera.scale;
       this.ctx.stroke();
     } else if (health?.healFlashTimer && health.healFlashTimer > 0) {
-      const progress = Math.min(1, Math.max(0, (6 - health.healFlashTimer) / 6));
+      const progress = Math.min(1, Math.max(0, (0.2 - health.healFlashTimer) / 0.2));
       const ringRadius = radius + 2 / camera.scale + (progress * 6) / camera.scale;
       const alpha = Math.max(0.1, 1 - progress * 0.7);
 

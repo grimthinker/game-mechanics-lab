@@ -1,6 +1,6 @@
 import { World } from '../World';
 import { GameMode } from '../../constants';
-import { RENDER_Z_INDEX, RenderCirclePrimitive } from '../types';
+import { RENDER_Z_INDEX, RenderCirclePrimitive, RenderLinePrimitive } from '../types';
 
 export class RenderSyncSystem {
   public update(_dt: number, world: World, gameMode: GameMode): void {
@@ -57,17 +57,56 @@ export class RenderSyncSystem {
         continue;
       }
 
+      // 2.5 Синхронизация предметов
+      if (archetype === 'item') {
+        const physStats = world.getComponent(id, 'physicsStats');
+        if (physStats) {
+          const radius = physStats.radius.current;
+          const rectPrim = renderable.primitives[0];
+          if (rectPrim && rectPrim.kind === 'rect') {
+            const size = radius * 1.6;
+            rectPrim.width = size;
+            rectPrim.height = size;
+          }
+        }
+      }
+
       // 3. Синхронизация визуального состояния существ
       if (archetype === 'creature') {
         const health = world.getComponent(id, 'health');
         const meta = world.getComponent(id, 'meta');
         const aiStats = world.getComponent(id, 'aiStats');
+        const physStats = world.getComponent(id, 'physicsStats');
 
         const isAlive = health ? health.isAlive && health.current > 0 : true;
         const state = meta?.state ?? 'idle';
+        const radius = physStats ? physStats.radius.current : 16;
 
-        // Первым примитивом существа является тело (круг)
+        // Синхронизация радиуса и линий направления
         const bodyPrim = renderable.primitives[0];
+        if (bodyPrim && bodyPrim.kind === 'circle') {
+          (bodyPrim as RenderCirclePrimitive).radius = radius;
+        }
+
+        if (renderable.primitives.length >= 4) {
+          const line1 = renderable.primitives[1] as RenderLinePrimitive;
+          const line2 = renderable.primitives[2] as RenderLinePrimitive;
+          const line3 = renderable.primitives[3] as RenderLinePrimitive;
+
+          if (line1 && line1.kind === 'line') {
+            line1.from = { x: radius, y: 0 };
+            line1.to = { x: 0, y: -radius };
+          }
+          if (line2 && line2.kind === 'line') {
+            line2.from = { x: radius, y: 0 };
+            line2.to = { x: 0, y: radius };
+          }
+          if (line3 && line3.kind === 'line') {
+            line3.from = { x: 0, y: radius };
+            line3.to = { x: 0, y: -radius };
+          }
+        }
+
         if (bodyPrim && bodyPrim.kind === 'circle') {
           const circlePrim = bodyPrim as RenderCirclePrimitive;
 

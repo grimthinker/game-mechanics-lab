@@ -454,8 +454,7 @@ export class PhysicsSystem {
           if (dist <= maxDist) {
             const targetAngle = Math.atan2(targetPos.y - pos.y, targetPos.x - pos.x);
             let angleDiff = targetAngle - angle;
-            while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-            while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+            angleDiff = Math.atan2(Math.sin(angleDiff), Math.cos(angleDiff));
             angleDiff = Math.abs(angleDiff);
 
             const angularTolerance = dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;

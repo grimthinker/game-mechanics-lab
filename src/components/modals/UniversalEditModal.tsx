@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { World } from '../../ecs/World';
 import { PhysicsSystem } from '../../ecs/systems/PhysicsSystem';
 import { AISystem } from '../../ecs/systems/AISystem';
@@ -25,8 +25,7 @@ import {
   BagFormFields,
   WeaponFormValues,
 } from './forms/FormFields';
-import { DEFAULT_ZONE_PARAMS } from '../../Weapon';
-import { weaponModalState } from './weaponModalState';
+import { DEFAULT_ZONE_PARAMS, ZoneTypeParams } from '../../Weapon';
 import { deg2Rad, rad2Deg, Degrees } from '../../utils';
 import { setBaseStat } from '../../ecs/stats/StatEvaluator';
 
@@ -71,6 +70,13 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   const [draftWeapon, setDraftWeapon] = useState<WeaponFormValues | null>(null);
   const [draftArmor, setDraftArmor] = useState<any | null>(null);
   const [draftBag, setDraftBag] = useState<any | null>(null);
+
+  const zoneParamsMapRef = useRef<Record<HitZoneType, ZoneTypeParams>>({
+    angle: { ...DEFAULT_ZONE_PARAMS.angle },
+    radius: { ...DEFAULT_ZONE_PARAMS.radius },
+    forward_line: { ...DEFAULT_ZONE_PARAMS.forward_line },
+    shrapnel: { ...DEFAULT_ZONE_PARAMS.shrapnel },
+  });
 
   useEffect(() => {
     if (!isOpen || !entityId || !world) return;
@@ -126,6 +132,26 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     const wStats = world.getComponent(entityId, 'weaponStats');
     const wZone = world.getComponent(entityId, 'weaponZone');
     if (wStats && wZone) {
+      zoneParamsMapRef.current = {
+        angle: { ...DEFAULT_ZONE_PARAMS.angle },
+        radius: { ...DEFAULT_ZONE_PARAMS.radius },
+        forward_line: { ...DEFAULT_ZONE_PARAMS.forward_line },
+        shrapnel: { ...DEFAULT_ZONE_PARAMS.shrapnel },
+      };
+      if (wZone.hitZoneType) {
+        zoneParamsMapRef.current[wZone.hitZoneType] = {
+          length: wZone.length ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].length,
+          radius: wZone.radius ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].radius,
+          angle: wZone.angle ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].angle,
+          rayCount: wZone.rayCount ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].rayCount,
+          pierceObstacles:
+            wZone.pierceObstacles ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].pierceObstacles,
+          pierceCreatures:
+            wZone.pierceCreatures ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].pierceCreatures,
+          pierceItems: wZone.pierceItems ?? DEFAULT_ZONE_PARAMS[wZone.hitZoneType].pierceItems,
+        };
+      }
+
       setDraftWeapon({
         name: meta?.name ?? item?.name ?? 'Оружие',
         baseDamage: wStats.baseDamage.base,
@@ -174,7 +200,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
   const handleZoneTypeChange = (newType: HitZoneType) => {
     if (!draftWeapon) return;
-    weaponModalState.zoneParamsMap[draftWeapon.hitZoneType] = {
+    zoneParamsMapRef.current[draftWeapon.hitZoneType] = {
       length: draftWeapon.length,
       radius: draftWeapon.radius,
       rayCount: draftWeapon.rayCount,
@@ -184,7 +210,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       pierceItems: draftWeapon.pierceItems,
     };
 
-    const nextParams = weaponModalState.zoneParamsMap[newType] || DEFAULT_ZONE_PARAMS[newType];
+    const nextParams = zoneParamsMapRef.current[newType] || DEFAULT_ZONE_PARAMS[newType];
     setDraftWeapon({
       ...draftWeapon,
       hitZoneType: newType,

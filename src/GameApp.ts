@@ -101,6 +101,14 @@ export class GameApp {
   }
 
   private deleteEntityRecursive(id: string): void {
+    // Каскадное удаление привязанных дочерних сущностей (ауры, зоны и т.д.)
+    const attachedEntities = this.world.getEntitiesWith('attachment');
+    for (const [childId, { attachment }] of attachedEntities) {
+      if (attachment.parentId === id) {
+        this.deleteEntityRecursive(childId);
+      }
+    }
+
     const eq = this.world.getComponent(id, 'equip');
     if (eq) {
       for (const slot of eq.slots) {

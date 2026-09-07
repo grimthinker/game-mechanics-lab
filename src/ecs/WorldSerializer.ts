@@ -26,6 +26,12 @@ export class WorldSerializer {
         }
       }
 
+      if (comp.brain) {
+        data.components.brain = {
+          blackboardData: JSON.parse(JSON.stringify(comp.brain.blackboard.getData())),
+        };
+      }
+
       entitiesData.push(data);
     }
 
@@ -54,6 +60,19 @@ export class WorldSerializer {
         for (const key of SERIALIZABLE_COMPONENT_KEYS) {
           if (comps[key] !== undefined) {
             this.app.world.addComponent(ent.id, key, comps[key]);
+          }
+        }
+
+        // Инициализация мозга и восстановление памяти (blackboard) для сущностей с ИИ
+        if (comps.aiStats) {
+          const behaviorId = comps.aiStats.behavior?.current ?? 'IdleTree';
+          this.app.aiSystem.initBotBrain(this.app.world, ent.id, behaviorId);
+
+          if (comps.brain?.blackboardData) {
+            const brain = this.app.world.getComponent(ent.id, 'brain');
+            if (brain && brain.blackboard) {
+              Object.assign(brain.blackboard.getData(), comps.brain.blackboardData);
+            }
           }
         }
 

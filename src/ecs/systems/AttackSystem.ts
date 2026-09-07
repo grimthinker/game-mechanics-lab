@@ -76,14 +76,14 @@ export class AttackSystem {
               atk.totalDuration = castTime;
             } else {
               this.executeHit(id, atk.weaponId, world, physics);
-              health.hitFlashTimer = 6;
+              health.hitFlashTimer = 0.2;
               atk.phase = 'recovery';
               atk.timer = recoveryTime;
               atk.totalDuration = recoveryTime;
             }
           } else if (atk.phase === 'cast') {
             this.executeHit(id, atk.weaponId, world, physics);
-            health.hitFlashTimer = 6;
+            health.hitFlashTimer = 0.2;
             atk.phase = 'recovery';
             atk.timer = recoveryTime;
             atk.totalDuration = recoveryTime;
@@ -142,7 +142,7 @@ export class AttackSystem {
       const finalDamage = Math.max(0, Math.round(mitigatedDamage - flatReduction));
 
       targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
-      targetHealth.hitFlashTimer = 6;
+      targetHealth.hitFlashTimer = 0.2;
     }
   }
 }

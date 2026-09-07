@@ -3,16 +3,18 @@ import { Radians } from '../../utils';
 import { removeModifier } from '../stats/StatEvaluator';
 
 export class DamageSystem {
-  public update(_dt: number, world: World): void {
+  public update(dt: number, world: World): void {
     const entities = world.getEntitiesWith('health');
 
     for (const [id, { health }] of entities) {
       if (health.hitFlashTimer > 0) {
-        health.hitFlashTimer--;
+        health.hitFlashTimer -= dt;
+        if (health.hitFlashTimer < 0) health.hitFlashTimer = 0;
       }
 
       if (health.healFlashTimer && health.healFlashTimer > 0) {
-        health.healFlashTimer--;
+        health.healFlashTimer -= dt;
+        if (health.healFlashTimer < 0) health.healFlashTimer = 0;
       }
 
       if (health.current <= 0 && health.isAlive) {

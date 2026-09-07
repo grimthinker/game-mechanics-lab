@@ -44,7 +44,7 @@ export class ZoneTriggerSystem {
           const nextHp = Math.max(0, health.current - deltaValue);
           health.current = Math.round(nextHp * 100) / 100;
           if (isPulseTick) {
-            health.hitFlashTimer = 6;
+            health.hitFlashTimer = 0.2;
           }
         }
         // 2. Лечение
@@ -53,7 +53,7 @@ export class ZoneTriggerSystem {
             const nextHp = Math.min(health.max.current, health.current + deltaValue);
             health.current = Math.round(nextHp * 100) / 100;
             if (isPulseTick) {
-              health.healFlashTimer = 6;
+              health.healFlashTimer = 0.2;
             }
           }
         }
