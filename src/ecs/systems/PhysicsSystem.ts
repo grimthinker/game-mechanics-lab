@@ -314,112 +314,89 @@ export class PhysicsSystem {
     attackerId: EntityId,
     world: World
   ): boolean {
-    let currStart = { x: from.x, y: from.y };
-    let currEnd = { x: rayEnd.x, y: rayEnd.y };
+    const disabledBodies: any[] = [];
+    let result = false;
 
-    const dirX = rayEnd.x - from.x;
-    const dirY = rayEnd.y - from.y;
-    const len = Math.hypot(dirX, dirY);
-    if (len === 0) return true;
-    const ux = dirX / len;
-    const uy = dirY / len;
+    try {
+      // Исключаем атакующего из проверки коллизий луча
+      const attackerPhys = world.getComponent(attackerId, 'physicsBody');
+      if (attackerPhys && attackerPhys.body) {
+        this.system.remove(attackerPhys.body);
+        disabledBodies.push(attackerPhys.body);
+      }
 
-    const maxSteps = 10;
-    for (let step = 0; step < maxSteps; step++) {
-      const rayResult = this.system.raycast(currStart, currEnd);
-      if (!rayResult) return true;
+      while (true) {
+        const rayResult = this.system.raycast(from, rayEnd);
 
-      const hitBody = rayResult.body;
-      const hitPoint = rayResult.point;
-      const hitEntityId = this.bodyToEntityMap.get(hitBody);
-
-      if (hitEntityId) {
-        const hitHealth = world.getComponent(hitEntityId, 'health');
-        const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
-        const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
-        const isDead = hitHealth && (!hitHealth.isAlive || hitHealth.current <= 0);
-        const isNonSolid =
-          (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) ||
-          (hitPhysStats && !hitPhysStats.isSolid);
-
-        if (isDead || isNonSolid) {
-          currStart = {
-            x: hitPoint.x + ux * 1,
-            y: hitPoint.y + uy * 1,
-          };
-          continue;
+        // Если луч ни во что не уперся, значит путь чист
+        if (!rayResult) {
+          result = true;
+          break;
         }
-      }
 
-      if (hitEntityId === targetId) {
-        return true;
-      }
+        const hitBody = rayResult.body;
+        const hitEntityId = this.bodyToEntityMap.get(hitBody);
 
-      if (hitEntityId === attackerId) {
-        const attackerPhysStats = world.getComponent(attackerId, 'physicsStats');
-        const attackerBody = world.getComponent(attackerId, 'physicsBody');
-        const r = attackerPhysStats?.radius.current ?? attackerBody?.body.r ?? 24;
-        const stepDist = r + 1;
-        if (stepDist >= len) return false;
-        currStart = {
-          x: from.x + ux * stepDist,
-          y: from.y + uy * stepDist,
-        };
-        continue;
-      }
-
-      if (hitBody instanceof Line) {
-        if (zone.pierceObstacles) {
-          currStart = {
-            x: hitPoint.x + ux * 1,
-            y: hitPoint.y + uy * 1,
-          };
-        } else {
-          return false;
+        // Если попали точно в цель
+        if (hitEntityId === targetId) {
+          result = true;
+          break;
         }
-      } else if (hitEntityId) {
-        const hitTransform = world.getComponent(hitEntityId, 'transform');
-        const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
-        const hitBody = world.getComponent(hitEntityId, 'physicsBody');
-        const r = hitPhysStats?.radius.current ?? hitBody?.body.r ?? 24;
 
-        if (hitTransform) {
-          const hitAiStats = world.getComponent(hitEntityId, 'aiStats');
-          const hitBehavior = hitAiStats?.behavior?.current ?? 'IdleTree';
+        let canPierce = false;
 
-          if (hitBehavior === 'PlayerTree') {
-            if (zone.piercePlayers) {
-              const distToCenter = (hitTransform.x - from.x) * ux + (hitTransform.y - from.y) * uy;
-              const stepDist = Math.max(0, distToCenter) + r + 1;
-              if (stepDist >= len) return false;
-              currStart = {
-                x: from.x + ux * stepDist,
-                y: from.y + uy * stepDist,
-              };
-            } else {
-              return false;
-            }
+        // Разбираемся с типом препятствия
+        if (hitBody instanceof Line) {
+          canPierce = !!zone.pierceObstacles;
+        } else if (hitEntityId) {
+          const hitHealth = world.getComponent(hitEntityId, 'health');
+          const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
+          const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
+
+          const isDead = hitHealth && (!hitHealth.isAlive || hitHealth.current <= 0);
+          const isNonSolid =
+            (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) ||
+            (hitPhysStats && !hitPhysStats.isSolid);
+
+          // Мертвых, бестелесных и триггеры (например ауры) всегда игнорируем
+          if (isDead || isNonSolid || hitPhys?.isTrigger) {
+            canPierce = true;
           } else {
-            if (zone.pierceBots) {
-              const distToCenter = (hitTransform.x - from.x) * ux + (hitTransform.y - from.y) * uy;
-              const stepDist = Math.max(0, distToCenter) + r + 1;
-              if (stepDist >= len) return false;
-              currStart = {
-                x: from.x + ux * stepDist,
-                y: from.y + uy * stepDist,
-              };
-            } else {
-              return false;
+            const category = (hitBody as any).category ?? CollisionCategory.NONE;
+            if (category === CollisionCategory.CREATURE) {
+              canPierce = !!zone.pierceCreatures;
+            } else if (category === CollisionCategory.ITEM) {
+              canPierce = !!zone.pierceItems;
+            } else if (category === CollisionCategory.OBSTACLE) {
+              canPierce = !!zone.pierceObstacles;
             }
           }
         } else {
-          return false;
+          // Если это тело без Entity (например, статические линии геометрии)
+          const category = (hitBody as any).category ?? CollisionCategory.NONE;
+          if (category === CollisionCategory.OBSTACLE) {
+            canPierce = !!zone.pierceObstacles;
+          }
         }
-      } else {
-        return false;
+
+        if (canPierce) {
+          // Временно отключаем тело и продолжаем пускать луч
+          this.system.remove(hitBody);
+          disabledBodies.push(hitBody);
+        } else {
+          // Попали в непробиваемое препятствие
+          result = false;
+          break;
+        }
+      }
+    } finally {
+      // Обязательно возвращаем все временно отключенные тела обратно в физический движок
+      for (const body of disabledBodies) {
+        this.system.insert(body);
       }
     }
-    return false;
+
+    return result;
   }
 
   private getDistanceToSegment(p: Point, a: Point, b: Point): number {

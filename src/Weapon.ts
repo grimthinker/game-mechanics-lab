@@ -14,8 +14,8 @@ export interface ZoneTypeParams {
   angle: Radians;
   rayCount: number;
   pierceObstacles: boolean;
-  piercePlayers: boolean;
-  pierceBots: boolean;
+  pierceCreatures: boolean;
+  pierceItems: boolean;
 }
 
 export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
@@ -25,8 +25,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
-    piercePlayers: false,
-    pierceBots: false,
+    pierceCreatures: false,
+    pierceItems: false,
   },
   radius: {
     length: 100,
@@ -34,8 +34,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
-    piercePlayers: false,
-    pierceBots: false,
+    pierceCreatures: false,
+    pierceItems: false,
   },
   forward_line: {
     length: 150,
@@ -43,8 +43,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
-    piercePlayers: false,
-    pierceBots: false,
+    pierceCreatures: false,
+    pierceItems: false,
   },
   shrapnel: {
     length: 120,
@@ -52,8 +52,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     angle: deg2Rad(60),
     rayCount: 5,
     pierceObstacles: false,
-    piercePlayers: false,
-    pierceBots: false,
+    pierceCreatures: false,
+    pierceItems: false,
   },
 };
 

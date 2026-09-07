@@ -42,8 +42,7 @@ export interface PhysicsBodyComponent {
   isTrigger?: boolean;
 }
 
-export type EntityArchetype =
-  'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'obstacle' | 'particles';
+export type EntityArchetype = 'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'particles';
 
 export interface TagComponent {
   archetype: EntityArchetype;
@@ -239,27 +238,6 @@ export interface OwnershipComponent {
   status: 'equipped' | 'inventory';
 }
 
-export interface WeaponCombatConfig {
-  baseDamage: number;
-  prepTime: number;
-  castTime: number;
-  recoveryTime: number;
-  prepTurnSlow: number;
-  recoveryTurnSlow: number;
-  prepMoveSlow: number;
-  recoveryMoveSlow: number;
-  castMoveSlow: number;
-  minMultiplier: number;
-  maxMultiplier: number;
-  critChance: number;
-  critMultiplier: number;
-}
-
-export interface ArmorCombatConfig {
-  defense: number;
-  flatReduction: number;
-}
-
 export interface EntityComponents {
   tag?: TagComponent;
   renderable?: RenderableComponent;
@@ -344,8 +322,8 @@ export type HitZoneConfig = {
   length?: number;
   rayCount?: number;
   pierceObstacles?: boolean;
-  piercePlayers?: boolean;
-  pierceBots?: boolean;
+  pierceCreatures?: boolean;
+  pierceItems?: boolean;
 };
 
 export interface HealthConfig {
@@ -364,7 +342,7 @@ export interface MovementConfig {
 
 export interface MovementStatsComponent {
   maxSpeed: StatValue<number>;
-  maxTurnSpeed: StatValue<Radians>;
+  maxTurnSpeed: StatValue<number>;
   runSpeedMultiplier: number;
   crouchSpeedMultiplier: number;
   runTurnMultiplier: number;

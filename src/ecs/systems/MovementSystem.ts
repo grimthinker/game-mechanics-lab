@@ -36,12 +36,12 @@ export class MovementSystem {
         });
         removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
 
-        addModifier(movementStats.maxTurnSpeed as any, {
+        addModifier(movementStats.maxTurnSpeed, {
           id: 'state_run_turn',
           type: ModifierType.PERCENT_MULT,
           value: movementStats.runTurnMultiplier,
         });
-        removeModifier(movementStats.maxTurnSpeed as any, 'state_crouch_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
       } else if (input.isCrouching) {
         addModifier(movementStats.maxSpeed, {
           id: 'state_crouch_speed',
@@ -50,17 +50,17 @@ export class MovementSystem {
         });
         removeModifier(movementStats.maxSpeed, 'state_run_speed');
 
-        addModifier(movementStats.maxTurnSpeed as any, {
+        addModifier(movementStats.maxTurnSpeed, {
           id: 'state_crouch_turn',
           type: ModifierType.PERCENT_MULT,
           value: movementStats.crouchTurnMultiplier,
         });
-        removeModifier(movementStats.maxTurnSpeed as any, 'state_run_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
       } else {
         removeModifier(movementStats.maxSpeed, 'state_run_speed');
         removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
-        removeModifier(movementStats.maxTurnSpeed as any, 'state_run_turn');
-        removeModifier(movementStats.maxTurnSpeed as any, 'state_crouch_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
       }
 
       // 2. Модификаторы замедления от активных атак оружия

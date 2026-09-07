@@ -433,7 +433,7 @@ export class Renderer {
     if (!hoveredId) return;
 
     const hoverComp = world.getEntity(hoveredId);
-    if (hoverComp && hoverComp.transform && hoverComp.item && !hoverComp.meta) {
+    if (hoverComp && hoverComp.transform && hoverComp.item) {
       this.ctx.save();
       this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
       const radius = hoverComp.physicsBody ? hoverComp.physicsBody.body.r : 16;

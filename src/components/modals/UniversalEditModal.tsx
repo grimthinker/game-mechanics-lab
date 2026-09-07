@@ -139,8 +139,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             ? (Math.round(rad2Deg(wZone.angle)) as Degrees)
             : (30 as Degrees),
         pierceObstacles: !!wZone.pierceObstacles,
-        piercePlayers: !!wZone.piercePlayers,
-        pierceBots: !!wZone.pierceBots,
+        pierceCreatures: !!wZone.pierceCreatures,
+        pierceItems: !!wZone.pierceItems,
         hitZoneType: wZone.hitZoneType,
       });
     } else {
@@ -180,8 +180,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       rayCount: draftWeapon.rayCount,
       angle: deg2Rad(draftWeapon.angle),
       pierceObstacles: draftWeapon.pierceObstacles,
-      piercePlayers: draftWeapon.piercePlayers,
-      pierceBots: draftWeapon.pierceBots,
+      pierceCreatures: draftWeapon.pierceCreatures,
+      pierceItems: draftWeapon.pierceItems,
     };
 
     const nextParams = weaponModalState.zoneParamsMap[newType] || DEFAULT_ZONE_PARAMS[newType];
@@ -193,8 +193,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       rayCount: nextParams.rayCount,
       angle: Math.round(rad2Deg(nextParams.angle)) as Degrees,
       pierceObstacles: nextParams.pierceObstacles,
-      piercePlayers: nextParams.piercePlayers,
-      pierceBots: nextParams.pierceBots,
+      pierceCreatures: nextParams.pierceCreatures,
+      pierceItems: nextParams.pierceItems,
     });
   };
 
@@ -319,8 +319,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           hitZoneType: 'forward_line',
           length: draftWeapon.length,
           pierceObstacles: draftWeapon.pierceObstacles,
-          piercePlayers: draftWeapon.piercePlayers,
-          pierceBots: draftWeapon.pierceBots,
+          pierceCreatures: draftWeapon.pierceCreatures,
+          pierceItems: draftWeapon.pierceItems,
         };
       } else {
         newZone = {
@@ -329,8 +329,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           angle: deg2Rad(draftWeapon.angle),
           rayCount: draftWeapon.rayCount,
           pierceObstacles: draftWeapon.pierceObstacles,
-          piercePlayers: draftWeapon.piercePlayers,
-          pierceBots: draftWeapon.pierceBots,
+          pierceCreatures: draftWeapon.pierceCreatures,
+          pierceItems: draftWeapon.pierceItems,
         };
       }
       world.addComponent(entityId, 'weaponZone', newZone);

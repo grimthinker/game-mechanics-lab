@@ -17,7 +17,6 @@ export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   marker: assembleMarker,
   zone: assembleZone,
   projectile: assembleCreature,
-  obstacle: assembleMarker,
   particles: assembleMarker,
 };
 

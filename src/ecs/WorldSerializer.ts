@@ -66,10 +66,14 @@ export class WorldSerializer {
         };
 
         if (comps.health) {
+          if (comps.health.max) normalizeStat(comps.health.max);
+          comps.health.current = Math.min(
+            comps.health.current,
+            comps.health.max?.current ?? comps.health.current
+          );
           comps.health.isAlive = comps.health.current > 0;
           comps.health.hitFlashTimer = 0;
           comps.health.healFlashTimer = 0;
-          if (comps.health.max) normalizeStat(comps.health.max);
         }
 
         if (comps.physicsStats) {

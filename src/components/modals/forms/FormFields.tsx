@@ -13,8 +13,8 @@ export interface WeaponFormValues {
   rayCount: number;
   angle: Degrees;
   pierceObstacles: boolean;
-  piercePlayers: boolean;
-  pierceBots: boolean;
+  pierceCreatures: boolean;
+  pierceItems: boolean;
   hitZoneType: HitZoneType;
 }
 
@@ -160,19 +160,19 @@ export const WeaponFormFields: React.FC<{
           <input
             disabled={isReadOnly}
             type="checkbox"
-            checked={values.piercePlayers}
-            onChange={(e) => onChange({ piercePlayers: e.target.checked })}
+            checked={values.pierceCreatures}
+            onChange={(e) => onChange({ pierceCreatures: e.target.checked })}
           />
-          Пробивать игроков
+          Пробивать существ
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
           <input
             disabled={isReadOnly}
             type="checkbox"
-            checked={values.pierceBots}
-            onChange={(e) => onChange({ pierceBots: e.target.checked })}
+            checked={values.pierceItems}
+            onChange={(e) => onChange({ pierceItems: e.target.checked })}
           />
-          Пробивать ботов
+          Пробивать предметы
         </label>
       </div>
     )}

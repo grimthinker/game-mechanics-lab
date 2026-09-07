@@ -72,7 +72,7 @@ export const App: React.FC = () => {
     }
   }, [showBTPanel]);
 
-  const modals = useGameModals({ appRef, updateStats: () => updateStats() });
+  const modals = useGameModals({ appRef });
 
   const updateStats = useCallback(() => {
     const app = appRef.current;

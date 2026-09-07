@@ -4,7 +4,6 @@ import { GameApp } from '../GameApp';
 
 interface UseGameModalsProps {
   appRef: React.RefObject<GameApp | null>;
-  updateStats: () => void;
 }
 
 export function useGameModals({ appRef }: UseGameModalsProps) {

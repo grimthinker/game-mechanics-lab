@@ -32,8 +32,8 @@ const createInitialWeaponState = () => {
         ? (Math.round(rad2Deg(preset.zone.angle)) as Degrees)
         : (30 as Degrees),
     pierceObstacles: !!preset.zone.pierceObstacles,
-    piercePlayers: !!preset.zone.piercePlayers,
-    pierceBots: !!preset.zone.pierceBots,
+    pierceCreatures: !!preset.zone.pierceCreatures,
+    pierceItems: !!preset.zone.pierceItems,
     hitZoneType: preset.zone.hitZoneType,
   };
   return { preset, values };
@@ -84,8 +84,8 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
           hitZoneType: 'forward_line',
           length: weaponValues.length,
           pierceObstacles: weaponValues.pierceObstacles,
-          piercePlayers: weaponValues.piercePlayers,
-          pierceBots: weaponValues.pierceBots,
+          pierceCreatures: weaponValues.pierceCreatures,
+          pierceItems: weaponValues.pierceItems,
         };
       } else {
         zone = {
@@ -94,8 +94,8 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
           angle: deg2Rad(weaponValues.angle),
           rayCount: weaponValues.rayCount,
           pierceObstacles: weaponValues.pierceObstacles,
-          piercePlayers: weaponValues.piercePlayers,
-          pierceBots: weaponValues.pierceBots,
+          pierceCreatures: weaponValues.pierceCreatures,
+          pierceItems: weaponValues.pierceItems,
         };
       }
 
