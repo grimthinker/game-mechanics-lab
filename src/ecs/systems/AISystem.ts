@@ -4,11 +4,11 @@ import { EntityUtils, Blackboard, BTLogicComponent } from '../../ai/core';
 import { createBTAISystem } from '../../ai/system';
 import { BEHAVIOR_TREES } from '../../ai/trees_library';
 import { EntityAdapter } from '../../EntityAdapter';
-import { PhysicsSystem } from '../systems/PhysicsSystem';
 
 export class AISystem {
   private aiSystem: { update: (dt: number) => void };
   private world!: World;
+  private adapters: Map<EntityId, EntityAdapter> = new Map();
 
   constructor() {
     const utils: EntityUtils = {
@@ -52,10 +52,21 @@ export class AISystem {
       'brain'
     );
 
+    const currentIds = new Set<string>();
+
     for (const [id] of entities) {
+      currentIds.add(id);
       const adapter = this.getEntityAdapter(id);
       if (adapter) result.push(adapter);
     }
+
+    // Очистка кэша от удаленных сущностей
+    for (const id of this.adapters.keys()) {
+      if (!currentIds.has(id)) {
+        this.adapters.delete(id);
+      }
+    }
+
     return result;
   }
 
@@ -64,6 +75,12 @@ export class AISystem {
     if (!ent || !ent.transform || !ent.input || !ent.aiStats || !ent.health) {
       return undefined;
     }
-    return new EntityAdapter(id, this.world);
+
+    let adapter = this.adapters.get(id);
+    if (!adapter) {
+      adapter = new EntityAdapter(id, this.world);
+      this.adapters.set(id, adapter);
+    }
+    return adapter;
   }
 }

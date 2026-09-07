@@ -3,7 +3,7 @@ import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
-import { BTNodeDTO } from './ai/core';
+import { BTLogicComponent, BTNodeDTO } from './ai/core';
 import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, rad2Deg } from './utils';
@@ -61,6 +61,7 @@ export const App: React.FC = () => {
 
   const showBTPanelRef = useRef(showBTPanel);
   const lastBTUpdateRef = useRef<number>(0);
+  const lastUIUpdateRef = useRef<number>(0);
   const lastSelectedEntityIdRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -94,24 +95,32 @@ export const App: React.FC = () => {
     }
 
     const targetId = app.selectedEntity?.id ?? null;
-    setSelectedEntityId(targetId);
-    setFrameTick((t) => (t + 1) % 1000);
+    const isEntityChanged = targetId !== lastSelectedEntityIdRef.current;
+
+    if (isEntityChanged) {
+      lastSelectedEntityIdRef.current = targetId;
+      setSelectedEntityId(targetId);
+    }
+
+    const now = performance.now();
+    const shouldUpdateUI = isEntityChanged || app.isPaused || now - lastUIUpdateRef.current >= 100;
+
+    if (shouldUpdateUI) {
+      lastUIUpdateRef.current = now;
+      setFrameTick((t) => (t + 1) % 1000);
+    }
 
     if (targetId) {
-      const c = new EntityAdapter(targetId, app.world);
-      const isEntityChanged = targetId !== lastSelectedEntityIdRef.current;
-      lastSelectedEntityIdRef.current = targetId;
+      const brain = app.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
 
       if (showBTPanelRef.current) {
-        const now = performance.now();
-        if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 50) {
+        if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 100) {
           lastBTUpdateRef.current = now;
-          setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
-          setBtBlackboard(!c.brain ? null : { ...c.brain.blackboard.getData() });
+          setBtData(!brain || !brain.root_node ? null : serializeBTNode(brain.root_node));
+          setBtBlackboard(!brain ? null : { ...brain.blackboard.getData() });
         }
       }
     } else {
-      lastSelectedEntityIdRef.current = null;
       setBtData(null);
       setBtBlackboard(null);
     }
