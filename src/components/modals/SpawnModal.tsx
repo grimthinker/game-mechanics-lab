@@ -28,6 +28,14 @@ export interface SpawnModalProps {
   setRunTurnMultiplier: (val: number) => void;
   crouchTurnMultiplier: number;
   setCrouchTurnMultiplier: (val: number) => void;
+  strafeSpeedMultiplier: number;
+  setStrafeSpeedMultiplier: (val: number) => void;
+  backwardSpeedMultiplier: number;
+  setBackwardSpeedMultiplier: (val: number) => void;
+  strafeTurnMultiplier: number;
+  setStrafeTurnMultiplier: (val: number) => void;
+  backwardTurnMultiplier: number;
+  setBackwardTurnMultiplier: (val: number) => void;
   stealthPower: number;
   setStealthPower: (val: number) => void;
   runStealthMultiplier: number;
@@ -68,6 +76,14 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setRunTurnMultiplier,
   crouchTurnMultiplier,
   setCrouchTurnMultiplier,
+  strafeSpeedMultiplier,
+  setStrafeSpeedMultiplier,
+  backwardSpeedMultiplier,
+  setBackwardSpeedMultiplier,
+  strafeTurnMultiplier,
+  setStrafeTurnMultiplier,
+  backwardTurnMultiplier,
+  setBackwardTurnMultiplier,
   stealthPower,
   setStealthPower,
   runStealthMultiplier,
@@ -292,6 +308,50 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
               max={10}
               step={0.1}
               onChange={(e) => setCrouchTurnMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости стрейфа:
+            <input
+              type="number"
+              value={strafeSpeedMultiplier}
+              min={0.1}
+              max={10}
+              step={0.05}
+              onChange={(e) => setStrafeSpeedMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости движения назад:
+            <input
+              type="number"
+              value={backwardSpeedMultiplier}
+              min={0.1}
+              max={10}
+              step={0.05}
+              onChange={(e) => setBackwardSpeedMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости поворота при стрейфе:
+            <input
+              type="number"
+              value={strafeTurnMultiplier}
+              min={0.1}
+              max={10}
+              step={0.05}
+              onChange={(e) => setStrafeTurnMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости поворота при движении назад:
+            <input
+              type="number"
+              value={backwardTurnMultiplier}
+              min={0.1}
+              max={10}
+              step={0.05}
+              onChange={(e) => setBackwardTurnMultiplier(Number(e.target.value))}
             />
           </label>
         </form>

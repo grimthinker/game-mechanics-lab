@@ -308,6 +308,20 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   </dd>
                 </div>
               )}
+              {meta?.directionMode && (
+                <div className="stat-row">
+                  <dt>Вид направления:</dt>
+                  <dd>
+                    {meta.directionMode === 'forward'
+                      ? 'Вперед'
+                      : meta.directionMode === 'strafe'
+                        ? 'В сторону (Стрейф)'
+                        : meta.directionMode === 'backward'
+                          ? 'Назад'
+                          : 'На месте'}
+                  </dd>
+                </div>
+              )}
               {aiStats && (
                 <div className="stat-row">
                   <dt>Поведение:</dt>
@@ -715,22 +729,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         {mode === GameMode.GAME ? (
           <ul className="control-keys">
             <li>
-              <kbd>W</kbd> Движение вперед
+              <kbd>W</kbd> / <kbd>S</kbd> Движение вперед / назад
             </li>
             <li>
-              <kbd>A</kbd> / <kbd>D</kbd> Поворот влево/вправо
+              <kbd>A</kbd> / <kbd>D</kbd> Стрейф влево / вправо
             </li>
             <li>
-              <kbd>LShift</kbd> Спринт (удержание)
+              <kbd>Мышь</kbd> Направление взгляда / прицеливание
+            </li>
+            <li>
+              <kbd>ЛКМ</kbd> / <kbd>Пробел</kbd> Атака оружием
+            </li>
+            <li>
+              <kbd>LShift</kbd> Спринт (только вперед)
             </li>
             <li>
               <kbd>X</kbd> Шаг (переключатель)
             </li>
             <li>
               <kbd>C</kbd> Присед (удержание)
-            </li>
-            <li>
-              <kbd>Пробел</kbd> Атака оружием
             </li>
           </ul>
         ) : mode === GameMode.SIMULATION ? (

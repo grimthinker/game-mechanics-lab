@@ -9,6 +9,7 @@ import {
 import { GameApp } from '../GameApp';
 import { GameMode } from '../constants';
 import { PlacementMode } from '../types';
+import { GlobalInput } from '../input/GlobalInput';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -36,7 +37,7 @@ export const useCanvasInteraction = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.style.cursor = placementMode ? 'pointer' : 'grab';
+    canvas.style.cursor = placementMode ? 'pointer' : mode === GameMode.GAME ? 'crosshair' : 'grab';
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -52,6 +53,11 @@ export const useCanvasInteraction = ({
   const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (e.button === 0 && app) {
+      if (mode === GameMode.GAME) {
+        GlobalInput.keys.add(' ');
+        return;
+      }
+
       const point = app.getCanvasPoint(e.clientX, e.clientY);
 
       if (!placementMode && app.isPaused && mode === GameMode.EDITOR) {
@@ -74,6 +80,12 @@ export const useCanvasInteraction = ({
   const handleMouseMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (!app) return;
+
+    if (mode === GameMode.GAME) {
+      app.setMouseScreenPos(e.clientX, e.clientY);
+    } else {
+      app.setMouseScreenPos(null, null);
+    }
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
@@ -126,6 +138,10 @@ export const useCanvasInteraction = ({
   const handleMouseUp = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (e.button !== 0 || !app) return;
+
+    if (mode === GameMode.GAME) {
+      GlobalInput.keys.delete(' ');
+    }
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
@@ -187,6 +203,10 @@ export const useCanvasInteraction = ({
   const handleMouseLeave = () => {
     const app = appRef.current;
     if (app) {
+      app.setMouseScreenPos(null, null);
+      if (mode === GameMode.GAME) {
+        GlobalInput.keys.delete(' ');
+      }
       if (app.isDraggingEntity()) {
         app.cancelEntityDrag();
       }
@@ -196,7 +216,11 @@ export const useCanvasInteraction = ({
     clickedEntityIdRef.current = null;
     dragStartPosRef.current = null;
     if (canvasRef.current) {
-      canvasRef.current.style.cursor = placementMode ? 'pointer' : 'grab';
+      canvasRef.current.style.cursor = placementMode
+        ? 'pointer'
+        : mode === GameMode.GAME
+          ? 'crosshair'
+          : 'grab';
     }
   };
 

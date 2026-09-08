@@ -313,19 +313,21 @@ export class BTServiceInputController extends BTService {
     const keys = bb?.get('pressed_keys') || [];
     const keysSet = new Set(keys);
 
-    if (keysSet.has('w')) {
-      entity.startMovingForward();
-    } else {
-      entity.stopMovingForward();
+    let forward: -1 | 0 | 1 = 0;
+    if (keysSet.has('w') && !keysSet.has('s')) {
+      forward = 1;
+    } else if (keysSet.has('s') && !keysSet.has('w')) {
+      forward = -1;
     }
 
-    if (keysSet.has('a') && !keysSet.has('d')) {
-      entity.startTurning(-1);
-    } else if (keysSet.has('d') && !keysSet.has('a')) {
-      entity.startTurning(1);
-    } else {
-      entity.stopTurning();
+    let strafe: -1 | 0 | 1 = 0;
+    if (keysSet.has('d') && !keysSet.has('a')) {
+      strafe = 1;
+    } else if (keysSet.has('a') && !keysSet.has('d')) {
+      strafe = -1;
     }
+
+    entity.setMovementInput(forward, strafe);
 
     if (keysSet.has('shift')) {
       entity.startRunning();

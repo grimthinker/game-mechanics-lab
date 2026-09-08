@@ -2,6 +2,7 @@ import { World } from './ecs/World';
 import {
   CreatureStance,
   CreatureMovementMode,
+  CreatureDirectionMode,
   EntityId,
   IMovable,
   EquipComponent,
@@ -68,6 +69,9 @@ export class EntityAdapter implements IMovable, EntityController {
   public get movementMode():
     'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting' | 'attacking' | 'dead' {
     return this.getComponent('meta')?.movementMode ?? 'immobile';
+  }
+  public get directionMode(): CreatureDirectionMode {
+    return this.getComponent('meta')?.directionMode ?? 'immobile';
   }
   public get pos(): Point {
     const transform = this.getComponent('transform');
@@ -177,13 +181,37 @@ export class EntityAdapter implements IMovable, EntityController {
   }
 
   // --- Команды управления (Agent Controller API) ---
+  public setMovementInput(forward: -1 | 0 | 1, strafe: -1 | 0 | 1): void {
+    const input = this.getInputIfActive();
+    if (input) {
+      input.moveForward = forward;
+      input.moveStrafe = strafe;
+      input.isMovingForward = forward === 1;
+    }
+  }
+
+  public setTargetLookAngle(angle?: Radians): void {
+    const input = this.getInputIfActive();
+    if (input) {
+      input.targetLookAngle = angle;
+    }
+  }
+
   public startMovingForward(): void {
     const input = this.getInputIfActive();
-    if (input) input.isMovingForward = true;
+    if (input) {
+      input.isMovingForward = true;
+      input.moveForward = 1;
+    }
   }
   public stopMovingForward(): void {
     const input = this.getComponent('input');
-    if (input) input.isMovingForward = false;
+    if (input) {
+      input.isMovingForward = false;
+      if (input.moveForward === 1) {
+        input.moveForward = 0;
+      }
+    }
   }
   public startTurning(direction: -1 | 1, ratio = 1): void {
     const input = this.getInputIfActive();
@@ -236,6 +264,8 @@ export class EntityAdapter implements IMovable, EntityController {
   public stop(): boolean {
     const input = this.getComponent('input');
     if (input) {
+      input.moveForward = 0;
+      input.moveStrafe = 0;
       input.isMovingForward = false;
       input.turnDirection = 0;
       input.turnRatio = 0;

@@ -209,6 +209,7 @@ export const App: React.FC = () => {
   const goToEditor = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
+    app.clearPlayerAim();
     if (snapshot) {
       app.deserializeWorld(snapshot);
       setSnapshot(null);
@@ -224,6 +225,7 @@ export const App: React.FC = () => {
   const goToSimulation = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
+    app.clearPlayerAim();
     if (modeRef.current === GameMode.EDITOR) {
       setSnapshot(app.serializeWorld());
     }
@@ -263,6 +265,10 @@ export const App: React.FC = () => {
           walkSpeedMultiplier: modals.walkSpeedMultiplier,
           runTurnMultiplier: modals.runTurnMultiplier,
           crouchTurnMultiplier: modals.crouchTurnMultiplier,
+          strafeSpeedMultiplier: modals.strafeSpeedMultiplier,
+          backwardSpeedMultiplier: modals.backwardSpeedMultiplier,
+          strafeTurnMultiplier: modals.strafeTurnMultiplier,
+          backwardTurnMultiplier: modals.backwardTurnMultiplier,
         },
         stealth: {
           stealthPower: modals.stealthPower,
@@ -282,6 +288,7 @@ export const App: React.FC = () => {
           name: 'Существо',
           stance: 'standing',
           movementMode: 'immobile',
+          directionMode: 'immobile',
           entityType: 'creature',
         },
       },
@@ -470,6 +477,14 @@ export const App: React.FC = () => {
         setRunTurnMultiplier={modals.setRunTurnMultiplier}
         crouchTurnMultiplier={modals.crouchTurnMultiplier}
         setCrouchTurnMultiplier={modals.setCrouchTurnMultiplier}
+        strafeSpeedMultiplier={modals.strafeSpeedMultiplier}
+        setStrafeSpeedMultiplier={modals.setStrafeSpeedMultiplier}
+        backwardSpeedMultiplier={modals.backwardSpeedMultiplier}
+        setBackwardSpeedMultiplier={modals.setBackwardSpeedMultiplier}
+        strafeTurnMultiplier={modals.strafeTurnMultiplier}
+        setStrafeTurnMultiplier={modals.setStrafeTurnMultiplier}
+        backwardTurnMultiplier={modals.backwardTurnMultiplier}
+        setBackwardTurnMultiplier={modals.setBackwardTurnMultiplier}
         stealthPower={modals.stealthPower}
         setStealthPower={modals.setStealthPower}
         runStealthMultiplier={modals.runStealthMultiplier}

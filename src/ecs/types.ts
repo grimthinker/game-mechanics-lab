@@ -183,6 +183,8 @@ export interface StatValue<T = number> {
 }
 
 export interface VelocityComponent {
+  vx: number;
+  vy: number;
   currentSpeed: number;
   currentTurnSpeed: Radians;
   externalVx?: number;
@@ -190,6 +192,9 @@ export interface VelocityComponent {
 }
 
 export interface InputComponent {
+  moveForward: -1 | 0 | 1;
+  moveStrafe: -1 | 0 | 1;
+  targetLookAngle?: Radians;
   isMovingForward: boolean;
   turnDirection: -1 | 0 | 1;
   turnRatio: number;
@@ -246,10 +251,13 @@ export type CreatureStance = 'standing' | 'crouching';
 export type CreatureMovementMode =
   'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting' | 'attacking' | 'dead';
 
+export type CreatureDirectionMode = 'forward' | 'strafe' | 'backward' | 'immobile';
+
 export interface CreatureMetaComponent {
   name: string;
   stance?: CreatureStance;
   movementMode?: CreatureMovementMode;
+  directionMode?: CreatureDirectionMode;
   entityType?: string;
 }
 
@@ -359,6 +367,10 @@ export interface MovementConfig {
   walkSpeedMultiplier?: number;
   runTurnMultiplier?: number;
   crouchTurnMultiplier?: number;
+  strafeSpeedMultiplier?: number;
+  backwardSpeedMultiplier?: number;
+  strafeTurnMultiplier?: number;
+  backwardTurnMultiplier?: number;
 }
 
 export interface MovementStatsComponent {
@@ -369,6 +381,10 @@ export interface MovementStatsComponent {
   walkSpeedMultiplier: number;
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
+  strafeSpeedMultiplier: number;
+  backwardSpeedMultiplier: number;
+  strafeTurnMultiplier: number;
+  backwardTurnMultiplier: number;
 }
 
 export interface StealthConfig {

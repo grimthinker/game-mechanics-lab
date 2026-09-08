@@ -9,6 +9,10 @@ export interface MovementInspectorValues {
   walkSpeedMultiplier: number;
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
+  strafeSpeedMultiplier: number;
+  backwardSpeedMultiplier: number;
+  strafeTurnMultiplier: number;
+  backwardTurnMultiplier: number;
 }
 
 export interface MovementInspectorProps {
@@ -114,6 +118,62 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
         step={0.1}
         onChange={(e) =>
           onChange({ crouchTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скорости стрейфа:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.strafeSpeedMultiplier}
+        min={0.1}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ strafeSpeedMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скорости движения назад:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.backwardSpeedMultiplier}
+        min={0.1}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ backwardSpeedMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель поворота при стрейфе:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.strafeTurnMultiplier}
+        min={0.1}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ strafeTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель поворота при движении назад:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.backwardTurnMultiplier}
+        min={0.1}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ backwardTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
         }
       />
     </label>

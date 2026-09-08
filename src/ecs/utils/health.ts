@@ -16,6 +16,9 @@ export function killEntity(world: World, id: EntityId): void {
 
   const input = world.getComponent(id, 'input');
   if (input) {
+    input.moveForward = 0;
+    input.moveStrafe = 0;
+    input.targetLookAngle = undefined;
     input.isMovingForward = false;
     input.turnDirection = 0;
     input.turnRatio = 0;
@@ -28,6 +31,8 @@ export function killEntity(world: World, id: EntityId): void {
 
   const velocity = world.getComponent(id, 'velocity');
   if (velocity) {
+    velocity.vx = 0;
+    velocity.vy = 0;
     velocity.currentSpeed = 0;
     velocity.currentTurnSpeed = 0 as Radians;
   }
@@ -50,6 +55,7 @@ export function killEntity(world: World, id: EntityId): void {
   const meta = world.getComponent(id, 'meta');
   if (meta) {
     meta.movementMode = 'dead';
+    meta.directionMode = 'immobile';
   }
 }
 

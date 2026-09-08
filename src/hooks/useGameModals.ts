@@ -21,6 +21,10 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const [runTurnMultiplier, setRunTurnMultiplier] = useState<number>(0.8);
   const [walkSpeedMultiplier, setWalkSpeedMultiplier] = useState<number>(0.5);
   const [crouchTurnMultiplier, setCrouchTurnMultiplier] = useState<number>(0.8);
+  const [strafeSpeedMultiplier, setStrafeSpeedMultiplier] = useState<number>(0.8);
+  const [backwardSpeedMultiplier, setBackwardSpeedMultiplier] = useState<number>(0.6);
+  const [strafeTurnMultiplier, setStrafeTurnMultiplier] = useState<number>(0.8);
+  const [backwardTurnMultiplier, setBackwardTurnMultiplier] = useState<number>(0.6);
   const [stealthPower, setStealthPower] = useState<number>(10);
   const [runStealthMultiplier, setRunStealthMultiplier] = useState<number>(0.5);
   const [walkStealthMultiplier, setWalkStealthMultiplier] = useState<number>(1.3);
@@ -89,6 +93,14 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       setWalkSpeedMultiplier,
       crouchTurnMultiplier,
       setCrouchTurnMultiplier,
+      strafeSpeedMultiplier,
+      setStrafeSpeedMultiplier,
+      backwardSpeedMultiplier,
+      setBackwardSpeedMultiplier,
+      strafeTurnMultiplier,
+      setStrafeTurnMultiplier,
+      backwardTurnMultiplier,
+      setBackwardTurnMultiplier,
       stealthPower,
       setStealthPower,
       runStealthMultiplier,
@@ -126,6 +138,10 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       runTurnMultiplier,
       walkSpeedMultiplier,
       crouchTurnMultiplier,
+      strafeSpeedMultiplier,
+      backwardSpeedMultiplier,
+      strafeTurnMultiplier,
+      backwardTurnMultiplier,
       stealthPower,
       runStealthMultiplier,
       walkStealthMultiplier,

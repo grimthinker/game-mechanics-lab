@@ -1,6 +1,11 @@
 import { Radians } from '../../utils';
 import { World } from '../World';
-import { CreatureMovementMode, CreatureStance, ModifierType } from '../types';
+import {
+  CreatureDirectionMode,
+  CreatureMovementMode,
+  CreatureStance,
+  ModifierType,
+} from '../types';
 import { addModifier, removeModifier } from '../stats/StatEvaluator';
 import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
 
@@ -21,7 +26,14 @@ export class MovementSystem {
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
       if (!health.isAlive) {
-        if (velocity.currentSpeed !== 0 || velocity.currentTurnSpeed !== 0) {
+        if (
+          velocity.vx !== 0 ||
+          velocity.vy !== 0 ||
+          velocity.currentSpeed !== 0 ||
+          velocity.currentTurnSpeed !== 0
+        ) {
+          velocity.vx = 0;
+          velocity.vy = 0;
           velocity.currentSpeed = 0;
           velocity.currentTurnSpeed = 0 as Radians;
         }
@@ -29,9 +41,14 @@ export class MovementSystem {
         removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
         removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
         removeModifier(movementStats.maxSpeed, 'attack_slow_move');
+        removeModifier(movementStats.maxSpeed, 'dir_strafe_speed');
+        removeModifier(movementStats.maxSpeed, 'dir_back_speed');
         removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
         removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'dir_strafe_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
+        meta.directionMode = 'immobile';
         continue;
       }
 
@@ -54,26 +71,77 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
       }
 
-      // 2. Определение вида движения (Movement Mode) с приоритетом: LShift (спринт) > X (ходьба)
+      // 2. Локальный ввод перемещения
+      let fwd = input.moveForward ?? 0;
+      let strafe = input.moveStrafe ?? 0;
+      if (input.isMovingForward && fwd === 0 && strafe === 0) {
+        fwd = 1;
+      }
+      const hasMoveInput = fwd !== 0 || strafe !== 0;
+
+      // 3. Определение вида направления движения (Direction Mode)
+      let directionMode: CreatureDirectionMode = 'immobile';
+
+      if (hasMoveInput) {
+        const inputLen = Math.hypot(fwd, strafe);
+        const nFwd = fwd / inputLen;
+        const nStrafe = strafe / inputLen;
+        // Угол отклонения вектора движения от направления взгляда (0 — вперед, PI — назад)
+        const angleDiff = Math.abs(Math.atan2(nStrafe, nFwd));
+
+        const deg45 = Math.PI / 4 + 0.001;
+        const deg135 = (3 * Math.PI) / 4 + 0.001;
+
+        if (angleDiff <= deg45) {
+          directionMode = 'forward';
+        } else if (angleDiff <= deg135) {
+          directionMode = 'strafe';
+        } else {
+          directionMode = 'backward';
+        }
+      } else if (velocity.currentSpeed > 1) {
+        // При движении по инерции угол определяется по фактическому вектору скорости
+        const moveAngle = Math.atan2(velocity.vy, velocity.vx);
+        const angleDiff = Math.abs(
+          Math.atan2(Math.sin(moveAngle - transform.angle), Math.cos(moveAngle - transform.angle))
+        );
+        const deg45 = Math.PI / 4 + 0.001;
+        const deg135 = (3 * Math.PI) / 4 + 0.001;
+
+        if (angleDiff <= deg45) {
+          directionMode = 'forward';
+        } else if (angleDiff <= deg135) {
+          directionMode = 'strafe';
+        } else {
+          directionMode = 'backward';
+        }
+      } else {
+        directionMode = 'immobile';
+      }
+
+      // 4. Определение вида движения (Movement Mode): спринт разрешен ТОЛЬКО при движении вперед
       let movementMode: CreatureMovementMode = 'immobile';
 
       if (activeAttacks.attacks.length > 0) {
         movementMode = 'attacking';
-      } else if (input.isMovingForward) {
-        if (input.isRunning) {
+      } else if (hasMoveInput || velocity.currentSpeed > 1) {
+        if (input.isRunning && directionMode === 'forward') {
           movementMode = 'sprinting';
         } else if (input.isSlowWalking) {
           movementMode = 'walking';
         } else {
           movementMode = 'jogging';
         }
-      } else if (input.turnDirection !== 0) {
+      } else if (
+        input.turnDirection !== 0 ||
+        (input.targetLookAngle !== undefined && Math.abs(velocity.currentTurnSpeed) > 0.01)
+      ) {
         movementMode = 'turning';
       } else {
         movementMode = 'immobile';
       }
 
-      // 3. Модификаторы скорости и поворота от вида движения
+      // 5. Модификаторы от вида движения (спринт / шаг)
       if (movementMode === 'sprinting') {
         addModifier(movementStats.maxSpeed, {
           id: 'mode_sprint_speed',
@@ -101,7 +169,43 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
       }
 
-      // 4. Модификаторы замедления от активных атак оружия
+      // 6. Модификаторы от вида направления движения (в сторону / назад)
+      if (directionMode === 'strafe') {
+        addModifier(movementStats.maxSpeed, {
+          id: 'dir_strafe_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.strafeSpeedMultiplier,
+        });
+        removeModifier(movementStats.maxSpeed, 'dir_back_speed');
+
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'dir_strafe_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.strafeTurnMultiplier,
+        });
+        removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
+      } else if (directionMode === 'backward') {
+        addModifier(movementStats.maxSpeed, {
+          id: 'dir_back_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.backwardSpeedMultiplier,
+        });
+        removeModifier(movementStats.maxSpeed, 'dir_strafe_speed');
+
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'dir_back_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.backwardTurnMultiplier,
+        });
+        removeModifier(movementStats.maxTurnSpeed, 'dir_strafe_turn');
+      } else {
+        removeModifier(movementStats.maxSpeed, 'dir_strafe_speed');
+        removeModifier(movementStats.maxSpeed, 'dir_back_speed');
+        removeModifier(movementStats.maxTurnSpeed, 'dir_strafe_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
+      }
+
+      // 7. Модификаторы замедления от атак
       let moveSlow = 1;
       let turnSlow = 1;
       for (const atk of activeAttacks.attacks) {
@@ -146,30 +250,89 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
       }
 
-      // 3. Линейная скорость с плавным разгоном и торможением за заданное время из конфига
-      const targetSpeed = input.isMovingForward ? movementStats.maxSpeed.current : 0;
-      const maxSpd = movementStats.maxSpeed.current > 0 ? movementStats.maxSpeed.current : 1;
+      // 8. Поворот взгляда существа (Mouse Aiming или Bot Turn Direction)
+      if (input.targetLookAngle !== undefined) {
+        let diff = input.targetLookAngle - transform.angle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        const maxTurnStep = movementStats.maxTurnSpeed.current * dt;
 
-      if (velocity.currentSpeed < targetSpeed) {
-        const accelRate = maxSpd / GAMEPLAY_CONFIG.accelerationTime;
-        velocity.currentSpeed = Math.min(targetSpeed, velocity.currentSpeed + accelRate * dt);
-      } else if (velocity.currentSpeed > targetSpeed) {
-        const decelRate = maxSpd / GAMEPLAY_CONFIG.decelerationTime;
-        velocity.currentSpeed = Math.max(targetSpeed, velocity.currentSpeed - decelRate * dt);
+        if (Math.abs(diff) <= maxTurnStep) {
+          transform.angle = input.targetLookAngle;
+          velocity.currentTurnSpeed = (diff / dt) as Radians;
+        } else {
+          const sign = Math.sign(diff) as -1 | 1;
+          transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
+          velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
+        }
+      } else {
+        const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
+        velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
+        if (velocity.currentTurnSpeed !== 0) {
+          transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
+        }
+      }
+      transform.angle = Math.atan2(Math.sin(transform.angle), Math.cos(transform.angle)) as Radians;
+
+      // 9. Расчет мирового целевого вектора скорости и 2D векторная интерполяция
+      let targetVx = 0;
+      let targetVy = 0;
+
+      if (hasMoveInput) {
+        const targetSpeed = movementStats.maxSpeed.current;
+        const inputLen = Math.hypot(fwd, strafe);
+        const nFwd = fwd / inputLen;
+        const nStrafe = strafe / inputLen;
+
+        const cosA = Math.cos(transform.angle);
+        const sinA = Math.sin(transform.angle);
+
+        // Поворот локального вектора ввода на угол взгляда transform.angle
+        const dirX = nFwd * cosA - nStrafe * sinA;
+        const dirY = nFwd * sinA + nStrafe * cosA;
+
+        targetVx = dirX * targetSpeed;
+        targetVy = dirY * targetSpeed;
       }
 
-      // 4. Скорость поворота (вычисляется из актуального максимума и намерения ввода turnRatio)
-      const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
-      velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
+      const deltaVx = targetVx - velocity.vx;
+      const deltaVy = targetVy - velocity.vy;
+      const distToTargetVel = Math.hypot(deltaVx, deltaVy);
 
-      // 5. Поворот
-      if (velocity.currentTurnSpeed !== 0) {
-        transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
+      if (distToTargetVel > 0.001) {
+        // Скалярное произведение вектора скорости и вектора изменения скорости:
+        // если оно отрицательно, вектор изменения направлен против движения (торможение)
+        const isDecelerating = velocity.vx * deltaVx + velocity.vy * deltaVy < 0;
+        const timeConstant = isDecelerating
+          ? GAMEPLAY_CONFIG.decelerationTime
+          : GAMEPLAY_CONFIG.accelerationTime;
+
+        const maxSpd = movementStats.maxSpeed.current > 0 ? movementStats.maxSpeed.current : 1;
+        const changeRate = maxSpd / timeConstant;
+        const step = changeRate * dt;
+
+        if (distToTargetVel <= step) {
+          velocity.vx = targetVx;
+          velocity.vy = targetVy;
+        } else {
+          velocity.vx += (deltaVx / distToTargetVel) * step;
+          velocity.vy += (deltaVy / distToTargetVel) * step;
+        }
+      } else {
+        velocity.vx = targetVx;
+        velocity.vy = targetVy;
       }
 
-      // 6. Обновление состояния сущности
+      velocity.currentSpeed = Math.hypot(velocity.vx, velocity.vy);
+      if (velocity.currentSpeed < 0.001) {
+        velocity.vx = 0;
+        velocity.vy = 0;
+        velocity.currentSpeed = 0;
+      }
+
+      // 10. Обновление метаданных сущности
       meta.stance = stance;
       meta.movementMode = movementMode;
+      meta.directionMode = directionMode;
     }
   }
 }

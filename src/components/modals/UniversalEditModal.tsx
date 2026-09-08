@@ -110,6 +110,12 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             walkSpeedMultiplier: Math.round((moveStats.walkSpeedMultiplier ?? 0.5) * 100) / 100,
             runTurnMultiplier: Math.round(moveStats.runTurnMultiplier * 100) / 100,
             crouchTurnMultiplier: Math.round(moveStats.crouchTurnMultiplier * 100) / 100,
+            strafeSpeedMultiplier: Math.round((moveStats.strafeSpeedMultiplier ?? 0.8) * 100) / 100,
+            backwardSpeedMultiplier:
+              Math.round((moveStats.backwardSpeedMultiplier ?? 0.6) * 100) / 100,
+            strafeTurnMultiplier: Math.round((moveStats.strafeTurnMultiplier ?? 0.8) * 100) / 100,
+            backwardTurnMultiplier:
+              Math.round((moveStats.backwardTurnMultiplier ?? 0.6) * 100) / 100,
           }
         : null
     );
@@ -304,6 +310,14 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           Math.round(Math.max(0.1, draftMovement.runTurnMultiplier) * 100) / 100;
         moveStats.crouchTurnMultiplier =
           Math.round(Math.max(0.1, draftMovement.crouchTurnMultiplier) * 100) / 100;
+        moveStats.strafeSpeedMultiplier =
+          Math.round(Math.max(0.1, draftMovement.strafeSpeedMultiplier ?? 0.8) * 100) / 100;
+        moveStats.backwardSpeedMultiplier =
+          Math.round(Math.max(0.1, draftMovement.backwardSpeedMultiplier ?? 0.6) * 100) / 100;
+        moveStats.strafeTurnMultiplier =
+          Math.round(Math.max(0.1, draftMovement.strafeTurnMultiplier ?? 0.8) * 100) / 100;
+        moveStats.backwardTurnMultiplier =
+          Math.round(Math.max(0.1, draftMovement.backwardTurnMultiplier ?? 0.6) * 100) / 100;
       }
     }
 

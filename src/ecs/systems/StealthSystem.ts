@@ -1,12 +1,12 @@
 import { World } from '../World';
-import { CreatureMovementMode, ModifierType } from '../types';
+import { ModifierType } from '../types';
 import { addModifier, removeModifier } from '../stats/StatEvaluator';
 
 export class StealthSystem {
   public update(_dt: number, world: World): void {
-    const entities = world.getEntitiesWith('stealthStats', 'input', 'health');
+    const entities = world.getEntitiesWith('stealthStats', 'health', 'meta');
 
-    for (const [_id, { stealthStats, input, health }] of entities) {
+    for (const [_id, { stealthStats, health, meta }] of entities) {
       if (!health.isAlive) {
         removeModifier(stealthStats.stealthPower, 'stance_crouch_stealth');
         removeModifier(stealthStats.stealthPower, 'mode_sprint_stealth');
@@ -24,7 +24,7 @@ export class StealthSystem {
       removeModifier(stealthStats.stealthPower, 'state_dead_stealth');
 
       // 1. Модификатор положения (Stance)
-      if (input.isCrouching) {
+      if (meta.stance === 'crouching') {
         addModifier(stealthStats.stealthPower, {
           id: 'stance_crouch_stealth',
           type: ModifierType.PERCENT_MULT,
@@ -34,21 +34,8 @@ export class StealthSystem {
         removeModifier(stealthStats.stealthPower, 'stance_crouch_stealth');
       }
 
-      // 2. Определение вида движения для стелса
-      let movementMode: CreatureMovementMode = 'immobile';
-      if (input.isMovingForward) {
-        if (input.isRunning) {
-          movementMode = 'sprinting';
-        } else if (input.isSlowWalking) {
-          movementMode = 'walking';
-        } else {
-          movementMode = 'jogging';
-        }
-      } else if (input.turnDirection !== 0) {
-        movementMode = 'turning';
-      } else {
-        movementMode = 'immobile';
-      }
+      // 2. Модификатор вида движения (Movement Mode), актуализированный в MovementSystem
+      const movementMode = meta.movementMode ?? 'immobile';
 
       removeModifier(stealthStats.stealthPower, 'mode_sprint_stealth');
       removeModifier(stealthStats.stealthPower, 'mode_walk_stealth');
@@ -80,6 +67,7 @@ export class StealthSystem {
           value: stealthStats.immobileStealthMultiplier,
         });
       }
+      // Режимы 'jogging' и 'attacking' не имеют модификаторов и сохраняют базовый стелс
     }
   }
 }

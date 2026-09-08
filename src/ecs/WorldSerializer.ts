@@ -134,6 +134,14 @@ export class WorldSerializer {
         if (comps.movementStats) {
           normalizeStat(comps.movementStats.maxSpeed);
           normalizeStat(comps.movementStats.maxTurnSpeed);
+          comps.movementStats.strafeSpeedMultiplier =
+            comps.movementStats.strafeSpeedMultiplier ?? 0.8;
+          comps.movementStats.backwardSpeedMultiplier =
+            comps.movementStats.backwardSpeedMultiplier ?? 0.6;
+          comps.movementStats.strafeTurnMultiplier =
+            comps.movementStats.strafeTurnMultiplier ?? 0.8;
+          comps.movementStats.backwardTurnMultiplier =
+            comps.movementStats.backwardTurnMultiplier ?? 0.6;
         }
 
         if (comps.stealthStats) {
@@ -190,12 +198,17 @@ export class WorldSerializer {
 
         if (comps.movementStats) {
           this.app.world.addComponent(ent.id, 'velocity', {
+            vx: 0,
+            vy: 0,
             currentSpeed: 0,
             currentTurnSpeed: 0 as Radians,
             externalVx: 0,
             externalVy: 0,
           });
           this.app.world.addComponent(ent.id, 'input', {
+            moveForward: 0,
+            moveStrafe: 0,
+            targetLookAngle: undefined,
             isMovingForward: false,
             turnDirection: 0,
             turnRatio: 0,
@@ -211,8 +224,13 @@ export class WorldSerializer {
           this.app.world.addComponent(ent.id, 'activeAttacks', { attacks: [] });
         }
 
-        if (comps.meta && comps.meta.movementMode === 'attacking') {
-          comps.meta.movementMode = 'immobile';
+        if (comps.meta) {
+          if (comps.meta.movementMode === 'attacking') {
+            comps.meta.movementMode = 'immobile';
+          }
+          if (!comps.meta.directionMode) {
+            comps.meta.directionMode = 'immobile';
+          }
         }
       }
     }

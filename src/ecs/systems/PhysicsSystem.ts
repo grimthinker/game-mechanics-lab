@@ -167,8 +167,8 @@ export class PhysicsSystem {
       const health = world.getComponent(id, 'health');
       if (health && !health.isAlive) continue;
 
-      const selfDx = Math.cos(transform.angle) * velocity.currentSpeed * dt;
-      const selfDy = Math.sin(transform.angle) * velocity.currentSpeed * dt;
+      const selfDx = (velocity.vx ?? 0) * dt;
+      const selfDy = (velocity.vy ?? 0) * dt;
 
       const extVx = velocity.externalVx ?? 0;
       const extVy = velocity.externalVy ?? 0;

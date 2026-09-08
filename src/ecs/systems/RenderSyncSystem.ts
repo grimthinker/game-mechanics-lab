@@ -1,6 +1,11 @@
 import { World } from '../World';
 import { GameMode } from '../../constants';
-import { RENDER_Z_INDEX, RenderCirclePrimitive, RenderLinePrimitive } from '../types';
+import {
+  RENDER_Z_INDEX,
+  RenderCirclePrimitive,
+  RenderLinePrimitive,
+  RenderPolygonPrimitive,
+} from '../types';
 
 export class RenderSyncSystem {
   public update(_dt: number, world: World, gameMode: GameMode): void {
@@ -89,15 +94,31 @@ export class RenderSyncSystem {
           (bodyPrim as RenderCirclePrimitive).radius = radius;
         }
 
-        // Синхронизация полигона стрелки направления
-        const arrowPrim = renderable.primitives[1];
-        if (arrowPrim && arrowPrim.kind === 'polygon') {
-          arrowPrim.points = [
+        // Бесшовная миграция со старых линий на полигон для ранее сохраненных сущностей
+        if (!renderable.primitives[1] || renderable.primitives[1].kind !== 'polygon') {
+          renderable.primitives = [
+            renderable.primitives[0],
+            {
+              kind: 'polygon',
+              points: [
+                { x: radius, y: 0 },
+                { x: 0, y: -radius },
+                { x: 0, y: radius },
+              ],
+              fill: '#7f8c8d',
+              stroke: '#95a5a6',
+              strokeWidth: 1.5,
+            },
+          ];
+        } else {
+          renderable.primitives[1].points = [
             { x: radius, y: 0 },
             { x: 0, y: -radius },
             { x: 0, y: radius },
           ];
         }
+
+        const arrowPrim = renderable.primitives[1] as RenderPolygonPrimitive;
 
         if (bodyPrim && bodyPrim.kind === 'circle') {
           const circlePrim = bodyPrim as RenderCirclePrimitive;

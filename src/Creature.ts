@@ -20,6 +20,10 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       walkSpeedMultiplier: 0.5,
       runTurnMultiplier: 0.8,
       crouchTurnMultiplier: 0.8,
+      strafeSpeedMultiplier: 0.8,
+      backwardSpeedMultiplier: 0.6,
+      strafeTurnMultiplier: 0.8,
+      backwardTurnMultiplier: 0.6,
     },
     stealth: {
       stealthPower: 10,
@@ -41,6 +45,7 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       name: 'Существо',
       stance: 'standing',
       movementMode: 'immobile',
+      directionMode: 'immobile',
       entityType: 'creature',
     },
   };

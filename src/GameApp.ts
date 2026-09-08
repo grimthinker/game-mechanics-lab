@@ -19,6 +19,7 @@ import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
+import { Radians } from './utils';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -26,6 +27,7 @@ export class GameApp {
   private canvas: HTMLCanvasElement;
   private renderer: Renderer;
   public world: World;
+  private mouseScreenPos: Point | null = null;
   public physics: PhysicsSystem;
   private movementSystem: MovementSystem;
   private stealthSystem: StealthSystem;
@@ -213,6 +215,15 @@ export class GameApp {
     this.lastTime = time;
 
     if (!this.isPaused) {
+      if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
+        const worldPoint = this.camera.getCanvasPoint(
+          this.mouseScreenPos.x,
+          this.mouseScreenPos.y,
+          this.canvas
+        );
+        this.updatePlayerAim(worldPoint);
+      }
+
       this.modifierSystem.update(dt, this.world);
       this.aiSystem.update(dt, this.world);
       this.attackSystem.update(dt, this.world, this.physics);
@@ -273,6 +284,32 @@ export class GameApp {
     if (hits.length === 0) return null;
     hits.sort((a, b) => b.zIndex - a.zIndex);
     return hits[0].id;
+  }
+
+  public setMouseScreenPos(clientX: number | null, clientY: number | null): void {
+    if (clientX === null || clientY === null) {
+      this.mouseScreenPos = null;
+    } else {
+      this.mouseScreenPos = { x: clientX, y: clientY };
+    }
+  }
+
+  public updatePlayerAim(worldPoint: Point): void {
+    const entities = this.world.getEntitiesWith('transform', 'input', 'health', 'aiStats');
+    for (const [, { transform, input, health, aiStats }] of entities) {
+      if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
+        const dx = worldPoint.x - transform.x;
+        const dy = worldPoint.y - transform.y;
+        input.targetLookAngle = Math.atan2(dy, dx) as Radians;
+      }
+    }
+  }
+
+  public clearPlayerAim(): void {
+    const entities = this.world.getEntitiesWith('input');
+    for (const [, { input }] of entities) {
+      input.targetLookAngle = undefined;
+    }
   }
 
   public pickNearestEntity(

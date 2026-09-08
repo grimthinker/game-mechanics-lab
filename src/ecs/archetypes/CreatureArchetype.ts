@@ -40,6 +40,7 @@ export function assembleCreature(
     name: config.meta?.name || id,
     stance: config.meta?.stance ?? 'standing',
     movementMode: config.meta?.movementMode ?? 'immobile',
+    directionMode: config.meta?.directionMode ?? 'immobile',
     entityType: config.meta?.entityType || 'creature',
   });
 
@@ -70,14 +71,23 @@ export function assembleCreature(
     walkSpeedMultiplier: config.movement?.walkSpeedMultiplier ?? 0.5,
     runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
     crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 0.8,
+    strafeSpeedMultiplier: config.movement?.strafeSpeedMultiplier ?? 0.8,
+    backwardSpeedMultiplier: config.movement?.backwardSpeedMultiplier ?? 0.6,
+    strafeTurnMultiplier: config.movement?.strafeTurnMultiplier ?? 0.8,
+    backwardTurnMultiplier: config.movement?.backwardTurnMultiplier ?? 0.6,
   });
   world.addComponent(id, 'velocity', {
+    vx: 0,
+    vy: 0,
     currentSpeed: 0,
     currentTurnSpeed: 0 as Radians,
     externalVx: 0,
     externalVy: 0,
   });
   world.addComponent(id, 'input', {
+    moveForward: 0,
+    moveStrafe: 0,
+    targetLookAngle: undefined,
     isMovingForward: false,
     turnDirection: 0,
     turnRatio: 0,
