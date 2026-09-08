@@ -192,8 +192,9 @@ export interface VelocityComponent {
 }
 
 export interface InputComponent {
-  moveForward: -1 | 0 | 1;
-  moveStrafe: -1 | 0 | 1;
+  desiredMoveVector: { x: number; y: number } | null;
+  moveForward?: -1 | 0 | 1;
+  moveStrafe?: -1 | 0 | 1;
   targetLookAngle?: Radians;
   isMovingForward: boolean;
   turnDirection: -1 | 0 | 1;

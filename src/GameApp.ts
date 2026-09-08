@@ -300,7 +300,10 @@ export class GameApp {
       if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
         const dx = worldPoint.x - transform.x;
         const dy = worldPoint.y - transform.y;
-        input.targetLookAngle = Math.atan2(dy, dx) as Radians;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 1) {
+          input.targetLookAngle = Math.atan2(dy, dx) as Radians;
+        }
       }
     }
   }

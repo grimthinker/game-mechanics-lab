@@ -73,6 +73,9 @@ export class EntityAdapter implements IMovable, EntityController {
   public get directionMode(): CreatureDirectionMode {
     return this.getComponent('meta')?.directionMode ?? 'immobile';
   }
+  public get targetLookAngle(): Radians | undefined {
+    return this.getComponent('input')?.targetLookAngle;
+  }
   public get pos(): Point {
     const transform = this.getComponent('transform');
     return transform ? { x: transform.x, y: transform.y } : { x: 0, y: 0 };
@@ -181,6 +184,13 @@ export class EntityAdapter implements IMovable, EntityController {
   }
 
   // --- Команды управления (Agent Controller API) ---
+  public setDesiredMoveVector(vec: Point | null): void {
+    const input = this.getInputIfActive();
+    if (input) {
+      input.desiredMoveVector = vec ? { x: vec.x, y: vec.y } : null;
+    }
+  }
+
   public setMovementInput(forward: -1 | 0 | 1, strafe: -1 | 0 | 1): void {
     const input = this.getInputIfActive();
     if (input) {
@@ -202,6 +212,8 @@ export class EntityAdapter implements IMovable, EntityController {
     if (input) {
       input.isMovingForward = true;
       input.moveForward = 1;
+      const angle = this.angle;
+      input.desiredMoveVector = { x: Math.cos(angle), y: Math.sin(angle) };
     }
   }
   public stopMovingForward(): void {
@@ -211,6 +223,7 @@ export class EntityAdapter implements IMovable, EntityController {
       if (input.moveForward === 1) {
         input.moveForward = 0;
       }
+      input.desiredMoveVector = null;
     }
   }
   public startTurning(direction: -1 | 1, ratio = 1): void {
@@ -264,6 +277,7 @@ export class EntityAdapter implements IMovable, EntityController {
   public stop(): boolean {
     const input = this.getComponent('input');
     if (input) {
+      input.desiredMoveVector = null;
       input.moveForward = 0;
       input.moveStrafe = 0;
       input.isMovingForward = false;
@@ -271,6 +285,7 @@ export class EntityAdapter implements IMovable, EntityController {
       input.turnRatio = 0;
       input.wantsAttack = false;
       input.attackSlotIndex = undefined;
+      input.targetLookAngle = undefined;
     }
     return true;
   }

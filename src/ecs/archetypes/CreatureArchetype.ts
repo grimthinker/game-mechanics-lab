@@ -85,6 +85,7 @@ export function assembleCreature(
     externalVy: 0,
   });
   world.addComponent(id, 'input', {
+    desiredMoveVector: null,
     moveForward: 0,
     moveStrafe: 0,
     targetLookAngle: undefined,

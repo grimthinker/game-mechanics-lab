@@ -1,6 +1,6 @@
 import { EntityAdapter } from '../EntityAdapter';
 import { Point } from '../types';
-import { vec2_distance_to, now_with_ms } from '../utils';
+import { vec2_distance_to, now_with_ms, Radians } from '../utils';
 import { LOGIC_CONFIG } from './config';
 import { NodeStatus, BTAction, PathKeys, BTSimpleAction } from './core';
 
@@ -350,26 +350,20 @@ export class BTActionFollowPathSmooth extends BTAction {
       return NodeStatus.SUCCESS;
     }
 
-    // Расчет угла до текущей путевой точки
+    // Расчет вектора и угла к следующей путевой точке
     const target = path[0];
     const dx = target.x - e_pos.x;
     const dy = target.y - e_pos.y;
-    const targetAngle = Math.atan2(dy, dx);
-    let diff = targetAngle - entity.angle;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    const dist = Math.hypot(dx, dy);
 
-    // Управляем поворотом во время движения
-    if (Math.abs(diff) > LOGIC_CONFIG.angleDiffTolerance) {
-      const direction: -1 | 1 = diff > 0 ? 1 : -1;
-      // Если угол большой (> 45°), можно снизить линейную скорость/замедлить поворот,
-      // либо просто передать ratio для поворота:
-      const ratio = Math.min(1, Math.abs(diff) / (Math.PI / 4));
-      entity.startTurning(direction, Math.max(0.3, ratio));
+    if (dist > 0.001) {
+      entity.setDesiredMoveVector({ x: dx / dist, y: dy / dist });
+      const targetAngle = Math.atan2(dy, dx) as Radians;
+      entity.setTargetLookAngle(targetAngle);
     } else {
-      entity.stopTurning();
+      entity.stop();
     }
 
-    entity.startMovingForward();
     return NodeStatus.RUNNING;
   }
 

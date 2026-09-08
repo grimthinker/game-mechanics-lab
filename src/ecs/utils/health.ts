@@ -16,6 +16,7 @@ export function killEntity(world: World, id: EntityId): void {
 
   const input = world.getComponent(id, 'input');
   if (input) {
+    input.desiredMoveVector = null;
     input.moveForward = 0;
     input.moveStrafe = 0;
     input.targetLookAngle = undefined;

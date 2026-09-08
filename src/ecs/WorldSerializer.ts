@@ -206,6 +206,7 @@ export class WorldSerializer {
             externalVy: 0,
           });
           this.app.world.addComponent(ent.id, 'input', {
+            desiredMoveVector: null,
             moveForward: 0,
             moveStrafe: 0,
             targetLookAngle: undefined,

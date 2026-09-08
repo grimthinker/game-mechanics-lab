@@ -71,23 +71,69 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
       }
 
-      // 2. Локальный ввод перемещения
-      let fwd = input.moveForward ?? 0;
-      let strafe = input.moveStrafe ?? 0;
-      if (input.isMovingForward && fwd === 0 && strafe === 0) {
-        fwd = 1;
-      }
-      const hasMoveInput = fwd !== 0 || strafe !== 0;
+      // 2. Поворот корпуса / взгляда существа (независимо от вектора движения)
+      if (input.targetLookAngle !== undefined) {
+        let diff = input.targetLookAngle - transform.angle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        const maxTurnStep = movementStats.maxTurnSpeed.current * dt;
 
-      // 3. Определение вида направления движения (Direction Mode)
+        if (Math.abs(diff) <= maxTurnStep) {
+          transform.angle = input.targetLookAngle;
+          velocity.currentTurnSpeed = (diff / dt) as Radians;
+        } else {
+          const sign = Math.sign(diff) as -1 | 1;
+          transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
+          velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
+        }
+      } else {
+        const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
+        velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
+        if (velocity.currentTurnSpeed !== 0) {
+          transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
+        }
+      }
+      transform.angle = Math.atan2(Math.sin(transform.angle), Math.cos(transform.angle)) as Radians;
+
+      // 3. Получение мирового вектора желаемого перемещения
+      let moveVecX = input.desiredMoveVector ? input.desiredMoveVector.x : 0;
+      let moveVecY = input.desiredMoveVector ? input.desiredMoveVector.y : 0;
+
+      // Резервный расчет для совместимости, если заданы дискретные moveForward/moveStrafe
+      if (!input.desiredMoveVector) {
+        let fwd = input.moveForward ?? 0;
+        let strafe = input.moveStrafe ?? 0;
+        if (input.isMovingForward && fwd === 0 && strafe === 0) {
+          fwd = 1;
+        }
+        if (fwd !== 0 || strafe !== 0) {
+          const len = Math.hypot(fwd, strafe);
+          const cosA = Math.cos(transform.angle);
+          const sinA = Math.sin(transform.angle);
+          moveVecX = (fwd / len) * cosA - (strafe / len) * sinA;
+          moveVecY = (fwd / len) * sinA + (strafe / len) * cosA;
+        }
+      }
+
+      const inputMag = Math.hypot(moveVecX, moveVecY);
+      const hasMoveInput = inputMag > 0.001;
+      if (hasMoveInput && inputMag > 1) {
+        moveVecX /= inputMag;
+        moveVecY /= inputMag;
+      }
+
+      // 4. Определение вида направления движения (Direction Mode)
       let directionMode: CreatureDirectionMode = 'immobile';
 
       if (hasMoveInput) {
-        const inputLen = Math.hypot(fwd, strafe);
-        const nFwd = fwd / inputLen;
-        const nStrafe = strafe / inputLen;
-        // Угол отклонения вектора движения от направления взгляда (0 — вперед, PI — назад)
-        const angleDiff = Math.abs(Math.atan2(nStrafe, nFwd));
+        // Угол желаемого мирового вектора перемещения
+        const desiredMoveAngle = Math.atan2(moveVecY, moveVecX);
+        // Угол расхождения между направлением движения и текущим направлением взгляда
+        const angleDiff = Math.abs(
+          Math.atan2(
+            Math.sin(desiredMoveAngle - transform.angle),
+            Math.cos(desiredMoveAngle - transform.angle)
+          )
+        );
 
         const deg45 = Math.PI / 4 + 0.001;
         const deg135 = (3 * Math.PI) / 4 + 0.001;
@@ -100,11 +146,15 @@ export class MovementSystem {
           directionMode = 'backward';
         }
       } else if (velocity.currentSpeed > 1) {
-        // При движении по инерции угол определяется по фактическому вектору скорости
-        const moveAngle = Math.atan2(velocity.vy, velocity.vx);
+        // При движении по инерции угол определяется по фактическому вектору текущей скорости
+        const actualMoveAngle = Math.atan2(velocity.vy, velocity.vx);
         const angleDiff = Math.abs(
-          Math.atan2(Math.sin(moveAngle - transform.angle), Math.cos(moveAngle - transform.angle))
+          Math.atan2(
+            Math.sin(actualMoveAngle - transform.angle),
+            Math.cos(actualMoveAngle - transform.angle)
+          )
         );
+
         const deg45 = Math.PI / 4 + 0.001;
         const deg135 = (3 * Math.PI) / 4 + 0.001;
 
@@ -119,7 +169,7 @@ export class MovementSystem {
         directionMode = 'immobile';
       }
 
-      // 4. Определение вида движения (Movement Mode): спринт разрешен ТОЛЬКО при движении вперед
+      // 5. Определение вида движения (Movement Mode): спринт разрешен ТОЛЬКО при движении вперед
       let movementMode: CreatureMovementMode = 'immobile';
 
       if (activeAttacks.attacks.length > 0) {
@@ -141,7 +191,7 @@ export class MovementSystem {
         movementMode = 'immobile';
       }
 
-      // 5. Модификаторы от вида движения (спринт / шаг)
+      // 6. Модификаторы от вида движения (спринт / шаг)
       if (movementMode === 'sprinting') {
         addModifier(movementStats.maxSpeed, {
           id: 'mode_sprint_speed',
@@ -169,7 +219,7 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
       }
 
-      // 6. Модификаторы от вида направления движения (в сторону / назад)
+      // 7. Модификаторы от вида направления движения (в сторону / назад)
       if (directionMode === 'strafe') {
         addModifier(movementStats.maxSpeed, {
           id: 'dir_strafe_speed',
@@ -205,7 +255,7 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
       }
 
-      // 7. Модификаторы замедления от атак
+      // 8. Модификаторы замедления от атак
       let moveSlow = 1;
       let turnSlow = 1;
       for (const atk of activeAttacks.attacks) {
@@ -250,48 +300,14 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
       }
 
-      // 8. Поворот взгляда существа (Mouse Aiming или Bot Turn Direction)
-      if (input.targetLookAngle !== undefined) {
-        let diff = input.targetLookAngle - transform.angle;
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        const maxTurnStep = movementStats.maxTurnSpeed.current * dt;
-
-        if (Math.abs(diff) <= maxTurnStep) {
-          transform.angle = input.targetLookAngle;
-          velocity.currentTurnSpeed = (diff / dt) as Radians;
-        } else {
-          const sign = Math.sign(diff) as -1 | 1;
-          transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
-          velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
-        }
-      } else {
-        const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
-        velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
-        if (velocity.currentTurnSpeed !== 0) {
-          transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
-        }
-      }
-      transform.angle = Math.atan2(Math.sin(transform.angle), Math.cos(transform.angle)) as Radians;
-
       // 9. Расчет мирового целевого вектора скорости и 2D векторная интерполяция
       let targetVx = 0;
       let targetVy = 0;
 
       if (hasMoveInput) {
         const targetSpeed = movementStats.maxSpeed.current;
-        const inputLen = Math.hypot(fwd, strafe);
-        const nFwd = fwd / inputLen;
-        const nStrafe = strafe / inputLen;
-
-        const cosA = Math.cos(transform.angle);
-        const sinA = Math.sin(transform.angle);
-
-        // Поворот локального вектора ввода на угол взгляда transform.angle
-        const dirX = nFwd * cosA - nStrafe * sinA;
-        const dirY = nFwd * sinA + nStrafe * cosA;
-
-        targetVx = dirX * targetSpeed;
-        targetVy = dirY * targetSpeed;
+        targetVx = moveVecX * targetSpeed;
+        targetVy = moveVecY * targetSpeed;
       }
 
       const deltaVx = targetVx - velocity.vx;

@@ -293,6 +293,7 @@ export class BTServiceInputController extends BTService {
   }
 
   protected override onAbort(entity: EntityAdapter): void {
+    entity.setDesiredMoveVector(null);
     entity.stop();
     entity.stopRunning();
     entity.stopWalking();
@@ -301,6 +302,7 @@ export class BTServiceInputController extends BTService {
   }
 
   protected override onClose(entity: EntityAdapter): void {
+    entity.setDesiredMoveVector(null);
     entity.stop();
     entity.stopRunning();
     entity.stopWalking();
@@ -313,21 +315,32 @@ export class BTServiceInputController extends BTService {
     const keys = bb?.get('pressed_keys') || [];
     const keysSet = new Set(keys);
 
-    let forward: -1 | 0 | 1 = 0;
-    if (keysSet.has('w') && !keysSet.has('s')) {
-      forward = 1;
-    } else if (keysSet.has('s') && !keysSet.has('w')) {
-      forward = -1;
-    }
+    // Линия прицеливания (направление на курсор мыши либо текущий угол корпуса)
+    const aimAngle = entity.targetLookAngle ?? entity.angle;
 
-    let strafe: -1 | 0 | 1 = 0;
-    if (keysSet.has('d') && !keysSet.has('a')) {
-      strafe = 1;
-    } else if (keysSet.has('a') && !keysSet.has('d')) {
-      strafe = -1;
-    }
+    let forwardIntent = 0;
+    if (keysSet.has('w')) forwardIntent += 1;
+    if (keysSet.has('s')) forwardIntent -= 1;
 
-    entity.setMovementInput(forward, strafe);
+    let strafeIntent = 0;
+    if (keysSet.has('d')) strafeIntent += 1;
+    if (keysSet.has('a')) strafeIntent -= 1;
+
+    if (forwardIntent !== 0 || strafeIntent !== 0) {
+      const cosA = Math.cos(aimAngle);
+      const sinA = Math.sin(aimAngle);
+
+      // Проекция намерения движения относительно направления курсора:
+      // W/S — вдоль линии прицеливания (cosA, sinA)
+      // D/A — перпендикулярно вправо (-sinA, cosA)
+      const dirX = forwardIntent * cosA - strafeIntent * sinA;
+      const dirY = forwardIntent * sinA + strafeIntent * cosA;
+      const len = Math.hypot(dirX, dirY);
+
+      entity.setDesiredMoveVector({ x: dirX / len, y: dirY / len });
+    } else {
+      entity.setDesiredMoveVector(null);
+    }
 
     if (keysSet.has('shift')) {
       entity.startRunning();
