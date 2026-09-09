@@ -55,6 +55,9 @@ export class ZoneTriggerSystem {
           const velocity = world.getComponent(targetId, 'velocity');
           if (!targetTransform || !velocity) return;
 
+          const targetRadius = targetPhysStats?.radius.current ?? targetPhys.body.r ?? 16;
+          const effectiveRadius = zoneTrigger.radius + targetRadius;
+
           const dx = targetTransform.x - zoneTransform.x;
           const dy = targetTransform.y - zoneTransform.y;
           const dist = Math.hypot(dx, dy);
@@ -71,8 +74,7 @@ export class ZoneTriggerSystem {
             zoneTrigger.centerValue !== undefined &&
             zoneTrigger.boundaryValue !== undefined
           ) {
-            const radius = zoneTrigger.radius;
-            const t = Math.min(1, Math.max(0, dist / radius));
+            const t = Math.min(1, Math.max(0, dist / effectiveRadius));
             forceMagnitude =
               zoneTrigger.centerValue + (zoneTrigger.boundaryValue - zoneTrigger.centerValue) * t;
           }
