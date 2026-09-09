@@ -15,8 +15,11 @@ import {
   HitZoneConfig,
   EntityComponents,
   EquipmentComponent,
+  InteractionPhase,
+  InteractionActionComponent,
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
+import { InteractionSystem } from './ecs/systems/InteractionSystem';
 import { LOGIC_CONFIG } from './ai/config';
 import { Point } from './types';
 import { Radians } from './utils';
@@ -146,6 +149,15 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get equip(): EquipmentComponent | undefined {
     return this.getComponent('equip');
+  }
+  public get interactionAction(): InteractionActionComponent | undefined {
+    return this.getComponent('interactionAction');
+  }
+  public get isInteracting(): boolean {
+    return this.interactionAction !== undefined;
+  }
+  public get interactionPhase(): InteractionPhase | null {
+    return this.interactionAction?.phase ?? null;
   }
   public get brain(): BTLogicComponent | undefined {
     return this.getComponent('brain') as BTLogicComponent | undefined;
@@ -304,6 +316,15 @@ export class EntityAdapter implements IMovable, EntityController {
       activeAttacks.attacks = activeAttacks.attacks.filter((a) => a.slotIndex !== slotIndex);
     } else {
       activeAttacks.attacks = [];
+    }
+  }
+  public pickup(targetItemId: EntityId): boolean {
+    return InteractionSystem.startPickup(this.world, this.id, targetItemId);
+  }
+  public cancelInteraction(): void {
+    const action = this.getComponent('interactionAction');
+    if (action) {
+      action.wantsCancel = true;
     }
   }
   public isSlotBusy(slotIndex: number): boolean {

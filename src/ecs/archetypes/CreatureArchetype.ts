@@ -11,10 +11,12 @@ import {
   RENDER_Z_INDEX,
   RenderableComponent,
   isValidStandardRadius,
+  EquipmentComponent,
 } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
+import { assembleItem } from './ItemArchetype';
 
 export function assembleCreature(
   world: World,
@@ -118,23 +120,65 @@ export function assembleCreature(
   aiSystem.initBotBrain(world, id, behavior);
 
   // 8. Экипировка и атаки
-  const equipData = config.equip ?? {
-    interactionSlots: [
-      { id: 'hand_left', interactDist: 15, strength: 50, itemId: null },
-      { id: 'hand_right', interactDist: 15, strength: 50, itemId: null },
-    ],
-    equipmentAreas: [
-      { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
-      { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
-      { id: 'torso', name: 'Туловище', type: 'torso', space: 40, itemIds: [] },
-      { id: 'hands_1', name: 'Рука (кольца)', type: 'hands', space: 10, itemIds: [] },
-      { id: 'hands_2', name: 'Рука (браслеты)', type: 'hands', space: 10, itemIds: [] },
-      { id: 'legs', name: 'Ноги', type: 'legs', space: 20, itemIds: [] },
-      { id: 'feet_1', name: 'Ступня левая', type: 'feet', space: 10, itemIds: [] },
-      { id: 'feet_2', name: 'Ступня правая', type: 'feet', space: 10, itemIds: [] },
-    ],
-  };
-  world.addComponent(id, 'equip', equipData);
+  const equipComp: EquipmentComponent = config.equip
+    ? JSON.parse(JSON.stringify(config.equip))
+    : {
+        interactionSlots: [
+          { id: 'hand_left', interactDist: 15, strength: 50, itemId: null },
+          { id: 'hand_right', interactDist: 15, strength: 50, itemId: null },
+        ],
+        equipmentAreas: [
+          { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
+          { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
+          { id: 'torso', name: 'Туловище', type: 'torso', space: 40, itemIds: [] },
+          { id: 'hands_1', name: 'Рука (кольца)', type: 'hands', space: 10, itemIds: [] },
+          { id: 'hands_2', name: 'Рука (браслеты)', type: 'hands', space: 10, itemIds: [] },
+          { id: 'legs', name: 'Ноги', type: 'legs', space: 20, itemIds: [] },
+          { id: 'feet_1', name: 'Ступня левая', type: 'feet', space: 10, itemIds: [] },
+          { id: 'feet_2', name: 'Ступня правая', type: 'feet', space: 10, itemIds: [] },
+        ],
+      };
+
+  // Автоматическая установка стандартной сумки в область "Туловище"
+  const torsoArea = equipComp.equipmentAreas.find((a) => a.type === 'torso');
+  if (torsoArea && torsoArea.itemIds.length === 0) {
+    const bagId = `item_bag_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    world.createEntity(bagId);
+    assembleItem(
+      world,
+      physics,
+      aiSystem,
+      bagId,
+      {
+        tag: { archetype: 'item', subType: 'bag' },
+        item: {
+          name: 'Сумка',
+          type: 'bag',
+          maxStack: 1,
+          size: 10,
+          equipType: 'torso',
+          equippable: true,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: {
+          radius: 16,
+          weight: 1,
+          isSolid: true,
+        },
+        ownership: {
+          ownerId: id,
+          status: 'equipped',
+        },
+        inventory: {
+          size: { width: 6, height: 4 },
+        },
+      },
+      position
+    );
+    torsoArea.itemIds.push(bagId);
+  }
+
+  world.addComponent(id, 'equip', equipComp);
   world.addComponent(id, 'activeAttacks', { attacks: [] });
 
   // 9. Трансформация и физическое тело

@@ -11,6 +11,8 @@ import {
   UniversalEditModal,
   ItemSpawnModal,
   ZoneSpawnModal,
+  InteractionSlotModal,
+  EquipmentAreaModal,
 } from './components/modals';
 import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
@@ -129,7 +131,7 @@ export const App: React.FC = () => {
   const { syncPlayerControls } = useKeyboardControls({
     isModalOpen:
       modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || isPaused,
-    isEditModalOpen: modals.isEditModalOpen,
+    isEditModalOpen: modals.isAnyEditModalOpen,
     mode,
   });
 
@@ -452,6 +454,8 @@ export const App: React.FC = () => {
         openItemSpawnModal={modals.openItemSpawnModal}
         openZoneSpawnModal={modals.openZoneSpawnModal}
         openEditModal={modals.openEditModal}
+        openSlotModal={modals.openSlotModal}
+        openAreaModal={modals.openAreaModal}
         handleDeleteEntity={handleDeleteEntity}
         isPaused={isPaused}
       />
@@ -516,6 +520,28 @@ export const App: React.FC = () => {
         onConfirm={handleItemSpawnConfirm}
       />
 
+      <InteractionSlotModal
+        isOpen={modals.isSlotModalOpen}
+        creatureId={modals.editingSlot?.creatureId ?? null}
+        slotId={modals.editingSlot?.slotId ?? null}
+        world={appRef.current?.world}
+        isReadOnly={isReadOnly}
+        onClose={modals.closeCurrentModal}
+        onInspectItem={(itemId) => modals.openEditModal(itemId)}
+        onConfirm={updateStats}
+      />
+
+      <EquipmentAreaModal
+        isOpen={modals.isAreaModalOpen}
+        creatureId={modals.editingArea?.creatureId ?? null}
+        areaId={modals.editingArea?.areaId ?? null}
+        world={appRef.current?.world}
+        isReadOnly={isReadOnly}
+        onClose={modals.closeCurrentModal}
+        onInspectItem={(itemId) => modals.openEditModal(itemId)}
+        onConfirm={updateStats}
+      />
+
       <UniversalEditModal
         isOpen={modals.isEditModalOpen}
         entityId={modals.editingEntityId}
@@ -523,9 +549,9 @@ export const App: React.FC = () => {
         physics={appRef.current?.physics}
         aiSystem={appRef.current?.aiSystem}
         isReadOnly={isReadOnly}
-        onClose={modals.closeEditModal}
+        onClose={modals.closeCurrentModal}
         onConfirm={() => {
-          modals.closeEditModal();
+          modals.closeCurrentModal();
           updateStats();
         }}
         onInspectItem={(itemId) => modals.openEditModal(itemId)}

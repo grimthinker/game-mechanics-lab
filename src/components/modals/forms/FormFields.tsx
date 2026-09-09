@@ -1,5 +1,9 @@
 import React from 'react';
-import { HitZoneType } from '../../../ecs/types';
+import {
+  HitZoneType,
+  STANDARD_EQUIPMENT_AREA_TYPES,
+  EQUIPMENT_AREA_TYPE_LABELS,
+} from '../../../ecs/types';
 import { HIT_ZONE_LABELS } from '../../../Weapon';
 import { Degrees } from '../../../utils';
 
@@ -62,13 +66,21 @@ export const CommonItemFormFields: React.FC<{
     </label>
     {values.equippable && (
       <label>
-        Тип экипировки (напр. torso, head):
-        <input
+        Тип экипировки:
+        <select
           disabled={isReadOnly}
-          type="text"
-          value={values.equipType || ''}
+          value={values.equipType || 'torso'}
           onChange={(e) => onChange({ equipType: e.target.value || null })}
-        />
+        >
+          {STANDARD_EQUIPMENT_AREA_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {EQUIPMENT_AREA_TYPE_LABELS[t] || t}
+            </option>
+          ))}
+          {values.equipType && !STANDARD_EQUIPMENT_AREA_TYPES.includes(values.equipType as any) && (
+            <option value={values.equipType}>{values.equipType}</option>
+          )}
+        </select>
       </label>
     )}
     <label>

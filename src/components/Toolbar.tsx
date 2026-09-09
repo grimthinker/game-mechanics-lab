@@ -23,6 +23,8 @@ interface ToolbarProps {
   openItemSpawnModal: () => void;
   openZoneSpawnModal: () => void;
   openEditModal: (entityId?: string) => void;
+  openSlotModal: (creatureId: string, slotId: string) => void;
+  openAreaModal: (creatureId: string, areaId: string) => void;
   handleDeleteEntity: () => void;
   isPaused: boolean;
 }
@@ -46,6 +48,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   openItemSpawnModal,
   openZoneSpawnModal,
   openEditModal,
+  openSlotModal,
+  openAreaModal,
   handleDeleteEntity,
   isPaused,
 }) => {
@@ -633,28 +637,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <div
                   style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}
                 >
-                  {equip.interactionSlots.map((slot, index) => {
+                  {equip.interactionSlots.map((slot) => {
                     const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
                     return (
                       <div
                         key={`inter_${slot.id}`}
-                        onClick={() => {
-                          if (slot.itemId) openEditModal(slot.itemId);
-                        }}
+                        onClick={() => selectedEntityId && openSlotModal(selectedEntityId, slot.id)}
                         style={{
-                          backgroundColor: '#1e1e1e',
+                          backgroundColor: slot.itemId ? '#243342' : '#1e1e1e',
                           padding: '6px 8px',
                           borderRadius: '4px',
-                          cursor: slot.itemId ? 'pointer' : 'default',
+                          cursor: 'pointer',
                           fontSize: '12px',
-                          border: '1px solid #444',
+                          border: slot.itemId ? '1px solid #2980b9' : '1px solid #444',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
                         }}
+                        title="Нажмите для настройки параметров ячейки"
                       >
-                        <span style={{ color: '#aaa' }}>{slot.id}:</span>
-                        <span>{slotItem ? slotItem.name : 'Пусто'}</span>
+                        <span style={{ color: slot.itemId ? '#ecf0f1' : '#777' }}>
+                          {slotItem ? slotItem.name : 'Пусто'}
+                        </span>
+                        <span style={{ color: '#888', fontSize: '11px' }}>⚙️</span>
                       </div>
                     );
                   })}
@@ -670,50 +675,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 <div
                   style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}
                 >
-                  {equip.equipmentAreas.map((area, index) => {
+                  {equip.equipmentAreas.map((area) => {
                     const isOccupied = area.itemIds.length > 0;
                     return (
                       <div
                         key={`area_${area.id}`}
+                        onClick={() => selectedEntityId && openAreaModal(selectedEntityId, area.id)}
                         style={{
-                          backgroundColor: isOccupied ? '#1abc9c10' : '#1e1e1e',
+                          backgroundColor: isOccupied ? '#1e3d29' : '#1e1e1e',
                           padding: '6px 8px',
                           borderRadius: '4px',
+                          cursor: 'pointer',
                           fontSize: '12px',
-                          border: '1px solid #444',
+                          border: isOccupied ? '1px solid #27ae60' : '1px solid #444',
                           display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
                         }}
+                        title="Нажмите для настройки области и списка надетых предметов"
                       >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <span style={{ color: '#aaa' }}>
-                            {area.name} (объем {area.space}):
-                          </span>
-                          <span>{isOccupied ? `${area.itemIds.length} предм.` : 'Пусто'}</span>
-                        </div>
-                        {isOccupied && (
-                          <div style={{ paddingLeft: '8px', borderLeft: '2px solid #555' }}>
-                            {area.itemIds.map((itemId) => {
-                              const itm = world.getComponent(itemId, 'item');
-                              return (
-                                <div
-                                  key={itemId}
-                                  onClick={() => openEditModal(itemId)}
-                                  style={{ cursor: 'pointer', color: '#f1c40f' }}
-                                >
-                                  - {itm ? itm.name : itemId}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                        <span style={{ color: isOccupied ? '#2ecc71' : '#aaa' }}>{area.name}</span>
+                        <span style={{ color: '#888', fontSize: '11px' }}>
+                          {isOccupied ? `(${area.itemIds.length})` : 'Пусто'}
+                        </span>
                       </div>
                     );
                   })}

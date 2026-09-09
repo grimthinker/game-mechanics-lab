@@ -112,6 +112,14 @@ export class GameApp {
     );
   }
 
+  public startPickup(entityId: string, targetItemId: string): boolean {
+    return this.interactionSystem.startPickup(this.world, entityId, targetItemId);
+  }
+
+  public cancelInteraction(entityId: string): boolean {
+    return this.interactionSystem.cancelInteraction(this.world, this.physics, entityId);
+  }
+
   public deleteSelectedEntity(): void {
     if (!this.selectedEntityId) return;
     const id = this.selectedEntityId;
@@ -133,8 +141,17 @@ export class GameApp {
 
     const eq = this.world.getComponent(id, 'equip');
     if (eq) {
-      for (const slot of eq.interactionSlots) {
-        if (slot.itemId) this.deleteEntityRecursive(slot.itemId);
+      if (eq.interactionSlots) {
+        for (const slot of eq.interactionSlots) {
+          if (slot.itemId) this.deleteEntityRecursive(slot.itemId);
+        }
+      }
+      if (eq.equipmentAreas) {
+        for (const area of eq.equipmentAreas) {
+          for (const itemId of area.itemIds) {
+            this.deleteEntityRecursive(itemId);
+          }
+        }
       }
     }
     const inv = this.world.getComponent(id, 'inventory');

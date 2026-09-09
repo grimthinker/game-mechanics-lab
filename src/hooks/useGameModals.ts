@@ -2,6 +2,12 @@ import { useState, useCallback, useMemo } from 'react';
 import { StandardRadius } from '../ecs/types';
 import { GameApp } from '../GameApp';
 
+// Тип кадра в стеке модальных окон
+export type ModalFrame =
+  | { type: 'entity'; entityId: string }
+  | { type: 'slot'; creatureId: string; slotId: string }
+  | { type: 'area'; creatureId: string; areaId: string };
+
 interface UseGameModalsProps {
   appRef: React.RefObject<GameApp | null>;
 }
@@ -47,26 +53,46 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const openZoneSpawnModal = useCallback(() => setIsZoneSpawnModalOpen(true), []);
   const closeZoneSpawnModal = useCallback(() => setIsZoneSpawnModalOpen(false), []);
 
-  // Единое модальное окно инспектора сущности
-  const [modalStack, setModalStack] = useState<string[]>([]);
+  const [modalStack, setModalStack] = useState<ModalFrame[]>([]);
 
-  const isEditModalOpen = modalStack.length > 0;
-  const editingEntityId = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
+  const currentModal = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
+
+  const isEditModalOpen = currentModal?.type === 'entity';
+  const editingEntityId = currentModal?.type === 'entity' ? currentModal.entityId : null;
+
+  const isSlotModalOpen = currentModal?.type === 'slot';
+  const editingSlot =
+    currentModal?.type === 'slot'
+      ? { creatureId: currentModal.creatureId, slotId: currentModal.slotId }
+      : null;
+
+  const isAreaModalOpen = currentModal?.type === 'area';
+  const editingArea =
+    currentModal?.type === 'area'
+      ? { creatureId: currentModal.creatureId, areaId: currentModal.areaId }
+      : null;
+
+  const isAnyEditModalOpen = modalStack.length > 0;
 
   const openEditModal = useCallback(
     (entityId?: string) => {
       const targetId = entityId ?? appRef.current?.selectedEntity?.id ?? null;
       if (!targetId) return;
-      setModalStack((prev) => [...prev, targetId]);
+      setModalStack((prev) => [...prev, { type: 'entity', entityId: targetId }]);
     },
     [appRef]
   );
 
-  const closeEditModal = useCallback(() => {
-    setModalStack((prev) => {
-      if (prev.length <= 1) return [];
-      return prev.slice(0, prev.length - 1);
-    });
+  const openSlotModal = useCallback((creatureId: string, slotId: string) => {
+    setModalStack((prev) => [...prev, { type: 'slot', creatureId, slotId }]);
+  }, []);
+
+  const openAreaModal = useCallback((creatureId: string, areaId: string) => {
+    setModalStack((prev) => [...prev, { type: 'area', creatureId, areaId }]);
+  }, []);
+
+  const closeCurrentModal = useCallback(() => {
+    setModalStack((prev) => prev.slice(0, -1));
   }, []);
 
   const closeAllEditModals = useCallback(() => {
@@ -128,8 +154,15 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       closeZoneSpawnModal,
       isEditModalOpen,
       editingEntityId,
+      isSlotModalOpen,
+      editingSlot,
+      isAreaModalOpen,
+      editingArea,
+      isAnyEditModalOpen,
       openEditModal,
-      closeEditModal,
+      openSlotModal,
+      openAreaModal,
+      closeCurrentModal,
       closeAllEditModals,
     }),
     [
@@ -165,8 +198,15 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       closeZoneSpawnModal,
       isEditModalOpen,
       editingEntityId,
+      isSlotModalOpen,
+      editingSlot,
+      isAreaModalOpen,
+      editingArea,
+      isAnyEditModalOpen,
       openEditModal,
-      closeEditModal,
+      openSlotModal,
+      openAreaModal,
+      closeCurrentModal,
       closeAllEditModals,
     ]
   );

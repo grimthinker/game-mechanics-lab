@@ -25,15 +25,7 @@ export class MovementSystem {
       id,
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
-      const interactionAction = world.getComponent(id, 'interactionAction');
-
-      if (!health.isAlive || interactionAction) {
-        if (interactionAction) {
-          input.desiredMoveVector = null;
-          input.turnDirection = 0;
-          input.wantsAttack = false;
-          input.isRunning = false;
-        }
+      if (!health.isAlive) {
         if (
           velocity.vx !== 0 ||
           velocity.vy !== 0 ||
@@ -58,6 +50,30 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
         meta.directionMode = 'immobile';
         continue;
+      }
+
+      const interactionAction = world.getComponent(id, 'interactionAction');
+      if (interactionAction) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
+        input.isRunning = false;
+        input.wantsAttack = false;
+
+        if (
+          interactionAction.type === 'pickup' &&
+          (interactionAction.phase === 'reach' || interactionAction.phase === 'abort_reach') &&
+          interactionAction.targetItemPos
+        ) {
+          const dx = interactionAction.targetItemPos.x - transform.x;
+          const dy = interactionAction.targetItemPos.y - transform.y;
+          if (Math.hypot(dx, dy) > 0.001) {
+            input.targetLookAngle = Math.atan2(dy, dx) as Radians;
+            input.turnDirection = 0;
+            input.turnRatio = 0;
+          }
+        }
       }
 
       // 1. Положение существа (Stance)

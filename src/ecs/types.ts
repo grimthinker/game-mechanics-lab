@@ -243,6 +243,26 @@ export interface InteractionSlot {
   itemId: EntityId | null;
 }
 
+export const STANDARD_EQUIPMENT_AREA_TYPES = [
+  'head',
+  'neck',
+  'torso',
+  'hands',
+  'legs',
+  'feet',
+] as const;
+
+export type StandardEquipmentAreaType = (typeof STANDARD_EQUIPMENT_AREA_TYPES)[number];
+
+export const EQUIPMENT_AREA_TYPE_LABELS: Record<string, string> = {
+  head: 'Голова (head)',
+  neck: 'Шея (neck)',
+  torso: 'Туловище (torso)',
+  hands: 'Руки (hands)',
+  legs: 'Ноги (legs)',
+  feet: 'Ступни (feet)',
+};
+
 export interface EquipmentArea {
   id: string;
   name: string;
@@ -256,6 +276,8 @@ export interface EquipmentComponent {
   equipmentAreas: EquipmentArea[];
 }
 
+export type InteractionPhase = 'reach' | 'lift' | 'abort_reach' | 'abort_lift';
+
 export interface InteractionActionComponent {
   type: 'pickup' | 'equip' | 'unequip';
   targetId?: string;
@@ -263,8 +285,11 @@ export interface InteractionActionComponent {
   areaId?: string;
   timer: number;
   totalDuration: number;
+  phase?: InteractionPhase;
+  targetItemPos?: Point;
+  elapsedInReach?: number;
+  wantsCancel?: boolean;
 }
-
 export interface ActiveAttackComponent {
   attacks: ActiveAttack[];
 }
