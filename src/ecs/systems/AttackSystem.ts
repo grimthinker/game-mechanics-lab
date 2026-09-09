@@ -14,23 +14,23 @@ export class AttackSystem {
         let chosenSlotIndex = -1;
 
         if (input.attackSlotIndex !== undefined) {
-          const slot = equip.slots[input.attackSlotIndex];
-          if (
-            slot &&
-            slot.type === 'weapon' &&
-            slot.itemId !== null &&
-            !busySlots.has(input.attackSlotIndex)
-          ) {
-            chosenSlotIndex = input.attackSlotIndex;
+          const slot = equip.interactionSlots[input.attackSlotIndex];
+          if (slot && slot.itemId !== null && !busySlots.has(input.attackSlotIndex)) {
+            const item = world.getComponent(slot.itemId, 'item');
+            if (item?.type === 'weapon') {
+              chosenSlotIndex = input.attackSlotIndex;
+            }
           }
         } else {
-          chosenSlotIndex = equip.slots.findIndex(
-            (s, idx) => s.type === 'weapon' && s.itemId !== null && !busySlots.has(idx)
-          );
+          chosenSlotIndex = equip.interactionSlots.findIndex((s, idx) => {
+            if (s.itemId === null || busySlots.has(idx)) return false;
+            const item = world.getComponent(s.itemId, 'item');
+            return item?.type === 'weapon';
+          });
         }
 
         if (chosenSlotIndex !== -1) {
-          const weaponSlot = equip.slots[chosenSlotIndex];
+          const weaponSlot = equip.interactionSlots[chosenSlotIndex];
           const weaponId = weaponSlot.itemId!;
           const wStats = world.getComponent(weaponId, 'weaponStats');
 
@@ -53,8 +53,8 @@ export class AttackSystem {
       for (let i = activeAttacks.attacks.length - 1; i >= 0; i--) {
         const atk = activeAttacks.attacks[i];
 
-        const slot = equip.slots[atk.slotIndex];
-        const isStillEquipped = slot && slot.type === 'weapon' && slot.itemId === atk.weaponId;
+        const slot = equip.interactionSlots[atk.slotIndex];
+        const isStillEquipped = slot && slot.itemId === atk.weaponId;
         const wStats = isStillEquipped
           ? world.getComponent(atk.weaponId, 'weaponStats')
           : undefined;
@@ -128,12 +128,15 @@ export class AttackSystem {
       let defense = 0;
       let flatReduction = 0;
 
-      const armorSlot = targetEquip?.slots.find((s) => s.type === 'armor' && s.itemId !== null);
-      if (armorSlot && armorSlot.itemId) {
-        const aStats = world.getComponent(armorSlot.itemId, 'armorStats');
-        if (aStats) {
-          defense = aStats.defense.current;
-          flatReduction = aStats.flatReduction.current;
+      if (targetEquip) {
+        for (const area of targetEquip.equipmentAreas) {
+          for (const itemId of area.itemIds) {
+            const aStats = world.getComponent(itemId, 'armorStats');
+            if (aStats) {
+              defense += aStats.defense.current;
+              flatReduction += aStats.flatReduction.current;
+            }
+          }
         }
       }
 

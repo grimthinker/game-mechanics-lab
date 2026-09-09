@@ -118,12 +118,23 @@ export function assembleCreature(
   aiSystem.initBotBrain(world, id, behavior);
 
   // 8. Экипировка и атаки
-  const equipSlots = config.equip ?? [
-    { type: 'armor', itemId: null },
-    { type: 'bag', itemId: null },
-    { type: 'weapon', itemId: null },
-  ];
-  world.addComponent(id, 'equip', { slots: equipSlots });
+  const equipData = config.equip ?? {
+    interactionSlots: [
+      { id: 'hand_left', interactDist: 15, strength: 50, itemId: null },
+      { id: 'hand_right', interactDist: 15, strength: 50, itemId: null },
+    ],
+    equipmentAreas: [
+      { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
+      { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
+      { id: 'torso', name: 'Туловище', type: 'torso', space: 40, itemIds: [] },
+      { id: 'hands_1', name: 'Рука (кольца)', type: 'hands', space: 10, itemIds: [] },
+      { id: 'hands_2', name: 'Рука (браслеты)', type: 'hands', space: 10, itemIds: [] },
+      { id: 'legs', name: 'Ноги', type: 'legs', space: 20, itemIds: [] },
+      { id: 'feet_1', name: 'Ступня левая', type: 'feet', space: 10, itemIds: [] },
+      { id: 'feet_2', name: 'Ступня правая', type: 'feet', space: 10, itemIds: [] },
+    ],
+  };
+  world.addComponent(id, 'equip', equipData);
   world.addComponent(id, 'activeAttacks', { attacks: [] });
 
   // 9. Трансформация и физическое тело

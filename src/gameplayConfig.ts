@@ -3,4 +3,8 @@ export const GAMEPLAY_CONFIG = {
   accelerationTime: 0.2,
   /** Время торможения существа до полной остановки (в секундах) */
   decelerationTime: 0.15,
+  /** Мин. время взаимодействия с предметами */
+  minInteractionTime: 0.1,
+  /** Макс. время взаимодействия с предметами */
+  maxInteractionTime: 1.0,
 };

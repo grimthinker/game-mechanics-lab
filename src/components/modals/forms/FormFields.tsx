@@ -5,6 +5,10 @@ import { Degrees } from '../../../utils';
 
 export interface WeaponFormValues {
   name: string;
+  size: number;
+  equipType: string | null;
+  equippable: boolean;
+  equipTimeMultiplier: number;
   baseDamage: number;
   prepTime: number;
   recoveryTime: number;
@@ -18,6 +22,70 @@ export interface WeaponFormValues {
   hitZoneType: HitZoneType;
 }
 
+export const CommonItemFormFields: React.FC<{
+  values: {
+    size: number;
+    equipType: string | null;
+    equippable: boolean;
+    equipTimeMultiplier: number;
+  };
+  onChange: (
+    v: Partial<{
+      size: number;
+      equipType: string | null;
+      equippable: boolean;
+      equipTimeMultiplier: number;
+    }>
+  ) => void;
+  isReadOnly?: boolean;
+}> = ({ values, onChange, isReadOnly }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+    <label>
+      Размер предмета (size):
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.size}
+        min={1}
+        max={100}
+        onChange={(e) => onChange({ size: Number(e.target.value) })}
+      />
+    </label>
+    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <input
+        disabled={isReadOnly}
+        type="checkbox"
+        checked={values.equippable}
+        onChange={(e) => onChange({ equippable: e.target.checked })}
+      />
+      Можно помещать в области экипировки
+    </label>
+    {values.equippable && (
+      <label>
+        Тип экипировки (напр. torso, head):
+        <input
+          disabled={isReadOnly}
+          type="text"
+          value={values.equipType || ''}
+          onChange={(e) => onChange({ equipType: e.target.value || null })}
+        />
+      </label>
+    )}
+    <label>
+      Множитель времени экипирования:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.equipTimeMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) => onChange({ equipTimeMultiplier: Number(e.target.value) })}
+      />
+    </label>
+  </div>
+);
+
 export const WeaponFormFields: React.FC<{
   values: WeaponFormValues;
   onChange: (v: Partial<WeaponFormValues>) => void;
@@ -25,6 +93,7 @@ export const WeaponFormFields: React.FC<{
   isReadOnly?: boolean;
 }> = ({ values, onChange, onZoneTypeChange, isReadOnly }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <CommonItemFormFields values={values} onChange={onChange} isReadOnly={isReadOnly} />
     <label>
       Название:
       <input
@@ -179,6 +248,10 @@ export const WeaponFormFields: React.FC<{
 
 export interface ArmorFormValues {
   name: string;
+  size: number;
+  equipType: string | null;
+  equippable: boolean;
+  equipTimeMultiplier: number;
   defense: number;
   flatReduction: number;
 }
@@ -189,6 +262,7 @@ export const ArmorFormFields: React.FC<{
   isReadOnly?: boolean;
 }> = ({ values, onChange, isReadOnly }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <CommonItemFormFields values={values} onChange={onChange} isReadOnly={isReadOnly} />
     <label>
       Название:
       <input
@@ -225,6 +299,10 @@ export const ArmorFormFields: React.FC<{
 
 export interface BagFormValues {
   name: string;
+  size: number;
+  equipType: string | null;
+  equippable: boolean;
+  equipTimeMultiplier: number;
   width: number;
   height: number;
 }
@@ -236,6 +314,7 @@ export const BagFormFields: React.FC<{
   isBagInventoryEmpty?: boolean;
 }> = ({ values, onChange, isReadOnly, isBagInventoryEmpty = true }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    <CommonItemFormFields values={values} onChange={onChange} isReadOnly={isReadOnly} />
     <label>
       Название:
       <input

@@ -58,9 +58,18 @@ export class WorldSerializer {
         if (ent.components?.ownership) {
           possessedItemIds.add(ent.id);
         }
-        if (ent.components?.equip?.slots) {
-          for (const slot of ent.components.equip.slots) {
-            if (slot.itemId) possessedItemIds.add(slot.itemId);
+        if (ent.components?.equip) {
+          if (ent.components.equip.interactionSlots) {
+            for (const slot of ent.components.equip.interactionSlots) {
+              if (slot.itemId) possessedItemIds.add(slot.itemId);
+            }
+          }
+          if (ent.components.equip.equipmentAreas) {
+            for (const area of ent.components.equip.equipmentAreas) {
+              for (const id of area.itemIds) {
+                possessedItemIds.add(id);
+              }
+            }
           }
         }
         if (ent.components?.inventory?.slots) {

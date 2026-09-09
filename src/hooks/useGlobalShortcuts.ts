@@ -28,7 +28,7 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
 
       // Обработка Esc и Enter для модалок
       if (e.key === 'Escape' || e.code === 'Escape') {
-        if (modals.isEditModalOpen) modals.closeEditModal();
+        if (modals.isEditModalOpen) modals.closeAllEditModals();
         else if (modals.isModalOpen) modals.closeSpawnModal();
         else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
         else if (modals.isZoneSpawnModalOpen) modals.closeZoneSpawnModal();

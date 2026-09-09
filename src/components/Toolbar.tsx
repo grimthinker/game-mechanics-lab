@@ -625,29 +625,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               )}
             </dl>
 
-            {equip && equip.slots.length > 0 && (
+            {equip && equip.interactionSlots.length > 0 && (
               <>
                 <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
-                  Экипировка:
+                  Ячейки взаимодействия:
                 </h4>
                 <div
                   style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}
                 >
-                  {equip.slots.map((slot, index) => {
+                  {equip.interactionSlots.map((slot, index) => {
                     const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
-                    const slotWeapon = slot.itemId
-                      ? world.getComponent(slot.itemId, 'weaponStats')
-                      : null;
-                    const slotArmor = slot.itemId
-                      ? world.getComponent(slot.itemId, 'armorStats')
-                      : null;
-                    const slotInv = slot.itemId
-                      ? world.getComponent(slot.itemId, 'inventory')
-                      : null;
-
                     return (
                       <div
-                        key={`${slot.type}_${index}`}
+                        key={`inter_${slot.id}`}
                         onClick={() => {
                           if (slot.itemId) openEditModal(slot.itemId);
                         }}
@@ -663,25 +653,67 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                           alignItems: 'center',
                         }}
                       >
-                        <span style={{ color: '#aaa' }}>{getSlotTypeName(slot.type)}:</span>
-                        <span>
-                          {slotItem ? slotItem.name : 'Пусто'}
-                          {slotWeapon && (
-                            <span style={{ color: '#f1c40f', marginLeft: '6px' }}>
-                              ({slotWeapon.baseDamage.current} урона)
-                            </span>
-                          )}
-                          {slotArmor && (
-                            <span style={{ color: '#3498db', marginLeft: '6px' }}>
-                              ({slotArmor.defense.current} защиты)
-                            </span>
-                          )}
-                          {slotInv && (
-                            <span style={{ color: '#2ecc71', marginLeft: '6px' }}>
-                              ({slotInv.size.width}x{slotInv.size.height})
-                            </span>
-                          )}
-                        </span>
+                        <span style={{ color: '#aaa' }}>{slot.id}:</span>
+                        <span>{slotItem ? slotItem.name : 'Пусто'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {equip && equip.equipmentAreas.length > 0 && (
+              <>
+                <h4 style={{ marginTop: '12px', fontSize: '13px', color: '#bdc3c7' }}>
+                  Области экипировки:
+                </h4>
+                <div
+                  style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}
+                >
+                  {equip.equipmentAreas.map((area, index) => {
+                    const isOccupied = area.itemIds.length > 0;
+                    return (
+                      <div
+                        key={`area_${area.id}`}
+                        style={{
+                          backgroundColor: isOccupied ? '#1abc9c10' : '#1e1e1e',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          border: '1px solid #444',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <span style={{ color: '#aaa' }}>
+                            {area.name} (объем {area.space}):
+                          </span>
+                          <span>{isOccupied ? `${area.itemIds.length} предм.` : 'Пусто'}</span>
+                        </div>
+                        {isOccupied && (
+                          <div style={{ paddingLeft: '8px', borderLeft: '2px solid #555' }}>
+                            {area.itemIds.map((itemId) => {
+                              const itm = world.getComponent(itemId, 'item');
+                              return (
+                                <div
+                                  key={itemId}
+                                  onClick={() => openEditModal(itemId)}
+                                  style={{ cursor: 'pointer', color: '#f1c40f' }}
+                                >
+                                  - {itm ? itm.name : itemId}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

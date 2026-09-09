@@ -21,6 +21,10 @@ const createInitialWeaponState = () => {
   const preset = createRandomWeaponPreset();
   const values: WeaponFormValues = {
     name: preset.name,
+    size: 10,
+    equipType: null,
+    equippable: false,
+    equipTimeMultiplier: 1.0,
     baseDamage: preset.combat.baseDamage,
     prepTime: preset.combat.prepTime,
     recoveryTime: preset.combat.recoveryTime,
@@ -50,12 +54,20 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
 
   const [armorValues, setArmorValues] = useState<ArmorFormValues>({
     name: 'Новая броня',
+    size: 20,
+    equipType: 'torso',
+    equippable: true,
+    equipTimeMultiplier: 1.0,
     defense: 15,
     flatReduction: 3,
   });
 
   const [bagValues, setBagValues] = useState<BagFormValues>({
     name: 'Новый рюкзак',
+    size: 10,
+    equipType: 'torso',
+    equippable: true,
+    equipTimeMultiplier: 1.0,
     width: 6,
     height: 4,
   });
@@ -106,7 +118,15 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
       }
 
       config = {
-        item: { name: weaponValues.name, type: 'weapon', maxStack: 1 },
+        item: {
+          name: weaponValues.name,
+          type: 'weapon',
+          maxStack: 1,
+          size: weaponValues.size,
+          equipType: weaponValues.equipType,
+          equippable: weaponValues.equippable,
+          equipTimeMultiplier: weaponValues.equipTimeMultiplier,
+        },
         physics: { radius, weight, isSolid },
         weaponStats: {
           baseDamage: weaponValues.baseDamage,
@@ -117,7 +137,15 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
       };
     } else if (type === 'armor') {
       config = {
-        item: { name: armorValues.name, type: 'armor', maxStack: 1 },
+        item: {
+          name: armorValues.name,
+          type: 'armor',
+          maxStack: 1,
+          size: armorValues.size,
+          equipType: armorValues.equipType,
+          equippable: armorValues.equippable,
+          equipTimeMultiplier: armorValues.equipTimeMultiplier,
+        },
         physics: { radius, weight, isSolid },
         armorStats: {
           defense: armorValues.defense,
@@ -126,7 +154,15 @@ export const ItemSpawnModal: React.FC<ItemSpawnModalProps> = ({ isOpen, onClose,
       };
     } else {
       config = {
-        item: { name: bagValues.name, type: 'bag', maxStack: 1 },
+        item: {
+          name: bagValues.name,
+          type: 'bag',
+          maxStack: 1,
+          size: bagValues.size,
+          equipType: bagValues.equipType,
+          equippable: bagValues.equippable,
+          equipTimeMultiplier: bagValues.equipTimeMultiplier,
+        },
         physics: { radius, weight, isSolid },
         inventory: {
           size: { width: bagValues.width, height: bagValues.height },

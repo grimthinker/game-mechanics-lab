@@ -5,7 +5,6 @@ import {
   CreatureDirectionMode,
   EntityId,
   IMovable,
-  EquipComponent,
   InventoryComponent,
   EntityController,
   StandardRadius,
@@ -15,6 +14,7 @@ import {
   WeaponStatsComponent,
   HitZoneConfig,
   EntityComponents,
+  EquipmentComponent,
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
@@ -144,7 +144,7 @@ export class EntityAdapter implements IMovable, EntityController {
   public get crouchTurnMultiplier(): number {
     return this.getComponent('movementStats')?.crouchTurnMultiplier ?? 1.2;
   }
-  public get equip(): EquipComponent | undefined {
+  public get equip(): EquipmentComponent | undefined {
     return this.getComponent('equip');
   }
   public get brain(): BTLogicComponent | undefined {
@@ -322,9 +322,12 @@ export class EntityAdapter implements IMovable, EntityController {
     const busySlots = new Set(activeAttacks?.attacks.map((a) => a.slotIndex));
     const freeSlots: { slotIndex: number; weaponId: EntityId }[] = [];
 
-    equip.slots.forEach((slot, index) => {
-      if (slot.type === 'weapon' && slot.itemId !== null && !busySlots.has(index)) {
-        freeSlots.push({ slotIndex: index, weaponId: slot.itemId });
+    equip.interactionSlots.forEach((slot, index) => {
+      if (slot.itemId !== null && !busySlots.has(index)) {
+        const item = this.world.getComponent(slot.itemId, 'item');
+        if (item?.type === 'weapon') {
+          freeSlots.push({ slotIndex: index, weaponId: slot.itemId });
+        }
       }
     });
 

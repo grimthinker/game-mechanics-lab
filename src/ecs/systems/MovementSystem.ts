@@ -25,7 +25,15 @@ export class MovementSystem {
       id,
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
-      if (!health.isAlive) {
+      const interactionAction = world.getComponent(id, 'interactionAction');
+
+      if (!health.isAlive || interactionAction) {
+        if (interactionAction) {
+          input.desiredMoveVector = null;
+          input.turnDirection = 0;
+          input.wantsAttack = false;
+          input.isRunning = false;
+        }
         if (
           velocity.vx !== 0 ||
           velocity.vy !== 0 ||

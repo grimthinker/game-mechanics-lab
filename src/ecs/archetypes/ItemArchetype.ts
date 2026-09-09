@@ -23,7 +23,15 @@ export function assembleItem(
   config: EntityConfig,
   position?: Point
 ): void {
-  const itemData = config.item ?? { name: 'Предмет', type: 'weapon', maxStack: 1 };
+  const itemData = config.item ?? {
+    name: 'Предмет',
+    type: 'weapon',
+    maxStack: 1,
+    size: 10,
+    equipType: null,
+    equippable: false,
+    equipTimeMultiplier: 1.0,
+  };
   const radius = config.physics?.radius ?? 16;
   const weight = config.physics?.weight ?? 1;
   const isSolid = config.physics?.isSolid ?? true;

@@ -220,6 +220,10 @@ export interface ItemData {
   name: string;
   type: ItemType;
   maxStack: number;
+  size: number;
+  equipType: string | null;
+  equippable: boolean;
+  equipTimeMultiplier: number;
 }
 
 export interface InventorySlot {
@@ -232,15 +236,33 @@ export interface InventoryComponent {
   slots: InventorySlot[][];
 }
 
-export type EquipSlotType = 'armor' | 'bag' | 'weapon';
-
-export interface EquipSlot {
-  type: EquipSlotType;
+export interface InteractionSlot {
+  id: string;
+  interactDist: number;
+  strength: number;
   itemId: EntityId | null;
 }
 
-export interface EquipComponent {
-  slots: EquipSlot[];
+export interface EquipmentArea {
+  id: string;
+  name: string;
+  type: string;
+  space: number;
+  itemIds: EntityId[];
+}
+
+export interface EquipmentComponent {
+  interactionSlots: InteractionSlot[];
+  equipmentAreas: EquipmentArea[];
+}
+
+export interface InteractionActionComponent {
+  type: 'pickup' | 'equip' | 'unequip';
+  targetId?: string;
+  slotIndex?: number;
+  areaId?: string;
+  timer: number;
+  totalDuration: number;
 }
 
 export interface ActiveAttackComponent {
@@ -285,7 +307,8 @@ export interface EntityComponents {
   aiStats?: AIStatsComponent;
   brain?: BTLogicComponent;
   inventory?: InventoryComponent;
-  equip?: EquipComponent;
+  equip?: EquipmentComponent;
+  interactionAction?: InteractionActionComponent;
   activeAttacks?: ActiveAttackComponent;
   item?: ItemComponent;
   meta?: CreatureMetaComponent;
@@ -310,6 +333,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'item',
   'inventory',
   'equip',
+  'interactionAction',
   'meta',
   'ownership',
   'gizmo',
@@ -476,7 +500,7 @@ export interface EntityConfig {
   ai?: AIConfig;
   item?: ItemData;
   inventory?: InventorySetup;
-  equip?: EquipSlot[];
+  equip?: EquipmentComponent;
   meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
   weaponStats?: Partial<WeaponCombatConfig>;

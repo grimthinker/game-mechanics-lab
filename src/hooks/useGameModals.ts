@@ -48,22 +48,29 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const closeZoneSpawnModal = useCallback(() => setIsZoneSpawnModalOpen(false), []);
 
   // Единое модальное окно инспектора сущности
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
+  const [modalStack, setModalStack] = useState<string[]>([]);
+
+  const isEditModalOpen = modalStack.length > 0;
+  const editingEntityId = modalStack.length > 0 ? modalStack[modalStack.length - 1] : null;
 
   const openEditModal = useCallback(
     (entityId?: string) => {
       const targetId = entityId ?? appRef.current?.selectedEntity?.id ?? null;
       if (!targetId) return;
-      setEditingEntityId(targetId);
-      setIsEditModalOpen(true);
+      setModalStack((prev) => [...prev, targetId]);
     },
     [appRef]
   );
 
   const closeEditModal = useCallback(() => {
-    setIsEditModalOpen(false);
-    setEditingEntityId(null);
+    setModalStack((prev) => {
+      if (prev.length <= 1) return [];
+      return prev.slice(0, prev.length - 1);
+    });
+  }, []);
+
+  const closeAllEditModals = useCallback(() => {
+    setModalStack([]);
   }, []);
 
   return useMemo(
@@ -123,6 +130,7 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       editingEntityId,
       openEditModal,
       closeEditModal,
+      closeAllEditModals,
     }),
     [
       isModalOpen,
@@ -159,6 +167,7 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       editingEntityId,
       openEditModal,
       closeEditModal,
+      closeAllEditModals,
     ]
   );
 }

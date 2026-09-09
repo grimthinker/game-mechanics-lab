@@ -6,6 +6,7 @@ import { AttackSystem } from './ecs/systems/AttackSystem';
 import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
 import { RenderSyncSystem } from './ecs/systems/RenderSyncSystem';
+import { InteractionSystem } from './ecs/systems/InteractionSystem';
 import { ZoneTriggerSystem } from './ecs/systems/ZoneTriggerSystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
@@ -35,6 +36,7 @@ export class GameApp {
   private damageSystem: DamageSystem;
   public aiSystem: AISystem;
   private renderSyncSystem: RenderSyncSystem;
+  public interactionSystem: InteractionSystem;
   private zoneTriggerSystem: ZoneTriggerSystem;
   private modifierSystem: ModifierSystem;
   private attachmentSystem: AttachmentSystem;
@@ -79,6 +81,7 @@ export class GameApp {
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
     this.renderSyncSystem = new RenderSyncSystem();
+    this.interactionSystem = new InteractionSystem();
     this.zoneTriggerSystem = new ZoneTriggerSystem();
     this.modifierSystem = new ModifierSystem();
     this.attachmentSystem = new AttachmentSystem();
@@ -130,7 +133,7 @@ export class GameApp {
 
     const eq = this.world.getComponent(id, 'equip');
     if (eq) {
-      for (const slot of eq.slots) {
+      for (const slot of eq.interactionSlots) {
         if (slot.itemId) this.deleteEntityRecursive(slot.itemId);
       }
     }
@@ -226,6 +229,7 @@ export class GameApp {
 
       this.modifierSystem.update(dt, this.world);
       this.aiSystem.update(dt, this.world);
+      this.interactionSystem.update(dt, this.world, this.physics);
       this.attackSystem.update(dt, this.world, this.physics);
       this.movementSystem.update(dt, this.world);
       this.stealthSystem.update(dt, this.world);

@@ -168,6 +168,10 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
       setDraftWeapon({
         name: meta?.name ?? item?.name ?? 'Оружие',
+        size: item?.size ?? 10,
+        equipType: item?.equipType ?? null,
+        equippable: item?.equippable ?? false,
+        equipTimeMultiplier: item?.equipTimeMultiplier ?? 1.0,
         baseDamage: wStats.baseDamage.base,
         prepTime: wStats.prepTime.base,
         recoveryTime: wStats.recoveryTime.base,
@@ -192,6 +196,10 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       aStats
         ? {
             name: meta?.name ?? item?.name ?? 'Броня',
+            size: item?.size ?? 20,
+            equipType: item?.equipType ?? 'torso',
+            equippable: item?.equippable ?? true,
+            equipTimeMultiplier: item?.equipTimeMultiplier ?? 1.0,
             defense: aStats.defense.base,
             flatReduction: aStats.flatReduction.base,
           }
@@ -203,6 +211,10 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       inv && item?.type === 'bag'
         ? {
             name: meta?.name ?? item.name,
+            size: item?.size ?? 10,
+            equipType: item?.equipType ?? 'torso',
+            equippable: item?.equippable ?? true,
+            equipTimeMultiplier: item?.equipTimeMultiplier ?? 1.0,
             width: inv.size.width,
             height: inv.size.height,
           }
@@ -245,7 +257,25 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     const meta = world.getComponent(entityId, 'meta');
     if (meta) meta.name = draftName;
     const item = world.getComponent(entityId, 'item');
-    if (item) item.name = draftName;
+    if (item) {
+      item.name = draftName;
+      if (draftWeapon) {
+        item.size = draftWeapon.size;
+        item.equipType = draftWeapon.equipType;
+        item.equippable = draftWeapon.equippable;
+        item.equipTimeMultiplier = draftWeapon.equipTimeMultiplier;
+      } else if (draftArmor) {
+        item.size = draftArmor.size;
+        item.equipType = draftArmor.equipType;
+        item.equippable = draftArmor.equippable;
+        item.equipTimeMultiplier = draftArmor.equipTimeMultiplier;
+      } else if (draftBag) {
+        item.size = draftBag.size;
+        item.equipType = draftBag.equipType;
+        item.equippable = draftBag.equippable;
+        item.equipTimeMultiplier = draftBag.equipTimeMultiplier;
+      }
+    }
 
     // 2. Физика
     const physStats = world.getComponent(entityId, 'physicsStats');
