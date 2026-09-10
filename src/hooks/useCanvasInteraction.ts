@@ -9,7 +9,6 @@ import {
 import { GameApp } from '../GameApp';
 import { GameMode } from '../constants';
 import { PlacementMode } from '../types';
-import { GlobalInput } from '../input/GlobalInput';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -53,8 +52,26 @@ export const useCanvasInteraction = ({
   const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (e.button === 0 && app) {
-      if (mode === GameMode.GAME) {
-        GlobalInput.keys.add(' ');
+      if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
+        const point = app.getCanvasPoint(e.clientX, e.clientY);
+        const targetEntityId = app.pickNearestEntity(point);
+        if (targetEntityId) {
+          const itemComp = app.world.getComponent(targetEntityId, 'item');
+          const tagComp = app.world.getComponent(targetEntityId, 'tag');
+          const ownershipComp = app.world.getComponent(targetEntityId, 'ownership');
+          const isItem = (tagComp?.archetype === 'item' || !!itemComp) && !ownershipComp;
+
+          if (isItem) {
+            const entities = app.world.getEntitiesWith('aiStats', 'health');
+            const playerEnt = entities.find(
+              ([, comp]) => comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive
+            );
+
+            if (playerEnt) {
+              app.startPickup(playerEnt[0], targetEntityId);
+            }
+          }
+        }
         return;
       }
 
@@ -139,8 +156,9 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (e.button !== 0 || !app) return;
 
-    if (mode === GameMode.GAME) {
-      GlobalInput.keys.delete(' ');
+    if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
+      app.endPan();
+      return;
     }
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
@@ -204,9 +222,6 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (app) {
       app.setMouseScreenPos(null, null);
-      if (mode === GameMode.GAME) {
-        GlobalInput.keys.delete(' ');
-      }
       if (app.isDraggingEntity()) {
         app.cancelEntityDrag();
       }

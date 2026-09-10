@@ -93,6 +93,27 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     selectedEntityId && world ? world.getComponent(selectedEntityId, 'inventory') : undefined;
   const equip =
     selectedEntityId && world ? world.getComponent(selectedEntityId, 'equip') : undefined;
+  const interactionAction =
+    selectedEntityId && world
+      ? world.getComponent(selectedEntityId, 'interactionAction')
+      : undefined;
+
+  const getPickupPhaseLabel = () => {
+    if (!interactionAction || interactionAction.type !== 'pickup' || !interactionAction.phase) {
+      return 'Нет';
+    }
+    switch (interactionAction.phase) {
+      case 'reach':
+        return 'Тянется к предмету';
+      case 'lift':
+        return 'Подъём предмета';
+      case 'abort_reach':
+      case 'abort_lift':
+        return 'Отмена подбора';
+      default:
+        return 'Нет';
+    }
+  };
 
   const getCardTitle = () => {
     switch (tag?.archetype) {
@@ -324,6 +345,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                           ? 'Назад'
                           : 'На месте'}
                   </dd>
+                </div>
+              )}
+              {(tag?.archetype === 'creature' || meta?.entityType === 'creature') && (
+                <div className="stat-row">
+                  <dt>Состояние подбора:</dt>
+                  <dd>{getPickupPhaseLabel()}</dd>
                 </div>
               )}
               {aiStats && (
@@ -754,7 +781,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <kbd>Мышь</kbd> Направление взгляда / прицеливание
             </li>
             <li>
-              <kbd>ЛКМ</kbd> / <kbd>Пробел</kbd> Атака оружием
+              <kbd>Пробел</kbd> Атака оружием
+            </li>
+            <li>
+              <kbd>LCtrl</kbd> + <kbd>ЛКМ</kbd> Подобрать предмет
             </li>
             <li>
               <kbd>LShift</kbd> Спринт (только вперед)

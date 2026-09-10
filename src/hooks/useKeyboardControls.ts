@@ -8,7 +8,7 @@ interface UseKeyboardControlsProps {
   mode: GameMode;
 }
 
-const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c', 'x']);
+const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c', 'x', ' ']);
 
 const getKeyName = (e: KeyboardEvent): string => {
   switch (e.code) {

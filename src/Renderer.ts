@@ -95,6 +95,7 @@ export class Renderer {
 
       // Отрисовка зон удара оружия перед живыми существами (zIndex >= 40)
       if (!attacksRendered && renderable.zIndex >= 40) {
+        this.renderInteractionRange(world, camera, selectedId);
         this.renderWeaponAttacks(
           world.getEntitiesWith('transform', 'activeAttacks'),
           world,
@@ -107,6 +108,7 @@ export class Renderer {
     }
 
     if (!attacksRendered) {
+      this.renderInteractionRange(world, camera, selectedId);
       this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
     }
 
@@ -318,6 +320,45 @@ export class Renderer {
   }
 
   // --- Вспомогательные методы рендеринга боевых зон и оверлеев ---
+
+  private renderInteractionRange(world: World, camera: Camera, selectedId: EntityId | null): void {
+    if (!selectedId) return;
+
+    const health = world.getComponent(selectedId, 'health');
+    if (health && !health.isAlive) return;
+
+    const equip = world.getComponent(selectedId, 'equip');
+    const transform = world.getComponent(selectedId, 'transform');
+    if (!equip || !transform) return;
+
+    let maxInteractDist = -1;
+    for (const slot of equip.interactionSlots) {
+      if (slot.itemId === null) {
+        if (slot.interactDist > maxInteractDist) {
+          maxInteractDist = slot.interactDist;
+        }
+      }
+    }
+
+    if (maxInteractDist < 0) return;
+
+    const physStats = world.getComponent(selectedId, 'physicsStats');
+    const physBody = world.getComponent(selectedId, 'physicsBody');
+    const radius = physStats?.radius.current ?? physBody?.body.r ?? 16;
+    const totalRadius = radius + maxInteractDist;
+
+    this.ctx.save();
+    this.ctx.translate(transform.x, transform.y);
+    this.ctx.beginPath();
+    this.ctx.setLineDash([6 / camera.scale, 6 / camera.scale]);
+    this.ctx.arc(0, 0, totalRadius, 0, Math.PI * 2);
+    this.ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
+    this.ctx.fill();
+    this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.6)';
+    this.ctx.lineWidth = 1.5 / camera.scale;
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
 
   private isEntityAlive(world: World, id: EntityId): boolean {
     const healthComp = world.getComponent(id, 'health');
