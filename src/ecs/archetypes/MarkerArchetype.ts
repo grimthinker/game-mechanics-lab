@@ -1,13 +1,21 @@
+import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
-import { EntityId, EntityConfig, RENDER_Z_INDEX, RenderableComponent } from '../types';
+import {
+  EntityId,
+  EntityConfig,
+  RENDER_Z_INDEX,
+  RenderableComponent,
+  CollisionCategory,
+  COLLISION_MASK_NONE,
+} from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
 
 export function assembleMarker(
   world: World,
-  _physics: PhysicsSystem,
+  physics: PhysicsSystem,
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
@@ -37,10 +45,21 @@ export function assembleMarker(
   // 3. Компонент гизмо
   world.addComponent(id, 'gizmo', gizmo);
 
-  // 4. Трансформация (без физического тела)
+  // 4. Трансформация и физическое тело-сенсор для выборки в check2d
   const posX = position?.x ?? 0;
   const posY = position?.y ?? 0;
   world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
+
+  const body = new Circle({ x: posX, y: posY }, radius);
+  body.isStatic = true;
+  world.addComponent(id, 'physicsBody', {
+    body,
+    isStatic: true,
+    category: CollisionCategory.NONE,
+    mask: COLLISION_MASK_NONE,
+    isTrigger: true,
+  });
+  physics.registerBody(id, body);
 
   // 5. Универсальный компонент отрисовки (Renderable)
   const renderable: RenderableComponent = {

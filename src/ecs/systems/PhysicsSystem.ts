@@ -15,8 +15,66 @@ export class PhysicsSystem {
   public obstaclesEnabled: boolean = true;
   private bodyToEntityMap: WeakMap<object, EntityId> = new WeakMap();
 
+  // Единый переиспользуемый сенсор для запросов мыши (Zero-Allocation)
+  private cursorSensor: Circle;
+
   constructor() {
     this.system = new System();
+
+    // Инициализируем сенсор один раз и навсегда добавляем в пространственный индекс
+    this.cursorSensor = new Circle({ x: 0, y: 0 }, 1);
+    this.system.insert(this.cursorSensor);
+  }
+
+  /**
+   * Точный запрос клика в точку worldPoint через BVH + SAT за O(log N).
+   * Возвращает список EntityId тел, перекрывающих данную точку.
+   */
+  public queryPointAt(worldPoint: Point): EntityId[] {
+    this.cursorSensor.setPosition(worldPoint.x, worldPoint.y);
+    this.cursorSensor.r = 1;
+    this.system.updateBody(this.cursorSensor);
+
+    const hitEntityIds: EntityId[] = [];
+    const seen = new Set<EntityId>();
+
+    this.system.checkOne(this.cursorSensor, (response) => {
+      const otherBody = response.b === this.cursorSensor ? response.a : response.b;
+      const id = this.bodyToEntityMap.get(otherBody);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        hitEntityIds.push(id);
+      }
+    });
+
+    return hitEntityIds;
+  }
+
+  /**
+   * Пространственный запрос тел в радиусе searchRadius через BVH за O(log N).
+   * Возвращает EntityId и глубину проникновения overlap.
+   */
+  public queryEntitiesInRadius(
+    center: Point,
+    searchRadius: number
+  ): Array<{ id: EntityId; overlap: number }> {
+    this.cursorSensor.setPosition(center.x, center.y);
+    this.cursorSensor.r = Math.max(0.001, searchRadius);
+    this.system.updateBody(this.cursorSensor);
+
+    const candidates: Array<{ id: EntityId; overlap: number }> = [];
+    const seen = new Set<EntityId>();
+
+    this.system.checkOne(this.cursorSensor, (response) => {
+      const otherBody = response.b === this.cursorSensor ? response.a : response.b;
+      const id = this.bodyToEntityMap.get(otherBody);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        candidates.push({ id, overlap: response.overlap });
+      }
+    });
+
+    return candidates;
   }
 
   public registerBody(entityId: EntityId, body: Body): void {

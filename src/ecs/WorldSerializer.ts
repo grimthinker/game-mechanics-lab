@@ -179,7 +179,19 @@ export class WorldSerializer {
         }
 
         // 3. Реставрация физического тела для объектов с физикой
-        if (comps.physicsStats && comps.transform && !isPossessedItem) {
+        if (comps.tag?.archetype === 'marker' && comps.transform && !isPossessedItem) {
+          const radius = comps.gizmo?.radius ?? 14;
+          const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
+          body.isStatic = true;
+          this.app.world.addComponent(ent.id, 'physicsBody', {
+            body,
+            isStatic: true,
+            category: CollisionCategory.NONE,
+            mask: COLLISION_MASK_NONE,
+            isTrigger: true,
+          });
+          this.app.physics.registerBody(ent.id, body);
+        } else if (comps.physicsStats && comps.transform && !isPossessedItem) {
           const archetype =
             comps.tag?.archetype ??
             (comps.zoneTrigger

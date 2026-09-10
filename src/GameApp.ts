@@ -456,24 +456,18 @@ export class GameApp {
 
   public pickEntityAt(worldPoint: Point): string | null {
     const isEditor = this.gameMode === GameMode.EDITOR;
-    const entities = this.world.getEntitiesWith('transform');
+    const hitIds = this.physics.queryPointAt(worldPoint);
     const hits: { id: string; zIndex: number }[] = [];
 
-    for (const [entityId, { transform, physicsBody }] of entities) {
-      const physStats = this.world.getComponent(entityId, 'physicsStats');
-      const gizmo = this.world.getComponent(entityId, 'gizmo');
+    for (const entityId of hitIds) {
       const renderable = this.world.getComponent(entityId, 'renderable');
-
       if (renderable && !renderable.isVisible) continue;
+
+      const physicsBody = this.world.getComponent(entityId, 'physicsBody');
+      const physStats = this.world.getComponent(entityId, 'physicsStats');
       if (!isEditor && !physicsBody && !physStats) continue;
 
-      const bodyRadius =
-        physicsBody && 'r' in physicsBody.body ? (physicsBody.body as any).r : undefined;
-      const radius = physStats?.radius.current ?? bodyRadius ?? gizmo?.radius ?? 14;
-      const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      if (dist <= radius) {
-        hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
-      }
+      hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
     }
 
     if (hits.length === 0) return null;
@@ -518,36 +512,30 @@ export class GameApp {
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
     const maxWorldDist = maxScreenDistancePx / this.camera.scale;
 
+    const candidates = this.physics.queryEntitiesInRadius(worldPoint, maxWorldDist);
+
     let nearestId: string | null = null;
     let minDistance = Infinity;
     let bestZIndex = -Infinity;
 
-    const entities = this.world.getEntitiesWith('transform');
-    for (const [entityId, { transform, physicsBody }] of entities) {
-      const physStats = this.world.getComponent(entityId, 'physicsStats');
-      const gizmo = this.world.getComponent(entityId, 'gizmo');
+    for (const { id: entityId, overlap } of candidates) {
       const renderable = this.world.getComponent(entityId, 'renderable');
-
       if (renderable && !renderable.isVisible) continue;
+
+      const physicsBody = this.world.getComponent(entityId, 'physicsBody');
+      const physStats = this.world.getComponent(entityId, 'physicsStats');
       if (!isEditor && !physicsBody && !physStats) continue;
 
-      const bodyRadius =
-        physicsBody && 'r' in physicsBody.body ? (physicsBody.body as any).r : undefined;
-      const radius = physStats?.radius.current ?? bodyRadius ?? gizmo?.radius ?? 14;
-      const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
-      const distToBoundary = Math.max(0, distToCenter - radius);
+      const distToBoundary = Math.max(0, maxWorldDist - overlap);
+      const zIndex = renderable?.zIndex ?? 0;
 
-      if (distToBoundary <= maxWorldDist) {
-        const zIndex = renderable?.zIndex ?? 0;
-
-        if (distToBoundary < minDistance - 0.001) {
-          minDistance = distToBoundary;
-          nearestId = entityId;
-          bestZIndex = zIndex;
-        } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
-          nearestId = entityId;
-          bestZIndex = zIndex;
-        }
+      if (distToBoundary < minDistance - 0.001) {
+        minDistance = distToBoundary;
+        nearestId = entityId;
+        bestZIndex = zIndex;
+      } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
+        nearestId = entityId;
+        bestZIndex = zIndex;
       }
     }
 
