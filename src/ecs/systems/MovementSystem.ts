@@ -118,6 +118,12 @@ export class MovementSystem {
       }
       transform.angle = Math.atan2(Math.sin(transform.angle), Math.cos(transform.angle)) as Radians;
 
+      // Синхронизация угла с физическим телом (SSOT -> Physics Body)
+      const physBodyComp = world.getComponent(id, 'physicsBody');
+      if (physBodyComp && physBodyComp.body && typeof physBodyComp.body.setAngle === 'function') {
+        physBodyComp.body.setAngle(transform.angle);
+      }
+
       // 3. Получение мирового вектора желаемого перемещения
       let moveVecX = input.desiredMoveVector ? input.desiredMoveVector.x : 0;
       let moveVecY = input.desiredMoveVector ? input.desiredMoveVector.y : 0;

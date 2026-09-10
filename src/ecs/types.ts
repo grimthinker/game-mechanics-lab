@@ -293,6 +293,10 @@ export interface InteractionActionComponent {
   wantsCancel?: boolean;
 }
 
+export interface PickupIntentComponent {
+  targetItemId: EntityId;
+}
+
 export interface ActiveAttackComponent {
   attacks: ActiveAttack[];
 }
@@ -338,6 +342,7 @@ export interface EntityComponents {
   inventory?: InventoryComponent;
   equip?: EquipmentComponent;
   interactionAction?: InteractionActionComponent;
+  pickupIntent?: PickupIntentComponent;
   activeAttacks?: ActiveAttackComponent;
   item?: ItemComponent;
   meta?: CreatureMetaComponent;

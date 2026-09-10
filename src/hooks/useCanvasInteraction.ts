@@ -68,7 +68,9 @@ export const useCanvasInteraction = ({
             );
 
             if (playerEnt) {
-              app.startPickup(playerEnt[0], targetEntityId);
+              app.world.addComponent(playerEnt[0], 'pickupIntent', {
+                targetItemId: targetEntityId,
+              });
             }
           }
         }

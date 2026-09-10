@@ -5,79 +5,91 @@ import { Circle } from 'detect-collisions';
 import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
 
 export class InteractionSystem {
-  public static startPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
+  public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
     const health = world.getComponent(entityId, 'health');
     if (!health || !health.isAlive) return false;
 
     if (world.getComponent(entityId, 'interactionAction')) return false;
+    if (world.getComponent(entityId, 'pickupIntent')) return false;
 
-    const equip = world.getComponent(entityId, 'equip');
-    const transform = world.getComponent(entityId, 'transform');
-    const targetTransform = world.getComponent(targetItemId, 'transform');
-    const targetItem = world.getComponent(targetItemId, 'item');
-    const targetPhysStats = world.getComponent(targetItemId, 'physicsStats');
     const targetOwnership = world.getComponent(targetItemId, 'ownership');
+    const targetItem = world.getComponent(targetItemId, 'item');
+    if (!targetItem || targetOwnership) return false;
 
-    if (
-      !equip ||
-      !transform ||
-      !targetTransform ||
-      !targetItem ||
-      !targetPhysStats ||
-      targetOwnership
-    ) {
-      return false;
-    }
-
-    const activeInteractions = world.getEntitiesWith('interactionAction');
-    for (const [, { interactionAction }] of activeInteractions) {
-      if (
-        interactionAction.type === 'pickup' &&
-        interactionAction.targetId === targetItemId &&
-        interactionAction.phase !== 'abort_reach' &&
-        interactionAction.phase !== 'abort_lift'
-      ) {
-        return false;
-      }
-    }
-
-    const dist = Math.hypot(targetTransform.x - transform.x, targetTransform.y - transform.y);
-    const myRadius = world.getComponent(entityId, 'physicsStats')?.radius.current ?? 16;
-    const targetRadius = targetPhysStats.radius.current;
-    const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
-
-    let bestSlotIndex = -1;
-    let maxStrength = -Infinity;
-
-    equip.interactionSlots.forEach((slot, index) => {
-      if (slot.itemId === null && distBetweenBorders <= slot.interactDist) {
-        if (slot.strength > maxStrength) {
-          maxStrength = slot.strength;
-          bestSlotIndex = index;
-        }
-      }
-    });
-
-    if (bestSlotIndex === -1) {
-      return false;
-    }
-
-    world.addComponent(entityId, 'interactionAction', {
-      type: 'pickup',
-      phase: 'reach',
-      targetId: targetItemId,
-      slotIndex: bestSlotIndex,
-      targetItemPos: { x: targetTransform.x, y: targetTransform.y },
-      timer: GAMEPLAY_CONFIG.pickupReachDuration,
-      totalDuration: GAMEPLAY_CONFIG.pickupReachDuration,
-      elapsedInReach: 0,
-    });
-
+    world.addComponent(entityId, 'pickupIntent', { targetItemId });
     return true;
   }
 
-  public startPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
-    return InteractionSystem.startPickup(world, entityId, targetItemId);
+  public requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
+    return InteractionSystem.requestPickup(world, entityId, targetItemId);
+  }
+
+  private processPickupIntents(world: World): void {
+    const intents = world.getEntitiesWith('pickupIntent', 'equip', 'transform', 'health');
+
+    for (const [id, { pickupIntent, equip, transform, health }] of intents) {
+      world.removeComponent(id, 'pickupIntent');
+
+      if (!health.isAlive) continue;
+      if (world.getComponent(id, 'interactionAction')) continue;
+
+      const targetItemId = pickupIntent.targetItemId;
+      const targetTransform = world.getComponent(targetItemId, 'transform');
+      const targetItem = world.getComponent(targetItemId, 'item');
+      const targetPhysStats = world.getComponent(targetItemId, 'physicsStats');
+      const targetOwnership = world.getComponent(targetItemId, 'ownership');
+
+      if (!targetTransform || !targetItem || !targetPhysStats || targetOwnership) {
+        continue;
+      }
+
+      let isTargetAlreadyTargeted = false;
+      const activeInteractions = world.getEntitiesWith('interactionAction');
+      for (const [, { interactionAction }] of activeInteractions) {
+        if (
+          interactionAction.type === 'pickup' &&
+          interactionAction.targetId === targetItemId &&
+          interactionAction.phase !== 'abort_reach' &&
+          interactionAction.phase !== 'abort_lift'
+        ) {
+          isTargetAlreadyTargeted = true;
+          break;
+        }
+      }
+      if (isTargetAlreadyTargeted) continue;
+
+      const dist = Math.hypot(targetTransform.x - transform.x, targetTransform.y - transform.y);
+      const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 16;
+      const targetRadius = targetPhysStats.radius.current;
+      const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
+
+      let bestSlotIndex = -1;
+      let maxStrength = -Infinity;
+
+      equip.interactionSlots.forEach((slot, index) => {
+        if (slot.itemId === null && distBetweenBorders <= slot.interactDist) {
+          if (slot.strength > maxStrength) {
+            maxStrength = slot.strength;
+            bestSlotIndex = index;
+          }
+        }
+      });
+
+      if (bestSlotIndex === -1) {
+        continue;
+      }
+
+      world.addComponent(id, 'interactionAction', {
+        type: 'pickup',
+        phase: 'reach',
+        targetId: targetItemId,
+        slotIndex: bestSlotIndex,
+        targetItemPos: { x: targetTransform.x, y: targetTransform.y },
+        timer: GAMEPLAY_CONFIG.pickupReachDuration,
+        totalDuration: GAMEPLAY_CONFIG.pickupReachDuration,
+        elapsedInReach: 0,
+      });
+    }
   }
 
   public cancelInteraction(world: World, physics: PhysicsSystem, entityId: EntityId): boolean {
@@ -154,6 +166,8 @@ export class InteractionSystem {
   }
 
   public update(dt: number, world: World, physics: PhysicsSystem): void {
+    this.processPickupIntents(world);
+
     const entities = world.getEntitiesWith('interactionAction', 'equip', 'transform', 'health');
 
     for (const [id, { interactionAction, equip, transform, health }] of entities) {

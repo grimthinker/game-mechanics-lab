@@ -113,7 +113,7 @@ export class GameApp {
   }
 
   public startPickup(entityId: string, targetItemId: string): boolean {
-    return this.interactionSystem.startPickup(this.world, entityId, targetItemId);
+    return InteractionSystem.requestPickup(this.world, entityId, targetItemId);
   }
 
   public cancelInteraction(entityId: string): boolean {
@@ -446,12 +446,14 @@ export class GameApp {
     const newX = worldPoint.x + this.dragOffset.x;
     const newY = worldPoint.y + this.dragOffset.y;
 
+    // Изменяем источник правды (Transform), физика синхронизирует тело автоматически в начале следующего тика или здесь через PhysicsSystem
     if (transform) {
       transform.x = newX;
       transform.y = newY;
     }
     if (phys && phys.body) {
       phys.body.setPosition(newX, newY);
+      this.physics.system.updateBody(phys.body);
     }
     this.attachmentSystem.update(this.world, this.physics);
   }

@@ -319,7 +319,7 @@ export class EntityAdapter implements IMovable, EntityController {
     }
   }
   public pickup(targetItemId: EntityId): boolean {
-    return InteractionSystem.startPickup(this.world, this.id, targetItemId);
+    return InteractionSystem.requestPickup(this.world, this.id, targetItemId);
   }
   public cancelInteraction(): void {
     const action = this.getComponent('interactionAction');

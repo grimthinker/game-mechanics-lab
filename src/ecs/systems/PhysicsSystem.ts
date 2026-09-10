@@ -71,6 +71,13 @@ export class PhysicsSystem {
 
     const body = phys.body;
 
+    // Синхронизируем тело из Transform перед началом перемещения (SSOT)
+    body.setPosition(transform.x, transform.y);
+    if (typeof body.setAngle === 'function') {
+      body.setAngle(transform.angle);
+    }
+    this.system.updateBody(body);
+
     // Если тело не сталкивается с препятствиями (бестелесное), двигаем напрямую
     if ((phys.mask & CollisionCategory.OBSTACLE) === 0) {
       body.setPosition(body.x + dx, body.y + dy);
@@ -154,6 +161,18 @@ export class PhysicsSystem {
         physicsBody.body.r !== physicsStats.radius.current
       ) {
         physicsBody.body.r = physicsStats.radius.current;
+      }
+    }
+
+    // Предварительная синхронизация тела из Transform (SSOT -> Body) для всех динамических объектов
+    const allPhysEntities = world.getEntitiesWith('transform', 'physicsBody');
+    for (const [_id, { transform, physicsBody }] of allPhysEntities) {
+      if (!physicsBody.isStatic && physicsBody.body) {
+        physicsBody.body.setPosition(transform.x, transform.y);
+        if (typeof physicsBody.body.setAngle === 'function') {
+          physicsBody.body.setAngle(transform.angle);
+        }
+        this.system.updateBody(physicsBody.body);
       }
     }
 
@@ -271,6 +290,14 @@ export class PhysicsSystem {
           transform.y = physicsBody.body.y;
           this.system.updateBody(physicsBody.body);
         }
+      }
+    }
+
+    // Финальная синхронизация позиций Body обратно в Transform для всех нестатичных тел после разрешения коллизий
+    for (const [_id, { transform, physicsBody }] of allPhysEntities) {
+      if (!physicsBody.isStatic && !physicsBody.isTrigger && physicsBody.body) {
+        transform.x = physicsBody.body.x;
+        transform.y = physicsBody.body.y;
       }
     }
   }
