@@ -9,6 +9,7 @@ import {
   RenderPrimitive,
   TransformComponent,
 } from './ecs/types';
+import { Point } from './types';
 import { VISUAL_CONFIG } from '../config/visualConfig';
 
 export class Renderer {
@@ -25,8 +26,11 @@ export class Renderer {
     world: World,
     _physics: PhysicsSystem,
     selectedId: EntityId | null,
+    selectedIds: Set<EntityId> = new Set(),
     gameMode: string = 'editor',
-    hoveredId: EntityId | null = null
+    hoveredId: EntityId | null = null,
+    draggedGhosts?: Array<{ id: EntityId; origPos: Point; pos: Point }> | null,
+    marqueeBox?: { start: Point; current: Point } | null
   ): void {
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -35,7 +39,16 @@ export class Renderer {
     this.ctx.scale(camera.scale, camera.scale);
 
     this.renderGrid(camera);
-    this.renderEntities(world, camera, selectedId, hoveredId, gameMode);
+    this.renderEntities(
+      world,
+      camera,
+      selectedId,
+      selectedIds,
+      hoveredId,
+      gameMode,
+      draggedGhosts,
+      marqueeBox
+    );
 
     this.ctx.restore();
   }
@@ -71,8 +84,11 @@ export class Renderer {
     world: World,
     camera: Camera,
     selectedId: EntityId | null,
+    selectedIds: Set<EntityId>,
     hoveredId: EntityId | null,
-    gameMode: string = 'editor'
+    gameMode: string = 'editor',
+    draggedGhosts?: Array<{ id: EntityId; origPos: Point; pos: Point }> | null,
+    marqueeBox?: { start: Point; current: Point } | null
   ): void {
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
@@ -80,6 +96,7 @@ export class Renderer {
     renderables.sort((a, b) => a[1].renderable.zIndex - b[1].renderable.zIndex);
 
     let attacksRendered = false;
+    const draggingIds = new Set(draggedGhosts?.map((g) => g.id));
 
     for (const [id, { transform, renderable }] of renderables) {
       if (!renderable.isVisible) continue;
@@ -94,15 +111,53 @@ export class Renderer {
         attacksRendered = true;
       }
 
-      this.renderEntityPrimitives(id, transform, renderable, camera, selectedId, hoveredId, world);
+      const isBeingDragged = draggingIds.has(id);
+      if (isBeingDragged) {
+        this.ctx.save();
+        this.ctx.globalAlpha = 0.35;
+        this.renderEntityPrimitives(
+          id,
+          transform,
+          renderable,
+          camera,
+          null,
+          selectedIds,
+          hoveredId,
+          world
+        );
+        this.ctx.restore();
+      } else {
+        this.renderEntityPrimitives(
+          id,
+          transform,
+          renderable,
+          camera,
+          selectedId,
+          selectedIds,
+          hoveredId,
+          world
+        );
+      }
     }
 
     if (!attacksRendered) {
       this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
     }
 
-    // Отрисовка эффектов взаимодействия (линия подбора, точка и радиус ячейки) поверх всех игровых сущностей
+    // Отрисовка эффектов взаимодействия
     this.renderPickupInteractions(world, camera);
+
+    // Отрисовка призраков перетаскиваемой группы (Ghost Drag Preview)
+    if (draggedGhosts) {
+      for (const ghost of draggedGhosts) {
+        this.renderGhostDrag(world, camera, ghost);
+      }
+    }
+
+    // Отрисовка рамки выделения (Marquee Selection Box)
+    if (marqueeBox) {
+      this.renderMarqueeBox(camera, marqueeBox);
+    }
 
     // Отрисовка Healthbars и ID-текстов
     this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera, gameMode);
@@ -111,12 +166,86 @@ export class Renderer {
     this.renderItemTooltips(world, camera, hoveredId);
   }
 
+  private renderMarqueeBox(camera: Camera, box: { start: Point; current: Point }): void {
+    const minX = Math.min(box.start.x, box.current.x);
+    const minY = Math.min(box.start.y, box.current.y);
+    const width = Math.abs(box.current.x - box.start.x);
+    const height = Math.abs(box.current.y - box.start.y);
+
+    this.ctx.save();
+    this.ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
+    this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.85)';
+    this.ctx.lineWidth = 1.5 / camera.scale;
+    this.ctx.setLineDash([5 / camera.scale, 3 / camera.scale]);
+    this.ctx.fillRect(minX, minY, width, height);
+    this.ctx.strokeRect(minX, minY, width, height);
+    this.ctx.restore();
+  }
+
+  private renderGhostDrag(
+    world: World,
+    camera: Camera,
+    draggedGhost: { id: EntityId; origPos: Point; pos: Point }
+  ): void {
+    const entity = world.getEntity(draggedGhost.id);
+    if (!entity || !entity.transform || !entity.renderable) return;
+
+    const origPos = draggedGhost.origPos;
+    const ghostPos = draggedGhost.pos;
+    const angle = entity.transform.angle;
+
+    // 1. Пунктирная направляющая линия
+    this.ctx.save();
+    this.ctx.beginPath();
+    this.ctx.setLineDash([6 / camera.scale, 4 / camera.scale]);
+    this.ctx.moveTo(origPos.x, origPos.y);
+    this.ctx.lineTo(ghostPos.x, ghostPos.y);
+    this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.75)';
+    this.ctx.lineWidth = 1.5 / camera.scale;
+    this.ctx.stroke();
+    this.ctx.restore();
+
+    // 2. Отрисовка призрака дочерних объектов
+    const attached = world.getEntitiesWith('attachment', 'renderable');
+    for (const [, { attachment, renderable }] of attached) {
+      if (attachment.parentId === draggedGhost.id && renderable.isVisible) {
+        const childX = ghostPos.x + (attachment.offsetX ?? 0);
+        const childY = ghostPos.y + (attachment.offsetY ?? 0);
+        this.ctx.save();
+        this.ctx.globalAlpha = 0.45;
+        this.ctx.translate(childX, childY);
+        this.ctx.rotate(angle);
+        for (const prim of renderable.primitives) {
+          this.drawPrimitive(prim, camera, angle);
+        }
+        this.ctx.restore();
+      }
+    }
+
+    // 3. Отрисовка призрака объекта
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.75;
+    this.ctx.translate(ghostPos.x, ghostPos.y);
+    this.ctx.rotate(angle);
+
+    for (const prim of entity.renderable.primitives) {
+      this.drawPrimitive(prim, camera, angle);
+    }
+
+    const strokeColor = VISUAL_CONFIG.selection.selectedColor;
+    const lineWidth = (VISUAL_CONFIG.selection.lineWidth + 0.5) / camera.scale;
+    this.drawSelectionOutline(entity.renderable.primitives[0], strokeColor, lineWidth);
+
+    this.ctx.restore();
+  }
+
   private renderEntityPrimitives(
     id: EntityId,
     transform: TransformComponent,
     renderable: RenderableComponent,
     camera: Camera,
     selectedId: EntityId | null,
+    selectedIds: Set<EntityId>,
     hoveredId: EntityId | null,
     world: World
   ): void {
@@ -166,12 +295,16 @@ export class Renderer {
     }
 
     // Универсальная подсветка выбора и наведения
-    const isSelected = id === selectedId;
+    const isActiveSelected = id === selectedId;
+    const isGroupSelected = selectedIds.has(id);
     const isHovered = id === hoveredId;
-    if (isSelected || isHovered) {
-      const strokeColor = isSelected
-        ? VISUAL_CONFIG.selection.selectedColor
-        : VISUAL_CONFIG.selection.hoverColor;
+
+    if (isActiveSelected || isGroupSelected || isHovered) {
+      const strokeColor = isActiveSelected
+        ? VISUAL_CONFIG.selection.selectedColor // Зеленый для активного
+        : isGroupSelected
+          ? '#3498db' // Синий для группы
+          : VISUAL_CONFIG.selection.hoverColor;
       const lineWidth = VISUAL_CONFIG.selection.lineWidth / camera.scale;
       this.drawSelectionOutline(renderable.primitives[0], strokeColor, lineWidth);
     }

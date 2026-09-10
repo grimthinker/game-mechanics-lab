@@ -17,6 +17,7 @@ interface UseCanvasInteractionProps {
   syncPlayerControls: () => void;
   updateStats: () => void;
   mode: GameMode;
+  typeFilters: Record<string, boolean>;
 }
 
 export const useCanvasInteraction = ({
@@ -26,17 +27,19 @@ export const useCanvasInteraction = ({
   syncPlayerControls,
   updateStats,
   mode,
+  typeFilters,
 }: UseCanvasInteractionProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const clickedEntityIdRef = useRef<string | null>(null);
+  const isMarqueeActiveRef = useRef<boolean>(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    canvas.style.cursor = placementMode ? 'pointer' : mode === GameMode.GAME ? 'crosshair' : 'grab';
+    canvas.style.cursor = placementMode ? 'pointer' : 'default';
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -51,9 +54,22 @@ export const useCanvasInteraction = ({
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
-    if (e.button === 0 && app) {
+    if (!app) return;
+
+    // Панорамирование камеры на СКМ (колесико мыши)
+    if (e.button === 1) {
+      e.preventDefault();
+      app.startPan(e.clientX, e.clientY);
+      e.currentTarget.style.cursor = 'grabbing';
+      return;
+    }
+
+    // Действия на ЛКМ
+    if (e.button === 0) {
+      const point = app.getCanvasPoint(e.clientX, e.clientY);
+
+      // В режиме игры: подбор предмета через Ctrl+ЛКМ
       if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
-        const point = app.getCanvasPoint(e.clientX, e.clientY);
         const targetEntityId = app.pickNearestEntity(point);
         if (targetEntityId) {
           const itemComp = app.world.getComponent(targetEntityId, 'item');
@@ -77,28 +93,33 @@ export const useCanvasInteraction = ({
         return;
       }
 
-      const point = app.getCanvasPoint(e.clientX, e.clientY);
+      if (placementMode) return;
 
-      if (!placementMode && app.isPaused && mode === GameMode.EDITOR) {
-        const entityId = app.pickEntityAt(point);
-        if (entityId) {
-          clickedEntityIdRef.current = entityId;
-          dragStartPosRef.current = { x: e.clientX, y: e.clientY };
-          e.currentTarget.style.cursor = 'grabbing';
-          return;
-        }
+      const entityId = app.pickEntityAt(point);
+      if (entityId) {
+        clickedEntityIdRef.current = entityId;
+        dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+        return;
       }
 
+      // Клик по пустому месту — начинаем рамку выделения
       clickedEntityIdRef.current = null;
       dragStartPosRef.current = null;
-      app.startPan(e.clientX, e.clientY);
-      e.currentTarget.style.cursor = 'grabbing';
+      isMarqueeActiveRef.current = true;
+      app.startMarquee(point);
     }
   };
 
   const handleMouseMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
     if (!app) return;
+
+    // Панорамирование камеры зажатым СКМ
+    if ((e.buttons & 4) === 4) {
+      app.pan(e.clientX, e.clientY);
+      e.currentTarget.style.cursor = 'grabbing';
+      return;
+    }
 
     if (mode === GameMode.GAME) {
       app.setMouseScreenPos(e.clientX, e.clientY);
@@ -108,26 +129,27 @@ export const useCanvasInteraction = ({
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
-    let isHoveringEntity = false;
-    if (placementMode) {
-      app.hoverEntity(null);
-    } else {
-      const nearestId = app.pickNearestEntity(point);
-      app.hoverEntity(nearestId);
-      isHoveringEntity = nearestId !== null;
+    // Обновление рамки выделения
+    if (isMarqueeActiveRef.current && (e.buttons & 1) === 1) {
+      app.updateMarquee(point);
+      e.currentTarget.style.cursor = 'crosshair';
+      return;
     }
 
+    // Обновление предпросмотра перемещения (Ghost Dragging)
     if (app.isDraggingEntity() && mode === GameMode.EDITOR) {
       app.updateDraggedEntityPosition(point);
       e.currentTarget.style.cursor = 'grabbing';
       return;
     }
 
+    // Инициализация начала драга сущности при смещении мыши > 5px
     if (
       app.isPaused &&
       mode === GameMode.EDITOR &&
       clickedEntityIdRef.current &&
-      dragStartPosRef.current
+      dragStartPosRef.current &&
+      (e.buttons & 1) === 1
     ) {
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
@@ -143,81 +165,83 @@ export const useCanvasInteraction = ({
       }
     }
 
-    app.pan(e.clientX, e.clientY);
+    // Подсветка при наведении
+    let isHoveringEntity = false;
+    if (placementMode) {
+      app.hoverEntity(null);
+    } else {
+      const nearestId = app.pickNearestEntity(point);
+      app.hoverEntity(nearestId);
+      isHoveringEntity = nearestId !== null;
+    }
 
-    if (e.buttons === 1) {
-      e.currentTarget.style.cursor = 'grabbing';
-    } else if (placementMode || isHoveringEntity) {
+    if (placementMode || isHoveringEntity) {
       e.currentTarget.style.cursor = 'pointer';
     } else {
-      e.currentTarget.style.cursor = 'grab';
+      e.currentTarget.style.cursor = 'default';
     }
   };
 
   const handleMouseUp = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const app = appRef.current;
-    if (e.button !== 0 || !app) return;
+    if (!app) return;
 
-    if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
+    if (e.button === 1) {
       app.endPan();
+      e.currentTarget.style.cursor = 'default';
       return;
     }
+
+    if (e.button !== 0) return;
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
+    // Завершение перемещения группы
     if (app.isDraggingEntity() && mode === GameMode.EDITOR) {
       app.endEntityDrag();
-      app.endPan();
       updateStats();
       clickedEntityIdRef.current = null;
       dragStartPosRef.current = null;
-
       const nearestId = app.pickNearestEntity(point);
-      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'grab';
+      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'default';
       return;
     }
 
-    const hadClickedEntity = clickedEntityIdRef.current;
-    clickedEntityIdRef.current = null;
-    dragStartPosRef.current = null;
+    // Завершение рамки выделения
+    if (isMarqueeActiveRef.current) {
+      isMarqueeActiveRef.current = false;
+      app.endMarquee(typeFilters);
+      updateStats();
+      e.currentTarget.style.cursor = 'default';
+      return;
+    }
 
+    // Спавн сущности
     if (placementMode && mode === GameMode.EDITOR) {
-      const wasDragging = app.endPan();
-      if (!wasDragging) {
-        if (placementMode.kind === 'entity') {
-          app.spawnEntity(placementMode.config, point);
-        }
-        setPlacementMode(null);
-        syncPlayerControls();
-        updateStats();
+      if (placementMode.kind === 'entity') {
+        app.spawnEntity(placementMode.config, point);
       }
-
-      const nearestId = app.pickNearestEntity(point);
-      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'grab';
+      setPlacementMode(null);
+      syncPlayerControls();
+      updateStats();
       return;
     }
 
-    if (hadClickedEntity && mode === GameMode.EDITOR && app.isPaused) {
+    // Одиночный клик по сущности — сбрасываем группу и выбираем только её
+    if (clickedEntityIdRef.current) {
       const entityId = app.pickEntityAt(point);
-      app.selectEntity(entityId);
+      app.selectEntity(entityId, true);
+      clickedEntityIdRef.current = null;
+      dragStartPosRef.current = null;
       syncPlayerControls();
       updateStats();
-
-      const nearestId = app.pickNearestEntity(point);
-      e.currentTarget.style.cursor = nearestId ? 'pointer' : 'grab';
       return;
     }
 
-    const wasDragging = app.endPan();
-    if (!wasDragging) {
-      const targetEntityId = app.pickNearestEntity(point);
-      app.selectEntity(targetEntityId);
-      syncPlayerControls();
-      updateStats();
-    }
-
-    const nearestId = app.pickNearestEntity(point);
-    e.currentTarget.style.cursor = placementMode || nearestId ? 'pointer' : 'grab';
+    // Одиночный клик по пустому месту — сбрасываем всё выделение
+    app.selectEntity(null, true);
+    syncPlayerControls();
+    updateStats();
   };
 
   const handleMouseLeave = () => {
@@ -227,18 +251,15 @@ export const useCanvasInteraction = ({
       if (app.isDraggingEntity()) {
         app.cancelEntityDrag();
       }
+      if (isMarqueeActiveRef.current) {
+        app.marqueeBox = null;
+        isMarqueeActiveRef.current = false;
+      }
       app.endPan();
       app.hoverEntity(null);
     }
     clickedEntityIdRef.current = null;
     dragStartPosRef.current = null;
-    if (canvasRef.current) {
-      canvasRef.current.style.cursor = placementMode
-        ? 'pointer'
-        : mode === GameMode.GAME
-          ? 'crosshair'
-          : 'grab';
-    }
   };
 
   return {

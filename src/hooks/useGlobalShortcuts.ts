@@ -63,7 +63,18 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
       }
 
       // Быстрые клавиши интерфейса
-      if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
+      if (
+        e.code === 'Delete' ||
+        e.key === 'Delete' ||
+        e.code === 'Backspace' ||
+        e.key === 'Backspace'
+      ) {
+        if (mode === GameMode.EDITOR) {
+          e.preventDefault();
+          handleSpawnConfirm(); // fallback
+          if (modals.handleDeleteEntity) modals.handleDeleteEntity();
+        }
+      } else if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
         if (mode !== GameMode.GAME) {
           setShowBTPanel((prev: boolean) => !prev);
         }

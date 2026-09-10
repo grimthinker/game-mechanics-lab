@@ -1,30 +1,38 @@
 import React from 'react';
 import { BTNodeDTO } from '../ai/core';
 import { BTGraph } from './BTGraph';
+import { useResizable } from '../hooks/useResizable';
 
 interface BTPanelProps {
   btPanelWidth: number;
-  blackboardHeight: number;
   btData: BTNodeDTO | null;
   btBlackboard: Record<string, any> | null;
   onClose: () => void;
-  onResizeBTStart: () => void;
-  onResizeBBStart: () => void;
+  onResizeBTStart: (e: React.MouseEvent) => void;
   isResizingBT: boolean;
-  isResizingBB: boolean;
 }
 
 export const BTPanel: React.FC<BTPanelProps> = ({
   btPanelWidth,
-  blackboardHeight,
   btData,
   btBlackboard,
   onClose,
   onResizeBTStart,
-  onResizeBBStart,
   isResizingBT,
-  isResizingBB,
 }) => {
+  // Унифицированный ресайз высоты окна памяти Blackboard
+  const {
+    size: blackboardHeight,
+    isResizing: isResizingBB,
+    startResizing: startResizingBB,
+  } = useResizable({
+    storageKey: 'blackboardHeight',
+    initialSize: 280,
+    minSize: 120,
+    maxSize: () => Math.max(120, window.innerHeight - 180),
+    direction: 'vertical-inverted',
+  });
+
   return (
     <div
       style={{
@@ -81,7 +89,7 @@ export const BTPanel: React.FC<BTPanelProps> = ({
       </div>
 
       <div
-        onMouseDown={onResizeBBStart}
+        onMouseDown={startResizingBB}
         style={{
           height: '6px',
           backgroundColor: isResizingBB ? '#2196f3' : '#2a2a2a',

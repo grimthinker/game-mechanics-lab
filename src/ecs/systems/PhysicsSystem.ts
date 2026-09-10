@@ -77,6 +77,36 @@ export class PhysicsSystem {
     return candidates;
   }
 
+  /**
+   * Пространственный запрос тел внутри прямоугольной рамки за O(log N).
+   */
+  public queryEntitiesInBox(minX: number, minY: number, maxX: number, maxY: number): EntityId[] {
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
+    const boxPoly = new Polygon({ x: minX, y: minY }, [
+      { x: 0, y: 0 },
+      { x: width, y: 0 },
+      { x: width, y: height },
+      { x: 0, y: height },
+    ]);
+    this.system.insert(boxPoly);
+
+    const hitIds: EntityId[] = [];
+    const seen = new Set<EntityId>();
+
+    this.system.checkOne(boxPoly, (response) => {
+      const other = response.b === boxPoly ? response.a : response.b;
+      const id = this.bodyToEntityMap.get(other);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        hitIds.push(id);
+      }
+    });
+
+    this.system.remove(boxPoly);
+    return hitIds;
+  }
+
   public registerBody(entityId: EntityId, body: Body): void {
     this.bodyToEntityMap.set(body, entityId);
     this.system.insert(body);

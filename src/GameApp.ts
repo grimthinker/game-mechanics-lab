@@ -45,8 +45,26 @@ export class GameApp {
   private serializer: WorldSerializer;
 
   public selectedEntityId: string | null = null;
+  public selectedEntityIds: Set<string> = new Set();
   public hoveredEntityId: string | null = null;
   private _cachedSelectedEntity: EntityAdapter | null = null;
+
+  // Рамка выделения
+  public marqueeBox: { start: Point; current: Point } | null = null;
+
+  // Массовое перемещение (Ghost Dragging)
+  public draggedEntities: Map<string, Point> = new Map();
+  public draggedAnchorId: string | null = null;
+  public draggedAnchorOriginalPos: Point | null = null;
+  public draggedAnchorCurrentPos: Point | null = null;
+  private dragOffset: Point = { x: 0, y: 0 };
+
+  public get draggedEntityId(): string | null {
+    return this.draggedAnchorId;
+  }
+  public get draggedCurrentPos(): Point | null {
+    return this.draggedAnchorCurrentPos;
+  }
 
   public get selectedEntity(): EntityAdapter | null {
     if (!this.selectedEntityId) return null;
@@ -131,11 +149,25 @@ export class GameApp {
   }
 
   public deleteSelectedEntity(): void {
-    if (!this.selectedEntityId) return;
-    const id = this.selectedEntityId;
-    this.deleteEntityRecursive(id);
-    if (this.hoveredEntityId === id) this.hoveredEntityId = null;
-    this.selectEntity(null);
+    this.deleteSelectedEntities();
+  }
+
+  public deleteSelectedEntities(): void {
+    const ids = Array.from(
+      this.selectedEntityIds.size > 0
+        ? this.selectedEntityIds
+        : this.selectedEntityId
+          ? [this.selectedEntityId]
+          : []
+    );
+
+    for (const id of ids) {
+      this.deleteEntityRecursive(id);
+      if (this.hoveredEntityId === id) this.hoveredEntityId = null;
+    }
+
+    this.selectedEntityIds.clear();
+    this.selectEntity(null, true);
   }
 
   private deleteEntityRecursive(id: string): void {
@@ -430,23 +462,108 @@ export class GameApp {
 
     this.renderSyncSystem.update(dt, this.world, this.gameMode);
 
+    // Подготовка данных призраков для всех перемещаемых объектов группы
+    let draggedGhosts: Array<{ id: string; origPos: Point; pos: Point }> | null = null;
+    if (this.draggedAnchorId && this.draggedAnchorCurrentPos && this.draggedAnchorOriginalPos) {
+      const dx = this.draggedAnchorCurrentPos.x - this.draggedAnchorOriginalPos.x;
+      const dy = this.draggedAnchorCurrentPos.y - this.draggedAnchorOriginalPos.y;
+      draggedGhosts = Array.from(this.draggedEntities.entries()).map(([id, origPos]) => ({
+        id,
+        origPos,
+        pos: { x: origPos.x + dx, y: origPos.y + dy },
+      }));
+    }
+
     this.renderer.render(
       this.camera,
       this.world,
       this.physics,
       this.selectedEntityId,
+      this.selectedEntityIds,
       this.gameMode,
-      this.hoveredEntityId
+      this.hoveredEntityId,
+      draggedGhosts,
+      this.marqueeBox
     );
     if (this.onFrame) this.onFrame();
 
     requestAnimationFrame((t) => this.loop(t));
   }
 
-  public selectEntity(id: string | null): void {
+  public selectEntity(id: string | null, clearGroup: boolean = false): void {
+    if (clearGroup) {
+      this.selectedEntityIds.clear();
+      if (id) this.selectedEntityIds.add(id);
+    } else if (id && !this.selectedEntityIds.has(id)) {
+      this.selectedEntityIds.add(id);
+    }
+
     if (this.selectedEntityId === id) return;
     this.selectedEntityId = id;
     this._cachedSelectedEntity = id ? new EntityAdapter(id, this.world) : null;
+  }
+
+  public selectEntities(ids: string[]): void {
+    this.selectedEntityIds = new Set(ids);
+    this.selectEntity(ids.length > 0 ? ids[0] : null, false);
+  }
+
+  public deselectEntity(id: string): void {
+    this.selectedEntityIds.delete(id);
+    if (this.selectedEntityId === id) {
+      const next = this.selectedEntityIds.values().next().value ?? null;
+      this.selectEntity(next, false);
+    }
+  }
+
+  public startMarquee(startPoint: Point): void {
+    this.marqueeBox = { start: startPoint, current: startPoint };
+  }
+
+  public updateMarquee(currentPoint: Point): void {
+    if (this.marqueeBox) {
+      this.marqueeBox.current = currentPoint;
+    }
+  }
+
+  public endMarquee(typeFilters: Record<string, boolean>): string[] {
+    if (!this.marqueeBox) return [];
+    const start = this.marqueeBox.start;
+    const current = this.marqueeBox.current;
+    this.marqueeBox = null;
+
+    const minX = Math.min(start.x, current.x);
+    const maxX = Math.max(start.x, current.x);
+    const minY = Math.min(start.y, current.y);
+    const maxY = Math.max(start.y, current.y);
+
+    // Если клик без растягивания (< 5px) — клик по пустому месту сбрасывает выбор
+    if (Math.hypot(maxX - minX, maxY - minY) < 5) {
+      this.selectEntity(null, true);
+      return [];
+    }
+
+    const rawIds = this.physics.queryEntitiesInBox(minX, minY, maxX, maxY);
+    const filteredIds: string[] = [];
+
+    for (const id of rawIds) {
+      const renderable = this.world.getComponent(id, 'renderable');
+      if (renderable && !renderable.isVisible) continue;
+
+      const tag = this.world.getComponent(id, 'tag');
+      const meta = this.world.getComponent(id, 'meta');
+      const archetype = tag?.archetype ?? meta?.entityType ?? 'creature';
+
+      if (typeFilters && typeFilters[archetype] === false) {
+        continue;
+      }
+
+      filteredIds.push(id);
+    }
+
+    this.selectedEntityIds = new Set(filteredIds);
+    this.selectEntity(filteredIds.length > 0 ? filteredIds[0] : null, false);
+    return filteredIds;
   }
 
   public hoverEntity(id: string | null): void {
@@ -558,73 +675,81 @@ export class GameApp {
     return this.camera.getCanvasPoint(clientX, clientY, this.canvas);
   }
 
-  private draggedEntityId: string | null = null;
-  private draggedEntityOriginalPos: Point | null = null;
-  private dragOffset: Point = { x: 0, y: 0 };
-
   public startDraggingEntity(id: string, clickWorldPoint: Point): boolean {
     if (!this.isPaused) return false;
-    const transform = this.world.getComponent(id, 'transform');
-    if (!transform) return false;
+    const anchorTransform = this.world.getComponent(id, 'transform');
+    if (!anchorTransform) return false;
 
-    this.draggedEntityId = id;
-    this.draggedEntityOriginalPos = { x: transform.x, y: transform.y };
+    // Если перетаскиваемый объект входит в группу, перемещаем всю группу
+    if (!this.selectedEntityIds.has(id)) {
+      this.selectEntity(id, true);
+    }
+
+    this.draggedEntities.clear();
+    for (const entId of this.selectedEntityIds) {
+      const t = this.world.getComponent(entId, 'transform');
+      if (t) {
+        this.draggedEntities.set(entId, { x: t.x, y: t.y });
+      }
+    }
+
+    this.draggedAnchorId = id;
+    this.draggedAnchorOriginalPos = { x: anchorTransform.x, y: anchorTransform.y };
     this.dragOffset = {
-      x: transform.x - clickWorldPoint.x,
-      y: transform.y - clickWorldPoint.y,
+      x: anchorTransform.x - clickWorldPoint.x,
+      y: anchorTransform.y - clickWorldPoint.y,
     };
+    this.draggedAnchorCurrentPos = { x: anchorTransform.x, y: anchorTransform.y };
     return true;
   }
 
   public updateDraggedEntityPosition(worldPoint: Point): void {
-    if (!this.draggedEntityId) return;
-    const id = this.draggedEntityId;
-
-    const transform = this.world.getComponent(id, 'transform');
-    const phys = this.world.getComponent(id, 'physicsBody');
-
-    const newX = worldPoint.x + this.dragOffset.x;
-    const newY = worldPoint.y + this.dragOffset.y;
-
-    // Изменяем источник правды (Transform), физика синхронизирует тело автоматически в начале следующего тика или здесь через PhysicsSystem
-    if (transform) {
-      transform.x = newX;
-      transform.y = newY;
-    }
-    if (phys && phys.body) {
-      phys.body.setPosition(newX, newY);
-      this.physics.system.updateBody(phys.body);
-    }
-    this.attachmentSystem.update(this.world, this.physics);
+    if (!this.draggedAnchorId) return;
+    this.draggedAnchorCurrentPos = {
+      x: worldPoint.x + this.dragOffset.x,
+      y: worldPoint.y + this.dragOffset.y,
+    };
   }
 
   public cancelEntityDrag(): void {
-    if (!this.draggedEntityId || !this.draggedEntityOriginalPos) {
-      this.draggedEntityId = null;
-      this.draggedEntityOriginalPos = null;
-      return;
-    }
-    const id = this.draggedEntityId;
-    const transform = this.world.getComponent(id, 'transform');
-    const phys = this.world.getComponent(id, 'physicsBody');
-    if (transform) {
-      transform.x = this.draggedEntityOriginalPos.x;
-      transform.y = this.draggedEntityOriginalPos.y;
-    }
-    if (phys && phys.body) {
-      phys.body.setPosition(this.draggedEntityOriginalPos.x, this.draggedEntityOriginalPos.y);
-    }
-    this.attachmentSystem.update(this.world, this.physics);
-    this.draggedEntityId = null;
-    this.draggedEntityOriginalPos = null;
+    this.draggedEntities.clear();
+    this.draggedAnchorId = null;
+    this.draggedAnchorOriginalPos = null;
+    this.draggedAnchorCurrentPos = null;
   }
 
   public endEntityDrag(): void {
-    this.draggedEntityId = null;
-    this.draggedEntityOriginalPos = null;
+    if (!this.draggedAnchorId || !this.draggedAnchorCurrentPos || !this.draggedAnchorOriginalPos) {
+      this.cancelEntityDrag();
+      return;
+    }
+
+    const dx = this.draggedAnchorCurrentPos.x - this.draggedAnchorOriginalPos.x;
+    const dy = this.draggedAnchorCurrentPos.y - this.draggedAnchorOriginalPos.y;
+
+    // Фиксируем новые позиции для всех объектов группы (включая препятствия)
+    for (const [entId, origPos] of this.draggedEntities.entries()) {
+      const newX = origPos.x + dx;
+      const newY = origPos.y + dy;
+
+      const transform = this.world.getComponent(entId, 'transform');
+      const phys = this.world.getComponent(entId, 'physicsBody');
+
+      if (transform) {
+        transform.x = newX;
+        transform.y = newY;
+      }
+      if (phys && phys.body) {
+        phys.body.setPosition(newX, newY);
+        this.physics.system.updateBody(phys.body);
+      }
+    }
+
+    this.attachmentSystem.update(this.world, this.physics);
+    this.cancelEntityDrag();
   }
 
   public isDraggingEntity(): boolean {
-    return this.draggedEntityId !== null;
+    return this.draggedAnchorId !== null;
   }
 }

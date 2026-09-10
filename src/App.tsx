@@ -19,6 +19,7 @@ import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
+import { SelectionBottomPanel } from './components/SelectionBottomPanel';
 import { PlacementMode } from './types';
 import { GameMode } from './constants';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -40,6 +41,14 @@ export const App: React.FC = () => {
 
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
+  const [typeFilters, setTypeFilters] = useState<Record<string, boolean>>({
+    creature: true,
+    item: true,
+    obstacle: true,
+    zone: true,
+    marker: true,
+  });
   const [, setFrameTick] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
@@ -47,16 +56,8 @@ export const App: React.FC = () => {
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
 
-  const {
-    showBTPanel,
-    setShowBTPanel,
-    btPanelWidth,
-    isResizingBT,
-    setIsResizingBT,
-    blackboardHeight,
-    isResizingBB,
-    setIsResizingBB,
-  } = useBTPanelState();
+  const { showBTPanel, setShowBTPanel, btPanelWidth, isResizingBT, startResizingBT } =
+    useBTPanelState();
 
   const showBTPanelRef = useRef(showBTPanel);
   const lastBTUpdateRef = useRef<number>(0);
@@ -100,6 +101,7 @@ export const App: React.FC = () => {
       lastSelectedEntityIdRef.current = targetId;
       setSelectedEntityId(targetId);
     }
+    setSelectedEntityIds(Array.from(app.selectedEntityIds));
 
     const now = performance.now();
     const shouldUpdateUI = isEntityChanged || app.isPaused || now - lastUIUpdateRef.current >= 100;
@@ -147,6 +149,7 @@ export const App: React.FC = () => {
       syncPlayerControls,
       updateStats,
       mode,
+      typeFilters,
     });
 
   const createNewWorld = useCallback(() => {
@@ -356,7 +359,7 @@ export const App: React.FC = () => {
   const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
-    app.deleteSelectedEntity();
+    app.deleteSelectedEntities();
     syncPlayerControls();
     updateStats();
   }, [syncPlayerControls, updateStats]);
@@ -365,7 +368,7 @@ export const App: React.FC = () => {
     mode,
     isPaused,
     togglePause,
-    modals,
+    modals: { ...modals, handleDeleteEntity },
     handleSpawnConfirm,
     setShowBTPanel,
   });
@@ -374,7 +377,7 @@ export const App: React.FC = () => {
 
   return (
     <div id="app">
-      <div id="canvas-container">
+      <div id="canvas-container" style={{ position: 'relative', overflow: 'hidden' }}>
         <canvas
           id="game-canvas"
           ref={canvasRef}
@@ -382,6 +385,32 @@ export const App: React.FC = () => {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
+          onContextMenu={(e) => e.preventDefault()}
+        />
+        <SelectionBottomPanel
+          selectedEntityIds={selectedEntityIds}
+          selectedEntityId={selectedEntityId}
+          world={appRef.current?.world}
+          typeFilters={typeFilters}
+          leftOffset={showBTPanel ? btPanelWidth : 0}
+          isResizingBT={isResizingBT}
+          onToggleFilter={(type) =>
+            setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
+          }
+          onSelectEntity={(id) => {
+            appRef.current?.selectEntity(id, false);
+            updateStats();
+          }}
+          onDeselectEntity={(id) => {
+            appRef.current?.deselectEntity(id);
+            updateStats();
+          }}
+          onClearSelection={() => {
+            appRef.current?.selectEntity(null, true);
+            updateStats();
+          }}
+          onDeleteSelected={handleDeleteEntity}
+          onInspectEntity={(id) => modals.openEditModal(id)}
         />
         {placementMode && (
           <div
@@ -415,14 +444,11 @@ export const App: React.FC = () => {
       {showBTPanel && (
         <BTPanel
           btPanelWidth={btPanelWidth}
-          blackboardHeight={blackboardHeight}
           btData={btData}
           btBlackboard={btBlackboard}
           onClose={() => setShowBTPanel(false)}
-          onResizeBTStart={() => setIsResizingBT(true)}
-          onResizeBBStart={() => setIsResizingBB(true)}
+          onResizeBTStart={startResizingBT}
           isResizingBT={isResizingBT}
-          isResizingBB={isResizingBB}
         />
       )}
 
