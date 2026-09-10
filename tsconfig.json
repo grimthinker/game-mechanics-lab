@@ -23,5 +23,5 @@
     // "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
   },
-  "include": ["src", "bundle.ts"]
+  "include": ["src", "bundle.ts", "config/physicsConfig.ts", "config/balanceConfig.ts", "config/gameplayConfig.ts", "config/visualConfig.ts"]
 }

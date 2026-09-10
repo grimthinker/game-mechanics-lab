@@ -8,7 +8,8 @@ import {
   ModifierType,
 } from '../types';
 import { addModifier, removeModifier } from '../stats/StatEvaluator';
-import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
+import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
+import { LOGIC_CONFIG } from '../../ai/config';
 
 export class MovementSystem {
   public update(dt: number, world: World): void {
@@ -101,15 +102,21 @@ export class MovementSystem {
       if (input.targetLookAngle !== undefined) {
         let diff = input.targetLookAngle - transform.angle;
         diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-        const maxTurnStep = movementStats.maxTurnSpeed.current * dt;
 
-        if (Math.abs(diff) <= maxTurnStep) {
+        // Если разница в пределах допуска (мертвая зона / tolerance), фиксируем угол и обнуляем угловую скорость во избежание микро-дрожания
+        if (Math.abs(diff) <= LOGIC_CONFIG.angleDiffTolerance) {
           transform.angle = input.targetLookAngle;
-          velocity.currentTurnSpeed = (diff / dt) as Radians;
+          velocity.currentTurnSpeed = 0 as Radians;
         } else {
-          const sign = Math.sign(diff) as -1 | 1;
-          transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
-          velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
+          const maxTurnStep = movementStats.maxTurnSpeed.current * dt;
+          if (Math.abs(diff) <= maxTurnStep) {
+            transform.angle = input.targetLookAngle;
+            velocity.currentTurnSpeed = (diff / dt) as Radians;
+          } else {
+            const sign = Math.sign(diff) as -1 | 1;
+            transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
+            velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
+          }
         }
       } else {
         const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;

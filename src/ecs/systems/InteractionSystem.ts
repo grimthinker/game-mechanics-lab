@@ -2,7 +2,7 @@ import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, EntityId, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
 import { Circle } from 'detect-collisions';
-import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
+import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
 import { Radians } from '../../utils';
 
 export class InteractionSystem {

@@ -1,43 +1,44 @@
-import { EntityConfig, StandardRadius } from './ecs/types';
-import { deg2Rad } from './utils';
+import { EntityConfig } from './ecs/types';
+import { BALANCE_CONFIG } from '../config/balanceConfig';
 
 export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): EntityConfig {
+  const cfg = BALANCE_CONFIG.creature;
   return {
     physics: {
-      radius: 16 as StandardRadius,
-      weight: 10,
+      radius: cfg.radius,
+      weight: cfg.weight,
       isSolid: true,
     },
     health: {
-      hp: 100,
-      maxHp: 100,
+      hp: cfg.hp,
+      maxHp: cfg.maxHp,
     },
     armorStats: {
       defense: 0,
       flatReduction: 0,
     },
     movement: {
-      maxSpeed: 150,
-      maxTurnSpeed: deg2Rad(270),
-      runSpeedMultiplier: 1.5,
-      crouchSpeedMultiplier: 0.5,
-      walkSpeedMultiplier: 0.5,
-      runTurnMultiplier: 0.8,
-      crouchTurnMultiplier: 0.8,
-      strafeSpeedMultiplier: 0.8,
-      backwardSpeedMultiplier: 0.6,
-      strafeTurnMultiplier: 0.8,
-      backwardTurnMultiplier: 0.6,
-      pickupSpeedMultiplier: 0.5,
-      pickupTurnMultiplier: 1.1,
+      maxSpeed: cfg.maxSpeed,
+      maxTurnSpeed: cfg.maxTurnSpeed,
+      runSpeedMultiplier: cfg.runSpeedMultiplier,
+      crouchSpeedMultiplier: cfg.crouchSpeedMultiplier,
+      walkSpeedMultiplier: cfg.walkSpeedMultiplier,
+      runTurnMultiplier: cfg.runTurnMultiplier,
+      crouchTurnMultiplier: cfg.crouchTurnMultiplier,
+      strafeSpeedMultiplier: cfg.strafeSpeedMultiplier,
+      backwardSpeedMultiplier: cfg.backwardSpeedMultiplier,
+      strafeTurnMultiplier: cfg.strafeTurnMultiplier,
+      backwardTurnMultiplier: cfg.backwardTurnMultiplier,
+      pickupSpeedMultiplier: cfg.pickupSpeedMultiplier,
+      pickupTurnMultiplier: cfg.pickupTurnMultiplier,
     },
     stealth: {
-      stealthPower: 10,
-      runStealthMultiplier: 0.5,
-      crouchStealthMultiplier: 1.5,
-      walkStealthMultiplier: 1.3,
-      turnInPlaceStealthMultiplier: 1.5,
-      immobileStealthMultiplier: 2.0,
+      stealthPower: cfg.stealthPower,
+      runStealthMultiplier: cfg.runStealthMultiplier,
+      crouchStealthMultiplier: cfg.crouchStealthMultiplier,
+      walkStealthMultiplier: cfg.walkStealthMultiplier,
+      turnInPlaceStealthMultiplier: cfg.turnInPlaceStealthMultiplier,
+      immobileStealthMultiplier: cfg.immobileStealthMultiplier,
     },
     ai: {
       behavior,

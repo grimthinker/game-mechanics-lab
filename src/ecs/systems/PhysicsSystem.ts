@@ -8,14 +8,7 @@ import {
   COLLISION_MASK_NONE,
 } from '../types';
 import { Point } from '../../types';
-
-const PHYSICS_CONFIG = {
-  A: 10,
-  C: 0.5,
-  B: 0.01,
-  d_min: 0.001,
-  R_mult: Math.sin(Math.PI / 4),
-};
+import { PHYSICS_CONFIG } from '../../../config/physicsConfig';
 
 export class PhysicsSystem {
   public system: System;

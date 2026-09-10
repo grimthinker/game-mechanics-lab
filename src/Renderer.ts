@@ -9,7 +9,7 @@ import {
   RenderPrimitive,
   TransformComponent,
 } from './ecs/types';
-import { VISUAL_CONFIG } from './visualConfig';
+import { VISUAL_CONFIG } from '../config/visualConfig';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
