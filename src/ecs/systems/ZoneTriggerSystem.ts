@@ -1,3 +1,4 @@
+import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory } from '../types';
@@ -55,7 +56,9 @@ export class ZoneTriggerSystem {
           const velocity = world.getComponent(targetId, 'velocity');
           if (!targetTransform || !velocity) return;
 
-          const targetRadius = targetPhysStats?.radius.current ?? targetPhys.body.r ?? 16;
+          const targetRadius =
+            targetPhysStats?.radius.current ??
+            (targetPhys.body instanceof Circle ? targetPhys.body.r : 16);
           const effectiveRadius = zoneTrigger.radius + targetRadius;
 
           const dx = targetTransform.x - zoneTransform.x;

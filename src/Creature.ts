@@ -12,6 +12,10 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       hp: 100,
       maxHp: 100,
     },
+    armorStats: {
+      defense: 0,
+      flatReduction: 0,
+    },
     movement: {
       maxSpeed: 150,
       maxTurnSpeed: deg2Rad(270),

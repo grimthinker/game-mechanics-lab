@@ -62,6 +62,27 @@ export class RenderSyncSystem {
         continue;
       }
 
+      // 2.3 Синхронизация препятствий
+      if (archetype === 'obstacle') {
+        const health = world.getComponent(id, 'health');
+        const isAlive = health ? health.isAlive : true;
+        const prim = renderable.primitives[0];
+        if (prim && prim.kind === 'polygon') {
+          if (!isAlive) {
+            renderable.zIndex = RENDER_Z_INDEX.ZONES;
+            prim.fill = 'rgba(80, 80, 80, 0.25)';
+            prim.stroke = 'rgba(120, 120, 120, 0.4)';
+            prim.dash = [4, 4];
+          } else {
+            renderable.zIndex = RENDER_Z_INDEX.OBSTACLES;
+            prim.fill = '#555555';
+            prim.stroke = '#777777';
+            prim.dash = undefined;
+          }
+        }
+        continue;
+      }
+
       // 2.5 Синхронизация предметов
       if (archetype === 'item') {
         const physStats = world.getComponent(id, 'physicsStats');

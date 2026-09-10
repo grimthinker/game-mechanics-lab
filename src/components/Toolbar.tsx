@@ -11,10 +11,8 @@ interface ToolbarProps {
   goToGame: () => void;
   obstaclesEnabled: boolean;
   setObstaclesEnabled: (val: boolean) => void;
-  setObstaclesData: (data: any[]) => void;
   selectedEntityId: string | null;
   world: World | null | undefined;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
   worldFileInputRef: React.RefObject<HTMLInputElement | null>;
   onNewWorld: () => void;
   onSaveWorld: () => void;
@@ -22,6 +20,7 @@ interface ToolbarProps {
   openSpawnModal: (behavior?: string) => void;
   openItemSpawnModal: () => void;
   openZoneSpawnModal: () => void;
+  openObstacleSpawnModal: () => void;
   openEditModal: (entityId?: string) => void;
   openSlotModal: (creatureId: string, slotId: string) => void;
   openAreaModal: (creatureId: string, areaId: string) => void;
@@ -36,10 +35,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   goToGame,
   obstaclesEnabled,
   setObstaclesEnabled,
-  setObstaclesData,
   selectedEntityId,
   world,
-  fileInputRef,
   worldFileInputRef,
   onNewWorld,
   onSaveWorld,
@@ -47,6 +44,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   openSpawnModal,
   openItemSpawnModal,
   openZoneSpawnModal,
+  openObstacleSpawnModal,
   openEditModal,
   openSlotModal,
   openAreaModal,
@@ -245,6 +243,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             >
               Добавить Зону
             </button>
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%' }}
+              onClick={openObstacleSpawnModal}
+            >
+              Добавить Препятствие
+            </button>
           </div>
         </div>
       )}
@@ -259,35 +264,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onChange={(e) => setObstaclesEnabled(e.target.checked)}
           />
         </label>
-        {mode === GameMode.EDITOR && (
-          <>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              accept=".json"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (evt) => {
-                  try {
-                    const data = JSON.parse(evt.target?.result as string);
-                    if (Array.isArray(data)) {
-                      setObstaclesData(data);
-                    }
-                  } catch {
-                    alert('Ошибка при чтении JSON файла!');
-                  }
-                };
-                reader.readAsText(file);
-              }}
-            />
-            <button className="btn" onClick={() => fileInputRef.current?.click()}>
-              Загрузить JSON препятствий
-            </button>
-          </>
-        )}
       </div>
 
       <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>

@@ -71,6 +71,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   const [draftWeapon, setDraftWeapon] = useState<WeaponFormValues | null>(null);
   const [draftArmor, setDraftArmor] = useState<any | null>(null);
   const [draftBag, setDraftBag] = useState<any | null>(null);
+  const [draftDestructible, setDraftDestructible] = useState<boolean>(false);
 
   const zoneParamsMapRef = useRef<Record<HitZoneType, ZoneTypeParams>>({
     angle: { ...DEFAULT_ZONE_PARAMS.angle },
@@ -85,11 +86,14 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     const meta = world.getComponent(entityId, 'meta');
     const item = world.getComponent(entityId, 'item');
     setDraftName(meta?.name ?? item?.name ?? entityId);
+    setDraftDestructible(meta?.destructible ?? false);
 
     const physStats = world.getComponent(entityId, 'physicsStats');
     const physBody = world.getComponent(entityId, 'physicsBody');
     setDraftPhysics({
-      radius: physStats?.radius.base ?? physBody?.body.r ?? 16,
+      radius:
+        physStats?.radius.base ??
+        (physBody && 'r' in physBody.body ? (physBody.body as any).r : 16),
       weight: physStats?.weight.base ?? 10,
       isSolid: physStats?.isSolid ?? (physBody ? physBody.mask !== 0 : true),
     });
@@ -224,6 +228,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
   if (!isOpen || !entityId || !world) return null;
 
+  const currentArchetype = world.getComponent(entityId, 'tag')?.archetype;
+  const currentItem = world.getComponent(entityId, 'item');
+
   const handleZoneTypeChange = (newType: HitZoneType) => {
     if (!draftWeapon) return;
     zoneParamsMapRef.current[draftWeapon.hitZoneType] = {
@@ -255,7 +262,12 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
 
     // 1. Мета
     const meta = world.getComponent(entityId, 'meta');
-    if (meta) meta.name = draftName;
+    if (meta) {
+      meta.name = draftName;
+      if (archetype === 'obstacle') {
+        meta.destructible = draftDestructible;
+      }
+    }
     const item = world.getComponent(entityId, 'item');
     if (item) {
       item.name = draftName;
@@ -297,7 +309,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       physStats.isSolid = draftPhysics.isSolid;
 
       if (physBody) {
-        physBody.body.r = finalRadius;
+        if ('r' in physBody.body) {
+          (physBody.body as any).r = finalRadius;
+        }
         physBody.mask = draftPhysics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
       }
     }
@@ -313,9 +327,9 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           killEntity(world, entityId);
         } else {
           health.isAlive = true;
-          const meta = world.getComponent(entityId, 'meta');
-          if (meta && meta.movementMode === 'dead') {
-            meta.movementMode = 'immobile';
+          const metaComp = world.getComponent(entityId, 'meta');
+          if (metaComp && metaComp.movementMode === 'dead') {
+            metaComp.movementMode = 'immobile';
           }
         }
       }
@@ -385,8 +399,8 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
       if (physStats) {
         setBaseStat(physStats.radius, draftZone.radius);
       }
-      if (physBody) {
-        physBody.body.r = draftZone.radius;
+      if (physBody && 'r' in physBody.body) {
+        (physBody.body as any).r = draftZone.radius;
       }
     }
 
@@ -468,7 +482,6 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   const inv = world.getComponent(entityId, 'inventory');
   const isBagEmpty = !inv || inv.slots.every((r) => r.every((c) => !c.itemId));
 
-  const currentArchetype = world.getComponent(entityId, 'tag')?.archetype;
   const showPhysicsInspector = currentArchetype === 'creature' || currentArchetype === 'item';
   const isStandardRadiusOnly = currentArchetype === 'creature';
 
@@ -485,6 +498,26 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
         <p className="modal-subtitle">ID: {entityId}</p>
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           <MetaInspector name={draftName} onChange={setDraftName} isReadOnly={isReadOnly} />
+
+          {currentArchetype === 'obstacle' && (
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: isReadOnly ? 'default' : 'pointer',
+                margin: '8px 0',
+              }}
+            >
+              <input
+                type="checkbox"
+                disabled={isReadOnly}
+                checked={draftDestructible}
+                onChange={(e) => setDraftDestructible(e.target.checked)}
+              />
+              Разрушаемое препятствие
+            </label>
+          )}
 
           {showPhysicsInspector && (
             <PhysicsInspector
@@ -554,13 +587,59 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
             </div>
           )}
 
-          {draftArmor && (
+          {draftArmor && currentItem && (
             <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #333' }}>
               <ArmorFormFields
                 values={draftArmor}
                 onChange={(patch) => setDraftArmor((prev: any) => ({ ...prev, ...patch }))}
                 isReadOnly={isReadOnly}
               />
+            </div>
+          )}
+
+          {draftArmor && currentArchetype === 'creature' && (
+            <div
+              style={{
+                marginTop: '8px',
+                paddingTop: '8px',
+                borderTop: '1px solid #333',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <h4 style={{ margin: '4px 0', fontSize: '13px', color: '#bdc3c7' }}>
+                Собственная броня существа
+              </h4>
+              <label>
+                Защита (defense):
+                <input
+                  disabled={isReadOnly}
+                  type="number"
+                  value={draftArmor.defense ?? 0}
+                  min={0}
+                  max={100}
+                  onChange={(e) =>
+                    setDraftArmor((prev: any) => ({ ...prev, defense: Number(e.target.value) }))
+                  }
+                />
+              </label>
+              <label>
+                Поглощение урона (flat reduction):
+                <input
+                  disabled={isReadOnly}
+                  type="number"
+                  value={draftArmor.flatReduction ?? 0}
+                  min={0}
+                  max={100}
+                  onChange={(e) =>
+                    setDraftArmor((prev: any) => ({
+                      ...prev,
+                      flatReduction: Number(e.target.value),
+                    }))
+                  }
+                />
+              </label>
             </div>
           )}
 

@@ -1,4 +1,4 @@
-import { Circle } from 'detect-collisions';
+import { Body, Circle, Polygon } from 'detect-collisions';
 import { Point } from '../types';
 import { BehaviorStatsConfig, BTLogicComponent } from '../ai/core';
 import { Radians } from '../utils';
@@ -35,14 +35,15 @@ export const COLLISION_MASK_ALL =
 export const COLLISION_MASK_NONE = 0;
 
 export interface PhysicsBodyComponent {
-  body: Circle;
+  body: Body;
   isStatic: boolean;
   category: number;
   mask: number;
   isTrigger?: boolean;
 }
 
-export type EntityArchetype = 'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'particles';
+export type EntityArchetype =
+  'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'particles' | 'obstacle';
 
 export interface TagComponent {
   archetype: EntityArchetype;
@@ -158,9 +159,9 @@ export interface AttachmentComponent {
 
 export interface GizmoComponent {
   type: 'spawner' | 'waypoint' | 'trigger' | 'sound' | 'marker';
-  color?: string; // Цвет отрисовки в редакторе (например, '#e67e22')
-  icon?: string; // Иконка (например, '🚩', '🔊', '⚙️', '📍')
-  radius?: number; // Радиус кликабельной зоны в редакторе (по умолчанию, например, 14px)
+  color?: string;
+  icon?: string;
+  radius?: number;
 }
 
 export const enum ModifierType {
@@ -212,6 +213,7 @@ export interface HealthComponent {
   isAlive: boolean;
   hitFlashTimer: number;
   healFlashTimer?: number;
+  healthBarTimer?: number;
 }
 
 export type ItemType = 'weapon' | 'armor' | 'bag';
@@ -290,6 +292,7 @@ export interface InteractionActionComponent {
   elapsedInReach?: number;
   wantsCancel?: boolean;
 }
+
 export interface ActiveAttackComponent {
   attacks: ActiveAttack[];
 }
@@ -307,6 +310,7 @@ export interface CreatureMetaComponent {
   movementMode?: CreatureMovementMode;
   directionMode?: CreatureDirectionMode;
   entityType?: string;
+  destructible?: boolean;
 }
 
 export type ItemComponent = ItemData;
@@ -385,12 +389,14 @@ export interface PhysicsConfig {
   radius: number;
   weight: number;
   isSolid?: boolean;
+  points?: Point[];
 }
 
 export interface PhysicsStatsComponent {
   radius: StatValue<number>;
   weight: StatValue<number>;
   isSolid: boolean;
+  points?: Point[];
 }
 
 export type HitZoneConfig = {
@@ -528,6 +534,7 @@ export interface EntityConfig {
   equip?: EquipmentComponent;
   meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
+  transform?: TransformComponent;
   weaponStats?: Partial<WeaponCombatConfig>;
   weaponZone?: HitZoneConfig;
   armorStats?: Partial<ArmorCombatConfig>;

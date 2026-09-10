@@ -16,6 +16,11 @@ export class DamageSystem {
         if (health.healFlashTimer < 0) health.healFlashTimer = 0;
       }
 
+      if (health.healthBarTimer && health.healthBarTimer > 0) {
+        health.healthBarTimer -= dt;
+        if (health.healthBarTimer < 0) health.healthBarTimer = 0;
+      }
+
       // Страховочная синхронизация на случай внешних модификаций
       if (health.current <= 0 && health.isAlive) {
         killEntity(world, id);

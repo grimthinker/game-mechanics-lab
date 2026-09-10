@@ -123,11 +123,17 @@ export class AttackSystem {
         rawDamage *= critMultiplier;
       }
 
-      // Учет брони цели из слота экипировки
-      const targetEquip = world.getComponent(targetId, 'equip');
+      // Учет брони цели: собственные характеристики существа + надетая экипировка
       let defense = 0;
       let flatReduction = 0;
 
+      const selfArmor = world.getComponent(targetId, 'armorStats');
+      if (selfArmor) {
+        defense += selfArmor.defense.current;
+        flatReduction += selfArmor.flatReduction.current;
+      }
+
+      const targetEquip = world.getComponent(targetId, 'equip');
       if (targetEquip) {
         for (const area of targetEquip.equipmentAreas) {
           for (const itemId of area.itemIds) {

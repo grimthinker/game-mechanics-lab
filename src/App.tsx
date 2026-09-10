@@ -4,13 +4,14 @@ import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
 import { BTLogicComponent, BTNodeDTO } from './ai/core';
-import { deg2Rad, rad2Deg } from './utils';
+import { deg2Rad } from './utils';
 import { serializeBTNode } from './ai/serializer';
 import {
   SpawnModal,
   UniversalEditModal,
   ItemSpawnModal,
   ZoneSpawnModal,
+  ObstacleSpawnModal,
   InteractionSlotModal,
   EquipmentAreaModal,
 } from './components/modals';
@@ -24,7 +25,6 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
@@ -130,7 +130,11 @@ export const App: React.FC = () => {
 
   const { syncPlayerControls } = useKeyboardControls({
     isModalOpen:
-      modals.isModalOpen || modals.isItemSpawnModalOpen || modals.isZoneSpawnModalOpen || isPaused,
+      modals.isModalOpen ||
+      modals.isItemSpawnModalOpen ||
+      modals.isZoneSpawnModalOpen ||
+      modals.isObstacleSpawnModalOpen ||
+      isPaused,
     isEditModalOpen: modals.isAnyEditModalOpen,
     mode,
   });
@@ -259,6 +263,10 @@ export const App: React.FC = () => {
       config: {
         physics: { radius: modals.radius, weight: modals.weight, isSolid: modals.isSolid },
         health: { hp: 100, maxHp: 100 },
+        armorStats: {
+          defense: modals.defense,
+          flatReduction: modals.flatReduction,
+        },
         movement: {
           maxSpeed: modals.maxSpeed,
           maxTurnSpeed: deg2Rad(modals.maxTurnSpeed),
@@ -327,6 +335,17 @@ export const App: React.FC = () => {
         config,
       });
       modals.closeZoneSpawnModal();
+    },
+    [modals]
+  );
+
+  const handleObstacleSpawnConfirm = useCallback(
+    (config: EntityConfig) => {
+      setPlacementMode({
+        kind: 'entity',
+        config,
+      });
+      modals.closeObstacleSpawnModal();
     },
     [modals]
   );
@@ -414,10 +433,8 @@ export const App: React.FC = () => {
           setObstaclesEnabled(val);
           appRef.current?.physics.setObstaclesEnabled(val);
         }}
-        setObstaclesData={(data) => appRef.current?.loadObstaclesFromData(data)}
         selectedEntityId={selectedEntityId}
         world={appRef.current?.world}
-        fileInputRef={fileInputRef}
         worldFileInputRef={worldFileInputRef}
         onNewWorld={createNewWorld}
         onSaveWorld={() => {
@@ -453,6 +470,7 @@ export const App: React.FC = () => {
         openSpawnModal={modals.openSpawnModal}
         openItemSpawnModal={modals.openItemSpawnModal}
         openZoneSpawnModal={modals.openZoneSpawnModal}
+        openObstacleSpawnModal={modals.openObstacleSpawnModal}
         openEditModal={modals.openEditModal}
         openSlotModal={modals.openSlotModal}
         openAreaModal={modals.openAreaModal}
@@ -464,6 +482,12 @@ export const App: React.FC = () => {
         isOpen={modals.isZoneSpawnModalOpen}
         onClose={modals.closeZoneSpawnModal}
         onConfirm={handleZoneSpawnConfirm}
+      />
+
+      <ObstacleSpawnModal
+        isOpen={modals.isObstacleSpawnModalOpen}
+        onClose={modals.closeObstacleSpawnModal}
+        onConfirm={handleObstacleSpawnConfirm}
       />
 
       <SpawnModal
@@ -510,6 +534,10 @@ export const App: React.FC = () => {
         setTurnInPlaceStealthMultiplier={modals.setTurnInPlaceStealthMultiplier}
         immobileStealthMultiplier={modals.immobileStealthMultiplier}
         setImmobileStealthMultiplier={modals.setImmobileStealthMultiplier}
+        defense={modals.defense}
+        setDefense={modals.setDefense}
+        flatReduction={modals.flatReduction}
+        setFlatReduction={modals.setFlatReduction}
         onClose={modals.closeSpawnModal}
         onConfirm={handleSpawnConfirm}
       />

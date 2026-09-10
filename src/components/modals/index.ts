@@ -5,3 +5,4 @@ export * from './ItemSpawnModal';
 export * from './ZoneSpawnModal';
 export * from './InteractionSlotModal';
 export * from './EquipmentAreaModal';
+export * from './ObstacleSpawnModal';

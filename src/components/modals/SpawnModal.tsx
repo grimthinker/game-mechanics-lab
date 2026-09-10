@@ -46,6 +46,10 @@ export interface SpawnModalProps {
   setTurnInPlaceStealthMultiplier: (val: number) => void;
   immobileStealthMultiplier: number;
   setImmobileStealthMultiplier: (val: number) => void;
+  defense: number;
+  setDefense: (val: number) => void;
+  flatReduction: number;
+  setFlatReduction: (val: number) => void;
   onClose: () => void;
   onConfirm: () => void;
 }
@@ -94,6 +98,10 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setTurnInPlaceStealthMultiplier,
   immobileStealthMultiplier,
   setImmobileStealthMultiplier,
+  defense,
+  setDefense,
+  flatReduction,
+  setFlatReduction,
   onClose,
   onConfirm,
 }) => {
@@ -165,6 +173,28 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
               min={1}
               max={100}
               onChange={(e) => setWeight(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Собственная защита (Defense):
+            <input
+              type="number"
+              value={defense}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(e) => setDefense(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Собственное поглощение (Flat Reduction):
+            <input
+              type="number"
+              value={flatReduction}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(e) => setFlatReduction(Number(e.target.value))}
             />
           </label>
           <label>

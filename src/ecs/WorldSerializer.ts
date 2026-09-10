@@ -6,7 +6,7 @@ import {
   COLLISION_MASK_NONE,
   SERIALIZABLE_COMPONENT_KEYS,
 } from './types';
-import { Circle } from 'detect-collisions';
+import { Circle, Polygon } from 'detect-collisions';
 import { deg2Rad, Radians } from '../utils';
 import { evaluateStat } from './stats/StatEvaluator';
 
@@ -38,7 +38,6 @@ export class WorldSerializer {
     }
 
     return {
-      obstacles: this.app.physics.getObstacleLines() || [],
       entities: entitiesData,
     };
   }
@@ -46,10 +45,6 @@ export class WorldSerializer {
   public deserializeWorld(data: any): void {
     if (!data) return;
     this.app.clearWorld();
-
-    if (Array.isArray(data.obstacles)) {
-      this.app.physics.loadObstacles(data.obstacles);
-    }
 
     if (Array.isArray(data.entities)) {
       // Сбор идентификаторов предметов, находящихся во владении (экипировка / инвентарь)
@@ -171,37 +166,67 @@ export class WorldSerializer {
 
         // 3. Реставрация физического тела для объектов с физикой
         if (comps.physicsStats && comps.transform && !isPossessedItem) {
-          // Гарантированное определение архетипа, даже если компонент tag поврежден или отсутствует
           const archetype =
-            comps.tag?.archetype ?? (comps.zoneTrigger ? 'zone' : comps.item ? 'item' : 'creature');
+            comps.tag?.archetype ??
+            (comps.zoneTrigger
+              ? 'zone'
+              : comps.item
+                ? 'item'
+                : comps.physicsStats.points
+                  ? 'obstacle'
+                  : 'creature');
 
           if (archetype !== 'marker') {
-            const radius = comps.physicsStats.radius.current;
-            const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
+            if (archetype === 'obstacle') {
+              const points = comps.physicsStats.points ?? [
+                { x: -50, y: -20 },
+                { x: 50, y: -20 },
+                { x: 50, y: 20 },
+                { x: -50, y: 20 },
+              ];
+              const body = new Polygon({ x: comps.transform.x, y: comps.transform.y }, points);
+              body.setAngle(comps.transform.angle ?? 0);
+              body.isStatic = true;
+              const category = CollisionCategory.OBSTACLE;
+              const isAlive = comps.health ? comps.health.isAlive : true;
+              const isSolid = comps.physicsStats.isSolid && isAlive;
+              const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
-            let isStatic = false;
-            let isTrigger = false;
-            let category = CollisionCategory.CREATURE;
-            let mask = comps.physicsStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+              this.app.world.addComponent(ent.id, 'physicsBody', {
+                body,
+                isStatic: true,
+                category,
+                mask,
+              });
+              this.app.physics.registerBody(ent.id, body);
+            } else {
+              const radius = comps.physicsStats.radius.current;
+              const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
 
-            if (archetype === 'item') {
-              category = CollisionCategory.ITEM;
-            } else if (archetype === 'zone') {
-              category = CollisionCategory.TRIGGER_ZONE;
-              mask = CollisionCategory.CREATURE;
-              isTrigger = true;
-              isStatic = false;
+              let isStatic = false;
+              let isTrigger = false;
+              let category = CollisionCategory.CREATURE;
+              let mask = comps.physicsStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+
+              if (archetype === 'item') {
+                category = CollisionCategory.ITEM;
+              } else if (archetype === 'zone') {
+                category = CollisionCategory.TRIGGER_ZONE;
+                mask = CollisionCategory.CREATURE;
+                isTrigger = true;
+                isStatic = false;
+              }
+
+              body.isStatic = isStatic;
+              this.app.world.addComponent(ent.id, 'physicsBody', {
+                body,
+                isStatic,
+                category,
+                mask,
+                isTrigger,
+              });
+              this.app.physics.registerBody(ent.id, body);
             }
-
-            body.isStatic = isStatic;
-            this.app.world.addComponent(ent.id, 'physicsBody', {
-              body,
-              isStatic,
-              category,
-              mask,
-              isTrigger,
-            });
-            this.app.physics.registerBody(ent.id, body);
           }
         }
 

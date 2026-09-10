@@ -36,6 +36,8 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const [walkStealthMultiplier, setWalkStealthMultiplier] = useState<number>(1.3);
   const [turnInPlaceStealthMultiplier, setTurnInPlaceStealthMultiplier] = useState<number>(1.5);
   const [immobileStealthMultiplier, setImmobileStealthMultiplier] = useState<number>(2.0);
+  const [defense, setDefense] = useState<number>(0);
+  const [flatReduction, setFlatReduction] = useState<number>(0);
 
   const openSpawnModal = useCallback((behavior?: string) => {
     if (behavior) setPendingSpawnBehavior(behavior);
@@ -52,6 +54,11 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const [isZoneSpawnModalOpen, setIsZoneSpawnModalOpen] = useState(false);
   const openZoneSpawnModal = useCallback(() => setIsZoneSpawnModalOpen(true), []);
   const closeZoneSpawnModal = useCallback(() => setIsZoneSpawnModalOpen(false), []);
+
+  // Спавн препятствий
+  const [isObstacleSpawnModalOpen, setIsObstacleSpawnModalOpen] = useState(false);
+  const openObstacleSpawnModal = useCallback(() => setIsObstacleSpawnModalOpen(true), []);
+  const closeObstacleSpawnModal = useCallback(() => setIsObstacleSpawnModalOpen(false), []);
 
   const [modalStack, setModalStack] = useState<ModalFrame[]>([]);
 
@@ -144,6 +151,10 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       setTurnInPlaceStealthMultiplier,
       immobileStealthMultiplier,
       setImmobileStealthMultiplier,
+      defense,
+      setDefense,
+      flatReduction,
+      setFlatReduction,
       openSpawnModal,
       closeSpawnModal,
       isItemSpawnModalOpen,
@@ -152,6 +163,9 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       isZoneSpawnModalOpen,
       openZoneSpawnModal,
       closeZoneSpawnModal,
+      isObstacleSpawnModalOpen,
+      openObstacleSpawnModal,
+      closeObstacleSpawnModal,
       isEditModalOpen,
       editingEntityId,
       isSlotModalOpen,
@@ -188,6 +202,8 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       walkStealthMultiplier,
       turnInPlaceStealthMultiplier,
       immobileStealthMultiplier,
+      defense,
+      flatReduction,
       openSpawnModal,
       closeSpawnModal,
       isItemSpawnModalOpen,
@@ -196,6 +212,9 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       isZoneSpawnModalOpen,
       openZoneSpawnModal,
       closeZoneSpawnModal,
+      isObstacleSpawnModalOpen,
+      openObstacleSpawnModal,
+      closeObstacleSpawnModal,
       isEditModalOpen,
       editingEntityId,
       isSlotModalOpen,

@@ -12,7 +12,7 @@ import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
 import { Renderer } from './Renderer';
-import { ObstacleSegment, Point } from './types';
+import { Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
@@ -176,7 +176,6 @@ export class GameApp {
       }
       this.world.removeEntity(id);
     }
-    this.physics.loadObstacles([]);
     this.aiSystem.clear();
     this.selectEntity(null);
     this.hoverEntity(null);
@@ -205,6 +204,27 @@ export class GameApp {
         x: spawnPos.x + 180,
         y: spawnPos.y - 180,
       }
+    );
+
+    // Начальное разрушаемое препятствие по умолчанию
+    this.spawnEntity(
+      {
+        tag: { archetype: 'obstacle' },
+        meta: { name: 'Каменная стена', entityType: 'obstacle', destructible: true },
+        health: { hp: 100, maxHp: 100 },
+        physics: {
+          radius: 65,
+          weight: 1000,
+          isSolid: true,
+          points: [
+            { x: -60, y: -25 },
+            { x: 60, y: -25 },
+            { x: 60, y: 25 },
+            { x: -60, y: 25 },
+          ],
+        },
+      },
+      { x: spawnPos.x, y: spawnPos.y + 160 }
     );
   }
 
@@ -295,7 +315,9 @@ export class GameApp {
       if (renderable && !renderable.isVisible) continue;
       if (!isEditor && !physicsBody && !physStats) continue;
 
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+      const bodyRadius =
+        physicsBody && 'r' in physicsBody.body ? (physicsBody.body as any).r : undefined;
+      const radius = physStats?.radius.current ?? bodyRadius ?? gizmo?.radius ?? 14;
       const dist = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       if (dist <= radius) {
         hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
@@ -357,7 +379,9 @@ export class GameApp {
       if (renderable && !renderable.isVisible) continue;
       if (!isEditor && !physicsBody && !physStats) continue;
 
-      const radius = physStats?.radius.current ?? physicsBody?.body.r ?? gizmo?.radius ?? 14;
+      const bodyRadius =
+        physicsBody && 'r' in physicsBody.body ? (physicsBody.body as any).r : undefined;
+      const radius = physStats?.radius.current ?? bodyRadius ?? gizmo?.radius ?? 14;
       const distToCenter = Math.hypot(transform.x - worldPoint.x, transform.y - worldPoint.y);
       const distToBoundary = Math.max(0, distToCenter - radius);
 
@@ -392,9 +416,6 @@ export class GameApp {
   }
   public getCanvasPoint(clientX: number, clientY: number): Point {
     return this.camera.getCanvasPoint(clientX, clientY, this.canvas);
-  }
-  public loadObstaclesFromData(segments: ObstacleSegment[]): void {
-    this.physics.loadObstacles(segments);
   }
 
   private draggedEntityId: string | null = null;

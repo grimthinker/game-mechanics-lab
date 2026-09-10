@@ -58,6 +58,18 @@ export function killEntity(world: World, id: EntityId): void {
     meta.movementMode = 'dead';
     meta.directionMode = 'immobile';
   }
+
+  const tag = world.getComponent(id, 'tag');
+  if (tag?.archetype === 'obstacle') {
+    const phys = world.getComponent(id, 'physicsBody');
+    if (phys) {
+      phys.mask = 0;
+    }
+    const physStats = world.getComponent(id, 'physicsStats');
+    if (physStats) {
+      physStats.isSolid = false;
+    }
+  }
 }
 
 /**
@@ -72,12 +84,19 @@ export function applyDamage(
   const health = world.getComponent(id, 'health');
   if (!health || !health.isAlive) return;
 
+  const tag = world.getComponent(id, 'tag');
+  const meta = world.getComponent(id, 'meta');
+  if (tag?.archetype === 'obstacle' && meta?.destructible === false) {
+    return;
+  }
+
   const nextHp = Math.max(0, health.current - amount);
   health.current = Math.round(nextHp * 100) / 100;
 
   if (triggerFlash) {
     health.hitFlashTimer = 0.2;
   }
+  health.healthBarTimer = 1.0;
 
   if (health.current <= 0) {
     killEntity(world, id);

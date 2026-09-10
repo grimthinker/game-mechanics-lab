@@ -60,6 +60,14 @@ export function assembleCreature(
     isAlive: hp > 0,
     hitFlashTimer: 0,
     healFlashTimer: 0,
+    healthBarTimer: 0,
+  });
+
+  // 4.5. Собственная броня существа
+  const armorConfig = config.armorStats ?? {};
+  world.addComponent(id, 'armorStats', {
+    defense: createStat(armorConfig.defense ?? 0),
+    flatReduction: createStat(armorConfig.flatReduction ?? 0),
   });
 
   // 5. Передвижение

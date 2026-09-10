@@ -1,3 +1,4 @@
+import { Circle } from 'detect-collisions';
 import { World } from './ecs/World';
 import { Camera } from './Camera';
 import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
@@ -21,9 +22,9 @@ export class Renderer {
   public render(
     camera: Camera,
     world: World,
-    physics: PhysicsSystem,
+    _physics: PhysicsSystem,
     selectedId: EntityId | null,
-    _gameMode: string = 'editor',
+    gameMode: string = 'editor',
     hoveredId: EntityId | null = null
   ): void {
     this.ctx.save();
@@ -33,8 +34,7 @@ export class Renderer {
     this.ctx.scale(camera.scale, camera.scale);
 
     this.renderGrid(camera);
-    this.renderObstacles(camera, physics);
-    this.renderEntities(world, camera, selectedId, hoveredId);
+    this.renderEntities(world, camera, selectedId, hoveredId, gameMode);
 
     this.ctx.restore();
   }
@@ -66,22 +66,12 @@ export class Renderer {
     this.ctx.stroke();
   }
 
-  private renderObstacles(camera: Camera, physics: PhysicsSystem): void {
-    this.ctx.strokeStyle = '#555';
-    this.ctx.lineWidth = 3 / camera.scale;
-    this.ctx.beginPath();
-    for (const line of physics.getObstacleLines()) {
-      this.ctx.moveTo(line.start.x, line.start.y);
-      this.ctx.lineTo(line.end.x, line.end.y);
-    }
-    this.ctx.stroke();
-  }
-
   private renderEntities(
     world: World,
     camera: Camera,
     selectedId: EntityId | null,
-    hoveredId: EntityId | null
+    hoveredId: EntityId | null,
+    gameMode: string = 'editor'
   ): void {
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
@@ -95,7 +85,6 @@ export class Renderer {
 
       // Отрисовка зон удара оружия перед живыми существами (zIndex >= 40)
       if (!attacksRendered && renderable.zIndex >= 40) {
-        this.renderInteractionRange(world, camera, selectedId);
         this.renderWeaponAttacks(
           world.getEntitiesWith('transform', 'activeAttacks'),
           world,
@@ -108,12 +97,11 @@ export class Renderer {
     }
 
     if (!attacksRendered) {
-      this.renderInteractionRange(world, camera, selectedId);
       this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
     }
 
     // Отрисовка Healthbars и ID-текстов
-    this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera);
+    this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera, gameMode);
 
     // Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
@@ -140,7 +128,8 @@ export class Renderer {
     const health = world.getComponent(id, 'health');
     const physStats = world.getComponent(id, 'physicsStats');
     const physBody = world.getComponent(id, 'physicsBody');
-    const radius = physStats?.radius.current ?? physBody?.body.r ?? 16;
+    const radius =
+      physStats?.radius.current ?? (physBody?.body instanceof Circle ? physBody.body.r : 16);
 
     if (health?.hitFlashTimer && health.hitFlashTimer > 0) {
       const progress = Math.min(1, Math.max(0, (0.2 - health.hitFlashTimer) / 0.2));
@@ -316,48 +305,17 @@ export class Renderer {
         firstPrim.width,
         firstPrim.height
       );
-    }
-  }
-
-  // --- Вспомогательные методы рендеринга боевых зон и оверлеев ---
-
-  private renderInteractionRange(world: World, camera: Camera, selectedId: EntityId | null): void {
-    if (!selectedId) return;
-
-    const health = world.getComponent(selectedId, 'health');
-    if (health && !health.isAlive) return;
-
-    const equip = world.getComponent(selectedId, 'equip');
-    const transform = world.getComponent(selectedId, 'transform');
-    if (!equip || !transform) return;
-
-    let maxInteractDist = -1;
-    for (const slot of equip.interactionSlots) {
-      if (slot.itemId === null) {
-        if (slot.interactDist > maxInteractDist) {
-          maxInteractDist = slot.interactDist;
+    } else if (firstPrim.kind === 'polygon') {
+      if (firstPrim.points.length > 0) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(firstPrim.points[0].x, firstPrim.points[0].y);
+        for (let i = 1; i < firstPrim.points.length; i++) {
+          this.ctx.lineTo(firstPrim.points[i].x, firstPrim.points[i].y);
         }
+        this.ctx.closePath();
+        this.ctx.stroke();
       }
     }
-
-    if (maxInteractDist < 0) return;
-
-    const physStats = world.getComponent(selectedId, 'physicsStats');
-    const physBody = world.getComponent(selectedId, 'physicsBody');
-    const radius = physStats?.radius.current ?? physBody?.body.r ?? 16;
-    const totalRadius = radius + maxInteractDist;
-
-    this.ctx.save();
-    this.ctx.translate(transform.x, transform.y);
-    this.ctx.beginPath();
-    this.ctx.setLineDash([6 / camera.scale, 6 / camera.scale]);
-    this.ctx.arc(0, 0, totalRadius, 0, Math.PI * 2);
-    this.ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
-    this.ctx.fill();
-    this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.6)';
-    this.ctx.lineWidth = 1.5 / camera.scale;
-    this.ctx.stroke();
-    this.ctx.restore();
   }
 
   private isEntityAlive(world: World, id: EntityId): boolean {
@@ -456,25 +414,48 @@ export class Renderer {
     }
   }
 
-  private renderUIOverlays(entities: Array<[EntityId, any]>, world: World, camera: Camera): void {
+  private renderUIOverlays(
+    entities: Array<[EntityId, any]>,
+    world: World,
+    camera: Camera,
+    gameMode: string
+  ): void {
     // Healthbars & ID texts
     for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) continue;
 
       const transform = entity.transform;
       const meta = entity.meta;
+      const tag = world.getComponent(id, 'tag');
+      const isObstacle = tag?.archetype === 'obstacle';
+
+      if (isObstacle) {
+        if (!meta?.destructible) continue;
+        if (gameMode === 'game') {
+          if (!entity.health?.healthBarTimer || entity.health.healthBarTimer <= 0) {
+            continue;
+          }
+        }
+      }
+
+      let overlayAlpha = 1;
+      if (isObstacle && gameMode === 'game' && entity.health?.healthBarTimer) {
+        overlayAlpha = Math.min(1, Math.max(0, entity.health.healthBarTimer / 0.3));
+      }
+
       const health = world.getComponent(id, 'health');
       const hp = health?.current ?? 0;
       const maxHp = health?.max.current ?? 100;
 
       const physStats = world.getComponent(id, 'physicsStats');
       const phys = world.getComponent(id, 'physicsBody');
-      const radius = physStats?.radius.current ?? phys?.body.r ?? 16;
+      const radius = physStats?.radius.current ?? (phys?.body instanceof Circle ? phys.body.r : 16);
 
       // Healthbar
       this.ctx.save();
+      this.ctx.globalAlpha = overlayAlpha;
       this.ctx.translate(transform.x, transform.y);
-      const barW = radius * 2;
+      const barW = Math.max(24, radius * 1.5);
       const barH = 4 / camera.scale;
       const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
       this.ctx.fillStyle = '#c0392b';
@@ -483,8 +464,9 @@ export class Renderer {
       this.ctx.fillRect(-barW / 2, -radius - 16 / camera.scale, barW * hpRatio, barH);
       this.ctx.restore();
 
-      // ID Text
+      // ID / Name Text
       this.ctx.save();
+      this.ctx.globalAlpha = overlayAlpha;
       this.ctx.translate(transform.x, transform.y);
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
@@ -503,7 +485,10 @@ export class Renderer {
     if (hoverComp && hoverComp.transform && hoverComp.item) {
       this.ctx.save();
       this.ctx.translate(hoverComp.transform.x, hoverComp.transform.y);
-      const radius = hoverComp.physicsBody ? hoverComp.physicsBody.body.r : 16;
+      const radius =
+        hoverComp.physicsBody && hoverComp.physicsBody.body instanceof Circle
+          ? hoverComp.physicsBody.body.r
+          : 16;
 
       this.ctx.fillStyle = '#ffffff';
       this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
