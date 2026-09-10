@@ -67,7 +67,13 @@ export class RenderSyncSystem {
         const health = world.getComponent(id, 'health');
         const isAlive = health ? health.isAlive : true;
         const prim = renderable.primitives[0];
+        const physStats = world.getComponent(id, 'physicsStats');
+
         if (prim && prim.kind === 'polygon') {
+          if (physStats && physStats.points) {
+            prim.points = JSON.parse(JSON.stringify(physStats.points));
+          }
+
           if (!isAlive) {
             renderable.zIndex = RENDER_Z_INDEX.ZONES;
             prim.fill = 'rgba(80, 80, 80, 0.25)';
@@ -184,10 +190,6 @@ export class RenderSyncSystem {
               case 'sprinting':
                 arrowPrim.fill = '#2ecc71';
                 arrowPrim.stroke = '#27ae60';
-                break;
-              case 'attacking':
-                arrowPrim.fill = '#e67e22';
-                arrowPrim.stroke = '#d35400';
                 break;
               default:
                 arrowPrim.fill = '#7f8c8d';

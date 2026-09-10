@@ -13,6 +13,8 @@ export interface MovementInspectorValues {
   backwardSpeedMultiplier: number;
   strafeTurnMultiplier: number;
   backwardTurnMultiplier: number;
+  pickupSpeedMultiplier: number;
+  pickupTurnMultiplier: number;
 }
 
 export interface MovementInspectorProps {
@@ -174,6 +176,34 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
         step={0.05}
         onChange={(e) =>
           onChange({ backwardTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скорости при подборе предмета:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.pickupSpeedMultiplier}
+        min={0.1}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ pickupSpeedMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель поворота при подборе предмета:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.pickupTurnMultiplier}
+        min={0.1}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ pickupTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
         }
       />
     </label>

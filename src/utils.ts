@@ -1,7 +1,7 @@
 import { Point } from './types';
 
-export type Radians = number & { readonly __brand: 'radians' };
-export type Degrees = number & { readonly __brand: 'degrees' };
+export type Radians = number;
+export type Degrees = number;
 
 export function deg2Rad(deg: number): Radians {
   return ((deg * Math.PI) / 180) as Radians;

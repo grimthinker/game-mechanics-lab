@@ -9,6 +9,7 @@ import {
   RenderPrimitive,
   TransformComponent,
 } from './ecs/types';
+import { VISUAL_CONFIG } from './visualConfig';
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -41,7 +42,7 @@ export class Renderer {
 
   private renderGrid(camera: Camera): void {
     const { scale, offsetX, offsetY } = camera;
-    const gridSize = 64;
+    const gridSize = VISUAL_CONFIG.grid.size;
     const left = -offsetX / scale;
     const top = -offsetY / scale;
     const right = (this.canvas.width - offsetX) / scale;
@@ -52,8 +53,8 @@ export class Renderer {
     const startY = Math.floor(top / gridSize) * gridSize;
     const endY = Math.ceil(bottom / gridSize) * gridSize;
 
-    this.ctx.strokeStyle = '#222';
-    this.ctx.lineWidth = 1 / scale;
+    this.ctx.strokeStyle = VISUAL_CONFIG.grid.color;
+    this.ctx.lineWidth = VISUAL_CONFIG.grid.lineWidth / scale;
     this.ctx.beginPath();
     for (let x = startX; x <= endX; x += gridSize) {
       this.ctx.moveTo(x, top);
@@ -100,6 +101,9 @@ export class Renderer {
       this.renderWeaponAttacks(world.getEntitiesWith('transform', 'activeAttacks'), world, camera);
     }
 
+    // Отрисовка эффектов взаимодействия (линия подбора, точка и радиус ячейки) поверх всех игровых сущностей
+    this.renderPickupInteractions(world, camera);
+
     // Отрисовка Healthbars и ID-текстов
     this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera, gameMode);
 
@@ -132,26 +136,32 @@ export class Renderer {
       physStats?.radius.current ?? (physBody?.body instanceof Circle ? physBody.body.r : 16);
 
     if (health?.hitFlashTimer && health.hitFlashTimer > 0) {
-      const progress = Math.min(1, Math.max(0, (0.2 - health.hitFlashTimer) / 0.2));
-      const ringRadius = radius + 2 / camera.scale + (progress * 6) / camera.scale;
+      const duration = VISUAL_CONFIG.flashes.duration;
+      const progress = Math.min(1, Math.max(0, (duration - health.hitFlashTimer) / duration));
+      const ringRadius =
+        radius + 2 / camera.scale + (progress * VISUAL_CONFIG.flashes.maxOffset) / camera.scale;
       const alpha = Math.max(0.1, 1 - progress * 0.7);
 
       this.ctx.beginPath();
       this.ctx.setLineDash([]);
       this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-      this.ctx.strokeStyle = `rgba(231, 76, 60, ${alpha})`;
-      this.ctx.lineWidth = Math.max(1, 2.5 - progress * 1.5) / camera.scale;
+      this.ctx.strokeStyle = `rgba(${VISUAL_CONFIG.flashes.hitRgb}, ${alpha})`;
+      this.ctx.lineWidth =
+        Math.max(1, VISUAL_CONFIG.flashes.baseWidth - progress * 1.5) / camera.scale;
       this.ctx.stroke();
     } else if (health?.healFlashTimer && health.healFlashTimer > 0) {
-      const progress = Math.min(1, Math.max(0, (0.2 - health.healFlashTimer) / 0.2));
-      const ringRadius = radius + 2 / camera.scale + (progress * 6) / camera.scale;
+      const duration = VISUAL_CONFIG.flashes.duration;
+      const progress = Math.min(1, Math.max(0, (duration - health.healFlashTimer) / duration));
+      const ringRadius =
+        radius + 2 / camera.scale + (progress * VISUAL_CONFIG.flashes.maxOffset) / camera.scale;
       const alpha = Math.max(0.1, 1 - progress * 0.7);
 
       this.ctx.beginPath();
       this.ctx.setLineDash([]);
       this.ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-      this.ctx.strokeStyle = `rgba(46, 204, 113, ${alpha})`;
-      this.ctx.lineWidth = Math.max(1, 2.5 - progress * 1.5) / camera.scale;
+      this.ctx.strokeStyle = `rgba(${VISUAL_CONFIG.flashes.healRgb}, ${alpha})`;
+      this.ctx.lineWidth =
+        Math.max(1, VISUAL_CONFIG.flashes.baseWidth - progress * 1.5) / camera.scale;
       this.ctx.stroke();
     }
 
@@ -159,8 +169,10 @@ export class Renderer {
     const isSelected = id === selectedId;
     const isHovered = id === hoveredId;
     if (isSelected || isHovered) {
-      const strokeColor = isSelected ? '#f1c40f' : 'rgba(241, 196, 15, 0.4)';
-      const lineWidth = 3 / camera.scale;
+      const strokeColor = isSelected
+        ? VISUAL_CONFIG.selection.selectedColor
+        : VISUAL_CONFIG.selection.hoverColor;
+      const lineWidth = VISUAL_CONFIG.selection.lineWidth / camera.scale;
       this.drawSelectionOutline(renderable.primitives[0], strokeColor, lineWidth);
     }
 
@@ -346,15 +358,15 @@ export class Renderer {
         this.ctx.translate(transform.x, transform.y);
         this.ctx.rotate(transform.angle);
 
-        let zoneAlpha = 0.15;
-        let zoneColor = '#f1c40f';
+        let zoneAlpha = VISUAL_CONFIG.weaponAttacks.defaultAlpha;
+        let zoneColor = VISUAL_CONFIG.weaponAttacks.defaultColor;
 
         if (hitFlashTimer > 0) {
-          zoneColor = '#e74c3c';
-          zoneAlpha = 0.9;
+          zoneColor = VISUAL_CONFIG.weaponAttacks.hitColor;
+          zoneAlpha = VISUAL_CONFIG.weaponAttacks.hitAlpha;
         } else if (activeAtk.phase === 'prep') {
-          zoneColor = '#f39c12';
-          zoneAlpha = 0.5;
+          zoneColor = VISUAL_CONFIG.weaponAttacks.prepColor;
+          zoneAlpha = VISUAL_CONFIG.weaponAttacks.prepAlpha;
         } else if (activeAtk.phase === 'recovery') {
           zoneAlpha = 0;
         }
@@ -363,7 +375,7 @@ export class Renderer {
           this.ctx.fillStyle = zoneColor;
           this.ctx.strokeStyle = zoneColor;
           this.ctx.globalAlpha = zoneAlpha;
-          this.ctx.lineWidth = 2 / camera.scale;
+          this.ctx.lineWidth = VISUAL_CONFIG.weaponAttacks.lineWidth / camera.scale;
 
           switch (zone.hitZoneType) {
             case 'radius': {
@@ -455,25 +467,38 @@ export class Renderer {
       this.ctx.save();
       this.ctx.globalAlpha = overlayAlpha;
       this.ctx.translate(transform.x, transform.y);
-      const barW = Math.max(24, radius * 1.5);
-      const barH = 4 / camera.scale;
+      const barW = Math.max(
+        VISUAL_CONFIG.healthbar.minWidth,
+        radius * VISUAL_CONFIG.healthbar.radiusMultiplier
+      );
+      const barH = VISUAL_CONFIG.healthbar.height / camera.scale;
       const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
-      this.ctx.fillStyle = '#c0392b';
-      this.ctx.fillRect(-barW / 2, -radius - 16 / camera.scale, barW, barH);
-      this.ctx.fillStyle = '#2ecc71';
-      this.ctx.fillRect(-barW / 2, -radius - 16 / camera.scale, barW * hpRatio, barH);
+      this.ctx.fillStyle = VISUAL_CONFIG.healthbar.bgColor;
+      this.ctx.fillRect(
+        -barW / 2,
+        -radius - VISUAL_CONFIG.healthbar.offsetY / camera.scale,
+        barW,
+        barH
+      );
+      this.ctx.fillStyle = VISUAL_CONFIG.healthbar.fillColor;
+      this.ctx.fillRect(
+        -barW / 2,
+        -radius - VISUAL_CONFIG.healthbar.offsetY / camera.scale,
+        barW * hpRatio,
+        barH
+      );
       this.ctx.restore();
 
       // ID / Name Text
       this.ctx.save();
       this.ctx.globalAlpha = overlayAlpha;
       this.ctx.translate(transform.x, transform.y);
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = `${Math.max(10, 11 / camera.scale)}px sans-serif`;
+      this.ctx.fillStyle = VISUAL_CONFIG.nameOverlay.color;
+      this.ctx.font = `${Math.max(10, VISUAL_CONFIG.nameOverlay.fontSize / camera.scale)}px ${VISUAL_CONFIG.nameOverlay.font}`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
       const displayName = meta?.name ?? id;
-      this.ctx.fillText(displayName, 0, -radius - 20 / camera.scale);
+      this.ctx.fillText(displayName, 0, -radius - VISUAL_CONFIG.nameOverlay.offsetY / camera.scale);
       this.ctx.restore();
     }
   }
@@ -490,15 +515,120 @@ export class Renderer {
           ? hoverComp.physicsBody.body.r
           : 16;
 
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = `${Math.max(10, 12 / camera.scale)}px sans-serif`;
+      this.ctx.fillStyle = VISUAL_CONFIG.itemTooltip.color;
+      this.ctx.font = `${Math.max(10, VISUAL_CONFIG.itemTooltip.fontSize / camera.scale)}px ${VISUAL_CONFIG.itemTooltip.font}`;
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'bottom';
-      this.ctx.shadowColor = 'black';
-      this.ctx.shadowBlur = 4;
+      this.ctx.shadowColor = VISUAL_CONFIG.itemTooltip.shadowColor;
+      this.ctx.shadowBlur = VISUAL_CONFIG.itemTooltip.shadowBlur;
       this.ctx.shadowOffsetX = 1;
       this.ctx.shadowOffsetY = 1;
-      this.ctx.fillText(hoverComp.item.name, 0, -radius - 15 / camera.scale);
+      this.ctx.fillText(
+        hoverComp.item.name,
+        0,
+        -radius - VISUAL_CONFIG.itemTooltip.offsetY / camera.scale
+      );
+      this.ctx.restore();
+    }
+  }
+
+  private renderPickupInteractions(world: World, camera: Camera): void {
+    const entities = world.getEntitiesWith('transform', 'interactionAction');
+
+    for (const [id, { transform, interactionAction }] of entities) {
+      if (interactionAction.type !== 'pickup' || !interactionAction.phase) continue;
+
+      const health = world.getComponent(id, 'health');
+      if (health && !health.isAlive) continue;
+
+      let itemPos = interactionAction.targetItemPos;
+      if (!itemPos && interactionAction.targetId) {
+        const itemTrans = world.getComponent(interactionAction.targetId, 'transform');
+        if (itemTrans) {
+          itemPos = { x: itemTrans.x, y: itemTrans.y };
+        }
+      }
+      if (!itemPos) continue;
+
+      const creaturePos = { x: transform.x, y: transform.y };
+      const phase = interactionAction.phase;
+      const totalDuration =
+        interactionAction.totalDuration > 0 ? interactionAction.totalDuration : 1;
+      const timer = Math.max(0, interactionAction.timer);
+
+      let color = VISUAL_CONFIG.pickupInteraction.reachColor;
+      let ratio = 0; // 0 — у существа, 1 — у предмета
+
+      if (phase === 'reach') {
+        color = VISUAL_CONFIG.pickupInteraction.reachColor;
+        ratio = Math.min(1, Math.max(0, 1 - timer / totalDuration));
+      } else if (phase === 'lift') {
+        color = VISUAL_CONFIG.pickupInteraction.liftColor;
+        ratio = Math.min(1, Math.max(0, timer / totalDuration));
+      } else if (phase === 'abort_reach' || phase === 'abort_lift') {
+        color = VISUAL_CONFIG.pickupInteraction.abortColor;
+        const startRatio = interactionAction.abortStartProgress ?? 0.5;
+        const abortFactor = Math.min(1, Math.max(0, timer / totalDuration));
+        ratio = startRatio * abortFactor;
+      }
+
+      const dotX = creaturePos.x + (itemPos.x - creaturePos.x) * ratio;
+      const dotY = creaturePos.y + (itemPos.y - creaturePos.y) * ratio;
+
+      const lineWidth = VISUAL_CONFIG.pickupInteraction.lineWidth / camera.scale;
+      const dotRadius = VISUAL_CONFIG.pickupInteraction.dotRadius / camera.scale;
+
+      // Расчет дальности взаимодействия ячейки (interactDist)
+      const equip = world.getComponent(id, 'equip');
+      const physStats = world.getComponent(id, 'physicsStats');
+      const creatureRadius = physStats?.radius.current ?? 16;
+      let interactDist: number | undefined = undefined;
+
+      if (equip && interactionAction.slotIndex !== undefined) {
+        interactDist = equip.interactionSlots[interactionAction.slotIndex]?.interactDist;
+      }
+
+      // Если индекс не указан, берем свободную ячейку с максимальной дальностью
+      if (interactDist === undefined && equip) {
+        let maxDist = -1;
+        for (const slot of equip.interactionSlots) {
+          if (slot.itemId === null && slot.interactDist > maxDist) {
+            maxDist = slot.interactDist;
+          }
+        }
+        if (maxDist > 0) interactDist = maxDist;
+      }
+
+      const totalReachRadius = creatureRadius + (interactDist ?? 15);
+
+      this.ctx.save();
+
+      // 1. Отрисовка окружности дальности взаимодействия (пунктир из конфига)
+      const rangeConfig = VISUAL_CONFIG.pickupInteraction.rangeCircle;
+      this.ctx.beginPath();
+      this.ctx.setLineDash(rangeConfig.dash.map((d) => d / camera.scale));
+      this.ctx.arc(creaturePos.x, creaturePos.y, totalReachRadius, 0, Math.PI * 2);
+      this.ctx.strokeStyle = rangeConfig.color;
+      this.ctx.lineWidth = rangeConfig.lineWidth / camera.scale;
+      this.ctx.stroke();
+
+      // Сброс пунктира перед рисованием луча
+      this.ctx.setLineDash([]);
+
+      // 2. Отрисовка линии связи
+      this.ctx.beginPath();
+      this.ctx.moveTo(creaturePos.x, creaturePos.y);
+      this.ctx.lineTo(itemPos.x, itemPos.y);
+      this.ctx.strokeStyle = color;
+      this.ctx.lineWidth = lineWidth;
+      this.ctx.stroke();
+
+      // 3. Отрисовка анимированной точки
+      this.ctx.beginPath();
+      this.ctx.arc(dotX, dotY, dotRadius, 0, Math.PI * 2);
+      this.ctx.fillStyle = color;
+      this.ctx.fill();
+
       this.ctx.restore();
     }
   }

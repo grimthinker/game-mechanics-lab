@@ -16,7 +16,6 @@ import {
 import { Point } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
-import { assembleItem } from './ItemArchetype';
 
 export function assembleCreature(
   world: World,
@@ -43,6 +42,7 @@ export function assembleCreature(
     stance: config.meta?.stance ?? 'standing',
     movementMode: config.meta?.movementMode ?? 'immobile',
     directionMode: config.meta?.directionMode ?? 'immobile',
+    actionMode: config.meta?.actionMode ?? 'idle',
     entityType: config.meta?.entityType || 'creature',
   });
 
@@ -75,7 +75,7 @@ export function assembleCreature(
   const maxTurnSpeed = config.movement?.maxTurnSpeed ?? ((Math.PI * 1.5) as Radians);
   world.addComponent(id, 'movementStats', {
     maxSpeed: createStat(maxSpeed),
-    maxTurnSpeed: createStat(maxTurnSpeed) as any,
+    maxTurnSpeed: createStat(maxTurnSpeed),
     runSpeedMultiplier: config.movement?.runSpeedMultiplier ?? 1.5,
     crouchSpeedMultiplier: config.movement?.crouchSpeedMultiplier ?? 0.5,
     walkSpeedMultiplier: config.movement?.walkSpeedMultiplier ?? 0.5,
@@ -85,6 +85,8 @@ export function assembleCreature(
     backwardSpeedMultiplier: config.movement?.backwardSpeedMultiplier ?? 0.6,
     strafeTurnMultiplier: config.movement?.strafeTurnMultiplier ?? 0.8,
     backwardTurnMultiplier: config.movement?.backwardTurnMultiplier ?? 0.6,
+    pickupSpeedMultiplier: config.movement?.pickupSpeedMultiplier ?? 0.5,
+    pickupTurnMultiplier: config.movement?.pickupTurnMultiplier ?? 1.1,
   });
   world.addComponent(id, 'velocity', {
     vx: 0,
@@ -132,8 +134,8 @@ export function assembleCreature(
     ? JSON.parse(JSON.stringify(config.equip))
     : {
         interactionSlots: [
-          { id: 'hand_left', interactDist: 15, strength: 50, itemId: null },
-          { id: 'hand_right', interactDist: 15, strength: 50, itemId: null },
+          { id: 'hand_left', interactDist: 25, strength: 11, itemId: null },
+          { id: 'hand_right', interactDist: 25, strength: 11, itemId: null },
         ],
         equipmentAreas: [
           { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
@@ -146,45 +148,6 @@ export function assembleCreature(
           { id: 'feet_2', name: 'Ступня правая', type: 'feet', space: 10, itemIds: [] },
         ],
       };
-
-  // Автоматическая установка стандартной сумки в область "Туловище"
-  const torsoArea = equipComp.equipmentAreas.find((a) => a.type === 'torso');
-  if (torsoArea && torsoArea.itemIds.length === 0) {
-    const bagId = `item_bag_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    world.createEntity(bagId);
-    assembleItem(
-      world,
-      physics,
-      aiSystem,
-      bagId,
-      {
-        tag: { archetype: 'item', subType: 'bag' },
-        item: {
-          name: 'Сумка',
-          type: 'bag',
-          maxStack: 1,
-          size: 10,
-          equipType: 'torso',
-          equippable: true,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: {
-          radius: 16,
-          weight: 1,
-          isSolid: true,
-        },
-        ownership: {
-          ownerId: id,
-          status: 'equipped',
-        },
-        inventory: {
-          size: { width: 6, height: 4 },
-        },
-      },
-      position
-    );
-    torsoArea.itemIds.push(bagId);
-  }
 
   world.addComponent(id, 'equip', equipComp);
   world.addComponent(id, 'activeAttacks', { attacks: [] });

@@ -164,15 +164,32 @@ export class PhysicsSystem {
       }
     }
 
-    // Предварительная синхронизация тела из Transform (SSOT -> Body) для всех динамических объектов
+    // Предварительная синхронизация тела из Transform (SSOT -> Body) для всех динамических и измененных статических объектов
     const allPhysEntities = world.getEntitiesWith('transform', 'physicsBody');
     for (const [_id, { transform, physicsBody }] of allPhysEntities) {
-      if (!physicsBody.isStatic && physicsBody.body) {
-        physicsBody.body.setPosition(transform.x, transform.y);
-        if (typeof physicsBody.body.setAngle === 'function') {
-          physicsBody.body.setAngle(transform.angle);
+      if (physicsBody.body) {
+        if (!physicsBody.isStatic) {
+          physicsBody.body.setPosition(transform.x, transform.y);
+          if (typeof physicsBody.body.setAngle === 'function') {
+            physicsBody.body.setAngle(transform.angle);
+          }
+          this.system.updateBody(physicsBody.body);
+        } else {
+          // Синхронизируем статические тела (например, препятствия), если их transform изменился (поворот, перемещение, десериализация)
+          const bodyAny = physicsBody.body as any;
+          const bodyAngle = typeof bodyAny.angle === 'number' ? bodyAny.angle : 0;
+          if (
+            bodyAny.x !== transform.x ||
+            bodyAny.y !== transform.y ||
+            bodyAngle !== transform.angle
+          ) {
+            physicsBody.body.setPosition(transform.x, transform.y);
+            if (typeof bodyAny.setAngle === 'function') {
+              bodyAny.setAngle(transform.angle);
+            }
+            this.system.updateBody(physicsBody.body);
+          }
         }
-        this.system.updateBody(physicsBody.body);
       }
     }
 
@@ -253,10 +270,11 @@ export class PhysicsSystem {
       const ratio2 = weight1 / totalMass;
 
       const mult = Math.min(PHYSICS_CONFIG.C, dt * PHYSICS_CONFIG.A);
-      const deltaX1 = mult * overlapX * ratio1;
-      const deltaY1 = mult * overlapY * ratio1;
-      const deltaX2 = mult * overlapX * ratio2;
-      const deltaY2 = mult * overlapY * ratio2;
+      const maxCorrection = 6.0; // Защита от телепортации / взрыва физики при лагах
+      const deltaX1 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapX * ratio1));
+      const deltaY1 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapY * ratio1));
+      const deltaX2 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapX * ratio2));
+      const deltaY2 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapY * ratio2));
 
       if (Math.abs(deltaX1) > PHYSICS_CONFIG.d_min || Math.abs(deltaY1) > PHYSICS_CONFIG.d_min) {
         p1.body.setPosition(p1.body.x - deltaX1, p1.body.y - deltaY1);

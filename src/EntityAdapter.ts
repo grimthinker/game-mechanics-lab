@@ -3,6 +3,7 @@ import {
   CreatureStance,
   CreatureMovementMode,
   CreatureDirectionMode,
+  CreatureActionMode,
   EntityId,
   IMovable,
   InventoryComponent,
@@ -19,7 +20,6 @@ import {
   InteractionActionComponent,
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
-import { InteractionSystem } from './ecs/systems/InteractionSystem';
 import { LOGIC_CONFIG } from './ai/config';
 import { Point } from './types';
 import { Radians } from './utils';
@@ -69,12 +69,14 @@ export class EntityAdapter implements IMovable, EntityController {
   public get stance(): 'standing' | 'crouching' {
     return this.getComponent('meta')?.stance ?? 'standing';
   }
-  public get movementMode():
-    'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting' | 'attacking' | 'dead' {
+  public get movementMode(): CreatureMovementMode {
     return this.getComponent('meta')?.movementMode ?? 'immobile';
   }
   public get directionMode(): CreatureDirectionMode {
     return this.getComponent('meta')?.directionMode ?? 'immobile';
+  }
+  public get actionMode(): CreatureActionMode {
+    return this.getComponent('meta')?.actionMode ?? 'idle';
   }
   public get targetLookAngle(): Radians | undefined {
     return this.getComponent('input')?.targetLookAngle;
@@ -319,7 +321,18 @@ export class EntityAdapter implements IMovable, EntityController {
     }
   }
   public pickup(targetItemId: EntityId): boolean {
-    return InteractionSystem.requestPickup(this.world, this.id, targetItemId);
+    const health = this.getComponent('health');
+    if (!health || !health.isAlive) return false;
+
+    if (this.getComponent('interactionAction')) return false;
+    if (this.getComponent('pickupIntent')) return false;
+
+    const targetOwnership = this.world.getComponent(targetItemId, 'ownership');
+    const targetItem = this.world.getComponent(targetItemId, 'item');
+    if (!targetItem || targetOwnership) return false;
+
+    this.world.addComponent(this.id, 'pickupIntent', { targetItemId });
+    return true;
   }
   public cancelInteraction(): void {
     const action = this.getComponent('interactionAction');

@@ -301,11 +301,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                           ? 'Спокойный шаг'
                           : meta.movementMode === 'jogging'
                             ? 'Обычное движение'
-                            : meta.movementMode === 'sprinting'
-                              ? 'Спринт'
-                              : meta.movementMode === 'attacking'
-                                ? 'Атака'
-                                : 'Мёртв'}
+                            : 'Спринт'}
+                  </dd>
+                </div>
+              )}
+              {meta?.actionMode && (
+                <div className="stat-row">
+                  <dt>Активность:</dt>
+                  <dd>
+                    {meta.actionMode === 'idle'
+                      ? 'Покой'
+                      : meta.actionMode === 'attacking'
+                        ? 'Атака'
+                        : meta.actionMode === 'pickup'
+                          ? 'Подбор предмета'
+                          : 'Экипирование'}
                   </dd>
                 </div>
               )}

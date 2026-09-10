@@ -59,6 +59,10 @@ export const useKeyboardControls = ({
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' || e.key === 'Meta') {
+        GlobalInput.keys.clear();
+        return;
+      }
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
       const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
@@ -89,6 +93,10 @@ export const useKeyboardControls = ({
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' || e.key === 'Meta') {
+        GlobalInput.keys.clear();
+        return;
+      }
       const key = getKeyName(e);
       if (!CONTROL_KEYS.has(key)) return;
       // Состояние тумблера X не сбрасывается при отпускании клавиши
@@ -101,14 +109,28 @@ export const useKeyboardControls = ({
       GlobalInput.keys.clear();
     };
 
+    const onContextMenu = () => {
+      GlobalInput.keys.clear();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        GlobalInput.keys.clear();
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    window.addEventListener('contextmenu', onContextMenu);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
+      window.removeEventListener('contextmenu', onContextMenu);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }, [isModalOpen, isEditModalOpen, mode]);
 

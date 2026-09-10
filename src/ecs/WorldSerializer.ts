@@ -47,30 +47,40 @@ export class WorldSerializer {
     this.app.clearWorld();
 
     if (Array.isArray(data.entities)) {
-      // Сбор идентификаторов предметов, находящихся во владении (экипировка / инвентарь)
-      const possessedItemIds = new Set<string>();
+      // Предварительный проход: санитайзинг и восстановление связей ownership
+      const entityMap = new Map<string, any>();
       for (const ent of data.entities) {
-        if (ent.components?.ownership) {
-          possessedItemIds.add(ent.id);
-        }
-        if (ent.components?.equip) {
+        entityMap.set(ent.id, ent);
+      }
+
+      for (const ent of data.entities) {
+        if (!ent.components) continue;
+
+        const injectOwnership = (itemId: string, status: 'equipped' | 'inventory') => {
+          const childEnt = entityMap.get(itemId);
+          if (childEnt && childEnt.components) {
+            childEnt.components.ownership = { ownerId: ent.id, status };
+          }
+        };
+
+        if (ent.components.equip) {
           if (ent.components.equip.interactionSlots) {
             for (const slot of ent.components.equip.interactionSlots) {
-              if (slot.itemId) possessedItemIds.add(slot.itemId);
+              if (slot.itemId) injectOwnership(slot.itemId, 'equipped');
             }
           }
           if (ent.components.equip.equipmentAreas) {
             for (const area of ent.components.equip.equipmentAreas) {
               for (const id of area.itemIds) {
-                possessedItemIds.add(id);
+                injectOwnership(id, 'equipped');
               }
             }
           }
         }
-        if (ent.components?.inventory?.slots) {
+        if (ent.components.inventory?.slots) {
           for (const row of ent.components.inventory.slots) {
             for (const cell of row) {
-              if (cell.itemId) possessedItemIds.add(cell.itemId);
+              if (cell.itemId) injectOwnership(cell.itemId, 'inventory');
             }
           }
         }
@@ -89,7 +99,7 @@ export class WorldSerializer {
           }
         }
 
-        const isPossessedItem = possessedItemIds.has(ent.id);
+        const isPossessedItem = !!comps.ownership;
 
         if (comps.renderable && isPossessedItem) {
           comps.renderable.isVisible = false;
@@ -146,6 +156,10 @@ export class WorldSerializer {
             comps.movementStats.strafeTurnMultiplier ?? 0.8;
           comps.movementStats.backwardTurnMultiplier =
             comps.movementStats.backwardTurnMultiplier ?? 0.6;
+          comps.movementStats.pickupSpeedMultiplier =
+            comps.movementStats.pickupSpeedMultiplier ?? 0.5;
+          comps.movementStats.pickupTurnMultiplier =
+            comps.movementStats.pickupTurnMultiplier ?? 1.1;
         }
 
         if (comps.stealthStats) {
@@ -231,40 +245,46 @@ export class WorldSerializer {
         }
 
         if (comps.movementStats) {
-          this.app.world.addComponent(ent.id, 'velocity', {
-            vx: 0,
-            vy: 0,
-            currentSpeed: 0,
-            currentTurnSpeed: 0 as Radians,
-            externalVx: 0,
-            externalVy: 0,
-          });
-          this.app.world.addComponent(ent.id, 'input', {
-            desiredMoveVector: null,
-            moveForward: 0,
-            moveStrafe: 0,
-            targetLookAngle: undefined,
-            isMovingForward: false,
-            turnDirection: 0,
-            turnRatio: 0,
-            isRunning: false,
-            isCrouching: false,
-            isSlowWalking: false,
-            wantsAttack: false,
-            attackSlotIndex: undefined,
-          });
+          if (!this.app.world.getComponent(ent.id, 'velocity')) {
+            this.app.world.addComponent(ent.id, 'velocity', {
+              vx: 0,
+              vy: 0,
+              currentSpeed: 0,
+              currentTurnSpeed: 0 as Radians,
+              externalVx: 0,
+              externalVy: 0,
+            });
+          }
+          if (!this.app.world.getComponent(ent.id, 'input')) {
+            this.app.world.addComponent(ent.id, 'input', {
+              desiredMoveVector: null,
+              moveForward: 0,
+              moveStrafe: 0,
+              targetLookAngle: undefined,
+              isMovingForward: false,
+              turnDirection: 0,
+              turnRatio: 0,
+              isRunning: false,
+              isCrouching: false,
+              isSlowWalking: false,
+              wantsAttack: false,
+              attackSlotIndex: undefined,
+            });
+          }
         }
 
         if (comps.equip) {
-          this.app.world.addComponent(ent.id, 'activeAttacks', { attacks: [] });
+          if (!this.app.world.getComponent(ent.id, 'activeAttacks')) {
+            this.app.world.addComponent(ent.id, 'activeAttacks', { attacks: [] });
+          }
         }
 
         if (comps.meta) {
-          if (comps.meta.movementMode === 'attacking') {
-            comps.meta.movementMode = 'immobile';
-          }
           if (!comps.meta.directionMode) {
             comps.meta.directionMode = 'immobile';
+          }
+          if (!comps.meta.actionMode) {
+            comps.meta.actionMode = 'idle';
           }
         }
       }

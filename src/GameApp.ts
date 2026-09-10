@@ -20,7 +20,7 @@ import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
-import { Radians } from './utils';
+import { deg2Rad, Radians } from './utils';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -50,6 +50,11 @@ export class GameApp {
 
   public get selectedEntity(): EntityAdapter | null {
     if (!this.selectedEntityId) return null;
+    if (!this.world.getEntity(this.selectedEntityId)) {
+      this.selectedEntityId = null;
+      this._cachedSelectedEntity = null;
+      return null;
+    }
     if (!this._cachedSelectedEntity || this._cachedSelectedEntity.id !== this.selectedEntityId) {
       this._cachedSelectedEntity = new EntityAdapter(this.selectedEntityId, this.world);
     }
@@ -57,7 +62,12 @@ export class GameApp {
   }
 
   public get hoveredEntity(): EntityAdapter | null {
-    return this.hoveredEntityId ? new EntityAdapter(this.hoveredEntityId, this.world) : null;
+    if (!this.hoveredEntityId) return null;
+    if (!this.world.getEntity(this.hoveredEntityId)) {
+      this.hoveredEntityId = null;
+      return null;
+    }
+    return new EntityAdapter(this.hoveredEntityId, this.world);
   }
 
   public onFrame: (() => void) | null = null;
@@ -225,6 +235,148 @@ export class GameApp {
         },
       },
       { x: spawnPos.x, y: spawnPos.y + 160 }
+    );
+
+    // Начальный спавн предметов в вертикальный ряд
+    const itemsX = spawnPos.x + 80;
+
+    // 1. Оружие с атакой в радиусе (Аура)
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'weapon' },
+        item: {
+          name: 'Аура разрушения',
+          type: 'weapon',
+          maxStack: 1,
+          size: 10,
+          equipType: null,
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 16, weight: 1, isSolid: true },
+        weaponStats: {
+          baseDamage: 30,
+          prepTime: 0.3,
+          castTime: 0,
+          recoveryTime: 0.4,
+        },
+        weaponZone: {
+          hitZoneType: 'radius',
+          radius: 50,
+          pierceObstacles: false,
+          pierceCreatures: false,
+          pierceItems: false,
+        },
+      },
+      { x: itemsX, y: spawnPos.y - 100 }
+    );
+
+    // 2. Оружие с атакой шрапнелью
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'weapon' },
+        item: {
+          name: 'Шрапнельный дробовик',
+          type: 'weapon',
+          maxStack: 1,
+          size: 10,
+          equipType: null,
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 16, weight: 1, isSolid: true },
+        weaponStats: {
+          baseDamage: 15,
+          prepTime: 0.4,
+          castTime: 0,
+          recoveryTime: 0.5,
+        },
+        weaponZone: {
+          hitZoneType: 'shrapnel',
+          length: 120,
+          angle: deg2Rad(60),
+          rayCount: 5,
+          pierceObstacles: false,
+          pierceCreatures: false,
+          pierceItems: false,
+        },
+      },
+      { x: itemsX, y: spawnPos.y - 50 }
+    );
+
+    // 3. Оружие с атакой на линии
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'weapon' },
+        item: {
+          name: 'Копьё пронзания',
+          type: 'weapon',
+          maxStack: 1,
+          size: 10,
+          equipType: null,
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 16, weight: 1, isSolid: true },
+        weaponStats: {
+          baseDamage: 25,
+          prepTime: 0.2,
+          castTime: 0,
+          recoveryTime: 0.3,
+        },
+        weaponZone: {
+          hitZoneType: 'forward_line',
+          length: 150,
+          pierceObstacles: false,
+          pierceCreatures: false,
+          pierceItems: false,
+        },
+      },
+      { x: itemsX, y: spawnPos.y }
+    );
+
+    // 4. Броня для туловища, вес 20
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'armor' },
+        item: {
+          name: 'Тяжёлый нагрудник',
+          type: 'armor',
+          maxStack: 1,
+          size: 20,
+          equipType: 'torso',
+          equippable: true,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 16, weight: 20, isSolid: true },
+        armorStats: {
+          defense: 25,
+          flatReduction: 5,
+        },
+      },
+      { x: itemsX, y: spawnPos.y + 50 }
+    );
+
+    // 5. Броня для головы, вес 10
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'armor' },
+        item: {
+          name: 'Стальной шлем',
+          type: 'armor',
+          maxStack: 1,
+          size: 10,
+          equipType: 'head',
+          equippable: true,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 16, weight: 10, isSolid: true },
+        armorStats: {
+          defense: 15,
+          flatReduction: 2,
+        },
+      },
+      { x: itemsX, y: spawnPos.y + 100 }
     );
   }
 

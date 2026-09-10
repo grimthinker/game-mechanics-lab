@@ -28,6 +28,8 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       backwardSpeedMultiplier: 0.6,
       strafeTurnMultiplier: 0.8,
       backwardTurnMultiplier: 0.6,
+      pickupSpeedMultiplier: 0.5,
+      pickupTurnMultiplier: 1.1,
     },
     stealth: {
       stealthPower: 10,
@@ -61,6 +63,7 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
       stance: 'standing',
       movementMode: 'immobile',
       directionMode: 'immobile',
+      actionMode: 'idle',
       entityType: 'creature',
     },
   };

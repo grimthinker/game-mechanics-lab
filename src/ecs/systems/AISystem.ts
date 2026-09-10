@@ -52,17 +52,17 @@ export class AISystem {
       'brain'
     );
 
-    const currentIds = new Set<string>();
+    // Собираем все ID существующих в мире сущностей для корректной очистки кэша
+    const allWorldIds = new Set(this.world.getAllEntities().map(([id]) => id));
 
     for (const [id] of entities) {
-      currentIds.add(id);
       const adapter = this.getEntityAdapter(id);
       if (adapter) result.push(adapter);
     }
 
-    // Очистка кэша от удаленных сущностей
+    // Очистка кэша от удаленных из мира сущностей (любого типа)
     for (const id of this.adapters.keys()) {
-      if (!currentIds.has(id)) {
+      if (!allWorldIds.has(id)) {
         this.adapters.delete(id);
       }
     }
@@ -80,7 +80,7 @@ export class AISystem {
 
   private getEntityAdapter(id: EntityId): EntityAdapter | undefined {
     const ent = this.world.getEntity(id);
-    if (!ent || !ent.transform || !ent.input || !ent.aiStats || !ent.health) {
+    if (!ent) {
       this.adapters.delete(id);
       return undefined;
     }

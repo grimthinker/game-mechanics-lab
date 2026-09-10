@@ -46,6 +46,10 @@ export interface SpawnModalProps {
   setTurnInPlaceStealthMultiplier: (val: number) => void;
   immobileStealthMultiplier: number;
   setImmobileStealthMultiplier: (val: number) => void;
+  pickupSpeedMultiplier: number;
+  setPickupSpeedMultiplier: (val: number) => void;
+  pickupTurnMultiplier: number;
+  setPickupTurnMultiplier: (val: number) => void;
   defense: number;
   setDefense: (val: number) => void;
   flatReduction: number;
@@ -88,6 +92,10 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
   setStrafeTurnMultiplier,
   backwardTurnMultiplier,
   setBackwardTurnMultiplier,
+  pickupSpeedMultiplier,
+  setPickupSpeedMultiplier,
+  pickupTurnMultiplier,
+  setPickupTurnMultiplier,
   stealthPower,
   setStealthPower,
   runStealthMultiplier,
@@ -382,6 +390,28 @@ export const SpawnModal: React.FC<SpawnModalProps> = ({
               max={10}
               step={0.05}
               onChange={(e) => setBackwardTurnMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель скорости при подборе предмета:
+            <input
+              type="number"
+              value={pickupSpeedMultiplier}
+              min={0.1}
+              max={10}
+              step={0.05}
+              onChange={(e) => setPickupSpeedMultiplier(Number(e.target.value))}
+            />
+          </label>
+          <label>
+            Множитель поворота при подборе предмета:
+            <input
+              type="number"
+              value={pickupTurnMultiplier}
+              min={0.1}
+              max={10}
+              step={0.05}
+              onChange={(e) => setPickupTurnMultiplier(Number(e.target.value))}
             />
           </label>
         </form>

@@ -3,6 +3,7 @@ import { World } from '../World';
 import {
   CreatureDirectionMode,
   CreatureMovementMode,
+  CreatureActionMode,
   CreatureStance,
   ModifierType,
 } from '../types';
@@ -41,29 +42,30 @@ export class MovementSystem {
         removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
         removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
         removeModifier(movementStats.maxSpeed, 'attack_slow_move');
+        removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
         removeModifier(movementStats.maxSpeed, 'dir_strafe_speed');
         removeModifier(movementStats.maxSpeed, 'dir_back_speed');
         removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
         removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
         removeModifier(movementStats.maxTurnSpeed, 'dir_strafe_turn');
         removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
+        meta.movementMode = 'immobile';
         meta.directionMode = 'immobile';
+        meta.actionMode = 'idle';
         continue;
       }
 
       const interactionAction = world.getComponent(id, 'interactionAction');
       if (interactionAction) {
-        input.desiredMoveVector = null;
-        input.moveForward = 0;
-        input.moveStrafe = 0;
-        input.isMovingForward = false;
+        // Запрещаем спринт и атаку во время взаимодействия, но перемещение не блокируем
         input.isRunning = false;
         input.wantsAttack = false;
 
         if (
           interactionAction.type === 'pickup' &&
-          (interactionAction.phase === 'reach' || interactionAction.phase === 'abort_reach') &&
+          interactionAction.phase === 'reach' &&
           interactionAction.targetItemPos
         ) {
           const dx = interactionAction.targetItemPos.x - transform.x;
@@ -153,6 +155,8 @@ export class MovementSystem {
 
       // 4. Определение вида направления движения (Direction Mode)
       let directionMode: CreatureDirectionMode = 'immobile';
+      const ANGLE_THRESHOLD_FORWARD = Math.PI / 4 + 0.001;
+      const ANGLE_THRESHOLD_BACKWARD = (3 * Math.PI) / 4 + 0.001;
 
       if (hasMoveInput) {
         // Угол желаемого мирового вектора перемещения
@@ -165,12 +169,9 @@ export class MovementSystem {
           )
         );
 
-        const deg45 = Math.PI / 4 + 0.001;
-        const deg135 = (3 * Math.PI) / 4 + 0.001;
-
-        if (angleDiff <= deg45) {
+        if (angleDiff <= ANGLE_THRESHOLD_FORWARD) {
           directionMode = 'forward';
-        } else if (angleDiff <= deg135) {
+        } else if (angleDiff <= ANGLE_THRESHOLD_BACKWARD) {
           directionMode = 'strafe';
         } else {
           directionMode = 'backward';
@@ -185,12 +186,9 @@ export class MovementSystem {
           )
         );
 
-        const deg45 = Math.PI / 4 + 0.001;
-        const deg135 = (3 * Math.PI) / 4 + 0.001;
-
-        if (angleDiff <= deg45) {
+        if (angleDiff <= ANGLE_THRESHOLD_FORWARD) {
           directionMode = 'forward';
-        } else if (angleDiff <= deg135) {
+        } else if (angleDiff <= ANGLE_THRESHOLD_BACKWARD) {
           directionMode = 'strafe';
         } else {
           directionMode = 'backward';
@@ -199,13 +197,21 @@ export class MovementSystem {
         directionMode = 'immobile';
       }
 
-      // 5. Определение вида движения (Movement Mode): спринт разрешен ТОЛЬКО при движении вперед
+      // 4.5. Определение режима активности (Action Mode)
+      let actionMode: CreatureActionMode = 'idle';
+      if (activeAttacks.attacks.length > 0) {
+        actionMode = 'attacking';
+      } else if (interactionAction?.type === 'pickup') {
+        actionMode = 'pickup';
+      } else if (interactionAction?.type === 'equip' || interactionAction?.type === 'unequip') {
+        actionMode = 'equipping';
+      }
+
+      // 5. Определение вида движения (Movement Mode): чисто локомоция
       let movementMode: CreatureMovementMode = 'immobile';
 
-      if (activeAttacks.attacks.length > 0) {
-        movementMode = 'attacking';
-      } else if (hasMoveInput || velocity.currentSpeed > 1) {
-        if (input.isRunning && directionMode === 'forward') {
+      if (hasMoveInput || velocity.currentSpeed > 1) {
+        if (input.isRunning && directionMode === 'forward' && actionMode === 'idle') {
           movementMode = 'sprinting';
         } else if (input.isSlowWalking) {
           movementMode = 'walking';
@@ -321,13 +327,30 @@ export class MovementSystem {
       }
 
       if (turnSlow < 1) {
-        addModifier(movementStats.maxTurnSpeed as any, {
+        addModifier(movementStats.maxTurnSpeed, {
           id: 'attack_slow_turn',
           type: ModifierType.PERCENT_MULT,
           value: turnSlow,
         });
       } else {
-        removeModifier(movementStats.maxTurnSpeed as any, 'attack_slow_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
+      }
+
+      // 8.5. Модификаторы скорости перемещения и поворота при подборе предметов
+      if (actionMode === 'pickup') {
+        addModifier(movementStats.maxSpeed, {
+          id: 'pickup_slow_move',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.pickupSpeedMultiplier,
+        });
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'pickup_slow_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.pickupTurnMultiplier,
+        });
+      } else {
+        removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
+        removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
       }
 
       // 9. Расчет мирового целевого вектора скорости и 2D векторная интерполяция
@@ -379,6 +402,7 @@ export class MovementSystem {
       meta.stance = stance;
       meta.movementMode = movementMode;
       meta.directionMode = directionMode;
+      meta.actionMode = actionMode;
     }
   }
 }

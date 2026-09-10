@@ -3,6 +3,7 @@ import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, EntityId, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
 import { Circle } from 'detect-collisions';
 import { GAMEPLAY_CONFIG } from '../../gameplayConfig';
+import { Radians } from '../../utils';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -98,8 +99,13 @@ export class InteractionSystem {
 
     if (action.type === 'pickup') {
       if (action.phase === 'reach') {
+        const currentRatio = Math.min(
+          1,
+          Math.max(0, 1 - action.timer / (action.totalDuration || 1))
+        );
         const rollbackDuration = Math.max(0.01, action.elapsedInReach ?? 0);
         action.phase = 'abort_reach';
+        action.abortStartProgress = currentRatio;
         action.timer = rollbackDuration;
         action.totalDuration = rollbackDuration;
         action.wantsCancel = false;
@@ -107,8 +113,10 @@ export class InteractionSystem {
       }
 
       if (action.phase === 'lift') {
+        const currentRatio = Math.min(1, Math.max(0, action.timer / (action.totalDuration || 1)));
         const targetId = action.targetId;
         const equip = world.getComponent(entityId, 'equip');
+        const transform = world.getComponent(entityId, 'transform');
 
         if (equip && action.slotIndex !== undefined && targetId) {
           if (equip.interactionSlots[action.slotIndex]?.itemId === targetId) {
@@ -116,13 +124,22 @@ export class InteractionSystem {
           }
         }
 
-        if (targetId && action.targetItemPos) {
+        if (targetId && transform) {
           world.removeComponent(targetId, 'ownership');
+
+          let dropX = action.targetItemPos?.x ?? transform.x;
+          let dropY = action.targetItemPos?.y ?? transform.y;
+
+          if (action.relativeDist !== undefined && action.relativeAngle !== undefined) {
+            const currentAngle = transform.angle + action.relativeAngle;
+            dropX = transform.x + Math.cos(currentAngle) * action.relativeDist;
+            dropY = transform.y + Math.sin(currentAngle) * action.relativeDist;
+          }
 
           const itTransform = world.getComponent(targetId, 'transform');
           if (itTransform) {
-            itTransform.x = action.targetItemPos.x;
-            itTransform.y = action.targetItemPos.y;
+            itTransform.x = dropX;
+            itTransform.y = dropY;
           }
 
           const renderable = world.getComponent(targetId, 'renderable');
@@ -132,10 +149,7 @@ export class InteractionSystem {
 
           const physStats = world.getComponent(targetId, 'physicsStats');
           if (physStats) {
-            const body = new Circle(
-              { x: action.targetItemPos.x, y: action.targetItemPos.y },
-              physStats.radius.current
-            );
+            const body = new Circle({ x: dropX, y: dropY }, physStats.radius.current);
             body.isStatic = false;
             const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
             world.addComponent(targetId, 'physicsBody', {
@@ -148,10 +162,15 @@ export class InteractionSystem {
           }
         }
 
-        const remainingTime = Math.max(0.01, action.timer);
+        const remainingTime = action.timer;
+        const reachDuration = GAMEPLAY_CONFIG.pickupReachDuration;
+        const totalLiftDuration = action.totalDuration > 0 ? action.totalDuration : 1;
+        const abortDuration = Math.max(0.01, remainingTime * (reachDuration / totalLiftDuration));
+
         action.phase = 'abort_lift';
-        action.timer = remainingTime;
-        action.totalDuration = remainingTime;
+        action.abortStartProgress = currentRatio;
+        action.timer = abortDuration;
+        action.totalDuration = abortDuration;
         action.wantsCancel = false;
         return true;
       }
@@ -195,26 +214,86 @@ export class InteractionSystem {
               interactionAction.slotIndex !== undefined
                 ? equip.interactionSlots[interactionAction.slotIndex]
                 : undefined;
+            const targetEntity = targetId ? world.getEntity(targetId) : undefined;
             const targetItem = targetId ? world.getComponent(targetId, 'item') : undefined;
             const targetPhysStats = targetId
               ? world.getComponent(targetId, 'physicsStats')
               : undefined;
+            const targetOwnership = targetId
+              ? world.getComponent(targetId, 'ownership')
+              : undefined;
 
-            if (!targetId || !slot || !targetItem || !targetPhysStats || slot.itemId !== null) {
-              world.removeComponent(id, 'interactionAction');
-              continue;
-            }
-
-            const weight = targetPhysStats.weight.current;
-            if (weight > slot.strength * 2) {
+            if (
+              !targetId ||
+              !targetEntity ||
+              !slot ||
+              !targetItem ||
+              !targetPhysStats ||
+              targetOwnership ||
+              slot.itemId !== null
+            ) {
+              const currentRatio = Math.min(
+                1,
+                Math.max(0, 1 - interactionAction.timer / (interactionAction.totalDuration || 1))
+              );
               const rollbackDuration = Math.max(
                 0.01,
                 interactionAction.elapsedInReach ?? GAMEPLAY_CONFIG.pickupReachDuration
               );
               interactionAction.phase = 'abort_reach';
+              interactionAction.abortStartProgress = currentRatio;
               interactionAction.timer = rollbackDuration;
               interactionAction.totalDuration = rollbackDuration;
               continue;
+            }
+
+            const targetTransform = world.getComponent(targetId, 'transform');
+            const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 16;
+            const targetRadius = targetPhysStats.radius.current;
+
+            let isOutOfReach = false;
+            if (targetTransform) {
+              const currentDist = Math.hypot(
+                targetTransform.x - transform.x,
+                targetTransform.y - transform.y
+              );
+              const distBetweenBorders = Math.max(0, currentDist - myRadius - targetRadius);
+              if (distBetweenBorders > slot.interactDist) {
+                isOutOfReach = true;
+              }
+            } else {
+              isOutOfReach = true;
+            }
+
+            const weight = targetPhysStats.weight.current;
+            if (isOutOfReach || weight > slot.strength * 2) {
+              const currentRatio = Math.min(
+                1,
+                Math.max(0, 1 - interactionAction.timer / (interactionAction.totalDuration || 1))
+              );
+              const rollbackDuration = Math.max(
+                0.01,
+                interactionAction.elapsedInReach ?? GAMEPLAY_CONFIG.pickupReachDuration
+              );
+              interactionAction.phase = 'abort_reach';
+              interactionAction.abortStartProgress = currentRatio;
+              interactionAction.timer = rollbackDuration;
+              interactionAction.totalDuration = rollbackDuration;
+              continue;
+            }
+
+            const targetTransformEntity = world.getComponent(targetId, 'transform');
+            const selfTransform = world.getComponent(id, 'transform');
+            let relativeDist = 0;
+            let relativeAngle = 0 as Radians;
+            if (targetTransformEntity && selfTransform) {
+              const dx = targetTransformEntity.x - selfTransform.x;
+              const dy = targetTransformEntity.y - selfTransform.y;
+              relativeDist = Math.hypot(dx, dy);
+              const worldAngle = Math.atan2(dy, dx);
+              let relAngle = worldAngle - selfTransform.angle;
+              relAngle = Math.atan2(Math.sin(relAngle), Math.cos(relAngle));
+              relativeAngle = relAngle as Radians;
             }
 
             slot.itemId = targetId;
@@ -230,16 +309,20 @@ export class InteractionSystem {
               renderable.isVisible = false;
             }
 
+            const minTime = Math.max(
+              GAMEPLAY_CONFIG.pickupReachDuration,
+              GAMEPLAY_CONFIG.minInteractionTime
+            );
+            const maxTime = Math.max(minTime, GAMEPLAY_CONFIG.maxInteractionTime);
             const maxCapacity = Math.max(1, slot.strength * 2);
             const weightRatio = Math.min(1, Math.max(0, weight / maxCapacity));
-            const stage2Duration =
-              GAMEPLAY_CONFIG.minInteractionTime +
-              weightRatio *
-                (GAMEPLAY_CONFIG.maxInteractionTime - GAMEPLAY_CONFIG.minInteractionTime);
+            const stage2Duration = minTime + weightRatio * (maxTime - minTime);
 
             interactionAction.phase = 'lift';
             interactionAction.timer = stage2Duration;
             interactionAction.totalDuration = stage2Duration;
+            interactionAction.relativeDist = relativeDist;
+            interactionAction.relativeAngle = relativeAngle;
           }
         } else if (interactionAction.phase === 'lift') {
           interactionAction.timer -= dt;
@@ -341,11 +424,81 @@ export class InteractionSystem {
     const physStats = world.getComponent(itemId, 'physicsStats');
 
     if (itemTransform && physStats) {
+      const itemRadius = physStats.radius.current;
       const dropDist = slot.interactDist;
-      itemTransform.x = transform.x + Math.cos(transform.angle) * dropDist;
-      itemTransform.y = transform.y + Math.sin(transform.angle) * dropDist;
 
-      const body = new Circle({ x: itemTransform.x, y: itemTransform.y }, physStats.radius.current);
+      const startPoint = { x: transform.x, y: transform.y };
+      let endPoint = {
+        x: transform.x + Math.cos(transform.angle) * dropDist,
+        y: transform.y + Math.sin(transform.angle) * dropDist,
+      };
+
+      const disabledBodies: any[] = [];
+      const dropperPhys = world.getComponent(entityId, 'physicsBody');
+
+      // Временно убираем тело того, кто бросает предмет, чтобы луч не застрял в нем самом
+      if (dropperPhys && dropperPhys.body) {
+        physics.system.remove(dropperPhys.body);
+        disabledBodies.push(dropperPhys.body);
+      }
+
+      try {
+        while (true) {
+          const rayResult = physics.system.raycast(startPoint, endPoint);
+          if (!rayResult) break; // Путь чист
+
+          const hitBody = rayResult.body;
+          const hitEntityId = physics.getEntityByBody(hitBody);
+          let blocksDrop = false;
+
+          if (hitEntityId) {
+            const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
+            const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
+            const hitHealth = world.getComponent(hitEntityId, 'health');
+
+            const isTrigger = hitPhys?.isTrigger;
+            const isDead = hitHealth && !hitHealth.isAlive;
+            const isSolid = hitPhysStats?.isSolid ?? hitPhys?.mask !== 0;
+
+            // Останавливаем луч только о живые существа, целые препятствия и предметы с коллизией
+            if (!isTrigger && !isDead && isSolid) {
+              blocksDrop = true;
+            }
+          } else {
+            // Геометрия без EntityId (базовые границы)
+            blocksDrop = true;
+          }
+
+          if (blocksDrop) {
+            // Совместимость: rayResult.point или сам объект в разных версиях detect-collisions
+            const hitPoint = (rayResult as any).point || rayResult;
+            const hitDist = Math.hypot(hitPoint.x - startPoint.x, hitPoint.y - startPoint.y);
+
+            // Укорачиваем дистанцию, чтобы предмет не врезался краем (минус радиус предмета и 1px зазора)
+            const safeDist = Math.max(0, hitDist - itemRadius - 1);
+
+            endPoint = {
+              x: startPoint.x + Math.cos(transform.angle) * safeDist,
+              y: startPoint.y + Math.sin(transform.angle) * safeDist,
+            };
+            break;
+          } else {
+            // Игнорируем мертвые тела и триггеры, временно отключая их и продолжая луч
+            physics.system.remove(hitBody);
+            disabledBodies.push(hitBody);
+          }
+        }
+      } finally {
+        // Гарантированно возвращаем все отключенные тела обратно в физический движок
+        for (const b of disabledBodies) {
+          physics.system.insert(b);
+        }
+      }
+
+      itemTransform.x = endPoint.x;
+      itemTransform.y = endPoint.y;
+
+      const body = new Circle({ x: itemTransform.x, y: itemTransform.y }, itemRadius);
       body.isStatic = false;
       const mask = physStats.isSolid
         ? CollisionCategory.OBSTACLE |

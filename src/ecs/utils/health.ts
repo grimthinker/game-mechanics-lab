@@ -43,9 +43,11 @@ export function killEntity(world: World, id: EntityId): void {
     removeModifier(movementStats.maxSpeed, 'state_run_speed');
     removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
     removeModifier(movementStats.maxSpeed, 'attack_slow_move');
+    removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
     removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
     removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
     removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
+    removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
   }
 
   const activeAttacks = world.getComponent(id, 'activeAttacks');
@@ -55,8 +57,9 @@ export function killEntity(world: World, id: EntityId): void {
 
   const meta = world.getComponent(id, 'meta');
   if (meta) {
-    meta.movementMode = 'dead';
+    meta.movementMode = 'immobile';
     meta.directionMode = 'immobile';
+    meta.actionMode = 'idle';
   }
 
   const tag = world.getComponent(id, 'tag');

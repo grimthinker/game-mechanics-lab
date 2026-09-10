@@ -279,6 +279,8 @@ export const App: React.FC = () => {
           backwardSpeedMultiplier: modals.backwardSpeedMultiplier,
           strafeTurnMultiplier: modals.strafeTurnMultiplier,
           backwardTurnMultiplier: modals.backwardTurnMultiplier,
+          pickupSpeedMultiplier: modals.pickupSpeedMultiplier,
+          pickupTurnMultiplier: modals.pickupTurnMultiplier,
         },
         stealth: {
           stealthPower: modals.stealthPower,
@@ -310,6 +312,7 @@ export const App: React.FC = () => {
           stance: 'standing',
           movementMode: 'immobile',
           directionMode: 'immobile',
+          actionMode: 'idle',
           entityType: 'creature',
         },
       },
@@ -524,6 +527,10 @@ export const App: React.FC = () => {
         setStrafeTurnMultiplier={modals.setStrafeTurnMultiplier}
         backwardTurnMultiplier={modals.backwardTurnMultiplier}
         setBackwardTurnMultiplier={modals.setBackwardTurnMultiplier}
+        pickupSpeedMultiplier={modals.pickupSpeedMultiplier}
+        setPickupSpeedMultiplier={modals.setPickupSpeedMultiplier}
+        pickupTurnMultiplier={modals.pickupTurnMultiplier}
+        setPickupTurnMultiplier={modals.setPickupTurnMultiplier}
         stealthPower={modals.stealthPower}
         setStealthPower={modals.setStealthPower}
         runStealthMultiplier={modals.runStealthMultiplier}

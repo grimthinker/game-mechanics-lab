@@ -107,19 +107,19 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     setDraftMovement(
       moveStats
         ? {
-            maxSpeed: Math.round(moveStats.maxSpeed.base),
-            maxTurnSpeed: Math.round(rad2Deg(moveStats.maxTurnSpeed.base)) as Degrees,
-            runSpeedMultiplier: Math.round(moveStats.runSpeedMultiplier * 100) / 100,
-            crouchSpeedMultiplier: Math.round(moveStats.crouchSpeedMultiplier * 100) / 100,
-            walkSpeedMultiplier: Math.round((moveStats.walkSpeedMultiplier ?? 0.5) * 100) / 100,
-            runTurnMultiplier: Math.round(moveStats.runTurnMultiplier * 100) / 100,
-            crouchTurnMultiplier: Math.round(moveStats.crouchTurnMultiplier * 100) / 100,
-            strafeSpeedMultiplier: Math.round((moveStats.strafeSpeedMultiplier ?? 0.8) * 100) / 100,
-            backwardSpeedMultiplier:
-              Math.round((moveStats.backwardSpeedMultiplier ?? 0.6) * 100) / 100,
-            strafeTurnMultiplier: Math.round((moveStats.strafeTurnMultiplier ?? 0.8) * 100) / 100,
-            backwardTurnMultiplier:
-              Math.round((moveStats.backwardTurnMultiplier ?? 0.6) * 100) / 100,
+            maxSpeed: moveStats.maxSpeed.base,
+            maxTurnSpeed: rad2Deg(moveStats.maxTurnSpeed.base) as Degrees,
+            runSpeedMultiplier: moveStats.runSpeedMultiplier,
+            crouchSpeedMultiplier: moveStats.crouchSpeedMultiplier,
+            walkSpeedMultiplier: moveStats.walkSpeedMultiplier ?? 0.5,
+            runTurnMultiplier: moveStats.runTurnMultiplier,
+            crouchTurnMultiplier: moveStats.crouchTurnMultiplier,
+            strafeSpeedMultiplier: moveStats.strafeSpeedMultiplier ?? 0.8,
+            backwardSpeedMultiplier: moveStats.backwardSpeedMultiplier ?? 0.6,
+            strafeTurnMultiplier: moveStats.strafeTurnMultiplier ?? 0.8,
+            backwardTurnMultiplier: moveStats.backwardTurnMultiplier ?? 0.6,
+            pickupSpeedMultiplier: moveStats.pickupSpeedMultiplier ?? 0.5,
+            pickupTurnMultiplier: moveStats.pickupTurnMultiplier ?? 1.1,
           }
         : null
     );
@@ -128,15 +128,12 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     setDraftStealth(
       stealthStats
         ? {
-            stealthPower: Math.round(stealthStats.stealthPower.base),
-            crouchStealthMultiplier: Math.round(stealthStats.crouchStealthMultiplier * 100) / 100,
-            runStealthMultiplier: Math.round(stealthStats.runStealthMultiplier * 100) / 100,
-            walkStealthMultiplier:
-              Math.round((stealthStats.walkStealthMultiplier ?? 1.3) * 100) / 100,
-            turnInPlaceStealthMultiplier:
-              Math.round((stealthStats.turnInPlaceStealthMultiplier ?? 1.5) * 100) / 100,
-            immobileStealthMultiplier:
-              Math.round((stealthStats.immobileStealthMultiplier ?? 2.0) * 100) / 100,
+            stealthPower: stealthStats.stealthPower.base,
+            crouchStealthMultiplier: stealthStats.crouchStealthMultiplier,
+            runStealthMultiplier: stealthStats.runStealthMultiplier,
+            walkStealthMultiplier: stealthStats.walkStealthMultiplier ?? 1.3,
+            turnInPlaceStealthMultiplier: stealthStats.turnInPlaceStealthMultiplier ?? 1.5,
+            immobileStealthMultiplier: stealthStats.immobileStealthMultiplier ?? 2.0,
           }
         : null
     );
@@ -327,10 +324,6 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
           killEntity(world, entityId);
         } else {
           health.isAlive = true;
-          const metaComp = world.getComponent(entityId, 'meta');
-          if (metaComp && metaComp.movementMode === 'dead') {
-            metaComp.movementMode = 'immobile';
-          }
         }
       }
     }
@@ -339,29 +332,25 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     if (draftMovement) {
       const moveStats = world.getComponent(entityId, 'movementStats');
       if (moveStats) {
-        setBaseStat(moveStats.maxSpeed, Math.max(0, Math.round(draftMovement.maxSpeed)));
-        setBaseStat(
-          moveStats.maxTurnSpeed as any,
-          deg2Rad(Math.max(0, Math.round(draftMovement.maxTurnSpeed)))
+        setBaseStat(moveStats.maxSpeed, Math.max(0, draftMovement.maxSpeed));
+        setBaseStat(moveStats.maxTurnSpeed, deg2Rad(Math.max(0, draftMovement.maxTurnSpeed)));
+        moveStats.runSpeedMultiplier = Math.max(0.1, draftMovement.runSpeedMultiplier);
+        moveStats.crouchSpeedMultiplier = Math.max(0.1, draftMovement.crouchSpeedMultiplier);
+        moveStats.walkSpeedMultiplier = Math.max(0.1, draftMovement.walkSpeedMultiplier ?? 0.5);
+        moveStats.runTurnMultiplier = Math.max(0.1, draftMovement.runTurnMultiplier);
+        moveStats.crouchTurnMultiplier = Math.max(0.1, draftMovement.crouchTurnMultiplier);
+        moveStats.strafeSpeedMultiplier = Math.max(0.1, draftMovement.strafeSpeedMultiplier ?? 0.8);
+        moveStats.backwardSpeedMultiplier = Math.max(
+          0.1,
+          draftMovement.backwardSpeedMultiplier ?? 0.6
         );
-        moveStats.runSpeedMultiplier =
-          Math.round(Math.max(0.1, draftMovement.runSpeedMultiplier) * 100) / 100;
-        moveStats.crouchSpeedMultiplier =
-          Math.round(Math.max(0.1, draftMovement.crouchSpeedMultiplier) * 100) / 100;
-        moveStats.walkSpeedMultiplier =
-          Math.round(Math.max(0.1, draftMovement.walkSpeedMultiplier ?? 0.5) * 100) / 100;
-        moveStats.runTurnMultiplier =
-          Math.round(Math.max(0.1, draftMovement.runTurnMultiplier) * 100) / 100;
-        moveStats.crouchTurnMultiplier =
-          Math.round(Math.max(0.1, draftMovement.crouchTurnMultiplier) * 100) / 100;
-        moveStats.strafeSpeedMultiplier =
-          Math.round(Math.max(0.1, draftMovement.strafeSpeedMultiplier ?? 0.8) * 100) / 100;
-        moveStats.backwardSpeedMultiplier =
-          Math.round(Math.max(0.1, draftMovement.backwardSpeedMultiplier ?? 0.6) * 100) / 100;
-        moveStats.strafeTurnMultiplier =
-          Math.round(Math.max(0.1, draftMovement.strafeTurnMultiplier ?? 0.8) * 100) / 100;
-        moveStats.backwardTurnMultiplier =
-          Math.round(Math.max(0.1, draftMovement.backwardTurnMultiplier ?? 0.6) * 100) / 100;
+        moveStats.strafeTurnMultiplier = Math.max(0.1, draftMovement.strafeTurnMultiplier ?? 0.8);
+        moveStats.backwardTurnMultiplier = Math.max(
+          0.1,
+          draftMovement.backwardTurnMultiplier ?? 0.6
+        );
+        moveStats.pickupSpeedMultiplier = Math.max(0.1, draftMovement.pickupSpeedMultiplier ?? 0.5);
+        moveStats.pickupTurnMultiplier = Math.max(0.1, draftMovement.pickupTurnMultiplier ?? 1.1);
       }
     }
 
@@ -369,17 +358,18 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
     if (draftStealth) {
       const stealthStats = world.getComponent(entityId, 'stealthStats');
       if (stealthStats) {
-        setBaseStat(stealthStats.stealthPower, Math.max(0, Math.round(draftStealth.stealthPower)));
-        stealthStats.crouchStealthMultiplier =
-          Math.round(Math.max(1, draftStealth.crouchStealthMultiplier) * 100) / 100;
-        stealthStats.runStealthMultiplier =
-          Math.round(Math.max(0, draftStealth.runStealthMultiplier) * 100) / 100;
-        stealthStats.walkStealthMultiplier =
-          Math.round(Math.max(0, draftStealth.walkStealthMultiplier ?? 1.3) * 100) / 100;
-        stealthStats.turnInPlaceStealthMultiplier =
-          Math.round(Math.max(0, draftStealth.turnInPlaceStealthMultiplier ?? 1.5) * 100) / 100;
-        stealthStats.immobileStealthMultiplier =
-          Math.round(Math.max(0, draftStealth.immobileStealthMultiplier ?? 2.0) * 100) / 100;
+        setBaseStat(stealthStats.stealthPower, Math.max(0, draftStealth.stealthPower));
+        stealthStats.crouchStealthMultiplier = Math.max(1, draftStealth.crouchStealthMultiplier);
+        stealthStats.runStealthMultiplier = Math.max(0, draftStealth.runStealthMultiplier);
+        stealthStats.walkStealthMultiplier = Math.max(0, draftStealth.walkStealthMultiplier ?? 1.3);
+        stealthStats.turnInPlaceStealthMultiplier = Math.max(
+          0,
+          draftStealth.turnInPlaceStealthMultiplier ?? 1.5
+        );
+        stealthStats.immobileStealthMultiplier = Math.max(
+          0,
+          draftStealth.immobileStealthMultiplier ?? 2.0
+        );
       }
     }
 

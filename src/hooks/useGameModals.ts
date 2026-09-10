@@ -36,6 +36,8 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
   const [walkStealthMultiplier, setWalkStealthMultiplier] = useState<number>(1.3);
   const [turnInPlaceStealthMultiplier, setTurnInPlaceStealthMultiplier] = useState<number>(1.5);
   const [immobileStealthMultiplier, setImmobileStealthMultiplier] = useState<number>(2.0);
+  const [pickupSpeedMultiplier, setPickupSpeedMultiplier] = useState<number>(0.5);
+  const [pickupTurnMultiplier, setPickupTurnMultiplier] = useState<number>(1.1);
   const [defense, setDefense] = useState<number>(0);
   const [flatReduction, setFlatReduction] = useState<number>(0);
 
@@ -151,6 +153,10 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       setTurnInPlaceStealthMultiplier,
       immobileStealthMultiplier,
       setImmobileStealthMultiplier,
+      pickupSpeedMultiplier,
+      setPickupSpeedMultiplier,
+      pickupTurnMultiplier,
+      setPickupTurnMultiplier,
       defense,
       setDefense,
       flatReduction,
@@ -202,6 +208,8 @@ export function useGameModals({ appRef }: UseGameModalsProps) {
       walkStealthMultiplier,
       turnInPlaceStealthMultiplier,
       immobileStealthMultiplier,
+      pickupSpeedMultiplier,
+      pickupTurnMultiplier,
       defense,
       flatReduction,
       openSpawnModal,

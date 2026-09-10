@@ -291,6 +291,9 @@ export interface InteractionActionComponent {
   targetItemPos?: Point;
   elapsedInReach?: number;
   wantsCancel?: boolean;
+  relativeDist?: number;
+  relativeAngle?: Radians;
+  abortStartProgress?: number;
 }
 
 export interface PickupIntentComponent {
@@ -303,16 +306,18 @@ export interface ActiveAttackComponent {
 
 export type CreatureStance = 'standing' | 'crouching';
 
-export type CreatureMovementMode =
-  'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting' | 'attacking' | 'dead';
+export type CreatureMovementMode = 'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting';
 
 export type CreatureDirectionMode = 'forward' | 'strafe' | 'backward' | 'immobile';
+
+export type CreatureActionMode = 'idle' | 'attacking' | 'pickup' | 'equipping';
 
 export interface CreatureMetaComponent {
   name: string;
   stance?: CreatureStance;
   movementMode?: CreatureMovementMode;
   directionMode?: CreatureDirectionMode;
+  actionMode?: CreatureActionMode;
   entityType?: string;
   destructible?: boolean;
 }
@@ -374,6 +379,9 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'weaponStats',
   'weaponZone',
   'armorStats',
+  'velocity',
+  'activeAttacks',
+  'input',
 ] as const;
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
@@ -432,6 +440,8 @@ export interface MovementConfig {
   backwardSpeedMultiplier?: number;
   strafeTurnMultiplier?: number;
   backwardTurnMultiplier?: number;
+  pickupSpeedMultiplier?: number;
+  pickupTurnMultiplier?: number;
 }
 
 export interface MovementStatsComponent {
@@ -446,6 +456,8 @@ export interface MovementStatsComponent {
   backwardSpeedMultiplier: number;
   strafeTurnMultiplier: number;
   backwardTurnMultiplier: number;
+  pickupSpeedMultiplier: number;
+  pickupTurnMultiplier: number;
 }
 
 export interface StealthConfig {
