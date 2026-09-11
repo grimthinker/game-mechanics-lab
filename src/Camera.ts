@@ -59,4 +59,9 @@ export class Camera {
       y: (screenY - this.offsetY) / this.scale,
     };
   }
+
+  public lookAt(worldX: number, worldY: number, canvas: HTMLCanvasElement): void {
+    this.offsetX = canvas.width / 2 - worldX * this.scale;
+    this.offsetY = canvas.height / 2 - worldY * this.scale;
+  }
 }

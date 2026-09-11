@@ -8,14 +8,11 @@ export interface SelectionBottomPanelProps {
   selectedEntityId: string | null;
   world: World | null | undefined;
   typeFilters: Record<string, boolean>;
-  leftOffset?: number;
-  isResizingBT?: boolean;
   onToggleFilter: (type: string) => void;
   onSelectEntity: (id: string) => void;
   onDeselectEntity: (id: string) => void;
   onClearSelection: () => void;
   onDeleteSelected: () => void;
-  onInspectEntity: (id: string) => void;
 }
 
 const ARCHETYPE_LABELS: Record<string, { label: string; icon: string }> = {
@@ -31,15 +28,17 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
   selectedEntityId,
   world,
   typeFilters,
-  leftOffset = 0,
-  isResizingBT = false,
   onToggleFilter,
   onSelectEntity,
   onDeselectEntity,
   onClearSelection,
   onDeleteSelected,
-  onInspectEntity,
 }) => {
+  // Автоматическое скрытие: панель активна только при групповом выделении (2+ сущности)
+  if (selectedEntityIds.length <= 1) {
+    return null;
+  }
+
   // Унифицированный ресайз высоты нижней панели
   const {
     size: panelHeight,
@@ -81,7 +80,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
       style={{
         position: 'absolute',
         bottom: 0,
-        left: `${leftOffset}px`,
+        left: 0,
         right: 0,
         height: `${panelHeight}px`,
         backgroundColor: '#181818',
@@ -218,7 +217,6 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
               <div
                 key={id}
                 onClick={() => onSelectEntity(id)}
-                onDoubleClick={() => onInspectEntity(id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -234,7 +232,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
                   boxSizing: 'border-box',
                   transition: 'background-color 0.15s, border-color 0.15s',
                 }}
-                title={`${data.name} (${id})\nКлик — сделать активным\nДвойной клик — редактировать`}
+                title={`${data.name} (${id})\nКлик — выбрать и просмотреть в Инспекторе`}
               >
                 <span style={{ fontSize: '14px' }}>{data.icon}</span>
                 <div

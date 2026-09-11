@@ -4,23 +4,13 @@ import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
 import { BTLogicComponent, BTNodeDTO } from './ai/core';
-import { deg2Rad } from './utils';
 import { serializeBTNode } from './ai/serializer';
-import {
-  SpawnModal,
-  UniversalEditModal,
-  ItemSpawnModal,
-  ZoneSpawnModal,
-  ObstacleSpawnModal,
-  InteractionSlotModal,
-  EquipmentAreaModal,
-} from './components/modals';
-import { useBTPanelState } from './hooks/useBTPanelState';
-import { useGameModals } from './hooks/useGameModals';
-import { BTPanel } from './components/BTPanel';
-import { Toolbar } from './components/Toolbar';
+import { createDefaultCreatureConfig } from './Creature';
+import { LeftDock } from './components/LeftDock/LeftDock';
+import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
+import { GameHUD } from './components/GameHUD';
 import { SelectionBottomPanel } from './components/SelectionBottomPanel';
 import { PlacementMode } from './types';
 import { GameMode } from './constants';
@@ -29,7 +19,7 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
-  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
   const [snapshot, setSnapshot] = useState<any>(null);
@@ -55,29 +45,27 @@ export const App: React.FC = () => {
   const [, setFrameTick] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
-  const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
+  const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
 
-  const { showBTPanel, setShowBTPanel, btPanelWidth, isResizingBT, startResizingBT } =
-    useBTPanelState();
-
-  const showBTPanelRef = useRef(showBTPanel);
   const lastBTUpdateRef = useRef<number>(0);
   const lastUIUpdateRef = useRef<number>(0);
   const lastSelectedEntityIdRef = useRef<string | null>(null);
 
+  // Синхронизация реального размера Canvas с Flex-контейнером
   useEffect(() => {
-    showBTPanelRef.current = showBTPanel;
-    if (showBTPanel && appRef.current?.selectedEntity) {
-      const c = appRef.current.selectedEntity;
-      setBtData(!c.brain || !c.brain.root_node ? null : serializeBTNode(c.brain.root_node));
-      setBtBlackboard(!c.brain ? null : { ...c.brain.blackboard.getData() });
-    }
-  }, [showBTPanel]);
-
-  const modals = useGameModals({ appRef });
+    if (!canvasWrapperRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        appRef.current?.resizeCanvas(width, height);
+      }
+    });
+    observer.observe(canvasWrapperRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -117,13 +105,10 @@ export const App: React.FC = () => {
 
     if (targetId) {
       const brain = app.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
-
-      if (showBTPanelRef.current) {
-        if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 100) {
-          lastBTUpdateRef.current = now;
-          setBtData(!brain || !brain.root_node ? null : serializeBTNode(brain.root_node));
-          setBtBlackboard(!brain ? null : { ...brain.blackboard.getData() });
-        }
+      if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 100) {
+        lastBTUpdateRef.current = now;
+        setBtData(!brain || !brain.root_node ? null : serializeBTNode(brain.root_node));
+        setBtBlackboard(!brain ? null : { ...brain.blackboard.getData() });
       }
     } else {
       setBtData(null);
@@ -135,13 +120,8 @@ export const App: React.FC = () => {
   updateStatsRef.current = updateStats;
 
   const { syncPlayerControls } = useKeyboardControls({
-    isModalOpen:
-      modals.isModalOpen ||
-      modals.isItemSpawnModalOpen ||
-      modals.isZoneSpawnModalOpen ||
-      modals.isObstacleSpawnModalOpen ||
-      isPaused,
-    isEditModalOpen: modals.isAnyEditModalOpen,
+    isModalOpen: isPaused,
+    isEditModalOpen: false,
     mode,
   });
 
@@ -199,19 +179,6 @@ export const App: React.FC = () => {
       appRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Настройка адаптивного размера канваса через ResizeObserver
-  useEffect(() => {
-    if (!canvasWrapperRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const { width, height } = entry.contentRect;
-        appRef.current?.resizeCanvas(width, height);
-      }
-    });
-    observer.observe(canvasWrapperRef.current);
-    return () => observer.disconnect();
   }, []);
 
   const togglePause = useCallback(() => {
@@ -272,9 +239,8 @@ export const App: React.FC = () => {
     setModeSync(GameMode.GAME);
     app.isPaused = false;
     setIsPaused(false);
-    setShowBTPanel(false);
     updateStats();
-  }, [updateStats, setShowBTPanel, setModeSync]);
+  }, [updateStats, setModeSync]);
 
   const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
@@ -302,187 +268,123 @@ export const App: React.FC = () => {
     }
   }, [syncPlayerControls, updateStats]);
 
-  const handleSpawnConfirm = useCallback(() => {
-    if (!modals.pendingSpawnBehavior) return;
+  const handleQuickSpawn = useCallback((type: 'player' | 'attacker') => {
+    const behavior = type === 'player' ? 'PlayerTree' : 'AttackerTree';
     setPlacementMode({
       kind: 'entity',
-      config: {
-        physics: { radius: modals.radius, weight: modals.weight, isSolid: modals.isSolid },
-        health: { hp: 100, maxHp: 100 },
-        armorStats: {
-          defense: modals.defense,
-          flatReduction: modals.flatReduction,
-        },
-        movement: {
-          maxSpeed: modals.maxSpeed,
-          maxTurnSpeed: deg2Rad(modals.maxTurnSpeed),
-          runSpeedMultiplier: modals.runSpeedMultiplier,
-          crouchSpeedMultiplier: modals.crouchSpeedMultiplier,
-          walkSpeedMultiplier: modals.walkSpeedMultiplier,
-          runTurnMultiplier: modals.runTurnMultiplier,
-          crouchTurnMultiplier: modals.crouchTurnMultiplier,
-          strafeSpeedMultiplier: modals.strafeSpeedMultiplier,
-          backwardSpeedMultiplier: modals.backwardSpeedMultiplier,
-          strafeTurnMultiplier: modals.strafeTurnMultiplier,
-          backwardTurnMultiplier: modals.backwardTurnMultiplier,
-          pickupSpeedMultiplier: modals.pickupSpeedMultiplier,
-          pickupTurnMultiplier: modals.pickupTurnMultiplier,
-        },
-        stealth: {
-          stealthPower: modals.stealthPower,
-          runStealthMultiplier: modals.runStealthMultiplier,
-          crouchStealthMultiplier: modals.crouchStealthMultiplier,
-          walkStealthMultiplier: modals.walkStealthMultiplier,
-          turnInPlaceStealthMultiplier: modals.turnInPlaceStealthMultiplier,
-          immobileStealthMultiplier: modals.immobileStealthMultiplier,
-        },
-        ai: { behavior: modals.pendingSpawnBehavior },
-        equip: {
-          interactionSlots: [
-            { id: 'hand_left', interactDist: 15, strength: 50, itemId: null },
-            { id: 'hand_right', interactDist: 15, strength: 50, itemId: null },
-          ],
-          equipmentAreas: [
-            { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
-            { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
-            { id: 'torso', name: 'Туловище', type: 'torso', space: 40, itemIds: [] },
-            { id: 'hands_1', name: 'Рука (кольца)', type: 'hands', space: 10, itemIds: [] },
-            { id: 'hands_2', name: 'Рука (браслеты)', type: 'hands', space: 10, itemIds: [] },
-            { id: 'legs', name: 'Ноги', type: 'legs', space: 20, itemIds: [] },
-            { id: 'feet_1', name: 'Ступня левая', type: 'feet', space: 10, itemIds: [] },
-            { id: 'feet_2', name: 'Ступня правая', type: 'feet', space: 10, itemIds: [] },
-          ],
-        },
-        meta: {
-          name: 'Существо',
-          stance: 'standing',
-          movementMode: 'immobile',
-          directionMode: 'immobile',
-          actionMode: 'idle',
-          entityType: 'creature',
-        },
-      },
+      config: createDefaultCreatureConfig(behavior),
     });
-    modals.closeSpawnModal();
-  }, [modals]);
+  }, []);
 
-  const handleItemSpawnConfirm = useCallback(
-    (config: EntityConfig) => {
-      setPlacementMode({
-        kind: 'entity',
-        config,
-      });
-      modals.closeItemSpawnModal();
-    },
-    [modals]
-  );
+  const handleSelectSpawnPreset = useCallback((config: EntityConfig) => {
+    setPlacementMode({
+      kind: 'entity',
+      config,
+    });
+  }, []);
 
-  const handleZoneSpawnConfirm = useCallback(
-    (config: EntityConfig) => {
-      setPlacementMode({
-        kind: 'entity',
-        config,
-      });
-      modals.closeZoneSpawnModal();
+  const handleFocusEntity = useCallback(
+    (id: string) => {
+      const app = appRef.current;
+      if (!app || !canvasRef.current) return;
+      const transform = app.world.getComponent(id, 'transform');
+      if (transform) {
+        app.camera.lookAt(transform.x, transform.y, canvasRef.current);
+      }
     },
-    [modals]
-  );
-
-  const handleObstacleSpawnConfirm = useCallback(
-    (config: EntityConfig) => {
-      setPlacementMode({
-        kind: 'entity',
-        config,
-      });
-      modals.closeObstacleSpawnModal();
-    },
-    [modals]
+    [canvasRef]
   );
 
   useGlobalShortcuts({
     mode,
     isPaused,
     togglePause,
-    modals: { ...modals, handleDeleteEntity },
-    handleSpawnConfirm,
-    setShowBTPanel,
+    handleDeleteEntity,
+    onQuickSpawn: handleQuickSpawn,
     onUndo: handleUndo,
     onRedo: handleRedo,
+    onExitGame: goToEditor,
   });
-
-  const isReadOnly = mode !== GameMode.EDITOR;
 
   return (
     <div
       id="app"
       style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
     >
-      <TopBar
-        mode={mode}
-        goToEditor={goToEditor}
-        goToSimulation={goToSimulation}
-        goToGame={goToGame}
-        obstaclesEnabled={obstaclesEnabled}
-        setObstaclesEnabled={(val) => {
-          setObstaclesEnabled(val);
-          appRef.current?.physics.setObstaclesEnabled(val);
-        }}
-        worldFileInputRef={worldFileInputRef}
-        onNewWorld={createNewWorld}
-        onSaveWorld={() => {
-          const app = appRef.current;
-          if (!app) return;
-          const data = app.serializeWorld();
-          const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `world_${Date.now()}.json`;
-          a.click();
-          URL.revokeObjectURL(url);
-        }}
-        onLoadWorldFile={(file) => {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            try {
-              const data = JSON.parse(evt.target?.result as string);
-              const app = appRef.current;
-              if (app) {
-                setSnapshot(null);
-                app.deserializeWorld(data);
-                app.history.clear();
-                syncPlayerControls();
-                updateStats();
+      {/* Верхняя панель управления скрывается в режиме игры */}
+      {mode !== GameMode.GAME && (
+        <TopBar
+          mode={mode}
+          goToEditor={goToEditor}
+          goToSimulation={goToSimulation}
+          goToGame={goToGame}
+          obstaclesEnabled={obstaclesEnabled}
+          setObstaclesEnabled={(val) => {
+            setObstaclesEnabled(val);
+            appRef.current?.physics.setObstaclesEnabled(val);
+          }}
+          worldFileInputRef={worldFileInputRef}
+          onNewWorld={createNewWorld}
+          onSaveWorld={() => {
+            const app = appRef.current;
+            if (!app) return;
+            const data = app.serializeWorld();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `world_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          onLoadWorldFile={(file) => {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              try {
+                const data = JSON.parse(evt.target?.result as string);
+                const app = appRef.current;
+                if (app) {
+                  setSnapshot(null);
+                  app.deserializeWorld(data);
+                  app.history.clear();
+                  syncPlayerControls();
+                  updateStats();
+                }
+              } catch {
+                alert('Ошибка при чтении JSON файла мира!');
               }
-            } catch {
-              alert('Ошибка при чтении JSON файла мира!');
-            }
-          };
-          reader.readAsText(file);
-        }}
-        isPaused={isPaused}
-        togglePause={togglePause}
-        canUndo={appRef.current?.history.canUndo() ?? false}
-        canRedo={appRef.current?.history.canRedo() ?? false}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onOpenHotkeys={() => setIsHotkeysOpen(true)}
-      />
+            };
+            reader.readAsText(file);
+          }}
+          isPaused={isPaused}
+          togglePause={togglePause}
+          canUndo={appRef.current?.history.canUndo() ?? false}
+          canRedo={appRef.current?.history.canRedo() ?? false}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onOpenHotkeys={() => setIsHotkeysOpen(true)}
+        />
+      )}
 
+      {/* Основная рабочая область (Flex-контейнер) */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {/* Будущий Left Dock (добавим на 3 этапе) */}
-        {showBTPanel && (
-          <BTPanel
-            btPanelWidth={btPanelWidth}
+        {/* Левый док (Иерархия, Палитра, BT) */}
+        {mode !== GameMode.GAME && (
+          <LeftDock
+            world={appRef.current?.world}
+            selectedEntityId={selectedEntityId}
+            onSelectEntity={(id) => {
+              appRef.current?.selectEntity(id, true);
+              updateStats();
+            }}
+            onFocusEntity={handleFocusEntity}
+            onSelectSpawnPreset={handleSelectSpawnPreset}
             btData={btData}
             btBlackboard={btBlackboard}
-            onClose={() => setShowBTPanel(false)}
-            onResizeBTStart={startResizingBT}
-            isResizingBT={isResizingBT}
           />
         )}
 
-        {/* Рабочая область холста */}
+        {/* Область отображения холста */}
         <div
           id="canvas-container"
           ref={canvasWrapperRef}
@@ -497,31 +399,39 @@ export const App: React.FC = () => {
             onMouseLeave={handleMouseLeave}
             onContextMenu={(e) => e.preventDefault()}
           />
-          <SelectionBottomPanel
-            selectedEntityIds={selectedEntityIds}
-            selectedEntityId={selectedEntityId}
-            world={appRef.current?.world}
-            typeFilters={typeFilters}
-            leftOffset={0} // Обнулен, так как доки теперь флексовые, а панель внутри холста
-            isResizingBT={isResizingBT}
-            onToggleFilter={(type) =>
-              setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
-            }
-            onSelectEntity={(id) => {
-              appRef.current?.selectEntity(id, false);
-              updateStats();
-            }}
-            onDeselectEntity={(id) => {
-              appRef.current?.deselectEntity(id);
-              updateStats();
-            }}
-            onClearSelection={() => {
-              appRef.current?.selectEntity(null, true);
-              updateStats();
-            }}
-            onDeleteSelected={handleDeleteEntity}
-            onInspectEntity={(id) => modals.openEditModal(id)}
-          />
+
+          {/* Внутриигровой интерфейс HUD */}
+          {mode === GameMode.GAME && (
+            <GameHUD world={appRef.current?.world} onExitToEditor={goToEditor} />
+          )}
+
+          {/* Нижняя панель группового выделения (Drawer) */}
+          {mode !== GameMode.GAME && (
+            <SelectionBottomPanel
+              selectedEntityIds={selectedEntityIds}
+              selectedEntityId={selectedEntityId}
+              world={appRef.current?.world}
+              typeFilters={typeFilters}
+              onToggleFilter={(type) =>
+                setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
+              }
+              onSelectEntity={(id) => {
+                appRef.current?.selectEntity(id, false);
+                updateStats();
+              }}
+              onDeselectEntity={(id) => {
+                appRef.current?.deselectEntity(id);
+                updateStats();
+              }}
+              onClearSelection={() => {
+                appRef.current?.selectEntity(null, true);
+                updateStats();
+              }}
+              onDeleteSelected={handleDeleteEntity}
+            />
+          )}
+
+          {/* Плашка режима размещения */}
           {placementMode && (
             <div
               style={{
@@ -551,137 +461,25 @@ export const App: React.FC = () => {
           )}
         </div>
 
-        {/* Правый док (Toolbar) */}
-        <Toolbar
-          mode={mode}
-          selectedEntityId={selectedEntityId}
-          world={appRef.current?.world}
-          openSpawnModal={modals.openSpawnModal}
-          openItemSpawnModal={modals.openItemSpawnModal}
-          openZoneSpawnModal={modals.openZoneSpawnModal}
-          openObstacleSpawnModal={modals.openObstacleSpawnModal}
-          openEditModal={modals.openEditModal}
-          openSlotModal={modals.openSlotModal}
-          openAreaModal={modals.openAreaModal}
-          handleDeleteEntity={handleDeleteEntity}
-        />
+        {/* Правый док (Живой Инспектор) */}
+        {mode !== GameMode.GAME && (
+          <Inspector
+            mode={mode}
+            selectedEntityId={selectedEntityId}
+            world={appRef.current?.world}
+            physics={appRef.current?.physics}
+            aiSystem={appRef.current?.aiSystem}
+            onCommitHistory={(desc) => {
+              appRef.current?.commitHistory(desc);
+              updateStats();
+            }}
+            onUpdateStats={updateStats}
+            handleDeleteEntity={handleDeleteEntity}
+          />
+        )}
       </div>
 
       <HotkeysModal isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
-
-      <ZoneSpawnModal
-        isOpen={modals.isZoneSpawnModalOpen}
-        onClose={modals.closeZoneSpawnModal}
-        onConfirm={handleZoneSpawnConfirm}
-      />
-
-      <ObstacleSpawnModal
-        isOpen={modals.isObstacleSpawnModalOpen}
-        onClose={modals.closeObstacleSpawnModal}
-        onConfirm={handleObstacleSpawnConfirm}
-      />
-
-      <SpawnModal
-        isOpen={modals.isModalOpen}
-        pendingSpawnBehavior={modals.pendingSpawnBehavior}
-        setPendingSpawnBehavior={modals.setPendingSpawnBehavior}
-        isSolid={modals.isSolid}
-        setIsSolid={modals.setIsSolid}
-        radius={modals.radius}
-        setRadius={modals.setRadius}
-        weight={modals.weight}
-        setWeight={modals.setWeight}
-        maxSpeed={modals.maxSpeed}
-        setMaxSpeed={modals.setMaxSpeed}
-        maxTurnSpeed={modals.maxTurnSpeed}
-        setMaxTurnSpeed={modals.setMaxTurnSpeed}
-        runSpeedMultiplier={modals.runSpeedMultiplier}
-        setRunSpeedMultiplier={modals.setRunSpeedMultiplier}
-        crouchSpeedMultiplier={modals.crouchSpeedMultiplier}
-        setCrouchSpeedMultiplier={modals.setCrouchSpeedMultiplier}
-        walkSpeedMultiplier={modals.walkSpeedMultiplier}
-        setWalkSpeedMultiplier={modals.setWalkSpeedMultiplier}
-        crouchStealthMultiplier={modals.crouchStealthMultiplier}
-        setCrouchStealthMultiplier={modals.setCrouchStealthMultiplier}
-        runTurnMultiplier={modals.runTurnMultiplier}
-        setRunTurnMultiplier={modals.setRunTurnMultiplier}
-        crouchTurnMultiplier={modals.crouchTurnMultiplier}
-        setCrouchTurnMultiplier={modals.setCrouchTurnMultiplier}
-        strafeSpeedMultiplier={modals.strafeSpeedMultiplier}
-        setStrafeSpeedMultiplier={modals.setStrafeSpeedMultiplier}
-        backwardSpeedMultiplier={modals.backwardSpeedMultiplier}
-        setBackwardSpeedMultiplier={modals.setBackwardSpeedMultiplier}
-        strafeTurnMultiplier={modals.strafeTurnMultiplier}
-        setStrafeTurnMultiplier={modals.setStrafeTurnMultiplier}
-        backwardTurnMultiplier={modals.backwardTurnMultiplier}
-        setBackwardTurnMultiplier={modals.setBackwardTurnMultiplier}
-        pickupSpeedMultiplier={modals.pickupSpeedMultiplier}
-        setPickupSpeedMultiplier={modals.setPickupSpeedMultiplier}
-        pickupTurnMultiplier={modals.pickupTurnMultiplier}
-        setPickupTurnMultiplier={modals.setPickupTurnMultiplier}
-        stealthPower={modals.stealthPower}
-        setStealthPower={modals.setStealthPower}
-        runStealthMultiplier={modals.runStealthMultiplier}
-        setRunStealthMultiplier={modals.setRunStealthMultiplier}
-        walkStealthMultiplier={modals.walkStealthMultiplier}
-        setWalkStealthMultiplier={modals.setWalkStealthMultiplier}
-        turnInPlaceStealthMultiplier={modals.turnInPlaceStealthMultiplier}
-        setTurnInPlaceStealthMultiplier={modals.setTurnInPlaceStealthMultiplier}
-        immobileStealthMultiplier={modals.immobileStealthMultiplier}
-        setImmobileStealthMultiplier={modals.setImmobileStealthMultiplier}
-        defense={modals.defense}
-        setDefense={modals.setDefense}
-        flatReduction={modals.flatReduction}
-        setFlatReduction={modals.setFlatReduction}
-        onClose={modals.closeSpawnModal}
-        onConfirm={handleSpawnConfirm}
-      />
-
-      <ItemSpawnModal
-        isOpen={modals.isItemSpawnModalOpen}
-        onClose={modals.closeItemSpawnModal}
-        onConfirm={handleItemSpawnConfirm}
-      />
-
-      <InteractionSlotModal
-        isOpen={modals.isSlotModalOpen}
-        creatureId={modals.editingSlot?.creatureId ?? null}
-        slotId={modals.editingSlot?.slotId ?? null}
-        world={appRef.current?.world}
-        isReadOnly={isReadOnly}
-        onClose={modals.closeCurrentModal}
-        onBeforeSave={() => appRef.current?.commitHistory('Настройка ячейки взаимодействия')}
-        onInspectItem={(itemId) => modals.openEditModal(itemId)}
-        onConfirm={updateStats}
-      />
-
-      <EquipmentAreaModal
-        isOpen={modals.isAreaModalOpen}
-        creatureId={modals.editingArea?.creatureId ?? null}
-        areaId={modals.editingArea?.areaId ?? null}
-        world={appRef.current?.world}
-        isReadOnly={isReadOnly}
-        onClose={modals.closeCurrentModal}
-        onBeforeSave={() => appRef.current?.commitHistory('Настройка области экипировки')}
-        onInspectItem={(itemId) => modals.openEditModal(itemId)}
-        onConfirm={updateStats}
-      />
-
-      <UniversalEditModal
-        isOpen={modals.isEditModalOpen}
-        entityId={modals.editingEntityId}
-        world={appRef.current?.world}
-        physics={appRef.current?.physics}
-        aiSystem={appRef.current?.aiSystem}
-        isReadOnly={isReadOnly}
-        onClose={modals.closeCurrentModal}
-        onBeforeApply={() => appRef.current?.commitHistory('Редактирование сущности')}
-        onConfirm={() => {
-          modals.closeCurrentModal();
-          updateStats();
-        }}
-        onInspectItem={(itemId) => modals.openEditModal(itemId)}
-      />
     </div>
   );
 };

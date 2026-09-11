@@ -5,11 +5,11 @@ interface GlobalShortcutsProps {
   mode: GameMode;
   isPaused: boolean;
   togglePause: () => void;
-  modals: any; // В идеале типизировать интерфейсом UseGameModalsReturn
-  handleSpawnConfirm: () => void;
-  setShowBTPanel: React.Dispatch<React.SetStateAction<boolean>>;
+  handleDeleteEntity: () => void;
+  onQuickSpawn?: (type: 'player' | 'attacker') => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onExitGame?: () => void;
 }
 
 export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
@@ -26,34 +26,16 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         return; // Игнорируем нажатия при вводе текста
       }
 
-      const { mode, togglePause, modals, handleSpawnConfirm, setShowBTPanel, onUndo, onRedo } =
+      const { mode, togglePause, handleDeleteEntity, onQuickSpawn, onUndo, onRedo, onExitGame } =
         propsRef.current;
 
-      // Обработка Esc и Enter для модалок
+      // Выход из режима игры по клавише Escape
       if (e.key === 'Escape' || e.code === 'Escape') {
-        if (modals.isEditModalOpen) modals.closeAllEditModals();
-        else if (modals.isModalOpen) modals.closeSpawnModal();
-        else if (modals.isItemSpawnModalOpen) modals.closeItemSpawnModal();
-        else if (modals.isZoneSpawnModalOpen) modals.closeZoneSpawnModal();
-        return;
-      }
-
-      if (e.key === 'Enter' || e.code === 'Enter') {
-        if (modals.isModalOpen) {
+        if (mode === GameMode.GAME && onExitGame) {
           e.preventDefault();
-          handleSpawnConfirm();
+          onExitGame();
+          return;
         }
-        return;
-      }
-
-      // Если открыта любая модалка, блокируем остальные хоткеи
-      if (
-        modals.isModalOpen ||
-        modals.isItemSpawnModalOpen ||
-        modals.isZoneSpawnModalOpen ||
-        modals.isEditModalOpen
-      ) {
-        return;
       }
 
       // Быстрые клавиши отмены и повтора (Undo / Redo)
@@ -84,7 +66,7 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         return;
       }
 
-      // Быстрые клавиши интерфейса
+      // Удаление выделенного
       if (
         e.code === 'Delete' ||
         e.key === 'Delete' ||
@@ -93,23 +75,22 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
       ) {
         if (mode === GameMode.EDITOR) {
           e.preventDefault();
-          handleSpawnConfirm(); // fallback
-          if (modals.handleDeleteEntity) modals.handleDeleteEntity();
+          handleDeleteEntity();
         }
-      } else if (e.code === 'KeyU' || e.key.toLowerCase() === 'u') {
-        if (mode !== GameMode.GAME) {
-          setShowBTPanel((prev: boolean) => !prev);
+        return;
+      }
+
+      // Быстрый спавн
+      if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
+        if (mode === GameMode.EDITOR && onQuickSpawn) {
+          onQuickSpawn('player');
+          e.preventDefault();
         }
-        e.preventDefault();
       } else if (e.ctrlKey && (e.code === 'KeyB' || e.key.toLowerCase() === 'b')) {
-        if (mode === GameMode.EDITOR) modals.openSpawnModal('AttackerTree');
-        e.preventDefault();
-      } else if (e.ctrlKey && (e.code === 'KeyP' || e.key.toLowerCase() === 'p')) {
-        if (mode === GameMode.EDITOR) modals.openSpawnModal('PlayerTree');
-        e.preventDefault();
-      } else if (e.ctrlKey && (e.code === 'KeyI' || e.key.toLowerCase() === 'i')) {
-        if (mode === GameMode.EDITOR) modals.openItemSpawnModal();
-        e.preventDefault();
+        if (mode === GameMode.EDITOR && onQuickSpawn) {
+          onQuickSpawn('attacker');
+          e.preventDefault();
+        }
       }
     };
 
