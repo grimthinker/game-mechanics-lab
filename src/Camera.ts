@@ -64,4 +64,10 @@ export class Camera {
     this.offsetX = canvas.width / 2 - worldX * this.scale;
     this.offsetY = canvas.height / 2 - worldY * this.scale;
   }
+
+  public reset(canvas: HTMLCanvasElement): void {
+    this.scale = 1.0;
+    this.offsetX = canvas.width / 2;
+    this.offsetY = canvas.height / 2;
+  }
 }

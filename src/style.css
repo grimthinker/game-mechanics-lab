@@ -84,6 +84,12 @@ select {
   padding: 4px 8px;
   border-radius: 4px;
 }
+select {
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
 
 .btn {
   background-color: #34495e;

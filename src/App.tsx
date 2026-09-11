@@ -11,10 +11,12 @@ import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
 import { GameHUD } from './components/GameHUD';
+import { CanvasHUD } from './components/CanvasHUD';
 import { SelectionBottomPanel } from './components/SelectionBottomPanel';
 import { PlacementMode } from './types';
 import { GameMode } from './constants';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import './editor.css';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -125,16 +127,30 @@ export const App: React.FC = () => {
     mode,
   });
 
-  const { canvasRef, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave } =
-    useCanvasInteraction({
-      appRef,
-      placementMode,
-      setPlacementMode,
-      syncPlayerControls,
-      updateStats,
-      mode,
-      typeFilters,
-    });
+  const {
+    canvasRef,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleMouseLeave,
+    cursorWorldPos,
+  } = useCanvasInteraction({
+    appRef,
+    placementMode,
+    setPlacementMode,
+    syncPlayerControls,
+    updateStats,
+    mode,
+    typeFilters,
+  });
+
+  const handleResetCamera = useCallback(() => {
+    const app = appRef.current;
+    const canvas = canvasRef.current;
+    if (!app || !canvas) return;
+    app.camera.reset(canvas);
+    updateStats();
+  }, [canvasRef, updateStats]);
 
   const createNewWorld = useCallback(() => {
     setSnapshot(null);
@@ -390,6 +406,15 @@ export const App: React.FC = () => {
           ref={canvasWrapperRef}
           style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
         >
+          {/* Статус-бар холста (зум, координаты, сброс вида) */}
+          {mode !== GameMode.GAME && (
+            <CanvasHUD
+              camera={appRef.current?.camera}
+              cursorWorldPos={cursorWorldPos}
+              onResetCamera={handleResetCamera}
+            />
+          )}
+
           <canvas
             id="game-canvas"
             ref={canvasRef}

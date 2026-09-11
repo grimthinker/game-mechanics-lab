@@ -589,17 +589,19 @@ export const Inspector: React.FC<InspectorProps> = ({
     }
   }, [draftArmor]);
 
-  if (!targetId || !world) {
+  if (!targetId || !world || !world.getEntity(targetId)) {
     return (
       <div
         style={{
           backgroundColor: THEME_COLORS[mode],
           width: '320px',
           minWidth: '320px',
+          maxWidth: '320px',
           height: '100%',
           borderLeft: '1px solid #333',
           padding: '16px',
           color: '#777',
+          boxSizing: 'border-box',
         }}
       >
         <p className="selection-hint" style={{ textAlign: 'center', marginTop: '50px' }}>
@@ -621,8 +623,11 @@ export const Inspector: React.FC<InspectorProps> = ({
         backgroundColor: THEME_COLORS[mode],
         width: '320px',
         minWidth: '320px',
+        maxWidth: '320px',
         height: '100%',
         overflowY: 'auto',
+        overflowX: 'hidden',
+        boxSizing: 'border-box',
         borderLeft: '1px solid #333',
         display: 'flex',
         flexDirection: 'column',
@@ -758,7 +763,7 @@ export const Inspector: React.FC<InspectorProps> = ({
               <div style={contentStyle}>
                 <TriggerZoneInspector
                   values={draftZone}
-                  onChange={(p) => setDraftZone((prev: any) => ({ ...prev, ...p }))}
+                  onChange={(p: any) => setDraftZone((prev: any) => ({ ...prev, ...p }))}
                   isReadOnly={isReadOnly}
                 />
               </div>
@@ -771,7 +776,7 @@ export const Inspector: React.FC<InspectorProps> = ({
               <div style={contentStyle}>
                 <WeaponFormFields
                   values={draftWeapon}
-                  onChange={(p) => setDraftWeapon((prev) => (prev ? { ...prev, ...p } : null))}
+                  onChange={(p: any) => setDraftWeapon((prev) => (prev ? { ...prev, ...p } : null))}
                   onZoneTypeChange={(newType) => {
                     zoneParamsMapRef.current[draftWeapon.hitZoneType] = {
                       length: draftWeapon.length,
@@ -810,7 +815,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                 {currentArchetype !== 'creature' && (
                   <ArmorFormFields
                     values={draftArmor}
-                    onChange={(p) => setDraftArmor((prev: any) => ({ ...prev, ...p }))}
+                    onChange={(p: any) => setDraftArmor((prev: any) => ({ ...prev, ...p }))}
                     isReadOnly={isReadOnly}
                   />
                 )}
@@ -860,7 +865,7 @@ export const Inspector: React.FC<InspectorProps> = ({
               <div style={contentStyle}>
                 <BagFormFields
                   values={draftBag}
-                  onChange={(p) => setDraftBag((prev: any) => ({ ...prev, ...p }))}
+                  onChange={(p: any) => setDraftBag((prev: any) => ({ ...prev, ...p }))}
                   isReadOnly={isReadOnly}
                   isBagInventoryEmpty={isBagEmpty}
                 />

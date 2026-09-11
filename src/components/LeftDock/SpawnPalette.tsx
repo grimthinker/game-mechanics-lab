@@ -31,21 +31,33 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset }) =>
           name: 'Игрок',
           description: 'Управление WASD, дерево PlayerTree',
           icon: '🎮',
-          createConfig: () => createDefaultCreatureConfig('PlayerTree'),
+          createConfig: () => {
+            const config = createDefaultCreatureConfig('PlayerTree');
+            if (config.meta) config.meta.name = 'Игрок';
+            return config;
+          },
         },
         {
           id: 'creature_attacker',
           name: 'Бот-атакующий',
           description: 'Поиск цели, преследование, AttackerTree',
           icon: '⚔️',
-          createConfig: () => createDefaultCreatureConfig('AttackerTree'),
+          createConfig: () => {
+            const config = createDefaultCreatureConfig('AttackerTree');
+            if (config.meta) config.meta.name = 'Бот-атакующий';
+            return config;
+          },
         },
         {
           id: 'creature_idle',
           name: 'Мирный бот',
           description: 'Существо без активного поведения',
           icon: '👤',
-          createConfig: () => createDefaultCreatureConfig('IdleTree'),
+          createConfig: () => {
+            const config = createDefaultCreatureConfig('IdleTree');
+            if (config.meta) config.meta.name = 'Мирный бот';
+            return config;
+          },
         },
       ],
     },

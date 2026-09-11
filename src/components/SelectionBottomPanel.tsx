@@ -34,12 +34,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
   onClearSelection,
   onDeleteSelected,
 }) => {
-  // Автоматическое скрытие: панель активна только при групповом выделении (2+ сущности)
-  if (selectedEntityIds.length <= 1) {
-    return null;
-  }
-
-  // Унифицированный ресайз высоты нижней панели
+  // Унифицированный ресайз высоты нижней панели (вызывается строго до любых условий)
   const {
     size: panelHeight,
     isResizing,
@@ -51,6 +46,11 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
     maxSize: () => Math.max(90, window.innerHeight - 200),
     direction: 'vertical-inverted',
   });
+
+  // Автоматическое скрытие: панель активна только при групповом выделении (2+ сущности)
+  if (selectedEntityIds.length <= 1) {
+    return null;
+  }
 
   const getEntityDisplayData = (id: string) => {
     if (!world) return { name: id, icon: '❓', archetype: 'unknown' };

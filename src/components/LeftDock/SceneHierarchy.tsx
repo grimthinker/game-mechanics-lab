@@ -8,6 +8,14 @@ interface SceneHierarchyProps {
   onFocusEntity: (id: string) => void;
 }
 
+interface EntityHierarchyItem {
+  id: string;
+  name: string;
+  hp?: string;
+  icon: string;
+  badges: Array<{ label: string; color: string }>;
+}
+
 const ARCHETYPE_CONFIG: Record<string, { label: string; icon: string }> = {
   creature: { label: 'Существа', icon: '👤' },
   item: { label: 'Предметы', icon: '📦' },
@@ -25,7 +33,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
   const [search, setSearch] = useState('');
 
   const groupedEntities = useMemo(() => {
-    const groups: Record<string, Array<{ id: string; name: string; hp?: string; icon: string }>> = {
+    const groups: Record<string, EntityHierarchyItem[]> = {
       creature: [],
       item: [],
       obstacle: [],
@@ -62,27 +70,57 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
         ? `${Math.round(health.current)}/${Math.round(health.max.current)}`
         : undefined;
 
+      const badges: Array<{ label: string; color: string }> = [];
+      if (comp.aiStats?.behavior.current && comp.aiStats.behavior.current !== 'IdleTree') {
+        badges.push({ label: 'AI', color: '#2980b9' });
+      }
+      if (
+        comp.equip &&
+        (comp.equip.interactionSlots.some((s) => s.itemId) ||
+          comp.equip.equipmentAreas.some((a) => a.itemIds.length > 0))
+      ) {
+        badges.push({ label: 'ЭКИП', color: '#8e44ad' });
+      }
+      if (comp.inventory && comp.inventory.slots.some((row) => row.some((cell) => cell.itemId))) {
+        badges.push({ label: 'ИНВ', color: '#27ae60' });
+      }
+      if (comp.zoneTrigger) {
+        badges.push({ label: 'ЗОНА', color: '#d35400' });
+      }
+
+      const entityData: EntityHierarchyItem = { id, name, hp, icon, badges };
+
       if (groups[archetype]) {
-        groups[archetype].push({ id, name, hp, icon });
+        groups[archetype].push(entityData);
       } else {
-        groups.creature.push({ id, name, hp, icon });
+        groups.creature.push(entityData);
       }
     }
 
     return groups;
   }, [world, search]);
 
+  const totalCount = world ? world.getAllEntities().length : 0;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      {/* Строка поиска */}
-      <div style={{ padding: '8px 10px', borderBottom: '1px solid #2a2a2a' }}>
+      {/* Строка поиска и общий счетчик */}
+      <div
+        style={{
+          padding: '8px 10px',
+          borderBottom: '1px solid #2a2a2a',
+          display: 'flex',
+          gap: '8px',
+          alignItems: 'center',
+        }}
+      >
         <input
           type="text"
           placeholder="Поиск сущностей..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
-            width: '100%',
+            flex: 1,
             boxSizing: 'border-box',
             backgroundColor: '#111',
             border: '1px solid #333',
@@ -92,6 +130,9 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
             fontSize: '12px',
           }}
         />
+        <span style={{ fontSize: '10px', color: '#777', flexShrink: 0 }}>
+          Всего: <strong style={{ color: '#aaa' }}>{totalCount}</strong>
+        </span>
       </div>
 
       {/* Список сущностей */}
@@ -171,6 +212,16 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
                           >
                             {entity.name}
                           </span>
+                          {entity.badges &&
+                            entity.badges.map((b) => (
+                              <span
+                                key={b.label}
+                                className="entity-badge"
+                                style={{ backgroundColor: b.color }}
+                              >
+                                {b.label}
+                              </span>
+                            ))}
                         </div>
                         {entity.hp && (
                           <span

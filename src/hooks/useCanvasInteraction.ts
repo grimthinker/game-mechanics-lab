@@ -1,6 +1,7 @@
 import {
   useRef,
   useEffect,
+  useState,
   MutableRefObject,
   Dispatch,
   SetStateAction,
@@ -8,7 +9,7 @@ import {
 } from 'react';
 import { GameApp } from '../GameApp';
 import { GameMode } from '../constants';
-import { PlacementMode } from '../types';
+import { PlacementMode, Point } from '../types';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -34,6 +35,7 @@ export const useCanvasInteraction = ({
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const clickedEntityIdRef = useRef<string | null>(null);
   const isMarqueeActiveRef = useRef<boolean>(false);
+  const [cursorWorldPos, setCursorWorldPos] = useState<Point | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -128,6 +130,7 @@ export const useCanvasInteraction = ({
     }
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
+    setCursorWorldPos({ x: Math.round(point.x), y: Math.round(point.y) });
 
     // Обновление рамки выделения
     if (isMarqueeActiveRef.current && (e.buttons & 1) === 1) {
@@ -220,7 +223,8 @@ export const useCanvasInteraction = ({
     if (placementMode && mode === GameMode.EDITOR) {
       if (placementMode.kind === 'entity') {
         app.commitHistory('Спавн объекта');
-        app.spawnEntity(placementMode.config, point);
+        const spawnedId = app.spawnEntity(placementMode.config, point);
+        app.selectEntity(spawnedId, true);
       }
       setPlacementMode(null);
       syncPlayerControls();
@@ -261,6 +265,7 @@ export const useCanvasInteraction = ({
     }
     clickedEntityIdRef.current = null;
     dragStartPosRef.current = null;
+    setCursorWorldPos(null);
   };
 
   return {
@@ -269,5 +274,6 @@ export const useCanvasInteraction = ({
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
+    cursorWorldPos,
   };
 };

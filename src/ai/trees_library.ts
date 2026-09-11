@@ -28,9 +28,9 @@ export const BEHAVIOR_TREES: Record<string, () => BTNode> = {
 };
 
 export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
-  PlayerTree: 'Игрок (Управление с клавиатуры)',
-  AttackerTree: 'Бот-атакующий',
-  CombatTree: 'Боевое поведение',
+  PlayerTree: 'Игрок (WASD)',
+  AttackerTree: 'Атакующий бот',
+  CombatTree: 'Боевой режим',
   IdleTree: 'Бездействие',
 };
 
