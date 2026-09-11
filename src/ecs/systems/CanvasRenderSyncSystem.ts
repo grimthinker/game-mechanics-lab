@@ -49,7 +49,7 @@ export class CanvasRenderSyncSystem {
           }
 
           if (textPrim && textPrim.kind === 'text') {
-            textPrim.offset = { x: 0, y: zoneTrigger.radius + 8 };
+            textPrim.offset = { x: 0, y: -(zoneTrigger.radius + 12) };
             const meta = world.getComponent(id, 'meta');
             if (meta) textPrim.text = meta.name;
           }

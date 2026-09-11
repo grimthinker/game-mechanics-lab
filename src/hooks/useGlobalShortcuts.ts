@@ -18,6 +18,11 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Предотвращаем фокус меню браузера по нажатию на Alt
+      if (e.key === 'Alt') {
+        e.preventDefault();
+      }
+
       const target = e.target as HTMLElement | null;
       if (
         target &&

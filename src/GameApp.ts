@@ -49,6 +49,7 @@ export class GameApp {
   private attachmentSystem: AttachmentSystem;
   public camera: Camera;
   public activeRendererMode: '2d' | '3d' = '2d';
+  public showUIOverlays: boolean = true;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
 
@@ -591,6 +592,7 @@ export class GameApp {
         draggedGhosts: draggedGhosts,
         marqueeBox: this.marqueeBox,
       },
+      showUIOverlays: this.showUIOverlays,
     });
     if (this.onFrame) this.onFrame();
 

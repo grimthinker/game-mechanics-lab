@@ -91,6 +91,23 @@ export class ThreeSyncSystem {
         } else {
           obj.scale.set(1, 1, 1);
         }
+
+        // Динамическое обновление материала зоны при изменении эффекта в редакторе
+        if (archetype === 'zone') {
+          const zTrigger = world.getComponent(id, 'zoneTrigger');
+          if (zTrigger) {
+            let mat = this.matZoneNeutral;
+            if (zTrigger.effect === 'damage') mat = this.matZoneDmg;
+            else if (zTrigger.effect === 'heal') mat = this.matZoneHeal;
+
+            const mainMesh = obj.children.find(
+              (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
+            ) as THREE.Mesh;
+            if (mainMesh && mainMesh.material !== mat) {
+              mainMesh.material = mat;
+            }
+          }
+        }
       }
     }
 

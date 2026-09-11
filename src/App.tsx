@@ -26,8 +26,15 @@ export const App: React.FC = () => {
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
   const [snapshot, setSnapshot] = useState<any>(null);
   const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
+  const [showUIOverlays, setShowUIOverlays] = useState<boolean>(true);
 
   const modeRef = useRef(mode);
+
+  const setShowUIOverlaysSync = useCallback((val: boolean) => {
+    setShowUIOverlays(val);
+    if (appRef.current) appRef.current.showUIOverlays = val;
+    updateStatsRef.current();
+  }, []);
 
   const setModeSync = useCallback((m: GameMode) => {
     setMode(m);
@@ -385,6 +392,8 @@ export const App: React.FC = () => {
               appRef.current.setRendererMode(nextMode);
             }
           }}
+          showUIOverlays={showUIOverlays}
+          setShowUIOverlays={setShowUIOverlaysSync}
         />
       )}
 

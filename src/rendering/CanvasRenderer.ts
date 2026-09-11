@@ -51,11 +51,16 @@ export class CanvasRenderer implements IRenderer {
   }
 
   public render(context: RenderContext): void {
-    const { camera, world, gameMode, editorData } = context;
+    const { camera, world, gameMode, editorData, showUIOverlays } = context;
     const { selectedId, selectedIds, hoveredId, draggedGhosts, marqueeBox } = editorData;
 
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Вращение вокруг центра экрана
+    this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+    this.ctx.rotate(camera.yaw);
+    this.ctx.translate(-this.canvas.width / 2, -this.canvas.height / 2);
 
     this.ctx.translate(camera.offsetX, camera.offsetY);
     this.ctx.scale(camera.scale, camera.scale);
@@ -69,7 +74,8 @@ export class CanvasRenderer implements IRenderer {
       hoveredId,
       gameMode,
       draggedGhosts,
-      marqueeBox
+      marqueeBox,
+      showUIOverlays
     );
 
     this.ctx.restore();
@@ -110,7 +116,8 @@ export class CanvasRenderer implements IRenderer {
     hoveredId: EntityId | null,
     gameMode: string = 'editor',
     draggedGhosts?: Array<{ id: EntityId; origPos: Point; pos: Point }> | null,
-    marqueeBox?: { start: Point; current: Point } | null
+    marqueeBox?: { start: Point; current: Point } | null,
+    showUIOverlays: boolean = true
   ): void {
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
@@ -182,7 +189,9 @@ export class CanvasRenderer implements IRenderer {
     }
 
     // Отрисовка Healthbars и ID-текстов
-    this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera, gameMode);
+    if (showUIOverlays) {
+      this.renderUIOverlays(world.getEntitiesWith('transform', 'health'), world, camera, gameMode);
+    }
 
     // Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);

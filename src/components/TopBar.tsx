@@ -21,6 +21,8 @@ export interface TopBarProps {
   onOpenHotkeys: () => void;
   renderMode: '2d' | '3d';
   onToggleRenderMode: () => void;
+  showUIOverlays: boolean;
+  setShowUIOverlays: (val: boolean) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -43,6 +45,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenHotkeys,
   renderMode,
   onToggleRenderMode,
+  showUIOverlays,
+  setShowUIOverlays,
 }) => {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
 
@@ -282,6 +286,24 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           {renderMode === '2d' ? '2D CANVAS' : '3D WEBGL'}
         </button>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            color: '#bdc3c7',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showUIOverlays}
+            onChange={(e) => setShowUIOverlays(e.target.checked)}
+          />
+          Имена и HP
+        </label>
 
         <label
           style={{

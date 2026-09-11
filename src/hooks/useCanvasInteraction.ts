@@ -58,6 +58,13 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app) return;
 
+    // Вращение камеры (LAlt + ЛКМ)
+    if (e.button === 0 && e.altKey) {
+      e.preventDefault();
+      app.camera.startRotate(e.clientX, e.clientY);
+      return;
+    }
+
     // Панорамирование камеры на СКМ (колесико мыши)
     if (e.button === 1) {
       e.preventDefault();
@@ -115,6 +122,13 @@ export const useCanvasInteraction = ({
   const handleMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
     const app = appRef.current;
     if (!app) return;
+
+    // Вращение
+    if (app.camera.isRotating) {
+      app.camera.rotate(e.clientX, e.clientY);
+      e.currentTarget.style.cursor = 'move';
+      return;
+    }
 
     // Панорамирование камеры зажатым СКМ
     if ((e.buttons & 4) === 4) {
@@ -189,6 +203,12 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app) return;
 
+    if (app.camera.isRotating) {
+      app.camera.endRotate();
+      e.currentTarget.style.cursor = 'default';
+      return;
+    }
+
     if (e.button === 1) {
       app.endPan();
       e.currentTarget.style.cursor = 'default';
@@ -259,6 +279,9 @@ export const useCanvasInteraction = ({
       if (isMarqueeActiveRef.current) {
         app.marqueeBox = null;
         isMarqueeActiveRef.current = false;
+      }
+      if (app.camera.isRotating) {
+        app.camera.endRotate();
       }
       app.endPan();
       app.hoverEntity(null);

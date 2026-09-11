@@ -18,6 +18,7 @@ export interface RenderContext {
   physics: PhysicsSystem;
   gameMode: string;
   editorData: EditorRenderData;
+  showUIOverlays: boolean;
 }
 
 export interface IRenderer {
