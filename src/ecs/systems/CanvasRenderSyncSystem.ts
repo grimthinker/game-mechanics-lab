@@ -1,13 +1,8 @@
 import { World } from '../World';
 import { GameMode } from '../../constants';
-import {
-  RENDER_Z_INDEX,
-  RenderCirclePrimitive,
-  RenderLinePrimitive,
-  RenderPolygonPrimitive,
-} from '../types';
+import { RENDER_Z_INDEX, RenderCirclePrimitive, RenderPolygonPrimitive } from '../types';
 
-export class RenderSyncSystem {
+export class CanvasRenderSyncSystem {
   public update(_dt: number, world: World, gameMode: GameMode): void {
     const entities = world.getEntitiesWith('renderable');
 

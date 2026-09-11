@@ -1,37 +1,55 @@
 import { Circle } from 'detect-collisions';
-import { World } from './ecs/World';
-import { Camera } from './Camera';
-import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
+import { World } from '../ecs/World';
+import { Camera } from '../Camera';
+import { PhysicsSystem } from '../ecs/systems/PhysicsSystem';
 import {
   EntityId,
   HitZoneConfig,
   RenderableComponent,
   RenderPrimitive,
   TransformComponent,
-} from './ecs/types';
-import { Point } from './types';
-import { VISUAL_CONFIG } from '../config/visualConfig';
+} from '../ecs/types';
+import { Point } from '../types';
+import { VISUAL_CONFIG } from '../../config/visualConfig';
+import { IRenderer, RenderContext } from './IRenderer';
 
-export class Renderer {
+export class CanvasRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
+  private container: HTMLDivElement;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+  constructor(container: HTMLDivElement) {
+    this.container = container;
+    this.canvas = document.createElement('canvas');
+    this.canvas.style.display = 'block';
+    this.canvas.style.width = '100%';
+    this.canvas.style.height = '100%';
+    this.canvas.style.position = 'absolute';
+    this.canvas.style.top = '0';
+    this.canvas.style.left = '0';
+    this.container.appendChild(this.canvas);
+    this.ctx = this.canvas.getContext('2d')!;
   }
 
-  public render(
-    camera: Camera,
-    world: World,
-    _physics: PhysicsSystem,
-    selectedId: EntityId | null,
-    selectedIds: Set<EntityId> = new Set(),
-    gameMode: string = 'editor',
-    hoveredId: EntityId | null = null,
-    draggedGhosts?: Array<{ id: EntityId; origPos: Point; pos: Point }> | null,
-    marqueeBox?: { start: Point; current: Point } | null
-  ): void {
+  public getCanvas(): HTMLCanvasElement {
+    return this.canvas;
+  }
+
+  public resize(width: number, height: number): void {
+    this.canvas.width = width;
+    this.canvas.height = height;
+  }
+
+  public destroy(): void {
+    if (this.canvas && this.canvas.parentNode) {
+      this.canvas.parentNode.removeChild(this.canvas);
+    }
+  }
+
+  public render(context: RenderContext): void {
+    const { camera, world, gameMode, editorData } = context;
+    const { selectedId, selectedIds, hoveredId, draggedGhosts, marqueeBox } = editorData;
+
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 

@@ -25,6 +25,7 @@ export const App: React.FC = () => {
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
   const [snapshot, setSnapshot] = useState<any>(null);
+  const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
 
   const modeRef = useRef(mode);
 
@@ -128,7 +129,7 @@ export const App: React.FC = () => {
   });
 
   const {
-    canvasRef,
+    containerRef,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -146,18 +147,18 @@ export const App: React.FC = () => {
 
   const handleResetCamera = useCallback(() => {
     const app = appRef.current;
-    const canvas = canvasRef.current;
+    const canvas = app?.canvas;
     if (!app || !canvas) return;
     app.camera.reset(canvas);
     updateStats();
-  }, [canvasRef, updateStats]);
+  }, [updateStats]);
 
   const createNewWorld = useCallback(() => {
     setSnapshot(null);
     const app = appRef.current;
     if (!app) return;
 
-    const canvas = canvasRef.current;
+    const canvas = app.canvas;
     const spawnPos = {
       x: canvas ? canvas.width / 2 : 300,
       y: canvas ? canvas.height / 2 : 300,
@@ -166,12 +167,12 @@ export const App: React.FC = () => {
     app.initDefaultWorld(spawnPos);
     syncPlayerControls();
     updateStats();
-  }, [canvasRef, syncPlayerControls, updateStats]);
+  }, [syncPlayerControls, updateStats]);
 
-  // Инициализация движка строго 1 раз при монтировании канваса
+  // Инициализация движка строго 1 раз при монтировании контейнера
   useEffect(() => {
-    if (!canvasRef.current) return;
-    const app = new GameApp(canvasRef.current);
+    if (!containerRef.current) return;
+    const app = new GameApp(containerRef.current);
     appRef.current = app;
 
     app.gameMode = modeRef.current;
@@ -182,7 +183,7 @@ export const App: React.FC = () => {
     app.onFrame = () => updateStatsRef.current();
 
     // Создание начального мира при первом запуске
-    const canvas = canvasRef.current;
+    const canvas = app.canvas;
     const spawnPos = {
       x: canvas ? canvas.width / 2 : 300,
       y: canvas ? canvas.height / 2 : 300,
@@ -299,17 +300,14 @@ export const App: React.FC = () => {
     });
   }, []);
 
-  const handleFocusEntity = useCallback(
-    (id: string) => {
-      const app = appRef.current;
-      if (!app || !canvasRef.current) return;
-      const transform = app.world.getComponent(id, 'transform');
-      if (transform) {
-        app.camera.lookAt(transform.x, transform.y, canvasRef.current);
-      }
-    },
-    [canvasRef]
-  );
+  const handleFocusEntity = useCallback((id: string) => {
+    const app = appRef.current;
+    if (!app || !app.canvas) return;
+    const transform = app.world.getComponent(id, 'transform');
+    if (transform) {
+      app.camera.lookAt(transform.x, transform.y, app.canvas);
+    }
+  }, []);
 
   useGlobalShortcuts({
     mode,
@@ -379,6 +377,14 @@ export const App: React.FC = () => {
           onUndo={handleUndo}
           onRedo={handleRedo}
           onOpenHotkeys={() => setIsHotkeysOpen(true)}
+          renderMode={renderMode}
+          onToggleRenderMode={() => {
+            const nextMode = renderMode === '2d' ? '3d' : '2d';
+            setRenderMode(nextMode);
+            if (appRef.current) {
+              appRef.current.setRendererMode(nextMode);
+            }
+          }}
         />
       )}
 
@@ -403,8 +409,16 @@ export const App: React.FC = () => {
         {/* Область отображения холста */}
         <div
           id="canvas-container"
-          ref={canvasWrapperRef}
+          ref={(node) => {
+            canvasWrapperRef.current = node;
+            containerRef.current = node;
+          }}
           style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+          onContextMenu={(e) => e.preventDefault()}
         >
           {/* Статус-бар холста (зум, координаты, сброс вида) */}
           {mode !== GameMode.GAME && (
@@ -414,16 +428,6 @@ export const App: React.FC = () => {
               onResetCamera={handleResetCamera}
             />
           )}
-
-          <canvas
-            id="game-canvas"
-            ref={canvasRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
-            onContextMenu={(e) => e.preventDefault()}
-          />
 
           {/* Внутриигровой интерфейс HUD */}
           {mode === GameMode.GAME && (

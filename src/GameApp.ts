@@ -5,13 +5,16 @@ import { StealthSystem } from './ecs/systems/StealthSystem';
 import { AttackSystem } from './ecs/systems/AttackSystem';
 import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
-import { RenderSyncSystem } from './ecs/systems/RenderSyncSystem';
+import { CanvasRenderSyncSystem } from './ecs/systems/CanvasRenderSyncSystem';
 import { InteractionSystem } from './ecs/systems/InteractionSystem';
 import { ZoneTriggerSystem } from './ecs/systems/ZoneTriggerSystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
-import { Renderer } from './Renderer';
+import { CanvasRenderer } from './rendering/CanvasRenderer';
+import { ThreeRenderer } from './rendering/ThreeRenderer';
+import { ThreeSyncSystem } from './ecs/systems/ThreeSyncSystem';
+import { IRenderer } from './rendering/IRenderer';
 import { Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { EntityFactory } from './ecs/EntityFactory';
@@ -26,8 +29,8 @@ import { HistoryManager, HistoryRecord } from './history/HistoryManager';
 export { EntityAdapter } from './EntityAdapter';
 
 export class GameApp {
-  private canvas: HTMLCanvasElement;
-  private renderer: Renderer;
+  private container: HTMLDivElement;
+  private renderer: IRenderer;
   public world: World;
   public history: HistoryManager = new HistoryManager(50);
   private isHistoryAction: boolean = false;
@@ -38,12 +41,14 @@ export class GameApp {
   private attackSystem: AttackSystem;
   private damageSystem: DamageSystem;
   public aiSystem: AISystem;
-  private renderSyncSystem: RenderSyncSystem;
+  private canvasRenderSyncSystem: CanvasRenderSyncSystem;
+  private threeSyncSystem: ThreeSyncSystem | null = null;
   public interactionSystem: InteractionSystem;
   private zoneTriggerSystem: ZoneTriggerSystem;
   private modifierSystem: ModifierSystem;
   private attachmentSystem: AttachmentSystem;
   public camera: Camera;
+  public activeRendererMode: '2d' | '3d' = '2d';
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
 
@@ -101,9 +106,9 @@ export class GameApp {
 
   private handleResize = () => this.resizeCanvas();
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.canvas = canvas;
-    this.renderer = new Renderer(canvas);
+  constructor(container: HTMLDivElement) {
+    this.container = container;
+    this.renderer = new CanvasRenderer(container);
     this.world = new World();
     this.physics = new PhysicsSystem();
     this.movementSystem = new MovementSystem();
@@ -111,7 +116,7 @@ export class GameApp {
     this.attackSystem = new AttackSystem();
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
-    this.renderSyncSystem = new RenderSyncSystem();
+    this.canvasRenderSyncSystem = new CanvasRenderSyncSystem();
     this.interactionSystem = new InteractionSystem();
     this.zoneTriggerSystem = new ZoneTriggerSystem();
     this.modifierSystem = new ModifierSystem();
@@ -124,17 +129,37 @@ export class GameApp {
     window.addEventListener('resize', this.handleResize);
   }
 
-  public resizeCanvas(width?: number, height?: number): void {
-    if (width !== undefined && height !== undefined) {
-      this.canvas.width = width;
-      this.canvas.height = height;
-    } else {
-      const parent = this.canvas.parentElement;
-      if (parent) {
-        this.canvas.width = parent.clientWidth;
-        this.canvas.height = parent.clientHeight;
-      }
+  public get canvas(): HTMLCanvasElement {
+    return this.renderer.getCanvas();
+  }
+
+  public setRendererMode(mode: '2d' | '3d'): void {
+    if (this.activeRendererMode === mode) return;
+    this.activeRendererMode = mode;
+
+    if (this.renderer.destroy) {
+      this.renderer.destroy();
     }
+
+    if (mode === '2d') {
+      this.renderer = new CanvasRenderer(this.container);
+      this.threeSyncSystem = null;
+    } else {
+      const threeRenderer = new ThreeRenderer(this.container);
+      this.renderer = threeRenderer;
+      this.threeSyncSystem = new ThreeSyncSystem(threeRenderer.scene);
+    }
+    this.resizeCanvas();
+  }
+
+  public resizeCanvas(width?: number, height?: number): void {
+    let w = width;
+    let h = height;
+    if (w === undefined || h === undefined) {
+      w = this.container.clientWidth;
+      h = this.container.clientHeight;
+    }
+    this.renderer.resize(w, h);
   }
 
   public spawnEntity(config: EntityConfig, position?: Point, forcedId?: string): string {
@@ -507,6 +532,9 @@ export class GameApp {
   public destroy(): void {
     this.isRunning = false;
     window.removeEventListener('resize', this.handleResize);
+    if (this.renderer.destroy) {
+      this.renderer.destroy();
+    }
   }
 
   private loop(time: number): void {
@@ -537,7 +565,11 @@ export class GameApp {
       this.damageSystem.update(dt, this.world);
     }
 
-    this.renderSyncSystem.update(dt, this.world, this.gameMode);
+    if (this.activeRendererMode === '2d') {
+      this.canvasRenderSyncSystem.update(dt, this.world, this.gameMode);
+    } else if (this.activeRendererMode === '3d' && this.threeSyncSystem) {
+      this.threeSyncSystem.update(dt, this.world, this.gameMode, this.selectedEntityIds);
+    }
 
     // Подготовка данных призраков для всех перемещаемых объектов группы
     let draggedGhosts: Array<{ id: string; origPos: Point; pos: Point }> | null = null;
@@ -551,17 +583,19 @@ export class GameApp {
       }));
     }
 
-    this.renderer.render(
-      this.camera,
-      this.world,
-      this.physics,
-      this.selectedEntityId,
-      this.selectedEntityIds,
-      this.gameMode,
-      this.hoveredEntityId,
-      draggedGhosts,
-      this.marqueeBox
-    );
+    this.renderer.render({
+      camera: this.camera,
+      world: this.world,
+      physics: this.physics,
+      gameMode: this.gameMode,
+      editorData: {
+        selectedId: this.selectedEntityId,
+        selectedIds: this.selectedEntityIds,
+        hoveredId: this.hoveredEntityId,
+        draggedGhosts: draggedGhosts,
+        marqueeBox: this.marqueeBox,
+      },
+    });
     if (this.onFrame) this.onFrame();
 
     requestAnimationFrame((t) => this.loop(t));

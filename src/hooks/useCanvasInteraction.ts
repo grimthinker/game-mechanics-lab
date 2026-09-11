@@ -30,7 +30,7 @@ export const useCanvasInteraction = ({
   mode,
   typeFilters,
 }: UseCanvasInteractionProps) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
   const clickedEntityIdRef = useRef<string | null>(null);
@@ -38,23 +38,23 @@ export const useCanvasInteraction = ({
   const [cursorWorldPos, setCursorWorldPos] = useState<Point | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    canvas.style.cursor = placementMode ? 'pointer' : 'default';
+    container.style.cursor = placementMode ? 'pointer' : 'default';
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       appRef.current?.zoomAt(e.clientX, e.clientY, e.deltaY);
     };
 
-    canvas.addEventListener('wheel', onWheel, { passive: false });
+    container.addEventListener('wheel', onWheel, { passive: false });
     return () => {
-      canvas.removeEventListener('wheel', onWheel);
+      container.removeEventListener('wheel', onWheel);
     };
   }, [placementMode]);
 
-  const handleMouseDown = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
     const app = appRef.current;
     if (!app) return;
 
@@ -112,7 +112,7 @@ export const useCanvasInteraction = ({
     }
   };
 
-  const handleMouseMove = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
     const app = appRef.current;
     if (!app) return;
 
@@ -185,7 +185,7 @@ export const useCanvasInteraction = ({
     }
   };
 
-  const handleMouseUp = (e: ReactMouseEvent<HTMLCanvasElement>) => {
+  const handleMouseUp = (e: ReactMouseEvent<HTMLDivElement>) => {
     const app = appRef.current;
     if (!app) return;
 
@@ -269,7 +269,7 @@ export const useCanvasInteraction = ({
   };
 
   return {
-    canvasRef,
+    containerRef,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

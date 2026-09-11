@@ -19,6 +19,8 @@ export interface TopBarProps {
   onUndo: () => void;
   onRedo: () => void;
   onOpenHotkeys: () => void;
+  renderMode: '2d' | '3d';
+  onToggleRenderMode: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -39,6 +41,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onUndo,
   onRedo,
   onOpenHotkeys,
+  renderMode,
+  onToggleRenderMode,
 }) => {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
 
@@ -264,6 +268,21 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Правая часть: Настройки отображения */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <button
+          className="btn btn-sm"
+          style={{
+            backgroundColor: renderMode === '3d' ? '#9b59b6' : 'transparent',
+            color: renderMode === '3d' ? '#fff' : '#bdc3c7',
+            border: '1px solid #9b59b6',
+            padding: '2px 8px',
+            fontSize: '11px',
+          }}
+          onClick={onToggleRenderMode}
+          title="Переключить рендерер"
+        >
+          {renderMode === '2d' ? '2D CANVAS' : '3D WEBGL'}
+        </button>
+
         <label
           style={{
             display: 'flex',
