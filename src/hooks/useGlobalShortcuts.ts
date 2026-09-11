@@ -8,6 +8,8 @@ interface GlobalShortcutsProps {
   modals: any; // В идеале типизировать интерфейсом UseGameModalsReturn
   handleSpawnConfirm: () => void;
   setShowBTPanel: React.Dispatch<React.SetStateAction<boolean>>;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
@@ -24,7 +26,8 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         return; // Игнорируем нажатия при вводе текста
       }
 
-      const { mode, togglePause, modals, handleSpawnConfirm, setShowBTPanel } = propsRef.current;
+      const { mode, togglePause, modals, handleSpawnConfirm, setShowBTPanel, onUndo, onRedo } =
+        propsRef.current;
 
       // Обработка Esc и Enter для модалок
       if (e.key === 'Escape' || e.code === 'Escape') {
@@ -51,6 +54,25 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         modals.isEditModalOpen
       ) {
         return;
+      }
+
+      // Быстрые клавиши отмены и повтора (Undo / Redo)
+      if (mode === GameMode.EDITOR && (e.ctrlKey || e.metaKey)) {
+        if (e.code === 'KeyZ' || e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (onRedo) onRedo();
+          } else {
+            if (onUndo) onUndo();
+          }
+          return;
+        }
+
+        if (e.code === 'KeyY' || e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          if (onRedo) onRedo();
+          return;
+        }
       }
 
       // Пауза (Пробел)

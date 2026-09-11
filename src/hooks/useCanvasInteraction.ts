@@ -219,6 +219,7 @@ export const useCanvasInteraction = ({
     // Спавн сущности
     if (placementMode && mode === GameMode.EDITOR) {
       if (placementMode.kind === 'entity') {
+        app.commitHistory('Спавн объекта');
         app.spawnEntity(placementMode.config, point);
       }
       setPlacementMode(null);

@@ -8,6 +8,7 @@ export interface InteractionSlotModalProps {
   world: World | null | undefined;
   isReadOnly?: boolean;
   onClose: () => void;
+  onBeforeSave?: () => void;
   onInspectItem: (itemId: string) => void;
   onConfirm?: () => void;
 }
@@ -19,6 +20,7 @@ export const InteractionSlotModal: React.FC<InteractionSlotModalProps> = ({
   world,
   isReadOnly,
   onClose,
+  onBeforeSave,
   onInspectItem,
   onConfirm,
 }) => {
@@ -45,6 +47,7 @@ export const InteractionSlotModal: React.FC<InteractionSlotModalProps> = ({
   const itemPhys = slot.itemId ? world.getComponent(slot.itemId, 'physicsStats') : null;
 
   const handleSave = () => {
+    if (onBeforeSave) onBeforeSave();
     slot.interactDist = Math.max(1, interactDist);
     slot.strength = Math.max(1, strength);
     if (onConfirm) onConfirm();

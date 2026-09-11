@@ -9,6 +9,7 @@ export interface EquipmentAreaModalProps {
   world: World | null | undefined;
   isReadOnly?: boolean;
   onClose: () => void;
+  onBeforeSave?: () => void;
   onInspectItem: (itemId: string) => void;
   onConfirm?: () => void;
 }
@@ -20,6 +21,7 @@ export const EquipmentAreaModal: React.FC<EquipmentAreaModalProps> = ({
   world,
   isReadOnly,
   onClose,
+  onBeforeSave,
   onInspectItem,
   onConfirm,
 }) => {
@@ -58,6 +60,7 @@ export const EquipmentAreaModal: React.FC<EquipmentAreaModalProps> = ({
   }
 
   const handleSave = () => {
+    if (onBeforeSave) onBeforeSave();
     area.name = name.trim() || area.name;
     area.type = type.trim() || area.type;
     area.space = Math.max(1, space);

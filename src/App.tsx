@@ -364,6 +364,24 @@ export const App: React.FC = () => {
     updateStats();
   }, [syncPlayerControls, updateStats]);
 
+  const handleUndo = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (app.undo()) {
+      syncPlayerControls();
+      updateStats();
+    }
+  }, [syncPlayerControls, updateStats]);
+
+  const handleRedo = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (app.redo()) {
+      syncPlayerControls();
+      updateStats();
+    }
+  }, [syncPlayerControls, updateStats]);
+
   useGlobalShortcuts({
     mode,
     isPaused,
@@ -371,6 +389,8 @@ export const App: React.FC = () => {
     modals: { ...modals, handleDeleteEntity },
     handleSpawnConfirm,
     setShowBTPanel,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
   });
 
   const isReadOnly = mode !== GameMode.EDITOR;
@@ -487,6 +507,7 @@ export const App: React.FC = () => {
               if (app) {
                 setSnapshot(null);
                 app.deserializeWorld(data);
+                app.history.clear();
                 syncPlayerControls();
                 updateStats();
               }
@@ -505,6 +526,10 @@ export const App: React.FC = () => {
         openAreaModal={modals.openAreaModal}
         handleDeleteEntity={handleDeleteEntity}
         isPaused={isPaused}
+        canUndo={appRef.current?.history.canUndo() ?? false}
+        canRedo={appRef.current?.history.canRedo() ?? false}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
 
       <ZoneSpawnModal
@@ -588,6 +613,7 @@ export const App: React.FC = () => {
         world={appRef.current?.world}
         isReadOnly={isReadOnly}
         onClose={modals.closeCurrentModal}
+        onBeforeSave={() => appRef.current?.commitHistory('Настройка ячейки взаимодействия')}
         onInspectItem={(itemId) => modals.openEditModal(itemId)}
         onConfirm={updateStats}
       />
@@ -599,6 +625,7 @@ export const App: React.FC = () => {
         world={appRef.current?.world}
         isReadOnly={isReadOnly}
         onClose={modals.closeCurrentModal}
+        onBeforeSave={() => appRef.current?.commitHistory('Настройка области экипировки')}
         onInspectItem={(itemId) => modals.openEditModal(itemId)}
         onConfirm={updateStats}
       />
@@ -611,6 +638,7 @@ export const App: React.FC = () => {
         aiSystem={appRef.current?.aiSystem}
         isReadOnly={isReadOnly}
         onClose={modals.closeCurrentModal}
+        onBeforeApply={() => appRef.current?.commitHistory('Редактирование сущности')}
         onConfirm={() => {
           modals.closeCurrentModal();
           updateStats();

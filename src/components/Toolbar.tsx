@@ -26,6 +26,10 @@ interface ToolbarProps {
   openAreaModal: (creatureId: string, areaId: string) => void;
   handleDeleteEntity: () => void;
   isPaused: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -50,6 +54,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   openAreaModal,
   handleDeleteEntity,
   isPaused,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }) => {
   const getSlotTypeName = (type: string) => {
     switch (type) {
@@ -166,6 +174,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {mode === GameMode.EDITOR && (
             <>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  className="btn btn-sm"
+                  style={{ flex: 1 }}
+                  disabled={!canUndo}
+                  onClick={onUndo}
+                  title="Отменить действие (Ctrl+Z)"
+                >
+                  ↶ Отмена
+                </button>
+                <button
+                  className="btn btn-sm"
+                  style={{ flex: 1 }}
+                  disabled={!canRedo}
+                  onClick={onRedo}
+                  title="Повторить действие (Ctrl+Y)"
+                >
+                  ↷ Повтор
+                </button>
+              </div>
               <button className="btn" onClick={onNewWorld}>
                 Новый мир
               </button>
@@ -793,6 +821,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </ul>
         ) : (
           <ul className="control-keys">
+            <li>
+              <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> Отмена / Повтор действия
+            </li>
             <li>
               <kbd>U</kbd> Дерево поведения (BT)
             </li>

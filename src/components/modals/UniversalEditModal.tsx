@@ -38,6 +38,7 @@ export interface UniversalEditModalProps {
   aiSystem: AISystem | null | undefined;
   isReadOnly?: boolean;
   onClose: () => void;
+  onBeforeApply?: () => void;
   onConfirm: () => void;
   onInspectItem?: (itemId: string) => void;
 }
@@ -50,6 +51,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   aiSystem,
   isReadOnly,
   onClose,
+  onBeforeApply,
   onConfirm,
   onInspectItem,
 }) => {
@@ -255,6 +257,7 @@ export const UniversalEditModal: React.FC<UniversalEditModalProps> = ({
   };
 
   const handleApply = () => {
+    if (onBeforeApply) onBeforeApply();
     const archetype = world.getComponent(entityId, 'tag')?.archetype;
 
     // 1. Мета

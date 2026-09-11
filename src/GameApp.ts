@@ -21,6 +21,7 @@ import { EntityConfig } from './ecs/types';
 import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, Radians } from './utils';
+import { HistoryManager, HistoryRecord } from './history/HistoryManager';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -28,6 +29,8 @@ export class GameApp {
   private canvas: HTMLCanvasElement;
   private renderer: Renderer;
   public world: World;
+  public history: HistoryManager = new HistoryManager(50);
+  private isHistoryAction: boolean = false;
   private mouseScreenPos: Point | null = null;
   public physics: PhysicsSystem;
   private movementSystem: MovementSystem;
@@ -161,6 +164,10 @@ export class GameApp {
           : []
     );
 
+    if (ids.length === 0) return;
+
+    this.commitHistory('Удаление объектов');
+
     for (const id of ids) {
       this.deleteEntityRecursive(id);
       if (this.hoveredEntityId === id) this.hoveredEntityId = null;
@@ -225,6 +232,7 @@ export class GameApp {
 
   public initDefaultWorld(center?: Point): void {
     this.clearWorld();
+    this.history.clear();
     const spawnPos: Point = center ?? {
       x: this.canvas.width / 2,
       y: this.canvas.height / 2,
@@ -418,6 +426,70 @@ export class GameApp {
 
   public deserializeWorld(data: any): void {
     this.serializer.deserializeWorld(data);
+  }
+
+  public captureHistoryRecord(description: string = 'Действие'): HistoryRecord {
+    return {
+      description,
+      worldSnapshot: this.serializeWorld(),
+      selectedEntityIds: Array.from(this.selectedEntityIds),
+      selectedEntityId: this.selectedEntityId,
+    };
+  }
+
+  public commitHistory(description: string = 'Изменение'): void {
+    if (this.gameMode !== GameMode.EDITOR || this.isHistoryAction) return;
+    this.history.pushState(this.captureHistoryRecord(description));
+  }
+
+  public undo(): boolean {
+    if (this.gameMode !== GameMode.EDITOR || !this.history.canUndo()) return false;
+
+    this.isHistoryAction = true;
+    try {
+      const current = this.captureHistoryRecord('Текущее состояние');
+      const target = this.history.undo(current);
+      if (target) {
+        this.restoreHistoryRecord(target);
+        return true;
+      }
+    } finally {
+      this.isHistoryAction = false;
+    }
+    return false;
+  }
+
+  public redo(): boolean {
+    if (this.gameMode !== GameMode.EDITOR || !this.history.canRedo()) return false;
+
+    this.isHistoryAction = true;
+    try {
+      const current = this.captureHistoryRecord('Текущее состояние');
+      const target = this.history.redo(current);
+      if (target) {
+        this.restoreHistoryRecord(target);
+        return true;
+      }
+    } finally {
+      this.isHistoryAction = false;
+    }
+    return false;
+  }
+
+  private restoreHistoryRecord(record: HistoryRecord): void {
+    this.deserializeWorld(record.worldSnapshot);
+    this.selectedEntityIds.clear();
+    for (const id of record.selectedEntityIds) {
+      if (this.world.getEntity(id)) {
+        this.selectedEntityIds.add(id);
+      }
+    }
+    const targetId =
+      record.selectedEntityId && this.world.getEntity(record.selectedEntityId)
+        ? record.selectedEntityId
+        : (this.selectedEntityIds.values().next().value ?? null);
+    this.selectEntity(targetId, false);
+    this.hoverEntity(null);
   }
 
   public start(): void {
@@ -726,6 +798,13 @@ export class GameApp {
 
     const dx = this.draggedAnchorCurrentPos.x - this.draggedAnchorOriginalPos.x;
     const dy = this.draggedAnchorCurrentPos.y - this.draggedAnchorOriginalPos.y;
+
+    if (Math.hypot(dx, dy) < 0.01) {
+      this.cancelEntityDrag();
+      return;
+    }
+
+    this.commitHistory('Перемещение объектов');
 
     // Фиксируем новые позиции для всех объектов группы (включая препятствия)
     for (const [entId, origPos] of this.draggedEntities.entries()) {
