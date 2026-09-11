@@ -26,4 +26,6 @@ export interface IRenderer {
   render(context: RenderContext): void;
   destroy?(): void;
   getCanvas(): HTMLCanvasElement;
+  screenToWorld(clientX: number, clientY: number, camera2D: Camera): Point;
+  pickEntity?(clientX: number, clientY: number): EntityId | null;
 }

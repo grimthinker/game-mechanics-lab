@@ -35,6 +35,10 @@ export class CanvasRenderer implements IRenderer {
     return this.canvas;
   }
 
+  public screenToWorld(clientX: number, clientY: number, camera2D: Camera): Point {
+    return camera2D.getCanvasPoint(clientX, clientY, this.canvas);
+  }
+
   public resize(width: number, height: number): void {
     this.canvas.width = width;
     this.canvas.height = height;

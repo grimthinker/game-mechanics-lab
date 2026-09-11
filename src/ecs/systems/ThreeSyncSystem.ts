@@ -174,6 +174,8 @@ export class ThreeSyncSystem {
     }
 
     if (mainMesh) {
+      group.userData.entityId = id;
+      mainMesh.userData.entityId = id;
       group.add(mainMesh);
 
       // Создаем обводку выделения

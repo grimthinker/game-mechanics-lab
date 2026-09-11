@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { IRenderer, RenderContext } from './IRenderer';
+import { Camera } from '../Camera';
+import { Point } from '../types';
+import { EntityId } from '../ecs/types';
 
 export class ThreeRenderer implements IRenderer {
   private container: HTMLDivElement;
@@ -7,6 +10,11 @@ export class ThreeRenderer implements IRenderer {
   public renderer: THREE.WebGLRenderer;
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
+
+  private raycaster = new THREE.Raycaster();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  private intersectionPoint = new THREE.Vector3();
+  private mouseNDC = new THREE.Vector2();
 
   constructor(container: HTMLDivElement) {
     this.container = container;
@@ -44,6 +52,44 @@ export class ThreeRenderer implements IRenderer {
 
   public getCanvas(): HTMLCanvasElement {
     return this.canvas;
+  }
+
+  public screenToWorld(clientX: number, clientY: number, _camera2D: Camera): Point {
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera);
+    const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.intersectionPoint);
+
+    if (hit) {
+      // 3D X -> 2D X, 3D Z -> 2D Y
+      return { x: hit.x, y: hit.z };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  public pickEntity(clientX: number, clientY: number): EntityId | null {
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+    for (const hit of intersects) {
+      if (hit.object.userData.isSelectionOutline || hit.object instanceof THREE.GridHelper) {
+        continue;
+      }
+      let curr: THREE.Object3D | null = hit.object;
+      while (curr) {
+        if (curr.userData && curr.userData.entityId) {
+          return curr.userData.entityId;
+        }
+        curr = curr.parent;
+      }
+    }
+    return null;
   }
 
   public resize(width: number, height: number): void {

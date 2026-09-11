@@ -545,11 +545,7 @@ export class GameApp {
 
     if (!this.isPaused) {
       if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
-        const worldPoint = this.camera.getCanvasPoint(
-          this.mouseScreenPos.x,
-          this.mouseScreenPos.y,
-          this.canvas
-        );
+        const worldPoint = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
         this.updatePlayerAim(worldPoint);
       }
 
@@ -682,7 +678,17 @@ export class GameApp {
     this.hoveredEntityId = id;
   }
 
-  public pickEntityAt(worldPoint: Point): string | null {
+  public pickEntityAt(worldPoint: Point, clientX?: number, clientY?: number): string | null {
+    if (
+      this.activeRendererMode === '3d' &&
+      clientX !== undefined &&
+      clientY !== undefined &&
+      this.renderer.pickEntity
+    ) {
+      const hit3dId = this.renderer.pickEntity(clientX, clientY);
+      if (hit3dId) return hit3dId;
+    }
+
     const isEditor = this.gameMode === GameMode.EDITOR;
     const hitIds = this.physics.queryPointAt(worldPoint);
     const hits: { id: string; zIndex: number }[] = [];
@@ -783,7 +789,7 @@ export class GameApp {
     this.camera.zoomAt(clientX, clientY, deltaY, this.canvas);
   }
   public getCanvasPoint(clientX: number, clientY: number): Point {
-    return this.camera.getCanvasPoint(clientX, clientY, this.canvas);
+    return this.renderer.screenToWorld(clientX, clientY, this.camera);
   }
 
   public startDraggingEntity(id: string, clickWorldPoint: Point): boolean {

@@ -97,7 +97,7 @@ export const useCanvasInteraction = ({
 
       if (placementMode) return;
 
-      const entityId = app.pickEntityAt(point);
+      const entityId = app.pickEntityAt(point, e.clientX, e.clientY);
       if (entityId) {
         clickedEntityIdRef.current = entityId;
         dragStartPosRef.current = { x: e.clientX, y: e.clientY };
@@ -234,7 +234,7 @@ export const useCanvasInteraction = ({
 
     // Одиночный клик по сущности — сбрасываем группу и выбираем только её
     if (clickedEntityIdRef.current) {
-      const entityId = app.pickEntityAt(point);
+      const entityId = app.pickEntityAt(point, e.clientX, e.clientY);
       app.selectEntity(entityId, true);
       clickedEntityIdRef.current = null;
       dragStartPosRef.current = null;
