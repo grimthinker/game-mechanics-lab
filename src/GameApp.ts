@@ -124,11 +124,16 @@ export class GameApp {
     window.addEventListener('resize', this.handleResize);
   }
 
-  private resizeCanvas(): void {
-    const parent = this.canvas.parentElement;
-    if (parent) {
-      this.canvas.width = parent.clientWidth;
-      this.canvas.height = parent.clientHeight;
+  public resizeCanvas(width?: number, height?: number): void {
+    if (width !== undefined && height !== undefined) {
+      this.canvas.width = width;
+      this.canvas.height = height;
+    } else {
+      const parent = this.canvas.parentElement;
+      if (parent) {
+        this.canvas.width = parent.clientWidth;
+        this.canvas.height = parent.clientHeight;
+      }
     }
   }
 

@@ -6,17 +6,8 @@ import { rad2Deg } from '../utils';
 
 interface ToolbarProps {
   mode: GameMode;
-  goToEditor: () => void;
-  goToSimulation: () => void;
-  goToGame: () => void;
-  obstaclesEnabled: boolean;
-  setObstaclesEnabled: (val: boolean) => void;
   selectedEntityId: string | null;
   world: World | null | undefined;
-  worldFileInputRef: React.RefObject<HTMLInputElement | null>;
-  onNewWorld: () => void;
-  onSaveWorld: () => void;
-  onLoadWorldFile: (file: File) => void;
   openSpawnModal: (behavior?: string) => void;
   openItemSpawnModal: () => void;
   openZoneSpawnModal: () => void;
@@ -25,26 +16,12 @@ interface ToolbarProps {
   openSlotModal: (creatureId: string, slotId: string) => void;
   openAreaModal: (creatureId: string, areaId: string) => void;
   handleDeleteEntity: () => void;
-  isPaused: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
   mode,
-  goToEditor,
-  goToSimulation,
-  goToGame,
-  obstaclesEnabled,
-  setObstaclesEnabled,
   selectedEntityId,
   world,
-  worldFileInputRef,
-  onNewWorld,
-  onSaveWorld,
-  onLoadWorldFile,
   openSpawnModal,
   openItemSpawnModal,
   openZoneSpawnModal,
@@ -53,11 +30,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   openSlotModal,
   openAreaModal,
   handleDeleteEntity,
-  isPaused,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo,
 }) => {
   const getSlotTypeName = (type: string) => {
     switch (type) {
@@ -139,113 +111,19 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   return (
-    <div id="toolbar" style={{ backgroundColor: THEME_COLORS[mode] }}>
-      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              position: 'relative',
-              width: '100%',
-            }}
-          >
-            <span>Мир</span>
-            {isPaused && mode !== GameMode.GAME && (
-              <span
-                style={{
-                  color: '#e74c3c',
-                  fontWeight: 'bold',
-                  fontSize: '14px',
-                  padding: '2px 8px',
-                  border: '1px solid #e74c3c',
-                  borderRadius: '4px',
-                  backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                  position: 'absolute',
-                  right: 0,
-                }}
-              >
-                ПАУЗА
-              </span>
-            )}
-          </div>
-        </h3>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {mode === GameMode.EDITOR && (
-            <>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  className="btn btn-sm"
-                  style={{ flex: 1 }}
-                  disabled={!canUndo}
-                  onClick={onUndo}
-                  title="Отменить действие (Ctrl+Z)"
-                >
-                  ↶ Отмена
-                </button>
-                <button
-                  className="btn btn-sm"
-                  style={{ flex: 1 }}
-                  disabled={!canRedo}
-                  onClick={onRedo}
-                  title="Повторить действие (Ctrl+Y)"
-                >
-                  ↷ Повтор
-                </button>
-              </div>
-              <button className="btn" onClick={onNewWorld}>
-                Новый мир
-              </button>
-              <button className="btn" onClick={onSaveWorld}>
-                Сохранить мир
-              </button>
-              <input
-                type="file"
-                ref={worldFileInputRef}
-                style={{ display: 'none' }}
-                accept=".json"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onLoadWorldFile(file);
-                  e.target.value = '';
-                }}
-              />
-              <button className="btn" onClick={() => worldFileInputRef.current?.click()}>
-                Загрузить мир
-              </button>
-            </>
-          )}
-          {mode !== GameMode.EDITOR && (
-            <button
-              className="btn"
-              style={{ backgroundColor: '#2980b9', color: '#fff' }}
-              onClick={goToEditor}
-            >
-              Редактор
-            </button>
-          )}
-          {mode !== GameMode.SIMULATION && (
-            <button
-              className="btn"
-              style={{ backgroundColor: '#27ae60', color: '#fff' }}
-              onClick={goToSimulation}
-            >
-              Симуляция
-            </button>
-          )}
-          {mode !== GameMode.GAME && (
-            <button
-              className="btn"
-              style={{ backgroundColor: '#8e44ad', color: '#fff' }}
-              onClick={goToGame}
-            >
-              Играть
-            </button>
-          )}
-        </div>
-      </div>
-
+    <div
+      id="toolbar"
+      style={{
+        backgroundColor: THEME_COLORS[mode],
+        position: 'relative',
+        width: '300px',
+        minWidth: '300px',
+        height: '100%',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {mode === GameMode.EDITOR && (
         <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
           <h3>Управление спавном</h3>
@@ -282,19 +160,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       )}
 
-      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>Препятствия</h3>
-        <label>
-          Включить коллизии
-          <input
-            type="checkbox"
-            checked={obstaclesEnabled}
-            onChange={(e) => setObstaclesEnabled(e.target.checked)}
-          />
-        </label>
-      </div>
-
-      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
+      <div
+        className="tool-group"
+        style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode], flex: 1 }}
+      >
         <h3>{selectedEntityId ? getCardTitle() : 'Выбранный объект'}</h3>
         {selectedEntityId && world ? (
           <div className="stats-list">
@@ -778,65 +647,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           </div>
         ) : (
           <p className="selection-hint">Ничего не выбрано</p>
-        )}
-      </div>
-
-      <div className="tool-group" style={{ backgroundColor: TOOL_GROUP_THEME_COLORS[mode] }}>
-        <h3>Управление</h3>
-        {mode === GameMode.GAME ? (
-          <ul className="control-keys">
-            <li>
-              <kbd>W</kbd> / <kbd>S</kbd> Движение вперед / назад
-            </li>
-            <li>
-              <kbd>A</kbd> / <kbd>D</kbd> Стрейф влево / вправо
-            </li>
-            <li>
-              <kbd>Мышь</kbd> Направление взгляда / прицеливание
-            </li>
-            <li>
-              <kbd>Пробел</kbd> Атака оружием
-            </li>
-            <li>
-              <kbd>LCtrl</kbd> + <kbd>ЛКМ</kbd> Подобрать предмет
-            </li>
-            <li>
-              <kbd>LShift</kbd> Спринт (только вперед)
-            </li>
-            <li>
-              <kbd>X</kbd> Шаг (переключатель)
-            </li>
-            <li>
-              <kbd>C</kbd> Присед (удержание)
-            </li>
-          </ul>
-        ) : mode === GameMode.SIMULATION ? (
-          <ul className="control-keys">
-            <li>
-              <kbd>Пробел</kbd> Пауза / Возобновление симуляции
-            </li>
-            <li>
-              <kbd>U</kbd> Дерево поведения (BT)
-            </li>
-          </ul>
-        ) : (
-          <ul className="control-keys">
-            <li>
-              <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> Отмена / Повтор действия
-            </li>
-            <li>
-              <kbd>U</kbd> Дерево поведения (BT)
-            </li>
-            <li>
-              <kbd>Ctrl+P</kbd> Быстрый спавн игрока
-            </li>
-            <li>
-              <kbd>Ctrl+B</kbd> Быстрый спавн бота
-            </li>
-            <li>
-              <kbd>Ctrl+I</kbd> Добавить предмет
-            </li>
-          </ul>
         )}
       </div>
     </div>

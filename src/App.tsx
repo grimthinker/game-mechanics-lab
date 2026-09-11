@@ -19,6 +19,8 @@ import { useBTPanelState } from './hooks/useBTPanelState';
 import { useGameModals } from './hooks/useGameModals';
 import { BTPanel } from './components/BTPanel';
 import { Toolbar } from './components/Toolbar';
+import { TopBar } from './components/TopBar';
+import { HotkeysModal } from './components/HotkeysModal';
 import { SelectionBottomPanel } from './components/SelectionBottomPanel';
 import { PlacementMode } from './types';
 import { GameMode } from './constants';
@@ -27,6 +29,7 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
   const [snapshot, setSnapshot] = useState<any>(null);
@@ -52,6 +55,7 @@ export const App: React.FC = () => {
   const [, setFrameTick] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
+  const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
@@ -197,6 +201,19 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Настройка адаптивного размера канваса через ResizeObserver
+  useEffect(() => {
+    if (!canvasWrapperRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        appRef.current?.resizeCanvas(width, height);
+      }
+    });
+    observer.observe(canvasWrapperRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const togglePause = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
@@ -258,6 +275,32 @@ export const App: React.FC = () => {
     setShowBTPanel(false);
     updateStats();
   }, [updateStats, setShowBTPanel, setModeSync]);
+
+  const handleDeleteEntity = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.deleteSelectedEntities();
+    syncPlayerControls();
+    updateStats();
+  }, [syncPlayerControls, updateStats]);
+
+  const handleUndo = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (app.undo()) {
+      syncPlayerControls();
+      updateStats();
+    }
+  }, [syncPlayerControls, updateStats]);
+
+  const handleRedo = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    if (app.redo()) {
+      syncPlayerControls();
+      updateStats();
+    }
+  }, [syncPlayerControls, updateStats]);
 
   const handleSpawnConfirm = useCallback(() => {
     if (!modals.pendingSpawnBehavior) return;
@@ -356,32 +399,6 @@ export const App: React.FC = () => {
     [modals]
   );
 
-  const handleDeleteEntity = useCallback(() => {
-    const app = appRef.current;
-    if (!app) return;
-    app.deleteSelectedEntities();
-    syncPlayerControls();
-    updateStats();
-  }, [syncPlayerControls, updateStats]);
-
-  const handleUndo = useCallback(() => {
-    const app = appRef.current;
-    if (!app) return;
-    if (app.undo()) {
-      syncPlayerControls();
-      updateStats();
-    }
-  }, [syncPlayerControls, updateStats]);
-
-  const handleRedo = useCallback(() => {
-    const app = appRef.current;
-    if (!app) return;
-    if (app.redo()) {
-      syncPlayerControls();
-      updateStats();
-    }
-  }, [syncPlayerControls, updateStats]);
-
   useGlobalShortcuts({
     mode,
     isPaused,
@@ -396,83 +413,11 @@ export const App: React.FC = () => {
   const isReadOnly = mode !== GameMode.EDITOR;
 
   return (
-    <div id="app">
-      <div id="canvas-container" style={{ position: 'relative', overflow: 'hidden' }}>
-        <canvas
-          id="game-canvas"
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-          onContextMenu={(e) => e.preventDefault()}
-        />
-        <SelectionBottomPanel
-          selectedEntityIds={selectedEntityIds}
-          selectedEntityId={selectedEntityId}
-          world={appRef.current?.world}
-          typeFilters={typeFilters}
-          leftOffset={showBTPanel ? btPanelWidth : 0}
-          isResizingBT={isResizingBT}
-          onToggleFilter={(type) =>
-            setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
-          }
-          onSelectEntity={(id) => {
-            appRef.current?.selectEntity(id, false);
-            updateStats();
-          }}
-          onDeselectEntity={(id) => {
-            appRef.current?.deselectEntity(id);
-            updateStats();
-          }}
-          onClearSelection={() => {
-            appRef.current?.selectEntity(null, true);
-            updateStats();
-          }}
-          onDeleteSelected={handleDeleteEntity}
-          onInspectEntity={(id) => modals.openEditModal(id)}
-        />
-        {placementMode && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 20,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              backgroundColor: 'rgba(41, 128, 185, 0.9)',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              display: 'flex',
-              gap: '15px',
-              alignItems: 'center',
-              zIndex: 50,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-            }}
-          >
-            <span>Выберите место для спавна на поле</span>
-            <button
-              className="btn btn-sm"
-              style={{ backgroundColor: '#c0392b' }}
-              onClick={() => setPlacementMode(null)}
-            >
-              Отмена
-            </button>
-          </div>
-        )}
-      </div>
-
-      {showBTPanel && (
-        <BTPanel
-          btPanelWidth={btPanelWidth}
-          btData={btData}
-          btBlackboard={btBlackboard}
-          onClose={() => setShowBTPanel(false)}
-          onResizeBTStart={startResizingBT}
-          isResizingBT={isResizingBT}
-        />
-      )}
-
-      <Toolbar
+    <div
+      id="app"
+      style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
+    >
+      <TopBar
         mode={mode}
         goToEditor={goToEditor}
         goToSimulation={goToSimulation}
@@ -482,8 +427,6 @@ export const App: React.FC = () => {
           setObstaclesEnabled(val);
           appRef.current?.physics.setObstaclesEnabled(val);
         }}
-        selectedEntityId={selectedEntityId}
-        world={appRef.current?.world}
         worldFileInputRef={worldFileInputRef}
         onNewWorld={createNewWorld}
         onSaveWorld={() => {
@@ -517,20 +460,114 @@ export const App: React.FC = () => {
           };
           reader.readAsText(file);
         }}
-        openSpawnModal={modals.openSpawnModal}
-        openItemSpawnModal={modals.openItemSpawnModal}
-        openZoneSpawnModal={modals.openZoneSpawnModal}
-        openObstacleSpawnModal={modals.openObstacleSpawnModal}
-        openEditModal={modals.openEditModal}
-        openSlotModal={modals.openSlotModal}
-        openAreaModal={modals.openAreaModal}
-        handleDeleteEntity={handleDeleteEntity}
         isPaused={isPaused}
+        togglePause={togglePause}
         canUndo={appRef.current?.history.canUndo() ?? false}
         canRedo={appRef.current?.history.canRedo() ?? false}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onOpenHotkeys={() => setIsHotkeysOpen(true)}
       />
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+        {/* Будущий Left Dock (добавим на 3 этапе) */}
+        {showBTPanel && (
+          <BTPanel
+            btPanelWidth={btPanelWidth}
+            btData={btData}
+            btBlackboard={btBlackboard}
+            onClose={() => setShowBTPanel(false)}
+            onResizeBTStart={startResizingBT}
+            isResizingBT={isResizingBT}
+          />
+        )}
+
+        {/* Рабочая область холста */}
+        <div
+          id="canvas-container"
+          ref={canvasWrapperRef}
+          style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+        >
+          <canvas
+            id="game-canvas"
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+          <SelectionBottomPanel
+            selectedEntityIds={selectedEntityIds}
+            selectedEntityId={selectedEntityId}
+            world={appRef.current?.world}
+            typeFilters={typeFilters}
+            leftOffset={0} // Обнулен, так как доки теперь флексовые, а панель внутри холста
+            isResizingBT={isResizingBT}
+            onToggleFilter={(type) =>
+              setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
+            }
+            onSelectEntity={(id) => {
+              appRef.current?.selectEntity(id, false);
+              updateStats();
+            }}
+            onDeselectEntity={(id) => {
+              appRef.current?.deselectEntity(id);
+              updateStats();
+            }}
+            onClearSelection={() => {
+              appRef.current?.selectEntity(null, true);
+              updateStats();
+            }}
+            onDeleteSelected={handleDeleteEntity}
+            onInspectEntity={(id) => modals.openEditModal(id)}
+          />
+          {placementMode && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 20,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(41, 128, 185, 0.9)',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                display: 'flex',
+                gap: '15px',
+                alignItems: 'center',
+                zIndex: 50,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              <span>Выберите место для спавна на поле</span>
+              <button
+                className="btn btn-sm"
+                style={{ backgroundColor: '#c0392b' }}
+                onClick={() => setPlacementMode(null)}
+              >
+                Отмена
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Правый док (Toolbar) */}
+        <Toolbar
+          mode={mode}
+          selectedEntityId={selectedEntityId}
+          world={appRef.current?.world}
+          openSpawnModal={modals.openSpawnModal}
+          openItemSpawnModal={modals.openItemSpawnModal}
+          openZoneSpawnModal={modals.openZoneSpawnModal}
+          openObstacleSpawnModal={modals.openObstacleSpawnModal}
+          openEditModal={modals.openEditModal}
+          openSlotModal={modals.openSlotModal}
+          openAreaModal={modals.openAreaModal}
+          handleDeleteEntity={handleDeleteEntity}
+        />
+      </div>
+
+      <HotkeysModal isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
 
       <ZoneSpawnModal
         isOpen={modals.isZoneSpawnModalOpen}
