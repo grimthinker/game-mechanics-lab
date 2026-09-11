@@ -4,12 +4,14 @@ import { Camera } from '../Camera';
 import { EntityId } from '../ecs/types';
 import { Point } from '../types';
 
+import { GizmoRenderData } from '../gizmos/types';
+
 export interface EditorRenderData {
   selectedId: EntityId | null;
   selectedIds: Set<EntityId>;
   hoveredId: EntityId | null;
-  draggedGhosts?: Array<{ id: EntityId; origPos: Point; pos: Point }> | null;
   marqueeBox?: { start: Point; current: Point } | null;
+  gizmo?: GizmoRenderData | null;
 }
 
 export interface RenderContext {

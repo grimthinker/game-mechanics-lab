@@ -2,14 +2,23 @@ import React, { useState } from 'react';
 import { Camera } from '../Camera';
 import { Point } from '../types';
 import { CAMERA_CONFIG } from '../../config/cameraConfig';
+import { GizmoTool } from '../gizmos/types';
 
 export interface CanvasHUDProps {
   camera: Camera | null | undefined;
   cursorWorldPos: Point | null;
   onResetCamera: () => void;
+  gizmoTool?: GizmoTool;
+  onSelectGizmoTool?: (tool: GizmoTool) => void;
 }
 
-export const CanvasHUD: React.FC<CanvasHUDProps> = ({ camera, cursorWorldPos, onResetCamera }) => {
+export const CanvasHUD: React.FC<CanvasHUDProps> = ({
+  camera,
+  cursorWorldPos,
+  onResetCamera,
+  gizmoTool = 'translate',
+  onSelectGizmoTool,
+}) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [panSpeed, setPanSpeed] = useState(() => camera?.panSpeed ?? 1.0);
   const [rotateSpeed, setRotateSpeed] = useState(() => camera?.rotateSpeed ?? 1.0);
@@ -20,6 +29,11 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({ camera, cursorWorldPos, on
 
   return (
     <div
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseMove={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         top: 12,
@@ -86,6 +100,69 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({ camera, cursorWorldPos, on
             <span style={{ color: '#666' }}>—</span>
           )}
         </div>
+
+        {/* Тулбар манипуляторов трансформации */}
+        {onSelectGizmoTool && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              borderLeft: '1px solid #333',
+              paddingLeft: '8px',
+            }}
+          >
+            <span style={{ color: '#888' }}>Гизмо:</span>
+            <button
+              onClick={() => onSelectGizmoTool('select')}
+              title="Выбор [Q] (без манипулятора)"
+              style={{
+                backgroundColor: gizmoTool === 'select' ? '#2980b9' : '#2c3e50',
+                border: 'none',
+                borderRadius: '3px',
+                color: '#fff',
+                cursor: 'pointer',
+                padding: '2px 6px',
+                fontSize: '10px',
+                fontWeight: gizmoTool === 'select' ? 'bold' : 'normal',
+              }}
+            >
+              ⛶ Q
+            </button>
+            <button
+              onClick={() => onSelectGizmoTool('translate')}
+              title="Сдвиг по осям [W] (Translate)"
+              style={{
+                backgroundColor: gizmoTool === 'translate' ? '#2980b9' : '#2c3e50',
+                border: 'none',
+                borderRadius: '3px',
+                color: '#fff',
+                cursor: 'pointer',
+                padding: '2px 6px',
+                fontSize: '10px',
+                fontWeight: gizmoTool === 'translate' ? 'bold' : 'normal',
+              }}
+            >
+              ✥ W
+            </button>
+            <button
+              onClick={() => onSelectGizmoTool('rotate')}
+              title="Вращение [E] (Rotate)"
+              style={{
+                backgroundColor: gizmoTool === 'rotate' ? '#2980b9' : '#2c3e50',
+                border: 'none',
+                borderRadius: '3px',
+                color: '#fff',
+                cursor: 'pointer',
+                padding: '2px 6px',
+                fontSize: '10px',
+                fontWeight: gizmoTool === 'rotate' ? 'bold' : 'normal',
+              }}
+            >
+              ↻ E
+            </button>
+          </div>
+        )}
 
         <button
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}

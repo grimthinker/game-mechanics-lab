@@ -37,12 +37,21 @@ export const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) =
           </ul>
 
           <h4 style={{ color: '#bdc3c7', marginTop: '16px', marginBottom: '8px' }}>
-            Быстрый спавн (в Редакторе):
+            Манипуляторы и спавн (в Редакторе):
           </h4>
           <ul
             className="control-keys"
             style={{ paddingLeft: '20px', margin: 0, color: '#ecf0f1', lineHeight: '1.8' }}
           >
+            <li>
+              <kbd>ПКМ</kbd> Контекстное радиальное меню (Pie Menu)
+            </li>
+            <li>
+              <kbd>Q</kbd> / <kbd>W</kbd> / <kbd>E</kbd> Режимы: Выбор / Сдвиг / Поворот
+            </li>
+            <li>
+              <kbd>Shift</kbd> (при драге манипулятора) Сетка 10 px / Шаг угла 15°
+            </li>
             <li>
               <kbd>Ctrl+P</kbd> Быстрый спавн игрока
             </li>

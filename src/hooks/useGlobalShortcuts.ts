@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { GameMode } from '../constants';
 
+import { GizmoTool } from '../gizmos/types';
+
 interface GlobalShortcutsProps {
   mode: GameMode;
   isPaused: boolean;
@@ -10,6 +12,9 @@ interface GlobalShortcutsProps {
   onUndo?: () => void;
   onRedo?: () => void;
   onExitGame?: () => void;
+  onSetGizmoTool?: (tool: GizmoTool) => void;
+  onCancelGizmo?: () => boolean;
+  onClosePieMenu?: () => boolean;
 }
 
 export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
@@ -31,14 +36,51 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         return; // Игнорируем нажатия при вводе текста
       }
 
-      const { mode, togglePause, handleDeleteEntity, onQuickSpawn, onUndo, onRedo, onExitGame } =
-        propsRef.current;
+      const {
+        mode,
+        togglePause,
+        handleDeleteEntity,
+        onQuickSpawn,
+        onUndo,
+        onRedo,
+        onExitGame,
+        onSetGizmoTool,
+        onCancelGizmo,
+        onClosePieMenu,
+      } = propsRef.current;
 
-      // Выход из режима игры по клавише Escape
+      // Закрытие радиального меню, отмена манипулятора или выход из игры по Escape
       if (e.key === 'Escape' || e.code === 'Escape') {
+        if (mode === GameMode.EDITOR && onClosePieMenu && onClosePieMenu()) {
+          e.preventDefault();
+          return;
+        }
+        if (mode === GameMode.EDITOR && onCancelGizmo && onCancelGizmo()) {
+          e.preventDefault();
+          return;
+        }
         if (mode === GameMode.GAME && onExitGame) {
           e.preventDefault();
           onExitGame();
+          return;
+        }
+      }
+
+      // Переключение режима манипулятора в редакторе: Q (Select), W (Translate), E (Rotate)
+      if (mode === GameMode.EDITOR && !e.ctrlKey && !e.metaKey && !e.altKey && onSetGizmoTool) {
+        if (e.code === 'KeyQ' || e.key.toLowerCase() === 'q') {
+          e.preventDefault();
+          onSetGizmoTool('select');
+          return;
+        }
+        if (e.code === 'KeyW' || e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          onSetGizmoTool('translate');
+          return;
+        }
+        if (e.code === 'KeyE' || e.key.toLowerCase() === 'e') {
+          e.preventDefault();
+          onSetGizmoTool('rotate');
           return;
         }
       }

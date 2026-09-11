@@ -7,6 +7,8 @@ import { SpawnPalette } from './SpawnPalette';
 import { BTGraph } from '../BTGraph';
 import { useResizable } from '../../hooks/useResizable';
 
+export type DockTab = 'hierarchy' | 'palette' | 'bt';
+
 export interface LeftDockProps {
   world: World | null | undefined;
   selectedEntityId: string | null;
@@ -15,9 +17,9 @@ export interface LeftDockProps {
   onSelectSpawnPreset: (config: EntityConfig) => void;
   btData: BTNodeDTO | null;
   btBlackboard: Record<string, any> | null;
+  activeTab?: DockTab;
+  onTabChange?: (tab: DockTab) => void;
 }
-
-type DockTab = 'hierarchy' | 'palette' | 'bt';
 
 export const LeftDock: React.FC<LeftDockProps> = ({
   world,
@@ -27,8 +29,15 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   onSelectSpawnPreset,
   btData,
   btBlackboard,
+  activeTab: externalTab,
+  onTabChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<DockTab>('hierarchy');
+  const [internalTab, setInternalTab] = useState<DockTab>('hierarchy');
+  const activeTab = externalTab ?? internalTab;
+  const setActiveTab = (tab: DockTab) => {
+    if (onTabChange) onTabChange(tab);
+    else setInternalTab(tab);
+  };
 
   const {
     size: dockWidth,

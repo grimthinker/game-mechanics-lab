@@ -6,7 +6,10 @@ import { EntityConfig } from './ecs/types';
 import { BTLogicComponent, BTNodeDTO } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
 import { createDefaultCreatureConfig } from './Creature';
-import { LeftDock } from './components/LeftDock/LeftDock';
+import { LeftDock, DockTab } from './components/LeftDock/LeftDock';
+import { PieMenu } from './components/PieMenu/PieMenu';
+import { PieMenuState } from './components/PieMenu/types';
+import { createRectanglePoints } from './utils';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
@@ -15,8 +18,10 @@ import { CanvasHUD } from './components/CanvasHUD';
 import { SelectionBottomPanel } from './components/SelectionBottomPanel';
 import { PlacementMode } from './types';
 import { GameMode } from './constants';
+import { GizmoTool } from './gizmos/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './editor.css';
+import { createZoneConfig } from './ecs/archetypes';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -27,6 +32,18 @@ export const App: React.FC = () => {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
   const [showUIOverlays, setShowUIOverlays] = useState<boolean>(true);
+  const [gizmoTool, setGizmoTool] = useState<GizmoTool>('translate');
+  const [leftDockTab, setLeftDockTab] = useState<DockTab>('hierarchy');
+  const [pieMenuState, setPieMenuState] = useState<PieMenuState | null>(null);
+
+  const setGizmoToolSync = useCallback((tool: GizmoTool) => {
+    setGizmoTool(tool);
+    if (appRef.current) appRef.current.gizmoTool = tool;
+  }, []);
+
+  const closePieMenu = useCallback(() => {
+    setPieMenuState(null);
+  }, []);
 
   const modeRef = useRef(mode);
 
@@ -39,6 +56,7 @@ export const App: React.FC = () => {
   const setModeSync = useCallback((m: GameMode) => {
     setMode(m);
     modeRef.current = m;
+    setPieMenuState(null);
     if (appRef.current) appRef.current.gameMode = m;
   }, []);
 
@@ -141,6 +159,7 @@ export const App: React.FC = () => {
     handleMouseMove,
     handleMouseUp,
     handleMouseLeave,
+    handleContextMenu,
     cursorWorldPos,
   } = useCanvasInteraction({
     appRef,
@@ -150,17 +169,21 @@ export const App: React.FC = () => {
     updateStats,
     mode,
     typeFilters,
+    onOpenPieMenu: setPieMenuState,
+    onClosePieMenu: closePieMenu,
   });
 
   const handleResetCamera = useCallback(() => {
+    closePieMenu();
     const app = appRef.current;
     const canvas = app?.canvas;
     if (!app || !canvas) return;
     app.camera.reset(canvas);
     updateStats();
-  }, [updateStats]);
+  }, [closePieMenu, updateStats]);
 
   const createNewWorld = useCallback(() => {
+    closePieMenu();
     setSnapshot(null);
     const app = appRef.current;
     if (!app) return;
@@ -174,7 +197,7 @@ export const App: React.FC = () => {
     app.initDefaultWorld(spawnPos);
     syncPlayerControls();
     updateStats();
-  }, [syncPlayerControls, updateStats]);
+  }, [closePieMenu, syncPlayerControls, updateStats]);
 
   // Инициализация движка строго 1 раз при монтировании контейнера
   useEffect(() => {
@@ -213,15 +236,10 @@ export const App: React.FC = () => {
       return;
     }
 
-    if (!app.isPaused && app.isDraggingEntity()) {
-      app.cancelEntityDrag();
-      updateStats();
-    }
-
     const nextState = !app.isPaused;
     app.isPaused = nextState;
     setIsPaused(nextState);
-  }, [updateStats]);
+  }, []);
 
   const goToEditor = useCallback(() => {
     const app = appRef.current;
@@ -316,6 +334,24 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const handleCancelGizmo = useCallback(() => {
+    const app = appRef.current;
+    if (app && app.isGizmoDragging()) {
+      app.cancelGizmoDrag(true);
+      updateStats();
+      return true;
+    }
+    return false;
+  }, [updateStats]);
+
+  const handleClosePieMenuViaShortcut = useCallback(() => {
+    if (pieMenuState !== null) {
+      setPieMenuState(null);
+      return true;
+    }
+    return false;
+  }, [pieMenuState]);
+
   useGlobalShortcuts({
     mode,
     isPaused,
@@ -325,6 +361,9 @@ export const App: React.FC = () => {
     onUndo: handleUndo,
     onRedo: handleRedo,
     onExitGame: goToEditor,
+    onSetGizmoTool: setGizmoToolSync,
+    onCancelGizmo: handleCancelGizmo,
+    onClosePieMenu: handleClosePieMenuViaShortcut,
   });
 
   return (
@@ -412,6 +451,8 @@ export const App: React.FC = () => {
             onSelectSpawnPreset={handleSelectSpawnPreset}
             btData={btData}
             btBlackboard={btBlackboard}
+            activeTab={leftDockTab}
+            onTabChange={setLeftDockTab}
           />
         )}
 
@@ -427,14 +468,16 @@ export const App: React.FC = () => {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
-          onContextMenu={(e) => e.preventDefault()}
+          onContextMenu={handleContextMenu}
         >
-          {/* Статус-бар холста (зум, координаты, сброс вида) */}
+          {/* Статус-бар холста (зум, координаты, сброс вида, выбор манипулятора) */}
           {mode !== GameMode.GAME && (
             <CanvasHUD
               camera={appRef.current?.camera}
               cursorWorldPos={cursorWorldPos}
               onResetCamera={handleResetCamera}
+              gizmoTool={gizmoTool}
+              onSelectGizmoTool={setGizmoToolSync}
             />
           )}
 
@@ -472,6 +515,11 @@ export const App: React.FC = () => {
           {/* Плашка режима размещения */}
           {placementMode && (
             <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseMove={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.stopPropagation()}
               style={{
                 position: 'absolute',
                 top: 20,
@@ -496,6 +544,226 @@ export const App: React.FC = () => {
                 Отмена
               </button>
             </div>
+          )}
+
+          {/* Радиальное контекстное меню (Pie Menu) */}
+          {pieMenuState && mode === GameMode.EDITOR && (
+            <PieMenu
+              position={pieMenuState.screenPos}
+              title={
+                pieMenuState.targetEntityId
+                  ? appRef.current?.world.getComponent(pieMenuState.targetEntityId, 'meta')?.name ||
+                    pieMenuState.targetEntityId
+                  : 'Быстрый спавн'
+              }
+              onClose={closePieMenu}
+              items={
+                pieMenuState.targetEntityId
+                  ? [
+                      {
+                        id: 'clone',
+                        label:
+                          pieMenuState.targetEntityIds.length > 1
+                            ? `Клон (${pieMenuState.targetEntityIds.length})`
+                            : 'Клонировать',
+                        icon: '📑',
+                        color: '#27ae60',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          const idsToClone =
+                            pieMenuState.targetEntityIds.length > 0
+                              ? pieMenuState.targetEntityIds
+                              : [pieMenuState.targetEntityId!];
+                          app.duplicateEntities(idsToClone, { x: 30, y: 30 });
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                      {
+                        id: 'focus',
+                        label: 'Фокус',
+                        icon: '🎯',
+                        color: '#3498db',
+                        onSelect: () => {
+                          if (pieMenuState.targetEntityId) {
+                            handleFocusEntity(pieMenuState.targetEntityId);
+                          }
+                        },
+                      },
+                      {
+                        id: 'inspect_bt',
+                        label: 'Дерево BT',
+                        icon: '🧠',
+                        color: '#9b59b6',
+                        onSelect: () => {
+                          if (pieMenuState.targetEntityId) {
+                            appRef.current?.selectEntity(pieMenuState.targetEntityId, true);
+                            setLeftDockTab('bt');
+                            updateStats();
+                          }
+                        },
+                      },
+                      {
+                        id: 'delete',
+                        label:
+                          pieMenuState.targetEntityIds.length > 1
+                            ? `Удалить (${pieMenuState.targetEntityIds.length})`
+                            : 'Удалить',
+                        icon: '🗑️',
+                        danger: true,
+                        onSelect: () => {
+                          handleDeleteEntity();
+                        },
+                      },
+                    ]
+                  : [
+                      {
+                        id: 'spawn_player',
+                        label: 'Игрок',
+                        icon: '🎮',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          app.commitHistory('Спавн игрока');
+                          const id = app.spawnEntity(
+                            createDefaultCreatureConfig('PlayerTree'),
+                            pieMenuState.worldPos
+                          );
+                          app.selectEntity(id, true);
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                      {
+                        id: 'spawn_attacker',
+                        label: 'Бот',
+                        icon: '⚔️',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          app.commitHistory('Спавн атакующего бота');
+                          const id = app.spawnEntity(
+                            createDefaultCreatureConfig('AttackerTree'),
+                            pieMenuState.worldPos
+                          );
+                          app.selectEntity(id, true);
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                      {
+                        id: 'spawn_wall',
+                        label: 'Стена',
+                        icon: '🧱',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          app.commitHistory('Спавн стены');
+                          const id = app.spawnEntity(
+                            {
+                              tag: { archetype: 'obstacle' },
+                              meta: {
+                                name: 'Каменная стена',
+                                entityType: 'obstacle',
+                                destructible: false,
+                              },
+                              physics: {
+                                radius: 54,
+                                weight: 1000,
+                                isSolid: true,
+                                points: createRectanglePoints(100, 40),
+                              },
+                            },
+                            pieMenuState.worldPos
+                          );
+                          app.selectEntity(id, true);
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                      {
+                        id: 'spawn_crate',
+                        label: 'Ящик',
+                        icon: '📦',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          app.commitHistory('Спавн ящика');
+                          const id = app.spawnEntity(
+                            {
+                              tag: { archetype: 'obstacle' },
+                              meta: {
+                                name: 'Деревянный ящик',
+                                entityType: 'obstacle',
+                                destructible: true,
+                              },
+                              health: { hp: 100, maxHp: 100 },
+                              physics: {
+                                radius: 42,
+                                weight: 50,
+                                isSolid: true,
+                                points: createRectanglePoints(60, 60),
+                              },
+                            },
+                            pieMenuState.worldPos
+                          );
+                          app.selectEntity(id, true);
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                      {
+                        id: 'spawn_fire_zone',
+                        label: 'Зона огня',
+                        icon: '🔥',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          app.commitHistory('Спавн зоны огня');
+                          const id = app.spawnEntity(
+                            createZoneConfig('damage', 70, 15, 'Зона огня'),
+                            pieMenuState.worldPos
+                          );
+                          app.selectEntity(id, true);
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                      {
+                        id: 'spawn_spear',
+                        label: 'Копьё',
+                        icon: '🗡️',
+                        onSelect: () => {
+                          const app = appRef.current;
+                          if (!app) return;
+                          app.commitHistory('Спавн оружия');
+                          const id = app.spawnEntity(
+                            {
+                              tag: { archetype: 'item', subType: 'weapon' },
+                              item: {
+                                name: 'Копьё пронзания',
+                                type: 'weapon',
+                                maxStack: 1,
+                                size: 10,
+                                equipType: null,
+                                equippable: false,
+                                equipTimeMultiplier: 1.0,
+                              },
+                              physics: { radius: 16, weight: 1, isSolid: true },
+                              weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
+                              weaponZone: { hitZoneType: 'forward_line', length: 150 },
+                            },
+                            pieMenuState.worldPos
+                          );
+                          app.selectEntity(id, true);
+                          syncPlayerControls();
+                          updateStats();
+                        },
+                      },
+                    ]
+              }
+            />
           )}
         </div>
 

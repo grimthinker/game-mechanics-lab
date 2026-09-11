@@ -77,6 +77,11 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
 
   return (
     <div
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseMove={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => e.stopPropagation()}
       style={{
         position: 'absolute',
         bottom: 0,

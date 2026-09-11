@@ -12,6 +12,8 @@ import {
 import { Point } from '../types';
 import { VISUAL_CONFIG } from '../../config/visualConfig';
 import { IRenderer, RenderContext } from './IRenderer';
+import { GizmoRenderer } from '../gizmos/GizmoRenderer';
+import { GizmoRenderData } from '../gizmos/types';
 
 export class CanvasRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
@@ -52,7 +54,7 @@ export class CanvasRenderer implements IRenderer {
 
   public render(context: RenderContext): void {
     const { camera, world, gameMode, editorData, showUIOverlays } = context;
-    const { selectedId, selectedIds, hoveredId, draggedGhosts, marqueeBox } = editorData;
+    const { selectedId, selectedIds, hoveredId, marqueeBox, gizmo } = editorData;
 
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -73,9 +75,9 @@ export class CanvasRenderer implements IRenderer {
       selectedIds,
       hoveredId,
       gameMode,
-      draggedGhosts,
       marqueeBox,
-      showUIOverlays
+      showUIOverlays,
+      gizmo
     );
 
     this.ctx.restore();
@@ -115,9 +117,9 @@ export class CanvasRenderer implements IRenderer {
     selectedIds: Set<EntityId>,
     hoveredId: EntityId | null,
     gameMode: string = 'editor',
-    draggedGhosts?: Array<{ id: EntityId; origPos: Point; pos: Point }> | null,
     marqueeBox?: { start: Point; current: Point } | null,
-    showUIOverlays: boolean = true
+    showUIOverlays: boolean = true,
+    gizmo?: GizmoRenderData | null
   ): void {
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
@@ -125,7 +127,6 @@ export class CanvasRenderer implements IRenderer {
     renderables.sort((a, b) => a[1].renderable.zIndex - b[1].renderable.zIndex);
 
     let attacksRendered = false;
-    const draggingIds = new Set(draggedGhosts?.map((g) => g.id));
 
     for (const [id, { transform, renderable }] of renderables) {
       if (!renderable.isVisible) continue;
@@ -140,33 +141,16 @@ export class CanvasRenderer implements IRenderer {
         attacksRendered = true;
       }
 
-      const isBeingDragged = draggingIds.has(id);
-      if (isBeingDragged) {
-        this.ctx.save();
-        this.ctx.globalAlpha = 0.35;
-        this.renderEntityPrimitives(
-          id,
-          transform,
-          renderable,
-          camera,
-          null,
-          selectedIds,
-          hoveredId,
-          world
-        );
-        this.ctx.restore();
-      } else {
-        this.renderEntityPrimitives(
-          id,
-          transform,
-          renderable,
-          camera,
-          selectedId,
-          selectedIds,
-          hoveredId,
-          world
-        );
-      }
+      this.renderEntityPrimitives(
+        id,
+        transform,
+        renderable,
+        camera,
+        selectedId,
+        selectedIds,
+        hoveredId,
+        world
+      );
     }
 
     if (!attacksRendered) {
@@ -175,13 +159,6 @@ export class CanvasRenderer implements IRenderer {
 
     // Отрисовка эффектов взаимодействия
     this.renderPickupInteractions(world, camera);
-
-    // Отрисовка призраков перетаскиваемой группы (Ghost Drag Preview)
-    if (draggedGhosts) {
-      for (const ghost of draggedGhosts) {
-        this.renderGhostDrag(world, camera, ghost);
-      }
-    }
 
     // Отрисовка рамки выделения (Marquee Selection Box)
     if (marqueeBox) {
@@ -195,6 +172,11 @@ export class CanvasRenderer implements IRenderer {
 
     // Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
+
+    // Отрисовка интерактивного манипулятора трансформации (Gizmo)
+    if (gizmo) {
+      GizmoRenderer.render(this.ctx, camera, gizmo);
+    }
   }
 
   private renderMarqueeBox(camera: Camera, box: { start: Point; current: Point }): void {
@@ -210,63 +192,6 @@ export class CanvasRenderer implements IRenderer {
     this.ctx.setLineDash([5 / camera.scale, 3 / camera.scale]);
     this.ctx.fillRect(minX, minY, width, height);
     this.ctx.strokeRect(minX, minY, width, height);
-    this.ctx.restore();
-  }
-
-  private renderGhostDrag(
-    world: World,
-    camera: Camera,
-    draggedGhost: { id: EntityId; origPos: Point; pos: Point }
-  ): void {
-    const entity = world.getEntity(draggedGhost.id);
-    if (!entity || !entity.transform || !entity.renderable) return;
-
-    const origPos = draggedGhost.origPos;
-    const ghostPos = draggedGhost.pos;
-    const angle = entity.transform.angle;
-
-    // 1. Пунктирная направляющая линия
-    this.ctx.save();
-    this.ctx.beginPath();
-    this.ctx.setLineDash([6 / camera.scale, 4 / camera.scale]);
-    this.ctx.moveTo(origPos.x, origPos.y);
-    this.ctx.lineTo(ghostPos.x, ghostPos.y);
-    this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.75)';
-    this.ctx.lineWidth = 1.5 / camera.scale;
-    this.ctx.stroke();
-    this.ctx.restore();
-
-    // 2. Отрисовка призрака дочерних объектов
-    const attached = world.getEntitiesWith('attachment', 'renderable');
-    for (const [, { attachment, renderable }] of attached) {
-      if (attachment.parentId === draggedGhost.id && renderable.isVisible) {
-        const childX = ghostPos.x + (attachment.offsetX ?? 0);
-        const childY = ghostPos.y + (attachment.offsetY ?? 0);
-        this.ctx.save();
-        this.ctx.globalAlpha = 0.45;
-        this.ctx.translate(childX, childY);
-        this.ctx.rotate(angle);
-        for (const prim of renderable.primitives) {
-          this.drawPrimitive(prim, camera, angle);
-        }
-        this.ctx.restore();
-      }
-    }
-
-    // 3. Отрисовка призрака объекта
-    this.ctx.save();
-    this.ctx.globalAlpha = 0.75;
-    this.ctx.translate(ghostPos.x, ghostPos.y);
-    this.ctx.rotate(angle);
-
-    for (const prim of entity.renderable.primitives) {
-      this.drawPrimitive(prim, camera, angle);
-    }
-
-    const strokeColor = VISUAL_CONFIG.selection.selectedColor;
-    const lineWidth = (VISUAL_CONFIG.selection.lineWidth + 0.5) / camera.scale;
-    this.drawSelectionOutline(entity.renderable.primitives[0], strokeColor, lineWidth);
-
     this.ctx.restore();
   }
 

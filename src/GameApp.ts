@@ -25,6 +25,7 @@ import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, Radians } from './utils';
 import { HistoryManager, HistoryRecord } from './history/HistoryManager';
+import { GizmoTool, GizmoHandle, GizmoDragState, GizmoInitialEntityData } from './gizmos/types';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -61,19 +62,13 @@ export class GameApp {
   // Рамка выделения
   public marqueeBox: { start: Point; current: Point } | null = null;
 
-  // Массовое перемещение (Ghost Dragging)
-  public draggedEntities: Map<string, Point> = new Map();
-  public draggedAnchorId: string | null = null;
-  public draggedAnchorOriginalPos: Point | null = null;
-  public draggedAnchorCurrentPos: Point | null = null;
-  private dragOffset: Point = { x: 0, y: 0 };
-
-  public get draggedEntityId(): string | null {
-    return this.draggedAnchorId;
-  }
-  public get draggedCurrentPos(): Point | null {
-    return this.draggedAnchorCurrentPos;
-  }
+  // Интерактивные манипуляторы (Gizmos)
+  public gizmoTool: GizmoTool = 'translate';
+  public hoveredGizmoHandle: GizmoHandle | null = null;
+  public activeGizmoHandle: GizmoHandle | null = null;
+  public gizmoDragState: GizmoDragState | null = null;
+  private gizmoStartSnapshot: HistoryRecord | null = null;
+  private pendingGizmoDragPoint: { point: Point; shiftKey: boolean } | null = null;
 
   public get selectedEntity(): EntityAdapter | null {
     if (!this.selectedEntityId) return null;
@@ -172,6 +167,153 @@ export class GameApp {
       position,
       forcedId
     );
+  }
+
+  public duplicateEntities(ids: string[], offset: Point = { x: 30, y: 30 }): string[] {
+    const validIds = ids.filter((id) => this.world.getEntity(id));
+    if (validIds.length === 0) return [];
+
+    this.commitHistory('Клонирование объектов');
+
+    const newIds: string[] = [];
+
+    for (const id of validIds) {
+      const comp = this.world.getEntity(id);
+      if (!comp || !comp.transform) continue;
+
+      const targetPos: Point = {
+        x: comp.transform.x + offset.x,
+        y: comp.transform.y + offset.y,
+      };
+
+      const config: EntityConfig = {};
+      if (comp.tag) config.tag = JSON.parse(JSON.stringify(comp.tag));
+      if (comp.meta) {
+        config.meta = JSON.parse(JSON.stringify(comp.meta));
+        config.meta!.name = `${comp.meta.name} (Копия)`;
+      }
+      if (comp.physicsStats) {
+        config.physics = {
+          radius: comp.physicsStats.radius.base,
+          weight: comp.physicsStats.weight.base,
+          isSolid: comp.physicsStats.isSolid,
+          points: comp.physicsStats.points
+            ? JSON.parse(JSON.stringify(comp.physicsStats.points))
+            : undefined,
+        };
+      }
+      if (comp.health) {
+        config.health = {
+          maxHp: comp.health.max.base,
+          hp: comp.health.current,
+        };
+      }
+      if (comp.movementStats) {
+        config.movement = {
+          maxSpeed: comp.movementStats.maxSpeed.base,
+          maxTurnSpeed: comp.movementStats.maxTurnSpeed.base,
+          runSpeedMultiplier: comp.movementStats.runSpeedMultiplier,
+          crouchSpeedMultiplier: comp.movementStats.crouchSpeedMultiplier,
+          walkSpeedMultiplier: comp.movementStats.walkSpeedMultiplier,
+          runTurnMultiplier: comp.movementStats.runTurnMultiplier,
+          crouchTurnMultiplier: comp.movementStats.crouchTurnMultiplier,
+          strafeSpeedMultiplier: comp.movementStats.strafeSpeedMultiplier,
+          backwardSpeedMultiplier: comp.movementStats.backwardSpeedMultiplier,
+          strafeTurnMultiplier: comp.movementStats.strafeTurnMultiplier,
+          backwardTurnMultiplier: comp.movementStats.backwardTurnMultiplier,
+          pickupSpeedMultiplier: comp.movementStats.pickupSpeedMultiplier,
+          pickupTurnMultiplier: comp.movementStats.pickupTurnMultiplier,
+        };
+      }
+      if (comp.stealthStats) {
+        config.stealth = {
+          stealthPower: comp.stealthStats.stealthPower.base,
+          runStealthMultiplier: comp.stealthStats.runStealthMultiplier,
+          crouchStealthMultiplier: comp.stealthStats.crouchStealthMultiplier,
+          walkStealthMultiplier: comp.stealthStats.walkStealthMultiplier,
+          turnInPlaceStealthMultiplier: comp.stealthStats.turnInPlaceStealthMultiplier,
+          immobileStealthMultiplier: comp.stealthStats.immobileStealthMultiplier,
+        };
+      }
+      if (comp.aiStats) {
+        config.ai = {
+          behavior: comp.aiStats.behavior.current,
+          stats: comp.aiStats.stats ? JSON.parse(JSON.stringify(comp.aiStats.stats)) : undefined,
+        };
+      }
+      if (comp.zoneTrigger) {
+        config.zoneTrigger = JSON.parse(JSON.stringify(comp.zoneTrigger));
+      }
+      if (comp.item) {
+        config.item = JSON.parse(JSON.stringify(comp.item));
+      }
+      if (comp.weaponStats) {
+        config.weaponStats = {
+          baseDamage: comp.weaponStats.baseDamage.base,
+          prepTime: comp.weaponStats.prepTime.base,
+          castTime: comp.weaponStats.castTime.base,
+          recoveryTime: comp.weaponStats.recoveryTime.base,
+          prepTurnSlow: comp.weaponStats.prepTurnSlow,
+          recoveryTurnSlow: comp.weaponStats.recoveryTurnSlow,
+          prepMoveSlow: comp.weaponStats.prepMoveSlow,
+          recoveryMoveSlow: comp.weaponStats.recoveryMoveSlow,
+          castMoveSlow: comp.weaponStats.castMoveSlow,
+          minMultiplier: comp.weaponStats.minMultiplier,
+          maxMultiplier: comp.weaponStats.maxMultiplier,
+          critChance: comp.weaponStats.critChance,
+          critMultiplier: comp.weaponStats.critMultiplier,
+        };
+      }
+      if (comp.weaponZone) {
+        config.weaponZone = JSON.parse(JSON.stringify(comp.weaponZone));
+      }
+      if (comp.armorStats) {
+        config.armorStats = {
+          defense: comp.armorStats.defense.base,
+          flatReduction: comp.armorStats.flatReduction.base,
+        };
+      }
+      if (comp.inventory) {
+        config.inventory = {
+          size: { ...comp.inventory.size },
+        };
+      }
+      if (comp.equip) {
+        config.equip = JSON.parse(JSON.stringify(comp.equip));
+        config.equip!.interactionSlots.forEach((s) => (s.itemId = null));
+        config.equip!.equipmentAreas.forEach((a) => (a.itemIds = []));
+      }
+      if (comp.gizmo) {
+        config.gizmo = JSON.parse(JSON.stringify(comp.gizmo));
+      }
+      config.transform = {
+        x: targetPos.x,
+        y: targetPos.y,
+        angle: comp.transform.angle,
+      };
+
+      const newId = this.spawnEntity(config, targetPos);
+
+      // Гарантируем перенос угла поворота (так как часть ассемблеров инициализируют угол в 0)
+      const newTrans = this.world.getComponent(newId, 'transform');
+      if (newTrans) {
+        newTrans.angle = comp.transform.angle;
+      }
+      const newPhys = this.world.getComponent(newId, 'physicsBody');
+      if (newPhys?.body && typeof newPhys.body.setAngle === 'function') {
+        newPhys.body.setAngle(comp.transform.angle);
+        this.physics.system.updateBody(newPhys.body);
+      }
+
+      newIds.push(newId);
+    }
+
+    if (newIds.length > 0) {
+      this.selectedEntityIds = new Set(newIds);
+      this.selectEntity(newIds[0], false);
+    }
+
+    return newIds;
   }
 
   public startPickup(entityId: string, targetItemId: string): boolean {
@@ -568,16 +710,36 @@ export class GameApp {
       this.threeSyncSystem.update(dt, this.world, this.gameMode, this.selectedEntityIds);
     }
 
-    // Подготовка данных призраков для всех перемещаемых объектов группы
-    let draggedGhosts: Array<{ id: string; origPos: Point; pos: Point }> | null = null;
-    if (this.draggedAnchorId && this.draggedAnchorCurrentPos && this.draggedAnchorOriginalPos) {
-      const dx = this.draggedAnchorCurrentPos.x - this.draggedAnchorOriginalPos.x;
-      const dy = this.draggedAnchorCurrentPos.y - this.draggedAnchorOriginalPos.y;
-      draggedGhosts = Array.from(this.draggedEntities.entries()).map(([id, origPos]) => ({
-        id,
-        origPos,
-        pos: { x: origPos.x + dx, y: origPos.y + dy },
-      }));
+    // Применяем накопленный ввод манипулятора строго 1 раз за кадр рендера (RAF Throttling)
+    this.applyPendingGizmoDrag();
+
+    let gizmoRenderData: import('./gizmos/types').GizmoRenderData | null = null;
+    if (this.gameMode === GameMode.EDITOR && this.selectedEntityId && this.gizmoTool !== 'select') {
+      const transform = this.world.getComponent(this.selectedEntityId, 'transform');
+      if (transform) {
+        let dragDelta: Point | undefined = undefined;
+        let dragDeltaAngle: number | undefined = undefined;
+
+        if (this.gizmoDragState) {
+          dragDelta = {
+            x: transform.x - this.gizmoDragState.anchorPos.x,
+            y: transform.y - this.gizmoDragState.anchorPos.y,
+          };
+          dragDeltaAngle = this.gizmoDragState.appliedDeltaAngle;
+        }
+
+        gizmoRenderData = {
+          tool: this.gizmoTool,
+          position: { x: transform.x, y: transform.y },
+          angle: transform.angle,
+          initialAngle: this.gizmoDragState?.initialAnchorAngle,
+          hoveredHandle: this.hoveredGizmoHandle,
+          activeHandle: this.activeGizmoHandle,
+          isDragging: this.isGizmoDragging(),
+          dragDelta,
+          dragDeltaAngle,
+        };
+      }
     }
 
     this.renderer.render({
@@ -589,8 +751,8 @@ export class GameApp {
         selectedId: this.selectedEntityId,
         selectedIds: this.selectedEntityIds,
         hoveredId: this.hoveredEntityId,
-        draggedGhosts: draggedGhosts,
         marqueeBox: this.marqueeBox,
+        gizmo: gizmoRenderData,
       },
       showUIOverlays: this.showUIOverlays,
     });
@@ -794,88 +956,249 @@ export class GameApp {
     return this.renderer.screenToWorld(clientX, clientY, this.camera);
   }
 
-  public startDraggingEntity(id: string, clickWorldPoint: Point): boolean {
-    if (!this.isPaused) return false;
-    const anchorTransform = this.world.getComponent(id, 'transform');
-    if (!anchorTransform) return false;
+  // --- Управление манипуляторами (Gizmo Controller) ---
 
-    // Если перетаскиваемый объект входит в группу, перемещаем всю группу
-    if (!this.selectedEntityIds.has(id)) {
-      this.selectEntity(id, true);
-    }
+  public setPendingGizmoDrag(point: Point, shiftKey: boolean): void {
+    this.pendingGizmoDragPoint = { point, shiftKey };
+  }
 
-    this.draggedEntities.clear();
-    for (const entId of this.selectedEntityIds) {
-      const t = this.world.getComponent(entId, 'transform');
-      if (t) {
-        this.draggedEntities.set(entId, { x: t.x, y: t.y });
+  private applyPendingGizmoDrag(): void {
+    if (!this.pendingGizmoDragPoint || !this.gizmoDragState) return;
+    const { point, shiftKey } = this.pendingGizmoDragPoint;
+    this.pendingGizmoDragPoint = null;
+    this.updateGizmoDrag(point, shiftKey);
+  }
+
+  public hitTestGizmo(worldPoint: Point): import('./gizmos/types').GizmoHandle | null {
+    if (!this.selectedEntityId || this.gizmoTool === 'select') return null;
+    const transform = this.world.getComponent(this.selectedEntityId, 'transform');
+    if (!transform) return null;
+
+    const invScale = 1 / this.camera.scale;
+    const gx = transform.x;
+    const gy = transform.y;
+    const mx = worldPoint.x;
+    const my = worldPoint.y;
+
+    if (this.gizmoTool === 'translate') {
+      const centerSize = 14 * invScale;
+      if (Math.abs(mx - gx) <= centerSize / 2 && Math.abs(my - gy) <= centerSize / 2) {
+        return 'center';
+      }
+
+      const axisLen = 65 * invScale;
+      const hitTolerance = 9 * invScale;
+
+      if (
+        mx >= gx + centerSize / 2 &&
+        mx <= gx + axisLen + 15 * invScale &&
+        Math.abs(my - gy) <= hitTolerance
+      ) {
+        return 'x';
+      }
+
+      if (
+        my >= gy + centerSize / 2 &&
+        my <= gy + axisLen + 15 * invScale &&
+        Math.abs(mx - gx) <= hitTolerance
+      ) {
+        return 'y';
+      }
+    } else if (this.gizmoTool === 'rotate') {
+      const ringRadius = 55 * invScale;
+      const ringThickness = 10 * invScale;
+      const dist = Math.hypot(mx - gx, my - gy);
+      if (Math.abs(dist - ringRadius) <= ringThickness) {
+        return 'rotate';
       }
     }
 
-    this.draggedAnchorId = id;
-    this.draggedAnchorOriginalPos = { x: anchorTransform.x, y: anchorTransform.y };
-    this.dragOffset = {
-      x: anchorTransform.x - clickWorldPoint.x,
-      y: anchorTransform.y - clickWorldPoint.y,
+    return null;
+  }
+
+  public startGizmoDrag(handle: GizmoHandle, worldPoint: Point): boolean {
+    if (!this.selectedEntityId) return false;
+    const anchorTransform = this.world.getComponent(this.selectedEntityId, 'transform');
+    if (!anchorTransform) return false;
+
+    // Фиксируем снимок мира ДО начала трансформации для корректной работы Undo (Ctrl+Z)
+    this.gizmoStartSnapshot = this.captureHistoryRecord('Трансформация манипулятором');
+
+    const initialEntities = new Map<string, GizmoInitialEntityData>();
+    const idsToDrag = this.selectedEntityIds.has(this.selectedEntityId)
+      ? Array.from(this.selectedEntityIds)
+      : [this.selectedEntityId];
+
+    for (const entId of idsToDrag) {
+      const t = this.world.getComponent(entId, 'transform');
+      if (t) {
+        initialEntities.set(entId, {
+          pos: { x: t.x, y: t.y },
+          angle: t.angle,
+        });
+      }
+    }
+
+    const anchorPos = { x: anchorTransform.x, y: anchorTransform.y };
+    const startAngle = Math.atan2(worldPoint.y - anchorPos.y, worldPoint.x - anchorPos.x);
+
+    this.activeGizmoHandle = handle;
+    this.gizmoDragState = {
+      tool: this.gizmoTool,
+      handle,
+      startPoint: { x: worldPoint.x, y: worldPoint.y },
+      currentPoint: { x: worldPoint.x, y: worldPoint.y },
+      anchorPos,
+      startAngle,
+      currentAngle: startAngle,
+      initialAnchorAngle: anchorTransform.angle,
+      appliedDeltaAngle: 0,
+      initialEntities,
     };
-    this.draggedAnchorCurrentPos = { x: anchorTransform.x, y: anchorTransform.y };
+
     return true;
   }
 
-  public updateDraggedEntityPosition(worldPoint: Point): void {
-    if (!this.draggedAnchorId) return;
-    this.draggedAnchorCurrentPos = {
-      x: worldPoint.x + this.dragOffset.x,
-      y: worldPoint.y + this.dragOffset.y,
-    };
-  }
+  public updateGizmoDrag(worldPoint: Point, shiftKey: boolean = false): void {
+    if (!this.gizmoDragState) return;
 
-  public cancelEntityDrag(): void {
-    this.draggedEntities.clear();
-    this.draggedAnchorId = null;
-    this.draggedAnchorOriginalPos = null;
-    this.draggedAnchorCurrentPos = null;
-  }
+    this.gizmoDragState.currentPoint = { x: worldPoint.x, y: worldPoint.y };
 
-  public endEntityDrag(): void {
-    if (!this.draggedAnchorId || !this.draggedAnchorCurrentPos || !this.draggedAnchorOriginalPos) {
-      this.cancelEntityDrag();
-      return;
-    }
+    if (this.gizmoDragState.tool === 'translate') {
+      let rawDx = worldPoint.x - this.gizmoDragState.startPoint.x;
+      let rawDy = worldPoint.y - this.gizmoDragState.startPoint.y;
 
-    const dx = this.draggedAnchorCurrentPos.x - this.draggedAnchorOriginalPos.x;
-    const dy = this.draggedAnchorCurrentPos.y - this.draggedAnchorOriginalPos.y;
-
-    if (Math.hypot(dx, dy) < 0.01) {
-      this.cancelEntityDrag();
-      return;
-    }
-
-    this.commitHistory('Перемещение объектов');
-
-    // Фиксируем новые позиции для всех объектов группы (включая препятствия)
-    for (const [entId, origPos] of this.draggedEntities.entries()) {
-      const newX = origPos.x + dx;
-      const newY = origPos.y + dy;
-
-      const transform = this.world.getComponent(entId, 'transform');
-      const phys = this.world.getComponent(entId, 'physicsBody');
-
-      if (transform) {
-        transform.x = newX;
-        transform.y = newY;
+      if (this.gizmoDragState.handle === 'x') {
+        rawDy = 0;
+      } else if (this.gizmoDragState.handle === 'y') {
+        rawDx = 0;
       }
-      if (phys && phys.body) {
-        phys.body.setPosition(newX, newY);
-        this.physics.system.updateBody(phys.body);
+
+      if (shiftKey) {
+        const snapGrid = 10;
+        rawDx = Math.round(rawDx / snapGrid) * snapGrid;
+        rawDy = Math.round(rawDy / snapGrid) * snapGrid;
+      }
+
+      for (const [entId, initData] of this.gizmoDragState.initialEntities.entries()) {
+        const t = this.world.getComponent(entId, 'transform');
+        const phys = this.world.getComponent(entId, 'physicsBody');
+        const newX = initData.pos.x + rawDx;
+        const newY = initData.pos.y + rawDy;
+
+        if (t) {
+          t.x = newX;
+          t.y = newY;
+        }
+        if (phys && phys.body) {
+          phys.body.setPosition(newX, newY);
+          this.physics.system.updateBody(phys.body);
+        }
+      }
+      this.attachmentSystem.update(this.world, this.physics);
+    } else if (this.gizmoDragState.tool === 'rotate') {
+      const anchor = this.gizmoDragState.anchorPos;
+      const currentAngle = Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x);
+      this.gizmoDragState.currentAngle = currentAngle;
+
+      // Нормализация разницы углов для предотвращения скачка при переходе через шов ±180°
+      let deltaAngle = currentAngle - this.gizmoDragState.startAngle;
+      deltaAngle = Math.atan2(Math.sin(deltaAngle), Math.cos(deltaAngle));
+
+      if (shiftKey) {
+        const snapStep = Math.PI / 12; // 15 градусов
+        deltaAngle = Math.round(deltaAngle / snapStep) * snapStep;
+      }
+
+      this.gizmoDragState.appliedDeltaAngle = deltaAngle;
+
+      for (const [entId, initData] of this.gizmoDragState.initialEntities.entries()) {
+        const t = this.world.getComponent(entId, 'transform');
+        const phys = this.world.getComponent(entId, 'physicsBody');
+
+        let newAngle = (initData.angle + deltaAngle) % (Math.PI * 2);
+        if (newAngle > Math.PI) newAngle -= Math.PI * 2;
+        if (newAngle < -Math.PI) newAngle += Math.PI * 2;
+
+        let newX = initData.pos.x;
+        let newY = initData.pos.y;
+
+        if (this.gizmoDragState.initialEntities.size > 1) {
+          const relX = initData.pos.x - anchor.x;
+          const relY = initData.pos.y - anchor.y;
+          newX = anchor.x + relX * Math.cos(deltaAngle) - relY * Math.sin(deltaAngle);
+          newY = anchor.y + relX * Math.sin(deltaAngle) + relY * Math.cos(deltaAngle);
+        }
+
+        if (t) {
+          t.x = newX;
+          t.y = newY;
+          t.angle = newAngle as Radians;
+        }
+        if (phys && phys.body) {
+          phys.body.setPosition(newX, newY);
+          if (typeof phys.body.setAngle === 'function') {
+            phys.body.setAngle(newAngle);
+          }
+          this.physics.system.updateBody(phys.body);
+        }
+      }
+      this.attachmentSystem.update(this.world, this.physics);
+    }
+  }
+
+  public endGizmoDrag(): void {
+    if (!this.gizmoDragState) return;
+
+    // Применяем последний необработанный кадр ввода перед фиксацией в истории
+    this.applyPendingGizmoDrag();
+
+    if (this.gizmoDragState.tool === 'translate') {
+      const dx = this.gizmoDragState.currentPoint.x - this.gizmoDragState.startPoint.x;
+      const dy = this.gizmoDragState.currentPoint.y - this.gizmoDragState.startPoint.y;
+      if (Math.hypot(dx, dy) > 0.5 && this.gizmoStartSnapshot) {
+        this.gizmoStartSnapshot.description = 'Смещение манипулятором';
+        this.history.pushState(this.gizmoStartSnapshot);
+      }
+    } else if (this.gizmoDragState.tool === 'rotate') {
+      let rawDelta = this.gizmoDragState.currentAngle - this.gizmoDragState.startAngle;
+      const deltaAngle = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta));
+      if (Math.abs(deltaAngle) > 0.01 && this.gizmoStartSnapshot) {
+        this.gizmoStartSnapshot.description = 'Вращение манипулятором';
+        this.history.pushState(this.gizmoStartSnapshot);
       }
     }
 
-    this.attachmentSystem.update(this.world, this.physics);
-    this.cancelEntityDrag();
+    this.cancelGizmoDrag(false);
   }
 
-  public isDraggingEntity(): boolean {
-    return this.draggedAnchorId !== null;
+  public cancelGizmoDrag(revert: boolean = false): void {
+    this.pendingGizmoDragPoint = null;
+    if (revert && this.gizmoDragState) {
+      for (const [entId, initData] of this.gizmoDragState.initialEntities.entries()) {
+        const t = this.world.getComponent(entId, 'transform');
+        const phys = this.world.getComponent(entId, 'physicsBody');
+        if (t) {
+          t.x = initData.pos.x;
+          t.y = initData.pos.y;
+          t.angle = initData.angle;
+        }
+        if (phys && phys.body) {
+          phys.body.setPosition(initData.pos.x, initData.pos.y);
+          if (typeof phys.body.setAngle === 'function') {
+            phys.body.setAngle(initData.angle);
+          }
+          this.physics.system.updateBody(phys.body);
+        }
+      }
+      this.attachmentSystem.update(this.world, this.physics);
+    }
+    this.activeGizmoHandle = null;
+    this.gizmoDragState = null;
+    this.gizmoStartSnapshot = null;
+  }
+
+  public isGizmoDragging(): boolean {
+    return this.gizmoDragState !== null;
   }
 }
