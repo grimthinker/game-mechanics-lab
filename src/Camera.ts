@@ -1,13 +1,21 @@
 import { Point } from './types';
 
+import { CAMERA_CONFIG } from '../config/cameraConfig';
+
 export class Camera {
-  public scale: number = 1.5;
+  public scale: number = CAMERA_CONFIG.defaultZoom;
   public offsetX: number = 0;
   public offsetY: number = 0;
   public yaw: number = 0;
-  public pitch: number = Math.PI / 3; // По умолчанию 60 градусов для 3D
-  public readonly minScale: number = 0.15;
-  public readonly maxScale: number = 6;
+  public pitch: number = CAMERA_CONFIG.defaultPitch;
+  public readonly minScale: number = CAMERA_CONFIG.minScale;
+  public readonly maxScale: number = CAMERA_CONFIG.maxScale;
+
+  // Настройки чувствительности (с сохранением в localStorage)
+  public panSpeed: number =
+    Number(localStorage.getItem('camera_pan_speed')) || CAMERA_CONFIG.defaultPanSpeed;
+  public rotateSpeed: number =
+    Number(localStorage.getItem('camera_rotate_speed')) || CAMERA_CONFIG.defaultRotateSpeed;
 
   private isPanning: boolean = false;
   private panStartX: number = 0;
@@ -17,6 +25,16 @@ export class Camera {
   public isRotating: boolean = false;
   private rotStartX: number = 0;
   private rotStartY: number = 0;
+
+  public setPanSpeed(val: number): void {
+    this.panSpeed = val;
+    localStorage.setItem('camera_pan_speed', val.toString());
+  }
+
+  public setRotateSpeed(val: number): void {
+    this.rotateSpeed = val;
+    localStorage.setItem('camera_rotate_speed', val.toString());
+  }
 
   public startRotate(clientX: number, clientY: number): void {
     this.isRotating = true;
@@ -29,10 +47,14 @@ export class Camera {
     const dx = clientX - this.rotStartX;
     const dy = clientY - this.rotStartY;
 
-    // Чувствительность вращения
-    this.yaw += dx * 0.01;
-    // Ограничиваем наклон (pitch), чтобы камера не уходила под землю и не переворачивалась
-    this.pitch = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, this.pitch + dy * 0.01));
+    this.yaw += dx * CAMERA_CONFIG.rotationSensitivity * this.rotateSpeed;
+    this.pitch = Math.max(
+      CAMERA_CONFIG.minPitch,
+      Math.min(
+        Math.PI / 2 - CAMERA_CONFIG.maxPitchOffset,
+        this.pitch + dy * CAMERA_CONFIG.rotationSensitivity * this.rotateSpeed
+      )
+    );
 
     this.rotStartX = clientX;
     this.rotStartY = clientY;
@@ -51,11 +73,16 @@ export class Camera {
 
   public pan(clientX: number, clientY: number): void {
     if (!this.isPanning) return;
-    const dx = clientX - this.panStartX;
-    const dy = clientY - this.panStartY;
+    const dx = (clientX - this.panStartX) * this.panSpeed;
+    const dy = (clientY - this.panStartY) * this.panSpeed;
     this.totalPanDistance += Math.hypot(dx, dy);
-    this.offsetX += dx;
-    this.offsetY += dy;
+
+    // Учитываем текущий угол поворота камеры, чтобы панорамирование шло по экранным осям
+    const unRotDx = dx * Math.cos(-this.yaw) - dy * Math.sin(-this.yaw);
+    const unRotDy = dx * Math.sin(-this.yaw) + dy * Math.cos(-this.yaw);
+
+    this.offsetX += unRotDx;
+    this.offsetY += unRotDy;
     this.panStartX = clientX;
     this.panStartY = clientY;
   }
@@ -109,10 +136,10 @@ export class Camera {
   }
 
   public reset(canvas: HTMLCanvasElement): void {
-    this.scale = 1.0;
+    this.scale = CAMERA_CONFIG.defaultZoom;
     this.offsetX = canvas.width / 2;
     this.offsetY = canvas.height / 2;
     this.yaw = 0;
-    this.pitch = Math.PI / 3;
+    this.pitch = CAMERA_CONFIG.defaultPitch;
   }
 }

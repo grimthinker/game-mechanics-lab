@@ -3,7 +3,6 @@ import { IRenderer, RenderContext } from './IRenderer';
 import { Camera } from '../Camera';
 import { Point } from '../types';
 import { EntityId } from '../ecs/types';
-
 import { World } from '../ecs/World';
 
 export class ThreeRenderer implements IRenderer {
@@ -133,7 +132,7 @@ export class ThreeRenderer implements IRenderer {
     const h = this.canvas.height;
     const scale = context.camera.scale;
 
-    // Вычисляем центральную точку мира, на которую смотрит 2D-камера
+    // Вычисляем центральную точку мира, на которую смотрит камера
     const centerX = (w / 2 - context.camera.offsetX) / scale;
     const centerY = (h / 2 - context.camera.offsetY) / scale;
 
@@ -142,7 +141,8 @@ export class ThreeRenderer implements IRenderer {
     const camY = dist * Math.sin(context.camera.pitch);
     const groundDist = dist * Math.cos(context.camera.pitch);
 
-    const camX = centerX - groundDist * Math.sin(context.camera.yaw);
+    // Синхронизированный поворот с 2D (знак плюс обеспечивает вращение по часовой стрелке)
+    const camX = centerX + groundDist * Math.sin(context.camera.yaw);
     const camZ = centerY + groundDist * Math.cos(context.camera.yaw);
 
     this.camera.position.set(camX, camY, camZ);
@@ -197,11 +197,10 @@ export class ThreeRenderer implements IRenderer {
 
       // Определяем высоту 3D-модели для позиционирования UI над ней
       let meshHeight = 40;
-      if (archetype === 'obstacle') meshHeight = 60;
-      if (archetype === 'item') meshHeight = radius * 1.5;
+      if (isObstacle) meshHeight = 60;
       if (archetype === 'zone') meshHeight = 2;
 
-      // Проекция 3D точки (потолок меша) на 2D экран
+      // Проекция 3D точки (верхушка меша) на 2D экран
       const pos3D = new THREE.Vector3(transform.x, meshHeight + 5, transform.y);
       pos3D.project(this.camera);
 
@@ -235,7 +234,6 @@ export class ThreeRenderer implements IRenderer {
       this.uiCtx.textAlign = 'center';
       this.uiCtx.textBaseline = 'bottom';
       const displayName = meta?.name ?? id;
-      // Если рисовали HealthBar, поднимаем текст чуть выше
       this.uiCtx.fillText(displayName, 0, health ? -14 : -4);
 
       this.uiCtx.restore();
