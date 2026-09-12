@@ -25,7 +25,7 @@ export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
 
 export function detectArchetype(config: EntityConfig): EntityArchetype {
   if (config.tag?.archetype) return config.tag.archetype;
-  if (config.zoneTrigger) return 'zone';
+  if (config.areaEffector || (config as any).zoneTrigger) return 'zone';
   if (config.item) return 'item';
   if (config.gizmo) return 'marker';
   if (config.meta?.entityType === 'obstacle' || (config.physics && config.physics.points)) {

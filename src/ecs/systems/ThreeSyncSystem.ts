@@ -106,13 +106,13 @@ export class ThreeSyncSystem {
 
         // Динамическое обновление материала зоны при изменении эффекта в редакторе
         if (archetype === 'zone') {
-          const zTrigger = world.getComponent(id, 'zoneTrigger');
-          if (zTrigger) {
+          const effector = world.getComponent(id, 'areaEffector');
+          if (effector) {
             let mat = this.matZoneNeutral;
-            if (zTrigger.effect === 'damage') mat = this.matZoneDmg;
-            else if (zTrigger.effect === 'heal') mat = this.matZoneHeal;
-            else if (zTrigger.effect === 'time_dilation') {
-              mat = zTrigger.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
+            if (effector.effect === 'damage') mat = this.matZoneDmg;
+            else if (effector.effect === 'heal') mat = this.matZoneHeal;
+            else if (effector.effect === 'time_dilation') {
+              mat = effector.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
             }
 
             const mainMesh = obj.children.find(
@@ -195,12 +195,12 @@ export class ThreeSyncSystem {
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = size / 2;
     } else if (archetype === 'zone') {
-      const zTrigger = world.getComponent(id, 'zoneTrigger');
+      const effector = world.getComponent(id, 'areaEffector');
       let mat = this.matZoneNeutral;
-      if (zTrigger?.effect === 'damage') mat = this.matZoneDmg;
-      else if (zTrigger?.effect === 'heal') mat = this.matZoneHeal;
-      else if (zTrigger?.effect === 'time_dilation') {
-        mat = (zTrigger.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
+      if (effector?.effect === 'damage') mat = this.matZoneDmg;
+      else if (effector?.effect === 'heal') mat = this.matZoneHeal;
+      else if (effector?.effect === 'time_dilation') {
+        mat = (effector.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
       }
 
       const geo = new THREE.CylinderGeometry(radius, radius, 2, 32);

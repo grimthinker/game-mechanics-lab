@@ -16,47 +16,47 @@ export class CanvasRenderSyncSystem {
         continue;
       }
 
-      // 2. Синхронизация триггерных зон
+      // 2. Синхронизация зон-эффекторов
       if (archetype === 'zone') {
-        const zoneTrigger = world.getComponent(id, 'zoneTrigger');
-        if (zoneTrigger) {
+        const areaEffector = world.getComponent(id, 'areaEffector');
+        if (areaEffector) {
           const circlePrim = renderable.primitives[0];
           const iconPrim = renderable.primitives[1];
           const textPrim = renderable.primitives[2];
 
           if (circlePrim && circlePrim.kind === 'circle') {
-            circlePrim.radius = zoneTrigger.radius;
-            if (zoneTrigger.effect === 'damage') {
+            circlePrim.radius = areaEffector.radius;
+            if (areaEffector.effect === 'damage') {
               circlePrim.fill = 'rgba(231, 76, 60, 0.2)';
               circlePrim.stroke = '#e74c3c';
-            } else if (zoneTrigger.effect === 'heal') {
+            } else if (areaEffector.effect === 'heal') {
               circlePrim.fill = 'rgba(46, 204, 113, 0.2)';
               circlePrim.stroke = '#2ecc71';
-            } else if (zoneTrigger.effect === 'repel') {
+            } else if (areaEffector.effect === 'repel') {
               circlePrim.fill = 'rgba(243, 156, 18, 0.2)';
               circlePrim.stroke = '#f39c12';
-            } else if (zoneTrigger.effect === 'attract') {
+            } else if (areaEffector.effect === 'attract') {
               circlePrim.fill = 'rgba(155, 89, 182, 0.2)';
               circlePrim.stroke = '#9b59b6';
-            } else if (zoneTrigger.effect === 'time_dilation') {
-              const isSpeedUp = zoneTrigger.valuePerSec > 1.0;
+            } else if (areaEffector.effect === 'time_dilation') {
+              const isSpeedUp = areaEffector.valuePerSec > 1.0;
               circlePrim.fill = isSpeedUp ? 'rgba(26, 188, 156, 0.2)' : 'rgba(52, 152, 219, 0.2)';
               circlePrim.stroke = isSpeedUp ? '#1abc9c' : '#3498db';
             }
           }
 
           if (iconPrim && iconPrim.kind === 'text') {
-            if (zoneTrigger.effect === 'damage') iconPrim.text = '☠️';
-            else if (zoneTrigger.effect === 'heal') iconPrim.text = '❤️';
-            else if (zoneTrigger.effect === 'repel') iconPrim.text = '💨';
-            else if (zoneTrigger.effect === 'attract') iconPrim.text = '🌀';
-            else if (zoneTrigger.effect === 'time_dilation') {
-              iconPrim.text = zoneTrigger.valuePerSec > 1.0 ? '⚡' : '⏳';
+            if (areaEffector.effect === 'damage') iconPrim.text = '☠️';
+            else if (areaEffector.effect === 'heal') iconPrim.text = '❤️';
+            else if (areaEffector.effect === 'repel') iconPrim.text = '💨';
+            else if (areaEffector.effect === 'attract') iconPrim.text = '🌀';
+            else if (areaEffector.effect === 'time_dilation') {
+              iconPrim.text = areaEffector.valuePerSec > 1.0 ? '⚡' : '⏳';
             }
           }
 
           if (textPrim && textPrim.kind === 'text') {
-            textPrim.offset = { x: 0, y: -(zoneTrigger.radius + 12) };
+            textPrim.offset = { x: 0, y: -(areaEffector.radius + 12) };
             const meta = world.getComponent(id, 'meta');
             if (meta) textPrim.text = meta.name;
           }

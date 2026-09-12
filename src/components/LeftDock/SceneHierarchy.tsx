@@ -84,7 +84,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
       if (comp.inventory && comp.inventory.slots.some((row) => row.some((cell) => cell.itemId))) {
         badges.push({ label: 'ИНВ', color: '#27ae60' });
       }
-      if (comp.zoneTrigger) {
+      if (comp.areaEffector) {
         badges.push({ label: 'ЗОНА', color: '#d35400' });
       }
 

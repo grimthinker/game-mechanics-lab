@@ -8,11 +8,11 @@ export class AttachmentSystem {
 
     for (const [id, { transform, attachment }] of entities) {
       const parent = world.getEntity(attachment.parentId);
-      const zoneTrigger = world.getComponent(id, 'zoneTrigger');
+      const areaEffector = world.getComponent(id, 'areaEffector');
 
       // 1. Проверка удаления родителя из мира
       if (!parent || !parent.transform) {
-        const destroyOnRemoval = zoneTrigger?.destroyOnParentRemoval ?? true;
+        const destroyOnRemoval = areaEffector?.destroyOnParentRemoval ?? true;
         if (destroyOnRemoval) {
           this.removeEntitySafe(world, physics, id);
         } else {
@@ -23,7 +23,7 @@ export class AttachmentSystem {
 
       // 2. Проверка гибели родителя (isAlive === false)
       if (parent.health && !parent.health.isAlive) {
-        const destroyOnDeath = zoneTrigger?.destroyOnParentDeath ?? false;
+        const destroyOnDeath = areaEffector?.destroyOnParentDeath ?? false;
         if (destroyOnDeath) {
           this.removeEntitySafe(world, physics, id);
           continue;

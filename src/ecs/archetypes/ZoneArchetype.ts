@@ -78,7 +78,7 @@ export function createZoneConfig(
       name: name || getDefaultZoneName(effect, valuePerSec),
       entityType: 'zone',
     },
-    zoneTrigger: {
+    areaEffector: {
       effect,
       radius,
       valuePerSec,
@@ -105,15 +105,16 @@ export function assembleZone(
   config: EntityConfig,
   position?: Point
 ): void {
-  const zTrigger = config.zoneTrigger ?? {
-    effect: 'damage',
-    radius: 80,
-    valuePerSec: 15,
-    ignoreParent: true,
-  };
+  const effector = config.areaEffector ??
+    (config as any).zoneTrigger ?? {
+      effect: 'damage',
+      radius: 80,
+      valuePerSec: 15,
+      ignoreParent: true,
+    };
 
-  const effect = zTrigger.effect;
-  const radius = zTrigger.radius;
+  const effect = effector.effect;
+  const radius = effector.radius;
   const name = config.meta?.name ?? getDefaultZoneName(effect);
 
   // 1. Тег
@@ -125,8 +126,8 @@ export function assembleZone(
     entityType: 'zone',
   });
 
-  // 3. Компонент триггера
-  world.addComponent(id, 'zoneTrigger', zTrigger);
+  // 3. Компонент эффектора
+  world.addComponent(id, 'areaEffector', effector);
 
   // 4. Компонент привязки (если передан)
   if (config.attachment) {
@@ -153,7 +154,7 @@ export function assembleZone(
   physics.registerBody(id, body);
 
   // 7. Универсальный рендер (слой 0 — земля/зоны)
-  const visuals = getZoneVisuals(effect, zTrigger.valuePerSec);
+  const visuals = getZoneVisuals(effect, effector.valuePerSec);
 
   const renderable: RenderableComponent = {
     zIndex: RENDER_Z_INDEX.ZONES,

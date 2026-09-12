@@ -139,7 +139,7 @@ export interface RenderableComponent {
 
 export type ZoneEffectType = 'damage' | 'heal' | 'repel' | 'attract' | 'time_dilation';
 
-export interface ZoneTriggerComponent {
+export interface AreaEffectorComponent {
   effect: ZoneEffectType;
   valuePerSec: number;
   radius: number;
@@ -332,7 +332,7 @@ export interface OwnershipComponent {
 export interface EntityComponents {
   tag?: TagComponent;
   renderable?: RenderableComponent;
-  zoneTrigger?: ZoneTriggerComponent;
+  areaEffector?: AreaEffectorComponent;
   attachment?: AttachmentComponent;
   transform?: TransformComponent;
   physicsBody?: PhysicsBodyComponent;
@@ -362,7 +362,7 @@ export interface EntityComponents {
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
   'tag',
   'renderable',
-  'zoneTrigger',
+  'areaEffector',
   'attachment',
   'health',
   'transform',
@@ -544,7 +544,7 @@ export interface InventorySetup {
 export interface EntityConfig {
   tag?: TagComponent;
   renderable?: RenderableComponent;
-  zoneTrigger?: ZoneTriggerComponent;
+  areaEffector?: AreaEffectorComponent;
   attachment?: AttachmentComponent;
   gizmo?: GizmoComponent;
   physics?: PhysicsConfig;

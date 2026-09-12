@@ -207,7 +207,7 @@ export class WorldSerializer {
         } else if (comps.physicsStats && comps.transform && !isPossessedItem) {
           const archetype =
             comps.tag?.archetype ??
-            (comps.zoneTrigger
+            (comps.areaEffector || comps.zoneTrigger
               ? 'zone'
               : comps.item
                 ? 'item'

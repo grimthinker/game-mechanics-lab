@@ -7,7 +7,7 @@ import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
 import { CanvasRenderSyncSystem } from './ecs/systems/CanvasRenderSyncSystem';
 import { InteractionSystem } from './ecs/systems/InteractionSystem';
-import { ZoneTriggerSystem } from './ecs/systems/ZoneTriggerSystem';
+import { AreaEffectorSystem } from './ecs/systems/AreaEffectorSystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
@@ -45,7 +45,7 @@ export class GameApp {
   private canvasRenderSyncSystem: CanvasRenderSyncSystem;
   private threeSyncSystem: ThreeSyncSystem | null = null;
   public interactionSystem: InteractionSystem;
-  private zoneTriggerSystem: ZoneTriggerSystem;
+  private areaEffectorSystem: AreaEffectorSystem;
   private modifierSystem: ModifierSystem;
   private attachmentSystem: AttachmentSystem;
   public camera: Camera;
@@ -118,7 +118,7 @@ export class GameApp {
     this.aiSystem = new AISystem();
     this.canvasRenderSyncSystem = new CanvasRenderSyncSystem();
     this.interactionSystem = new InteractionSystem();
-    this.zoneTriggerSystem = new ZoneTriggerSystem();
+    this.areaEffectorSystem = new AreaEffectorSystem();
     this.modifierSystem = new ModifierSystem();
     this.attachmentSystem = new AttachmentSystem();
     this.camera = new Camera();
@@ -245,8 +245,8 @@ export class GameApp {
           stats: comp.aiStats.stats ? JSON.parse(JSON.stringify(comp.aiStats.stats)) : undefined,
         };
       }
-      if (comp.zoneTrigger) {
-        config.zoneTrigger = JSON.parse(JSON.stringify(comp.zoneTrigger));
+      if (comp.areaEffector) {
+        config.areaEffector = JSON.parse(JSON.stringify(comp.areaEffector));
       }
       if (comp.item) {
         config.item = JSON.parse(JSON.stringify(comp.item));
@@ -746,7 +746,7 @@ export class GameApp {
     this.stealthSystem.update(dt, this.world);
     this.physics.update(dt, this.world);
     this.attachmentSystem.update(this.world, this.physics);
-    this.zoneTriggerSystem.update(dt, this.world, this.physics);
+    this.areaEffectorSystem.update(dt, this.world, this.physics);
     this.damageSystem.update(dt, this.world);
   }
 

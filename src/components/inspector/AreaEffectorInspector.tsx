@@ -1,13 +1,13 @@
 import React from 'react';
-import { ZoneEffectType, ZoneTriggerComponent } from '../../ecs/types';
+import { ZoneEffectType, AreaEffectorComponent } from '../../ecs/types';
 
-export interface TriggerZoneInspectorProps {
-  values: ZoneTriggerComponent;
-  onChange: (patch: Partial<ZoneTriggerComponent>) => void;
+export interface AreaEffectorInspectorProps {
+  values: AreaEffectorComponent;
+  onChange: (patch: Partial<AreaEffectorComponent>) => void;
   isReadOnly?: boolean;
 }
 
-export const TriggerZoneInspector: React.FC<TriggerZoneInspectorProps> = ({
+export const AreaEffectorInspector: React.FC<AreaEffectorInspectorProps> = ({
   values,
   onChange,
   isReadOnly,

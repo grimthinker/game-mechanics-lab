@@ -5,7 +5,7 @@ import { CollisionCategory, ModifierType } from '../types';
 import { applyDamage, applyHeal } from '../utils/health';
 import { addModifier } from '../stats/StatEvaluator';
 
-export class ZoneTriggerSystem {
+export class AreaEffectorSystem {
   private pulseTimer: number = 0;
   private readonly PULSE_INTERVAL: number = 0.4; // Интервал между вспышками (2.5 раза в сек)
 
@@ -16,12 +16,12 @@ export class ZoneTriggerSystem {
       this.pulseTimer = 0;
     }
 
-    const zones = world.getEntitiesWith('zoneTrigger', 'transform', 'physicsBody');
+    const effectors = world.getEntitiesWith('areaEffector', 'transform', 'physicsBody');
 
     for (const [
       zoneId,
-      { zoneTrigger, transform: zoneTransform, physicsBody: zonePhys },
-    ] of zones) {
+      { areaEffector, transform: zoneTransform, physicsBody: zonePhys },
+    ] of effectors) {
       const attachment = world.getComponent(zoneId, 'attachment');
 
       // Поиск перекрывающихся тел через пространственный движок (с учетом радиусов существ)
@@ -34,7 +34,7 @@ export class ZoneTriggerSystem {
         if (!targetPhys || (targetPhys.category & CollisionCategory.CREATURE) === 0) return;
 
         // Иммунитет носителя ауры
-        if (zoneTrigger.ignoreParent && attachment && attachment.parentId === targetId) {
+        if (areaEffector.ignoreParent && attachment && attachment.parentId === targetId) {
           return;
         }
 
@@ -43,19 +43,19 @@ export class ZoneTriggerSystem {
 
         const targetTs = world.getComponent(targetId, 'timeScale')?.multiplier.current ?? 1.0;
         const localDt = dt * targetTs;
-        const deltaValue = zoneTrigger.valuePerSec * localDt;
+        const deltaValue = areaEffector.valuePerSec * localDt;
 
         // Поле замедления/ускорения времени (с поддержкой плавного затухания от центра к краям)
-        if (zoneTrigger.effect === 'time_dilation') {
+        if (areaEffector.effect === 'time_dilation') {
           const targetTimeScale = world.getComponent(targetId, 'timeScale');
           if (targetTimeScale) {
-            let timeMultiplier = zoneTrigger.valuePerSec;
+            let timeMultiplier = areaEffector.valuePerSec;
 
             // Плавное радиальное изменение эффекта времени от центра к границе
             if (
-              zoneTrigger.distanceAttenuation &&
-              zoneTrigger.centerValue !== undefined &&
-              zoneTrigger.boundaryValue !== undefined
+              areaEffector.distanceAttenuation &&
+              areaEffector.centerValue !== undefined &&
+              areaEffector.boundaryValue !== undefined
             ) {
               const targetTransform = world.getComponent(targetId, 'transform');
               const targetPhysStats = world.getComponent(targetId, 'physicsStats');
@@ -63,15 +63,15 @@ export class ZoneTriggerSystem {
                 const targetRadius =
                   targetPhysStats?.radius.current ??
                   (targetPhys.body instanceof Circle ? targetPhys.body.r : 16);
-                const effectiveRadius = zoneTrigger.radius + targetRadius;
+                const effectiveRadius = areaEffector.radius + targetRadius;
                 const dist = Math.hypot(
                   targetTransform.x - zoneTransform.x,
                   targetTransform.y - zoneTransform.y
                 );
                 const t = Math.min(1, Math.max(0, dist / effectiveRadius));
                 timeMultiplier =
-                  zoneTrigger.centerValue +
-                  (zoneTrigger.boundaryValue - zoneTrigger.centerValue) * t;
+                  areaEffector.centerValue +
+                  (areaEffector.boundaryValue - areaEffector.centerValue) * t;
               }
             }
 
@@ -86,15 +86,15 @@ export class ZoneTriggerSystem {
         }
 
         // 1. Урон
-        if (zoneTrigger.effect === 'damage') {
+        if (areaEffector.effect === 'damage') {
           applyDamage(world, targetId, deltaValue, isPulseTick);
         }
         // 2. Лечение
-        else if (zoneTrigger.effect === 'heal') {
+        else if (areaEffector.effect === 'heal') {
           applyHeal(world, targetId, deltaValue, isPulseTick);
         }
         // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и расстояния
-        else if (zoneTrigger.effect === 'repel' || zoneTrigger.effect === 'attract') {
+        else if (areaEffector.effect === 'repel' || areaEffector.effect === 'attract') {
           const targetTransform = world.getComponent(targetId, 'transform');
           const targetPhysStats = world.getComponent(targetId, 'physicsStats');
           const velocity = world.getComponent(targetId, 'velocity');
@@ -103,33 +103,34 @@ export class ZoneTriggerSystem {
           const targetRadius =
             targetPhysStats?.radius.current ??
             (targetPhys.body instanceof Circle ? targetPhys.body.r : 16);
-          const effectiveRadius = zoneTrigger.radius + targetRadius;
+          const effectiveRadius = areaEffector.radius + targetRadius;
 
           const dx = targetTransform.x - zoneTransform.x;
           const dy = targetTransform.y - zoneTransform.y;
           const dist = Math.hypot(dx, dy);
 
-          if (zoneTrigger.effect === 'attract' && dist <= 4) return;
+          if (areaEffector.effect === 'attract' && dist <= 4) return;
 
           const ux = dist > 0.001 ? dx / dist : Math.random() - 0.5;
           const uy = dist > 0.001 ? dy / dist : Math.random() - 0.5;
           const len = Math.hypot(ux, uy) || 1;
 
-          let forceMagnitude = zoneTrigger.valuePerSec;
+          let forceMagnitude = areaEffector.valuePerSec;
           if (
-            zoneTrigger.distanceAttenuation &&
-            zoneTrigger.centerValue !== undefined &&
-            zoneTrigger.boundaryValue !== undefined
+            areaEffector.distanceAttenuation &&
+            areaEffector.centerValue !== undefined &&
+            areaEffector.boundaryValue !== undefined
           ) {
             const t = Math.min(1, Math.max(0, dist / effectiveRadius));
             forceMagnitude =
-              zoneTrigger.centerValue + (zoneTrigger.boundaryValue - zoneTrigger.centerValue) * t;
+              areaEffector.centerValue +
+              (areaEffector.boundaryValue - areaEffector.centerValue) * t;
           }
 
           const weight = targetPhysStats?.weight.current ?? 1;
           const acceleration = forceMagnitude / Math.max(0.1, weight);
 
-          const sign = zoneTrigger.effect === 'repel' ? 1 : -1;
+          const sign = areaEffector.effect === 'repel' ? 1 : -1;
           velocity.externalVx = (velocity.externalVx ?? 0) + sign * (ux / len) * acceleration * dt;
           velocity.externalVy = (velocity.externalVy ?? 0) + sign * (uy / len) * acceleration * dt;
         }

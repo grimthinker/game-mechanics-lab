@@ -15,7 +15,7 @@ import {
   STANDARD_EQUIPMENT_AREA_TYPES,
   EQUIPMENT_AREA_TYPE_LABELS,
 } from '../ecs/types';
-import { TriggerZoneInspector } from './inspector/TriggerZoneInspector';
+import { AreaEffectorInspector } from './inspector/AreaEffectorInspector';
 import {
   WeaponFormFields,
   ArmorFormFields,
@@ -197,8 +197,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     const aiStats = world.getComponent(targetId, 'aiStats');
     setDraftAI(aiStats ? aiStats.behavior.current : null);
 
-    const zTrigger = world.getComponent(targetId, 'zoneTrigger');
-    setDraftZone(zTrigger ? { ...zTrigger } : null);
+    const effector = world.getComponent(targetId, 'areaEffector');
+    setDraftZone(effector ? { ...effector } : null);
 
     const wStats = world.getComponent(targetId, 'weaponStats');
     const wZone = world.getComponent(targetId, 'weaponZone');
@@ -450,11 +450,11 @@ export const Inspector: React.FC<InspectorProps> = ({
   useEffect(() => {
     if (!targetId || !world || isReadOnly || !draftZone) return;
     let changed = false;
-    const zTrigger = world.getComponent(targetId, 'zoneTrigger');
+    const effector = world.getComponent(targetId, 'areaEffector');
     const physStats = world.getComponent(targetId, 'physicsStats');
     const physBody = world.getComponent(targetId, 'physicsBody');
-    if (zTrigger) {
-      Object.assign(zTrigger, draftZone);
+    if (effector) {
+      Object.assign(effector, draftZone);
       if (physStats && physStats.radius.base !== draftZone.radius) {
         setBaseStat(physStats.radius, draftZone.radius);
       }
@@ -464,7 +464,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       changed = true;
     }
     if (changed) {
-      requestCommit('Настройка триггерной зоны');
+      requestCommit('Настройка зоны эффектора');
       onUpdateStats();
     }
   }, [draftZone]);
@@ -759,9 +759,9 @@ export const Inspector: React.FC<InspectorProps> = ({
 
           {draftZone && (
             <details open>
-              <summary style={summaryStyle}>Свойства зоны</summary>
+              <summary style={summaryStyle}>Свойства зоны (Area Effector)</summary>
               <div style={contentStyle}>
-                <TriggerZoneInspector
+                <AreaEffectorInspector
                   values={draftZone}
                   onChange={(p: any) => setDraftZone((prev: any) => ({ ...prev, ...p }))}
                   isReadOnly={isReadOnly}
