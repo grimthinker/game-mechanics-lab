@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dagre from 'dagre';
 import { BTNodeDTO, NodeCategory, NodeStatus } from '../ai/core';
+import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
 
 const NODE_WIDTH = 200;
 const NODE_HEIGHT = 80; // Увеличено, чтобы помещались таймер и параметры
@@ -23,6 +24,7 @@ interface NodeLayout {
 interface EdgeLayout {
   from: string;
   to: string;
+  status?: NodeStatus;
   points: { x: number; y: number }[];
 }
 
@@ -93,7 +95,7 @@ export const BTGraph: React.FC<BTGraphProps> = ({
       if (node.children) {
         node.children.forEach((child, idx) => {
           const childId = child.id || `${nodeId}_${idx}`;
-          g.setEdge(nodeId, childId);
+          g.setEdge(nodeId, childId, { status: child.status });
           processNode(child, childId);
         });
       }
@@ -124,6 +126,7 @@ export const BTGraph: React.FC<BTGraphProps> = ({
       calculatedEdges.push({
         from: edge.v,
         to: edge.w,
+        status: edgeData.status,
         points: edgeData.points,
       });
     });
@@ -243,6 +246,19 @@ export const BTGraph: React.FC<BTGraphProps> = ({
         userSelect: 'none',
       }}
     >
+      <style>
+        {`
+          @keyframes bt-running-dash {
+            to { stroke-dashoffset: -20; }
+          }
+          .bt-running-edge {
+            stroke: #00e5ff;
+            stroke-width: 3px;
+            stroke-dasharray: 8 6;
+            animation: bt-running-dash 0.5s linear infinite;
+          }
+        `}
+      </style>
       <div
         style={{
           position: 'absolute',
@@ -261,15 +277,19 @@ export const BTGraph: React.FC<BTGraphProps> = ({
             overflow: 'visible',
           }}
         >
-          {edges.map((edge, idx) => (
-            <path
-              key={idx}
-              d={pointsToPath(edge.points)}
-              fill="none"
-              stroke="#555"
-              strokeWidth="2"
-            />
-          ))}
+          {edges.map((edge, idx) => {
+            const isRunning = edge.status === 'RUNNING';
+            return (
+              <path
+                key={idx}
+                d={pointsToPath(edge.points)}
+                fill="none"
+                stroke={isRunning ? 'transparent' : '#555'}
+                strokeWidth={isRunning ? '3' : '2'}
+                className={isRunning ? 'bt-running-edge' : ''}
+              />
+            );
+          })}
         </svg>
 
         {nodes.map((node) => {
@@ -359,6 +379,32 @@ export const BTGraph: React.FC<BTGraphProps> = ({
                     .join(', ')}
                 </div>
               )}
+
+              {/* Удержание цветовой вспышки (Flash Retention) поверх фона */}
+              {node.originalNode.lastResultTime &&
+              Date.now() - node.originalNode.lastResultTime < AI_DEBUG_CONFIG.btFlashDurationMs &&
+              node.status !== 'RUNNING' &&
+              !isService ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    borderRadius: 'inherit',
+                    pointerEvents: 'none',
+                    backgroundColor:
+                      node.originalNode.status === 'SUCCESS'
+                        ? AI_DEBUG_CONFIG.colors.btFlashSuccess
+                        : AI_DEBUG_CONFIG.colors.btFlashFailure,
+                    opacity: Math.max(
+                      0,
+                      1 -
+                        (Date.now() - node.originalNode.lastResultTime) /
+                          AI_DEBUG_CONFIG.btFlashDurationMs
+                    ),
+                    transition: 'none',
+                  }}
+                />
+              ) : null}
             </div>
           );
         })}

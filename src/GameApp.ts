@@ -51,6 +51,7 @@ export class GameApp {
   public camera: Camera;
   public activeRendererMode: '2d' | '3d' = '2d';
   public showUIOverlays: boolean = true;
+  public showAIDebug: boolean = false;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
 
@@ -753,6 +754,7 @@ export class GameApp {
         hoveredId: this.hoveredEntityId,
         marqueeBox: this.marqueeBox,
         gizmo: gizmoRenderData,
+        showAIDebug: this.showAIDebug,
       },
       showUIOverlays: this.showUIOverlays,
     });

@@ -32,6 +32,7 @@ export const App: React.FC = () => {
   const [snapshot, setSnapshot] = useState<any>(null);
   const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
   const [showUIOverlays, setShowUIOverlays] = useState<boolean>(true);
+  const [showAIDebug, setShowAIDebug] = useState<boolean>(false);
   const [gizmoTool, setGizmoTool] = useState<GizmoTool>('translate');
   const [leftDockTab, setLeftDockTab] = useState<DockTab>('hierarchy');
   const [pieMenuState, setPieMenuState] = useState<PieMenuState | null>(null);
@@ -50,6 +51,12 @@ export const App: React.FC = () => {
   const setShowUIOverlaysSync = useCallback((val: boolean) => {
     setShowUIOverlays(val);
     if (appRef.current) appRef.current.showUIOverlays = val;
+    updateStatsRef.current();
+  }, []);
+
+  const setShowAIDebugSync = useCallback((val: boolean) => {
+    setShowAIDebug(val);
+    if (appRef.current) appRef.current.showAIDebug = val;
     updateStatsRef.current();
   }, []);
 
@@ -433,6 +440,8 @@ export const App: React.FC = () => {
           }}
           showUIOverlays={showUIOverlays}
           setShowUIOverlays={setShowUIOverlaysSync}
+          showAIDebug={showAIDebug}
+          setShowAIDebug={setShowAIDebugSync}
         />
       )}
 

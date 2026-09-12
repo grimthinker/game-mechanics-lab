@@ -23,6 +23,8 @@ export interface TopBarProps {
   onToggleRenderMode: () => void;
   showUIOverlays: boolean;
   setShowUIOverlays: (val: boolean) => void;
+  showAIDebug: boolean;
+  setShowAIDebug: (val: boolean) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -47,6 +49,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onToggleRenderMode,
   showUIOverlays,
   setShowUIOverlays,
+  showAIDebug,
+  setShowAIDebug,
 }) => {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
 
@@ -321,6 +325,26 @@ export const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => setObstaclesEnabled(e.target.checked)}
           />
           Коллизии
+        </label>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            color: '#f39c12',
+            marginLeft: '8px',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showAIDebug}
+            onChange={(e) => setShowAIDebug(e.target.checked)}
+            style={{ accentColor: '#f39c12' }}
+          />
+          AI Debug
         </label>
 
         <button

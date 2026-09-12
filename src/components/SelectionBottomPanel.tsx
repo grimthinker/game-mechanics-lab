@@ -95,6 +95,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
         zIndex: 40,
         boxShadow: '0 -4px 15px rgba(0,0,0,0.5)',
         userSelect: 'none',
+        overflow: 'hidden',
       }}
     >
       {/* Ручка изменения высоты */}
@@ -198,6 +199,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
       <div
         style={{
           flex: 1,
+          minHeight: 0,
           overflowY: 'auto',
           padding: '8px 12px',
           display: 'flex',

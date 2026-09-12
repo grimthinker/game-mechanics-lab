@@ -14,6 +14,7 @@ import { VISUAL_CONFIG } from '../../config/visualConfig';
 import { IRenderer, RenderContext } from './IRenderer';
 import { GizmoRenderer } from '../gizmos/GizmoRenderer';
 import { GizmoRenderData } from '../gizmos/types';
+import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
 
 export class CanvasRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
@@ -54,7 +55,7 @@ export class CanvasRenderer implements IRenderer {
 
   public render(context: RenderContext): void {
     const { camera, world, gameMode, editorData, showUIOverlays } = context;
-    const { selectedId, selectedIds, hoveredId, marqueeBox, gizmo } = editorData;
+    const { selectedId, selectedIds, hoveredId, marqueeBox, gizmo, showAIDebug } = editorData;
 
     this.ctx.save();
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -77,7 +78,8 @@ export class CanvasRenderer implements IRenderer {
       gameMode,
       marqueeBox,
       showUIOverlays,
-      gizmo
+      gizmo,
+      showAIDebug
     );
 
     this.ctx.restore();
@@ -119,7 +121,8 @@ export class CanvasRenderer implements IRenderer {
     gameMode: string = 'editor',
     marqueeBox?: { start: Point; current: Point } | null,
     showUIOverlays: boolean = true,
-    gizmo?: GizmoRenderData | null
+    gizmo?: GizmoRenderData | null,
+    showAIDebug?: boolean
   ): void {
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
@@ -173,10 +176,125 @@ export class CanvasRenderer implements IRenderer {
     // Отрисовка Hover-текстов для предметов
     this.renderItemTooltips(world, camera, hoveredId);
 
+    // Отрисовка визуализаторов отладки AI (только вне режима Игры)
+    if (showAIDebug && selectedIds.size > 0 && gameMode !== 'game') {
+      this.renderAIDebugGizmos(world, camera, selectedIds);
+    }
+
     // Отрисовка интерактивного манипулятора трансформации (Gizmo)
     if (gizmo) {
       GizmoRenderer.render(this.ctx, camera, gizmo);
     }
+  }
+
+  private renderAIDebugGizmos(world: World, camera: Camera, selectedIds: Set<EntityId>): void {
+    this.ctx.save();
+    const invScale = 1 / camera.scale;
+
+    for (const id of selectedIds) {
+      const transform = world.getComponent(id, 'transform');
+      const brain = world.getComponent(id, 'brain') as any; // BTLogicComponent
+      if (!transform || !brain) continue;
+
+      const bb = brain.blackboard;
+      const px = transform.x;
+      const py = transform.y;
+
+      // 1. Радиусы
+      const detectDist = bb.get('detect_dist');
+      if (detectDist) {
+        this.ctx.beginPath();
+        this.ctx.arc(px, py, detectDist, 0, Math.PI * 2);
+        this.ctx.strokeStyle = AI_DEBUG_CONFIG.colors.detectRadius;
+        this.ctx.lineWidth = 1.5 * invScale;
+        this.ctx.setLineDash(AI_DEBUG_CONFIG.dashArrays.radii.map((d) => d * invScale));
+        this.ctx.stroke();
+      }
+
+      const loseDist = bb.get('lose_target_dist');
+      if (loseDist) {
+        this.ctx.beginPath();
+        this.ctx.arc(px, py, loseDist, 0, Math.PI * 2);
+        this.ctx.strokeStyle = AI_DEBUG_CONFIG.colors.loseRadius;
+        this.ctx.stroke();
+      }
+
+      const followDist = bb.get('follow_stop_dist');
+      if (followDist) {
+        this.ctx.beginPath();
+        this.ctx.arc(px, py, followDist, 0, Math.PI * 2);
+        this.ctx.strokeStyle = AI_DEBUG_CONFIG.colors.attackRadius;
+        this.ctx.stroke();
+      }
+
+      this.ctx.setLineDash([]);
+
+      // 2. Траектория (Path)
+      const path = bb.get('current_path') as Point[] | undefined;
+      if (path && path.length > 0) {
+        this.ctx.beginPath();
+        this.ctx.moveTo(px, py);
+        for (const pt of path) {
+          this.ctx.lineTo(pt.x, pt.y);
+        }
+        this.ctx.strokeStyle = AI_DEBUG_CONFIG.colors.pathLine;
+        this.ctx.lineWidth = 2 * invScale;
+        this.ctx.setLineDash(AI_DEBUG_CONFIG.dashArrays.path.map((d) => d * invScale));
+        this.ctx.stroke();
+
+        this.ctx.fillStyle = AI_DEBUG_CONFIG.colors.pathLine;
+        for (const pt of path) {
+          this.ctx.beginPath();
+          this.ctx.arc(pt.x, pt.y, 3 * invScale, 0, Math.PI * 2);
+          this.ctx.fill();
+        }
+      }
+      this.ctx.setLineDash([]);
+
+      // 3. Линия к цели (Target Line)
+      const targetId = bb.get('target_id');
+      let targetName = 'Нет';
+      if (targetId) {
+        const tTrans = world.getComponent(targetId, 'transform');
+        const tMeta = world.getComponent(targetId, 'meta');
+        if (tTrans) {
+          targetName = tMeta?.name || targetId;
+          this.ctx.beginPath();
+          this.ctx.moveTo(px, py);
+          this.ctx.lineTo(tTrans.x, tTrans.y);
+          this.ctx.strokeStyle = AI_DEBUG_CONFIG.colors.targetLine;
+          this.ctx.lineWidth = 1.5 * invScale;
+          this.ctx.setLineDash(AI_DEBUG_CONFIG.dashArrays.targetLine.map((d) => d * invScale));
+          this.ctx.stroke();
+
+          this.ctx.font = `${14 * invScale}px sans-serif`;
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText('🎯', tTrans.x, tTrans.y - 20 * invScale);
+        }
+      }
+      this.ctx.setLineDash([]);
+
+      // 4. Информационный бейдж
+      const isEngaged = bb.get('is_engaged') ? 'ДА' : 'НЕТ';
+      const badgeText = `Цель: ${targetName} | В бою: ${isEngaged}`;
+
+      this.ctx.font = `bold ${Math.max(10, 11 * invScale)}px sans-serif`;
+      const metrics = this.ctx.measureText(badgeText);
+      const bWidth = metrics.width + 12 * invScale;
+      const bHeight = 18 * invScale;
+      const bY = py + 30 * invScale;
+
+      this.ctx.fillStyle = AI_DEBUG_CONFIG.colors.badgeBg;
+      this.ctx.fillRect(px - bWidth / 2, bY, bWidth, bHeight);
+
+      this.ctx.fillStyle = AI_DEBUG_CONFIG.colors.badgeText;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(badgeText, px, bY + bHeight / 2);
+    }
+
+    this.ctx.restore();
   }
 
   private renderMarqueeBox(camera: Camera, box: { start: Point; current: Point }): void {

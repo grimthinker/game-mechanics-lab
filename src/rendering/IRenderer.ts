@@ -12,6 +12,7 @@ export interface EditorRenderData {
   hoveredId: EntityId | null;
   marqueeBox?: { start: Point; current: Point } | null;
   gizmo?: GizmoRenderData | null;
+  showAIDebug?: boolean;
 }
 
 export interface RenderContext {

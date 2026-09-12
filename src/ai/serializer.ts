@@ -42,6 +42,7 @@ export function serializeBTNode(node: BTNode, path: string = 'root'): BTNodeDTO 
     description: description,
     parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
     timeToNextTick: timeToNextTick,
+    lastResultTime: node.lastResultTime,
     children: children,
   };
 }

@@ -29,6 +29,7 @@ export interface BTNodeDTO {
   description?: string;
   parameters?: Record<string, any>;
   timeToNextTick?: number;
+  lastResultTime?: number;
   children: BTNodeDTO[];
 }
 
@@ -58,6 +59,7 @@ export abstract class BTNode {
   }
 
   public lastStatus: NodeStatus = NodeStatus.IDLE;
+  public lastResultTime: number = 0;
   protected isOpen: boolean = false;
 
   protected onOpen(ctx: EntityAdapter): void {}
@@ -73,6 +75,10 @@ export abstract class BTNode {
 
     const status = this.onTick(ctx);
     this.lastStatus = status;
+
+    if (status === NodeStatus.SUCCESS || status === NodeStatus.FAILURE) {
+      this.lastResultTime = Date.now();
+    }
 
     if (status !== NodeStatus.RUNNING) {
       this.isOpen = false;

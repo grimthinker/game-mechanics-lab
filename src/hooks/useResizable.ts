@@ -35,6 +35,7 @@ export function useResizable({
   const startResizing = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       setIsResizing(true);
       startCoordRef.current = direction === 'horizontal' ? e.clientX : e.clientY;
       startSizeRef.current = size;
@@ -61,12 +62,13 @@ export function useResizable({
       setIsResizing(false);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    // Слушатели с capture: true гарантированно перехватывают движение мыши даже если дочерние элементы вызывают stopPropagation()
+    window.addEventListener('mousemove', handleMouseMove, { capture: true });
+    window.addEventListener('mouseup', handleMouseUp, { capture: true });
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
     };
   }, [isResizing, minSize, maxSize, direction]);
 
