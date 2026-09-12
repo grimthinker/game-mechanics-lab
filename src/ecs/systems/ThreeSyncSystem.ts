@@ -34,6 +34,18 @@ export class ThreeSyncSystem {
     opacity: 0.3,
     side: THREE.DoubleSide,
   });
+  private matZoneSlow = new THREE.MeshBasicMaterial({
+    color: 0x3498db,
+    transparent: true,
+    opacity: 0.3,
+    side: THREE.DoubleSide,
+  });
+  private matZoneFast = new THREE.MeshBasicMaterial({
+    color: 0x1abc9c,
+    transparent: true,
+    opacity: 0.3,
+    side: THREE.DoubleSide,
+  });
 
   private matSelection = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
 
@@ -99,6 +111,9 @@ export class ThreeSyncSystem {
             let mat = this.matZoneNeutral;
             if (zTrigger.effect === 'damage') mat = this.matZoneDmg;
             else if (zTrigger.effect === 'heal') mat = this.matZoneHeal;
+            else if (zTrigger.effect === 'time_dilation') {
+              mat = zTrigger.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
+            }
 
             const mainMesh = obj.children.find(
               (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
@@ -184,6 +199,9 @@ export class ThreeSyncSystem {
       let mat = this.matZoneNeutral;
       if (zTrigger?.effect === 'damage') mat = this.matZoneDmg;
       else if (zTrigger?.effect === 'heal') mat = this.matZoneHeal;
+      else if (zTrigger?.effect === 'time_dilation') {
+        mat = (zTrigger.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
+      }
 
       const geo = new THREE.CylinderGeometry(radius, radius, 2, 32);
       mainMesh = new THREE.Mesh(geo, mat);

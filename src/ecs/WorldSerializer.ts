@@ -99,6 +99,13 @@ export class WorldSerializer {
           }
         }
 
+        // Фолбэк для обратной совместимости старых сейвов:
+        if (!comps.timeScale) {
+          this.app.world.addComponent(ent.id, 'timeScale', {
+            multiplier: { base: 1.0, current: 1.0, modifiers: [] },
+          });
+        }
+
         const isPossessedItem = !!comps.ownership;
 
         if (comps.renderable && isPossessedItem) {
@@ -176,6 +183,10 @@ export class WorldSerializer {
         if (comps.armorStats) {
           normalizeStat(comps.armorStats.defense);
           normalizeStat(comps.armorStats.flatReduction);
+        }
+
+        if (comps.timeScale) {
+          normalizeStat(comps.timeScale.multiplier);
         }
 
         // 3. Реставрация физического тела для объектов с физикой

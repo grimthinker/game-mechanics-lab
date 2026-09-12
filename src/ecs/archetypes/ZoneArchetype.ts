@@ -15,7 +15,7 @@ import { Point } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 
-export function getDefaultZoneName(effect: ZoneEffectType): string {
+export function getDefaultZoneName(effect: ZoneEffectType, valuePerSec?: number): string {
   switch (effect) {
     case 'damage':
       return 'Зона урона';
@@ -25,10 +25,17 @@ export function getDefaultZoneName(effect: ZoneEffectType): string {
       return 'Силовое поле (Отталкивание)';
     case 'attract':
       return 'Воронка (Притягивание)';
+    case 'time_dilation':
+      return valuePerSec !== undefined && valuePerSec > 1.0
+        ? 'Зона ускорения времени'
+        : 'Зона замедления времени';
   }
 }
 
-export function getZoneVisuals(effect: ZoneEffectType): {
+export function getZoneVisuals(
+  effect: ZoneEffectType,
+  valuePerSec?: number
+): {
   fillColor: string;
   strokeColor: string;
   icon: string;
@@ -42,6 +49,14 @@ export function getZoneVisuals(effect: ZoneEffectType): {
       return { fillColor: 'rgba(243, 156, 18, 0.2)', strokeColor: '#f39c12', icon: '💨' };
     case 'attract':
       return { fillColor: 'rgba(155, 89, 182, 0.2)', strokeColor: '#9b59b6', icon: '🌀' };
+    case 'time_dilation': {
+      const isSpeedUp = valuePerSec !== undefined && valuePerSec > 1.0;
+      return {
+        fillColor: isSpeedUp ? 'rgba(26, 188, 156, 0.2)' : 'rgba(52, 152, 219, 0.2)',
+        strokeColor: isSpeedUp ? '#1abc9c' : '#3498db',
+        icon: isSpeedUp ? '⚡' : '⏳',
+      };
+    }
   }
 }
 
@@ -60,7 +75,7 @@ export function createZoneConfig(
   return {
     tag: { archetype: 'zone', subType: effect },
     meta: {
-      name: name || getDefaultZoneName(effect),
+      name: name || getDefaultZoneName(effect, valuePerSec),
       entityType: 'zone',
     },
     zoneTrigger: {
@@ -138,7 +153,7 @@ export function assembleZone(
   physics.registerBody(id, body);
 
   // 7. Универсальный рендер (слой 0 — земля/зоны)
-  const visuals = getZoneVisuals(effect);
+  const visuals = getZoneVisuals(effect, zTrigger.valuePerSec);
 
   const renderable: RenderableComponent = {
     zIndex: RENDER_Z_INDEX.ZONES,

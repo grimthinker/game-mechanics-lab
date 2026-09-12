@@ -14,6 +14,8 @@ export interface TopBarProps {
   onLoadWorldFile: (file: File) => void;
   isPaused: boolean;
   togglePause: () => void;
+  globalTimeScale: number;
+  setGlobalTimeScale: (val: number) => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -40,6 +42,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   onLoadWorldFile,
   isPaused,
   togglePause,
+  globalTimeScale,
+  setGlobalTimeScale,
   canUndo,
   canRedo,
   onUndo,
@@ -272,6 +276,33 @@ export const TopBar: React.FC<TopBarProps> = ({
         >
           {isPaused ? 'ПАУЗА' : '▶ ИДЕТ'}
         </button>
+
+        {mode === GameMode.SIMULATION && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              borderLeft: '1px solid #333',
+              paddingLeft: '8px',
+              marginLeft: '4px',
+            }}
+          >
+            <span style={{ fontSize: '11px', color: '#bdc3c7' }}>Скорость:</span>
+            <input
+              type="range"
+              min="0.05"
+              max="5"
+              step="0.05"
+              value={globalTimeScale}
+              onChange={(e) => setGlobalTimeScale(parseFloat(e.target.value))}
+              style={{ width: '70px', accentColor: '#27ae60', cursor: 'pointer' }}
+            />
+            <span style={{ fontSize: '11px', color: '#fff', width: '30px' }}>
+              {globalTimeScale.toFixed(2)}x
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Правая часть: Настройки отображения */}

@@ -278,7 +278,9 @@ export const BTGraph: React.FC<BTGraphProps> = ({
           }}
         >
           {edges.map((edge, idx) => {
-            const isRunning = edge.status === 'RUNNING';
+            // Динамически сверяем актуальный статус целевого узла из массива nodes
+            const targetNode = nodes.find((n) => n.id === edge.to);
+            const isRunning = targetNode?.status === 'RUNNING';
             return (
               <path
                 key={idx}

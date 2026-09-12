@@ -1,5 +1,5 @@
 import { EntityAdapter } from '../EntityAdapter';
-import { now_with_ms, vec2_distance_to } from '../utils';
+import { vec2_distance_to } from '../utils';
 import { BTDecorator, BTNode, NodeStatus } from './core';
 
 export abstract class BTCondition extends BTDecorator {
@@ -81,7 +81,7 @@ export class BTCooldown extends BTDecorator {
   }
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
-    const currentTime = now_with_ms() * 1000;
+    const currentTime = (ctx.brain!.blackboard.get('local_time') ?? 0) * 1000;
 
     if (currentTime - this.lastExecutionTime < this.params.cooldownMs) {
       return NodeStatus.FAILURE;

@@ -27,6 +27,9 @@ export class MovementSystem {
       id,
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const localDt = dt * ts;
+
       if (!health.isAlive) {
         if (
           velocity.vx !== 0 ||
@@ -107,22 +110,24 @@ export class MovementSystem {
         if (Math.abs(diff) <= LOGIC_CONFIG.angleDiffTolerance) {
           transform.angle = input.targetLookAngle;
           velocity.currentTurnSpeed = 0 as Radians;
-        } else {
-          const maxTurnStep = movementStats.maxTurnSpeed.current * dt;
+        } else if (localDt > 0) {
+          const maxTurnStep = movementStats.maxTurnSpeed.current * localDt;
           if (Math.abs(diff) <= maxTurnStep) {
             transform.angle = input.targetLookAngle;
-            velocity.currentTurnSpeed = (diff / dt) as Radians;
+            velocity.currentTurnSpeed = (diff / localDt) as Radians;
           } else {
             const sign = Math.sign(diff) as -1 | 1;
             transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
             velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
           }
+        } else {
+          velocity.currentTurnSpeed = 0 as Radians;
         }
       } else {
         const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
         velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
         if (velocity.currentTurnSpeed !== 0) {
-          transform.angle = (transform.angle + velocity.currentTurnSpeed * dt) as Radians;
+          transform.angle = (transform.angle + velocity.currentTurnSpeed * localDt) as Radians;
         }
       }
       transform.angle = Math.atan2(Math.sin(transform.angle), Math.cos(transform.angle)) as Radians;
@@ -384,7 +389,7 @@ export class MovementSystem {
 
         const maxSpd = movementStats.maxSpeed.current > 0 ? movementStats.maxSpeed.current : 1;
         const changeRate = maxSpd / timeConstant;
-        const step = changeRate * dt;
+        const step = changeRate * localDt;
 
         if (distToTargetVel <= step) {
           velocity.vx = targetVx;

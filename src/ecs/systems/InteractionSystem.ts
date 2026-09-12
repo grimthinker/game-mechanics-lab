@@ -190,6 +190,9 @@ export class InteractionSystem {
     const entities = world.getEntitiesWith('interactionAction', 'equip', 'transform', 'health');
 
     for (const [id, { interactionAction, equip, transform, health }] of entities) {
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const localDt = dt * ts;
+
       if (!health.isAlive) {
         if (interactionAction.type === 'pickup' && interactionAction.phase === 'lift') {
           this.cancelInteraction(world, physics, id);
@@ -205,8 +208,8 @@ export class InteractionSystem {
 
       if (interactionAction.type === 'pickup') {
         if (interactionAction.phase === 'reach') {
-          interactionAction.elapsedInReach = (interactionAction.elapsedInReach ?? 0) + dt;
-          interactionAction.timer -= dt;
+          interactionAction.elapsedInReach = (interactionAction.elapsedInReach ?? 0) + localDt;
+          interactionAction.timer -= localDt;
 
           if (interactionAction.timer <= 0) {
             const targetId = interactionAction.targetId;
@@ -325,7 +328,7 @@ export class InteractionSystem {
             interactionAction.relativeAngle = relativeAngle;
           }
         } else if (interactionAction.phase === 'lift') {
-          interactionAction.timer -= dt;
+          interactionAction.timer -= localDt;
           if (interactionAction.timer <= 0) {
             world.removeComponent(id, 'interactionAction');
           }
@@ -333,7 +336,7 @@ export class InteractionSystem {
           interactionAction.phase === 'abort_reach' ||
           interactionAction.phase === 'abort_lift'
         ) {
-          interactionAction.timer -= dt;
+          interactionAction.timer -= localDt;
           if (interactionAction.timer <= 0) {
             world.removeComponent(id, 'interactionAction');
           }
@@ -341,7 +344,7 @@ export class InteractionSystem {
         continue;
       }
 
-      interactionAction.timer -= dt;
+      interactionAction.timer -= localDt;
 
       if (interactionAction.timer <= 0) {
         if (

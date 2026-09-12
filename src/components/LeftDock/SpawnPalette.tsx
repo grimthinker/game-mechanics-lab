@@ -265,6 +265,59 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset }) =>
           createConfig: () =>
             createZoneConfig('attract', 70, 200, 'Воронка', false, false, false, true, 7000, 0),
         },
+        {
+          id: 'zone_time_slow',
+          name: 'Зона замедления (0.5x)',
+          description: 'Замедляет локальное время вдвое (0.5x)',
+          icon: '⏳',
+          createConfig: () =>
+            createZoneConfig(
+              'time_dilation',
+              70,
+              0.5,
+              'Зона замедления (0.5x)',
+              false,
+              false,
+              false,
+              false
+            ),
+        },
+        {
+          id: 'zone_time_fast',
+          name: 'Зона ускорения (1.8x)',
+          description: 'Ускоряет локальное время на 80% (1.8x)',
+          icon: '⚡',
+          createConfig: () =>
+            createZoneConfig(
+              'time_dilation',
+              70,
+              1.8,
+              'Зона ускорения (1.8x)',
+              false,
+              false,
+              false,
+              false
+            ),
+        },
+        {
+          id: 'zone_time_vortex',
+          name: 'Воронка времени (Градиент)',
+          description: 'Плавное замедление от 0.2x в центре до 1.0x на краю',
+          icon: '🌀',
+          createConfig: () =>
+            createZoneConfig(
+              'time_dilation',
+              90,
+              0.5,
+              'Воронка времени',
+              false,
+              false,
+              false,
+              true,
+              0.2,
+              1.0
+            ),
+        },
       ],
     },
   ];

@@ -1,6 +1,6 @@
 import { EntityAdapter } from '../EntityAdapter';
 import { Point } from '../types';
-import { vec2_distance_to, now_with_ms, Radians } from '../utils';
+import { vec2_distance_to, Radians } from '../utils';
 import { LOGIC_CONFIG } from './config';
 import { NodeStatus, BTAction, PathKeys, BTSimpleAction } from './core';
 
@@ -237,12 +237,12 @@ export class BTWait extends BTAction {
   }
 
   protected onOpen(ctx: EntityAdapter): void {
-    this.startTime = now_with_ms();
+    this.startTime = ctx.brain!.blackboard.get('local_time') ?? 0;
   }
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
-    const elapsed = now_with_ms() - this.startTime;
-    if (elapsed >= this.params.duration) {
+    const currentTime = ctx.brain!.blackboard.get('local_time') ?? 0;
+    if (currentTime - this.startTime >= this.params.duration) {
       return NodeStatus.SUCCESS;
     }
     return NodeStatus.RUNNING;

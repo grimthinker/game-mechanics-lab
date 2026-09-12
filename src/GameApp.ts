@@ -52,6 +52,7 @@ export class GameApp {
   public activeRendererMode: '2d' | '3d' = '2d';
   public showUIOverlays: boolean = true;
   public showAIDebug: boolean = false;
+  public globalTimeScale: number = 1.0;
   public entityFactory: EntityFactory;
   private serializer: WorldSerializer;
 
@@ -98,6 +99,7 @@ export class GameApp {
   private lastTime: number = 0;
   private isRunning: boolean = false;
   public isPaused: boolean = false;
+  private timeAccumulator: number = 0;
 
   public gameMode: GameMode = GameMode.EDITOR;
 
@@ -287,6 +289,9 @@ export class GameApp {
       if (comp.gizmo) {
         config.gizmo = JSON.parse(JSON.stringify(comp.gizmo));
       }
+      if (comp.timeScale) {
+        config.timeScale = JSON.parse(JSON.stringify(comp.timeScale));
+      }
       config.transform = {
         x: targetPos.x,
         y: targetPos.y,
@@ -427,6 +432,42 @@ export class GameApp {
       {
         x: spawnPos.x + 180,
         y: spawnPos.y - 180,
+      }
+    );
+
+    // Зона замедления времени (скорость 0.4x)
+    this.spawnEntity(
+      createZoneConfig(
+        'time_dilation',
+        70,
+        0.4,
+        'Зона замедления (0.4x)',
+        false,
+        false,
+        false,
+        false
+      ),
+      {
+        x: spawnPos.x - 180,
+        y: spawnPos.y + 180,
+      }
+    );
+
+    // Зона ускорения времени (скорость 1.8x)
+    this.spawnEntity(
+      createZoneConfig(
+        'time_dilation',
+        70,
+        1.8,
+        'Зона ускорения (1.8x)',
+        false,
+        false,
+        false,
+        false
+      ),
+      {
+        x: spawnPos.x + 180,
+        y: spawnPos.y + 180,
       }
     );
 
@@ -681,34 +722,49 @@ export class GameApp {
     }
   }
 
+  private updateSystems(dt: number): void {
+    if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
+      const worldPoint = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
+      this.updatePlayerAim(worldPoint);
+    }
+
+    this.modifierSystem.update(dt, this.world);
+    this.aiSystem.update(dt, this.world);
+    this.interactionSystem.update(dt, this.world, this.physics);
+    this.attackSystem.update(dt, this.world, this.physics);
+    this.movementSystem.update(dt, this.world);
+    this.stealthSystem.update(dt, this.world);
+    this.physics.update(dt, this.world);
+    this.attachmentSystem.update(this.world, this.physics);
+    this.zoneTriggerSystem.update(dt, this.world, this.physics);
+    this.damageSystem.update(dt, this.world);
+  }
+
   private loop(time: number): void {
     if (!this.isRunning) return;
 
-    const dt = Math.min(0.1, (time - this.lastTime) / 1000);
+    const realDt = Math.min(0.1, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
     if (!this.isPaused) {
-      if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
-        const worldPoint = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
-        this.updatePlayerAim(worldPoint);
-      }
+      const simulatedDt = realDt * this.globalTimeScale;
+      const MAX_SUBSTEP = 1 / 60; // Максимально допустимый шаг физики/логики
 
-      this.modifierSystem.update(dt, this.world);
-      this.aiSystem.update(dt, this.world);
-      this.interactionSystem.update(dt, this.world, this.physics);
-      this.attackSystem.update(dt, this.world, this.physics);
-      this.movementSystem.update(dt, this.world);
-      this.stealthSystem.update(dt, this.world);
-      this.physics.update(dt, this.world);
-      this.attachmentSystem.update(this.world, this.physics);
-      this.zoneTriggerSystem.update(dt, this.world, this.physics);
-      this.damageSystem.update(dt, this.world);
+      // Настоящий Temporal Sub-stepping:
+      // При слоу-мо (< 1.0) делаем ровно 1 шаг за кадр рендера с малым dt (плавные 60 FPS без рывков).
+      // При ускорении (> 1.0) или лагах дробим вызов на безопасные субстепы <= 1/60 сек.
+      const steps = Math.min(10, Math.max(1, Math.ceil(simulatedDt / MAX_SUBSTEP)));
+      const stepDt = simulatedDt / steps;
+
+      for (let i = 0; i < steps; i++) {
+        this.updateSystems(stepDt);
+      }
     }
 
     if (this.activeRendererMode === '2d') {
-      this.canvasRenderSyncSystem.update(dt, this.world, this.gameMode);
+      this.canvasRenderSyncSystem.update(realDt, this.world, this.gameMode);
     } else if (this.activeRendererMode === '3d' && this.threeSyncSystem) {
-      this.threeSyncSystem.update(dt, this.world, this.gameMode, this.selectedEntityIds);
+      this.threeSyncSystem.update(realDt, this.world, this.gameMode, this.selectedEntityIds);
     }
 
     // Применяем накопленный ввод манипулятора строго 1 раз за кадр рендера (RAF Throttling)

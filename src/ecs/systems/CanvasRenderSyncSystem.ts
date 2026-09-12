@@ -38,6 +38,10 @@ export class CanvasRenderSyncSystem {
             } else if (zoneTrigger.effect === 'attract') {
               circlePrim.fill = 'rgba(155, 89, 182, 0.2)';
               circlePrim.stroke = '#9b59b6';
+            } else if (zoneTrigger.effect === 'time_dilation') {
+              const isSpeedUp = zoneTrigger.valuePerSec > 1.0;
+              circlePrim.fill = isSpeedUp ? 'rgba(26, 188, 156, 0.2)' : 'rgba(52, 152, 219, 0.2)';
+              circlePrim.stroke = isSpeedUp ? '#1abc9c' : '#3498db';
             }
           }
 
@@ -46,6 +50,9 @@ export class CanvasRenderSyncSystem {
             else if (zoneTrigger.effect === 'heal') iconPrim.text = '❤️';
             else if (zoneTrigger.effect === 'repel') iconPrim.text = '💨';
             else if (zoneTrigger.effect === 'attract') iconPrim.text = '🌀';
+            else if (zoneTrigger.effect === 'time_dilation') {
+              iconPrim.text = zoneTrigger.valuePerSec > 1.0 ? '⚡' : '⏳';
+            }
           }
 
           if (textPrim && textPrim.kind === 'text') {

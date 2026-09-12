@@ -137,7 +137,7 @@ export interface RenderableComponent {
   syncWithTransform?: boolean;
 }
 
-export type ZoneEffectType = 'damage' | 'heal' | 'repel' | 'attract';
+export type ZoneEffectType = 'damage' | 'heal' | 'repel' | 'attract' | 'time_dilation';
 
 export interface ZoneTriggerComponent {
   effect: ZoneEffectType;
@@ -356,6 +356,7 @@ export interface EntityComponents {
   weaponStats?: WeaponStatsComponent;
   weaponZone?: HitZoneConfig;
   armorStats?: ArmorStatsComponent;
+  timeScale?: TimeScaleComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -382,6 +383,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'velocity',
   'activeAttacks',
   'input',
+  'timeScale',
 ] as const;
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
@@ -493,6 +495,10 @@ export interface ArmorStatsComponent {
   flatReduction: StatValue<number>;
 }
 
+export interface TimeScaleComponent {
+  multiplier: StatValue<number>;
+}
+
 export interface WeaponCombatConfig {
   baseDamage: number;
   prepTime: number;
@@ -555,6 +561,7 @@ export interface EntityConfig {
   weaponStats?: Partial<WeaponCombatConfig>;
   weaponZone?: HitZoneConfig;
   armorStats?: Partial<ArmorCombatConfig>;
+  timeScale?: TimeScaleComponent;
 }
 
 export interface ActiveAttack {

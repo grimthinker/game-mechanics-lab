@@ -24,25 +24,32 @@ export const TriggerZoneInspector: React.FC<TriggerZoneInspectorProps> = ({
         <option value="heal">Лечение (Источник жизни)</option>
         <option value="repel">Отталкивание (Силовое поле)</option>
         <option value="attract">Притягивание (Воронка / Гравитация)</option>
+        <option value="time_dilation">Искажение времени (Множитель)</option>
       </select>
     </label>
 
-    <label>
-      {values.effect === 'damage' || values.effect === 'heal'
-        ? 'Сила эффекта (HP / сек):'
-        : 'Базовая сила импульса:'}
-      <input
-        disabled={isReadOnly}
-        type="number"
-        value={values.valuePerSec}
-        min={1}
-        max={2000}
-        step={5}
-        onChange={(e) => onChange({ valuePerSec: Number(e.target.value) })}
-      />
-    </label>
+    {(!values.distanceAttenuation || values.effect === 'damage' || values.effect === 'heal') && (
+      <label>
+        {values.effect === 'time_dilation'
+          ? 'Множитель времени (0.5 = 50%):'
+          : values.effect === 'damage' || values.effect === 'heal'
+            ? 'Сила эффекта (HP / сек):'
+            : 'Базовая сила импульса:'}
+        <input
+          disabled={isReadOnly}
+          type="number"
+          value={values.valuePerSec}
+          min={0.01}
+          max={2000}
+          step={values.effect === 'time_dilation' ? 0.05 : 5}
+          onChange={(e) => onChange({ valuePerSec: Number(e.target.value) })}
+        />
+      </label>
+    )}
 
-    {(values.effect === 'repel' || values.effect === 'attract') && (
+    {(values.effect === 'repel' ||
+      values.effect === 'attract' ||
+      values.effect === 'time_dilation') && (
       <>
         <label
           style={{
@@ -58,32 +65,38 @@ export const TriggerZoneInspector: React.FC<TriggerZoneInspectorProps> = ({
             checked={values.distanceAttenuation ?? false}
             onChange={(e) => onChange({ distanceAttenuation: e.target.checked })}
           />
-          Зависимость силы от расстояния (Линейная)
+          {values.effect === 'time_dilation'
+            ? 'Плавный градиент времени (от центра к краю)'
+            : 'Зависимость силы от расстояния (Линейная)'}
         </label>
 
         {values.distanceAttenuation && (
           <>
             <label>
-              Сила в центре:
+              {values.effect === 'time_dilation'
+                ? 'Множитель в центре (напр. 0.2x):'
+                : 'Сила в центре:'}
               <input
                 disabled={isReadOnly}
                 type="number"
-                value={values.centerValue ?? 150}
-                min={1}
+                value={values.centerValue ?? (values.effect === 'time_dilation' ? 0.2 : 150)}
+                min={0}
                 max={2000}
-                step={10}
+                step={values.effect === 'time_dilation' ? 0.05 : 10}
                 onChange={(e) => onChange({ centerValue: Number(e.target.value) })}
               />
             </label>
             <label>
-              Сила на границе:
+              {values.effect === 'time_dilation'
+                ? 'Множитель на границе (напр. 1.0x):'
+                : 'Сила на границе:'}
               <input
                 disabled={isReadOnly}
                 type="number"
-                value={values.boundaryValue ?? 30}
+                value={values.boundaryValue ?? (values.effect === 'time_dilation' ? 1.0 : 30)}
                 min={0}
                 max={2000}
-                step={10}
+                step={values.effect === 'time_dilation' ? 0.05 : 10}
                 onChange={(e) => onChange({ boundaryValue: Number(e.target.value) })}
               />
             </label>

@@ -227,6 +227,7 @@ type SquaredStats = {
 };
 
 export interface BBData extends BehaviorStatsConfig, SquaredStats {
+  local_time: number;
   pressed_keys?: string[];
   target_id: string;
   best_candidate_id: string | undefined;

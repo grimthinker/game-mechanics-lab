@@ -279,14 +279,17 @@ export class PhysicsSystem {
       const health = world.getComponent(id, 'health');
       if (health && !health.isAlive) continue;
 
-      const selfDx = (velocity.vx ?? 0) * dt;
-      const selfDy = (velocity.vy ?? 0) * dt;
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const localDt = dt * ts;
+
+      const selfDx = (velocity.vx ?? 0) * localDt;
+      const selfDy = (velocity.vy ?? 0) * localDt;
 
       const extVx = velocity.externalVx ?? 0;
       const extVy = velocity.externalVy ?? 0;
 
-      const totalDx = selfDx + extVx * dt;
-      const totalDy = selfDy + extVy * dt;
+      const totalDx = selfDx + extVx * localDt;
+      const totalDy = selfDy + extVy * localDt;
 
       if (totalDx !== 0 || totalDy !== 0) {
         this.moveEntitySafe(world, id, totalDx, totalDy);
@@ -295,7 +298,7 @@ export class PhysicsSystem {
       // Затухание внешнего импульса (трение / инерция)
       if (extVx !== 0 || extVy !== 0) {
         const damping = 5.0;
-        const factor = Math.max(0, 1 - damping * dt);
+        const factor = Math.max(0, 1 - damping * localDt);
         velocity.externalVx = extVx * factor;
         velocity.externalVy = extVy * factor;
 

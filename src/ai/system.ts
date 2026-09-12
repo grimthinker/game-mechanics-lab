@@ -35,7 +35,16 @@ export function createBTAISystem(utils: EntityUtils) {
   function update(dt: number) {
     const entities = utils.get_all_entities();
     for (const ctx of entities) {
-      update_context(ctx, { dt });
+      const ts = ctx.timeScaleMultiplier;
+      const localDt = dt * ts;
+
+      const bb = ctx.brain?.blackboard;
+      if (bb) {
+        const currentLocalTime = (bb.get('local_time') as number) ?? 0;
+        bb.set('local_time', currentLocalTime + localDt);
+      }
+
+      update_context(ctx, { dt: localDt });
       process_events(ctx);
       ctx.brain?.root_node.tick(ctx);
     }

@@ -1,8 +1,9 @@
 import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
-import { CollisionCategory } from '../types';
+import { CollisionCategory, ModifierType } from '../types';
 import { applyDamage, applyHeal } from '../utils/health';
+import { addModifier } from '../stats/StatEvaluator';
 
 export class ZoneTriggerSystem {
   private pulseTimer: number = 0;
@@ -21,7 +22,6 @@ export class ZoneTriggerSystem {
       zoneId,
       { zoneTrigger, transform: zoneTransform, physicsBody: zonePhys },
     ] of zones) {
-      const deltaValue = zoneTrigger.valuePerSec * dt;
       const attachment = world.getComponent(zoneId, 'attachment');
 
       // Поиск перекрывающихся тел через пространственный движок (с учетом радиусов существ)
@@ -40,6 +40,50 @@ export class ZoneTriggerSystem {
 
         const health = world.getComponent(targetId, 'health');
         if (!health || !health.isAlive) return;
+
+        const targetTs = world.getComponent(targetId, 'timeScale')?.multiplier.current ?? 1.0;
+        const localDt = dt * targetTs;
+        const deltaValue = zoneTrigger.valuePerSec * localDt;
+
+        // Поле замедления/ускорения времени (с поддержкой плавного затухания от центра к краям)
+        if (zoneTrigger.effect === 'time_dilation') {
+          const targetTimeScale = world.getComponent(targetId, 'timeScale');
+          if (targetTimeScale) {
+            let timeMultiplier = zoneTrigger.valuePerSec;
+
+            // Плавное радиальное изменение эффекта времени от центра к границе
+            if (
+              zoneTrigger.distanceAttenuation &&
+              zoneTrigger.centerValue !== undefined &&
+              zoneTrigger.boundaryValue !== undefined
+            ) {
+              const targetTransform = world.getComponent(targetId, 'transform');
+              const targetPhysStats = world.getComponent(targetId, 'physicsStats');
+              if (targetTransform) {
+                const targetRadius =
+                  targetPhysStats?.radius.current ??
+                  (targetPhys.body instanceof Circle ? targetPhys.body.r : 16);
+                const effectiveRadius = zoneTrigger.radius + targetRadius;
+                const dist = Math.hypot(
+                  targetTransform.x - zoneTransform.x,
+                  targetTransform.y - zoneTransform.y
+                );
+                const t = Math.min(1, Math.max(0, dist / effectiveRadius));
+                timeMultiplier =
+                  zoneTrigger.centerValue +
+                  (zoneTrigger.boundaryValue - zoneTrigger.centerValue) * t;
+              }
+            }
+
+            addModifier(targetTimeScale.multiplier, {
+              id: `zone_td_${zoneId}`,
+              type: ModifierType.PERCENT_MULT,
+              value: Math.max(0, timeMultiplier),
+              duration: 0.15, // Быстро спадает при выходе из зоны
+            });
+          }
+          return;
+        }
 
         // 1. Урон
         if (zoneTrigger.effect === 'damage') {

@@ -6,18 +6,21 @@ export class DamageSystem {
     const entities = world.getEntitiesWith('health');
 
     for (const [id, { health }] of entities) {
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const localDt = dt * ts;
+
       if (health.hitFlashTimer > 0) {
-        health.hitFlashTimer -= dt;
+        health.hitFlashTimer -= localDt;
         if (health.hitFlashTimer < 0) health.hitFlashTimer = 0;
       }
 
       if (health.healFlashTimer && health.healFlashTimer > 0) {
-        health.healFlashTimer -= dt;
+        health.healFlashTimer -= localDt;
         if (health.healFlashTimer < 0) health.healFlashTimer = 0;
       }
 
       if (health.healthBarTimer && health.healthBarTimer > 0) {
-        health.healthBarTimer -= dt;
+        health.healthBarTimer -= localDt;
         if (health.healthBarTimer < 0) health.healthBarTimer = 0;
       }
 

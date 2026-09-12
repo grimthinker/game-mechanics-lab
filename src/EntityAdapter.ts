@@ -177,6 +177,9 @@ export class EntityAdapter implements IMovable, EntityController {
     }
     return 'idle';
   }
+  public get timeScaleMultiplier(): number {
+    return this.getComponent('timeScale')?.multiplier.current ?? 1.0;
+  }
   public get attack_phase(): 'prep' | 'cast' | 'recovery' | null {
     const activeAttacks = this.getComponent('activeAttacks');
     return activeAttacks?.attacks[0]?.phase ?? null;

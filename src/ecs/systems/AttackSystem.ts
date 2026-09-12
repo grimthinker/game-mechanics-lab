@@ -64,10 +64,13 @@ export class AttackSystem {
           continue;
         }
 
+        const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+        const localDt = dt * ts;
+
         const castTime = wStats.castTime.current;
         const recoveryTime = wStats.recoveryTime.current;
 
-        atk.timer -= dt;
+        atk.timer -= localDt;
 
         if (atk.timer <= 0) {
           if (atk.phase === 'prep') {

@@ -53,6 +53,11 @@ export function assembleCreature(
     isSolid,
   });
 
+  // 3.5. Локальное время
+  world.addComponent(id, 'timeScale', {
+    multiplier: createStat(1.0),
+  });
+
   // 4. Здоровье
   world.addComponent(id, 'health', {
     current: hp,

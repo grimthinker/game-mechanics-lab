@@ -67,6 +67,11 @@ export const App: React.FC = () => {
     if (appRef.current) appRef.current.gameMode = m;
   }, []);
 
+  const setGlobalTimeScaleSync = useCallback((val: number) => {
+    setGlobalTimeScale(val);
+    if (appRef.current) appRef.current.globalTimeScale = val;
+  }, []);
+
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
@@ -80,6 +85,7 @@ export const App: React.FC = () => {
   const [, setFrameTick] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
+  const [globalTimeScale, setGlobalTimeScale] = useState<number>(1.0);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
@@ -215,6 +221,7 @@ export const App: React.FC = () => {
     app.gameMode = modeRef.current;
     app.isPaused = true;
     setIsPaused(true);
+    app.globalTimeScale = globalTimeScale;
 
     app.start();
     app.onFrame = () => updateStatsRef.current();
@@ -285,11 +292,12 @@ export const App: React.FC = () => {
     if (modeRef.current === GameMode.EDITOR) {
       setSnapshot(app.serializeWorld());
     }
+    setGlobalTimeScaleSync(1.0); // Возвращаем нормальную скорость времени для игры
     setModeSync(GameMode.GAME);
     app.isPaused = false;
     setIsPaused(false);
     updateStats();
-  }, [updateStats, setModeSync]);
+  }, [updateStats, setModeSync, setGlobalTimeScaleSync]);
 
   const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
@@ -425,6 +433,8 @@ export const App: React.FC = () => {
           }}
           isPaused={isPaused}
           togglePause={togglePause}
+          globalTimeScale={globalTimeScale}
+          setGlobalTimeScale={setGlobalTimeScaleSync}
           canUndo={appRef.current?.history.canUndo() ?? false}
           canRedo={appRef.current?.history.canRedo() ?? false}
           onUndo={handleUndo}
