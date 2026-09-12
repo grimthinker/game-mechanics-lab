@@ -12,9 +12,9 @@ export class AISystem {
 
   constructor() {
     const utils: EntityUtils = {
-      get_all_entities: () => this.getAllAIEntities(),
-      get_entity: (id: string) => this.getEntityAdapter(id),
-      get_path: (_start, end) => Promise.resolve([{ x: end.x, y: end.y }]),
+      getAllEntities: () => this.getAllAIEntities(),
+      getEntity: (id: string) => this.getEntityAdapter(id),
+      getPath: (_start, end) => Promise.resolve([{ x: end.x, y: end.y }]),
     };
 
     this.aiSystem = createBTAISystem(utils);

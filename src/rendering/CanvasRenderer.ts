@@ -201,7 +201,7 @@ export class CanvasRenderer implements IRenderer {
       const py = transform.y;
 
       // 1. Радиусы
-      const detectDist = bb.get('detect_dist');
+      const detectDist = bb.get('detectDist') ?? (bb as any).get('detect_dist');
       if (detectDist) {
         this.ctx.beginPath();
         this.ctx.arc(px, py, detectDist, 0, Math.PI * 2);
@@ -211,7 +211,7 @@ export class CanvasRenderer implements IRenderer {
         this.ctx.stroke();
       }
 
-      const loseDist = bb.get('lose_target_dist');
+      const loseDist = bb.get('loseTargetDist') ?? (bb as any).get('lose_target_dist');
       if (loseDist) {
         this.ctx.beginPath();
         this.ctx.arc(px, py, loseDist, 0, Math.PI * 2);
@@ -219,7 +219,7 @@ export class CanvasRenderer implements IRenderer {
         this.ctx.stroke();
       }
 
-      const followDist = bb.get('follow_stop_dist');
+      const followDist = bb.get('followStopDist') ?? (bb as any).get('follow_stop_dist');
       if (followDist) {
         this.ctx.beginPath();
         this.ctx.arc(px, py, followDist, 0, Math.PI * 2);
@@ -230,7 +230,8 @@ export class CanvasRenderer implements IRenderer {
       this.ctx.setLineDash([]);
 
       // 2. Траектория (Path)
-      const path = bb.get('current_path') as Point[] | undefined;
+      const path = (bb.get('currentPath') ?? (bb as any).get('current_path')) as
+        Point[] | undefined;
       if (path && path.length > 0) {
         this.ctx.beginPath();
         this.ctx.moveTo(px, py);
@@ -252,7 +253,7 @@ export class CanvasRenderer implements IRenderer {
       this.ctx.setLineDash([]);
 
       // 3. Линия к цели (Target Line)
-      const targetId = bb.get('target_id');
+      const targetId = bb.get('targetId') ?? (bb as any).get('target_id');
       let targetName = 'Нет';
       if (targetId) {
         const tTrans = world.getComponent(targetId, 'transform');
@@ -276,7 +277,7 @@ export class CanvasRenderer implements IRenderer {
       this.ctx.setLineDash([]);
 
       // 4. Информационный бейдж
-      const isEngaged = bb.get('is_engaged') ? 'ДА' : 'НЕТ';
+      const isEngaged = bb.get('isEngaged') ? 'ДА' : 'НЕТ';
       const badgeText = `Цель: ${targetName} | В бою: ${isEngaged}`;
 
       this.ctx.font = `bold ${Math.max(10, 11 * invScale)}px sans-serif`;

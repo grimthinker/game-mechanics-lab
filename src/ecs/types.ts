@@ -585,6 +585,6 @@ export interface IMovable {
 
 export interface EntityController {
   stop: () => boolean;
-  attack: (id_target?: string) => boolean;
+  attack: (targetId?: string) => boolean;
   getPos: () => Point;
 }

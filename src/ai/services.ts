@@ -25,23 +25,23 @@ export class BTServiceFindNearestTarget extends BTService {
   protected tickService(entity: EntityAdapter): void {
     const bb = entity.brain!.blackboard;
 
-    const range = bb.get('detect_dist') ?? 400;
-    const rangeSq = bb.get('detect_dist_sq') ?? range * range;
-    const loseDist = bb.get('lose_target_dist') ?? 600;
-    const loseDistSq = bb.get('lose_target_dist_sq') ?? loseDist * loseDist;
+    const range = bb.get('detectDist') ?? 400;
+    const rangeSq = bb.get('detectDistSq') ?? range * range;
+    const loseDist = bb.get('loseTargetDist') ?? 600;
+    const loseDistSq = bb.get('loseTargetDistSq') ?? loseDist * loseDist;
 
-    const currentTargetId = bb.get('target_id');
+    const currentTargetId = bb.get('targetId');
     if (currentTargetId !== undefined && currentTargetId !== null) {
-      const target = entity.utils.get_entity(currentTargetId);
+      const target = entity.utils.getEntity(currentTargetId);
 
       let shouldLose = false;
       if (!target || !target.isAlive) {
         shouldLose = true;
       } else {
-        const e_pos = entity.getPos();
-        const t_pos = target.getPos();
-        const dx = t_pos.x - e_pos.x;
-        const dy = t_pos.y - e_pos.y;
+        const selfPos = entity.getPos();
+        const targetPos = target.getPos();
+        const dx = targetPos.x - selfPos.x;
+        const dy = targetPos.y - selfPos.y;
         const distSq = dx * dx + dy * dy;
 
         if (distSq > loseDistSq) {
@@ -50,40 +50,40 @@ export class BTServiceFindNearestTarget extends BTService {
       }
 
       if (shouldLose) {
-        bb.remove('target_id');
+        bb.remove('targetId');
       } else {
         return;
       }
     }
 
-    const entities = entity.utils.get_all_entities();
+    const entities = entity.utils.getAllEntities();
 
-    let nearest_id: string | null = null;
-    let min_dist_sq = rangeSq;
+    let nearestId: string | null = null;
+    let minDistSq = rangeSq;
 
     for (const e of entities) {
       if (entity.id === e.id) continue;
       if (!e.isAlive) continue;
 
-      const e_pos = entity.getPos();
-      const t_pos = e.getPos();
+      const selfPos = entity.getPos();
+      const targetPos = e.getPos();
 
-      const dx = t_pos.x - e_pos.x;
+      const dx = targetPos.x - selfPos.x;
       if (dx > range || dx < -range) continue;
 
-      const dy = t_pos.y - e_pos.y;
+      const dy = targetPos.y - selfPos.y;
       if (dy > range || dy < -range) continue;
 
-      const dist_sq = dx * dx + dy * dy;
+      const distSq = dx * dx + dy * dy;
 
-      if (dist_sq < min_dist_sq) {
-        min_dist_sq = dist_sq;
-        nearest_id = e.id;
+      if (distSq < minDistSq) {
+        minDistSq = distSq;
+        nearestId = e.id;
       }
     }
 
-    if (nearest_id !== null) {
-      bb.set('best_candidate_id', nearest_id);
+    if (nearestId !== null) {
+      bb.set('bestCandidateId', nearestId);
     }
   }
 }
@@ -121,36 +121,36 @@ export class BTServicePathUpdater extends BTService {
   protected tickService(entity: EntityAdapter): void {
     const bb = entity.brain!.blackboard;
 
-    if (bb.get('is_engaged')) return;
+    if (bb.get('isEngaged')) return;
 
-    const target_id = bb.get('target_id');
-    if (target_id === undefined) return;
+    const targetId = bb.get('targetId');
+    if (targetId === undefined) return;
 
-    const target = entity.utils.get_entity(target_id);
+    const target = entity.utils.getEntity(targetId);
 
     if (target) {
-      const e_pos = entity.getPos();
-      const t_pos = target.getPos();
-      const dx = t_pos.x - e_pos.x;
-      const dy = t_pos.y - e_pos.y;
+      const selfPos = entity.getPos();
+      const targetPos = target.getPos();
+      const dx = targetPos.x - selfPos.x;
+      const dy = targetPos.y - selfPos.y;
       const distSq = dx * dx + dy * dy;
 
-      this.updatePathingLogic(entity, e_pos, t_pos, distSq);
+      this.updatePathingLogic(entity, selfPos, targetPos, distSq);
     }
   }
 
   private updatePathingLogic(
     entity: EntityAdapter,
-    self_pos: Point,
-    target_pos: Point,
+    selfPos: Point,
+    targetPos: Point,
     distSq: number
   ) {
     if (this.isRequesting) return;
 
     let shouldRequest = false;
 
-    const pdx = self_pos.x - this.lastStartPos.x;
-    const pdy = self_pos.y - this.lastStartPos.y;
+    const pdx = selfPos.x - this.lastStartPos.x;
+    const pdy = selfPos.y - this.lastStartPos.y;
     if (pdx * pdx + pdy * pdy > this.pushedDistanceSq) {
       shouldRequest = true;
     }
@@ -164,8 +164,8 @@ export class BTServicePathUpdater extends BTService {
       const currentThreshold =
         this.params.minTargetMoveThreshold +
         t * (this.params.maxTargetMoveThreshold - this.params.minTargetMoveThreshold);
-      const tdx = target_pos.x - this.lastTargetPos.x;
-      const tdy = target_pos.y - this.lastTargetPos.y;
+      const tdx = targetPos.x - this.lastTargetPos.x;
+      const tdy = targetPos.y - this.lastTargetPos.y;
 
       if (tdx * tdx + tdy * tdy > currentThreshold * currentThreshold) {
         shouldRequest = true;
@@ -175,18 +175,18 @@ export class BTServicePathUpdater extends BTService {
     if (shouldRequest) {
       this.isRequesting = true;
       this.requestTimer = 0;
-      this.lastStartPos = { ...self_pos };
-      this.lastTargetPos = { ...target_pos };
-      const path_promise = entity.utils.get_path(self_pos, target_pos, entity.radius);
-      this.handlePathPromise(entity, path_promise);
+      this.lastStartPos = { ...selfPos };
+      this.lastTargetPos = { ...targetPos };
+      const pathPromise = entity.utils.getPath(selfPos, targetPos, entity.radius);
+      this.handlePathPromise(entity, pathPromise);
     }
   }
 
   private handlePathPromise(entity: EntityAdapter, promise: Promise<Point[]>) {
     promise
-      .then((new_path) => {
+      .then((newPath) => {
         this.isRequesting = false;
-        if (new_path) entity.brain!.blackboard.set('current_path', new_path);
+        if (newPath) entity.brain!.blackboard.set('currentPath', newPath);
       })
       .catch(() => {
         this.isRequesting = false;
@@ -211,26 +211,26 @@ export class BTServiceSyncStats extends BTService {
   }
 
   protected tickService(entity: EntityAdapter): void {
-    const stats = entity.ai_stats;
+    const stats = entity.aiStats;
     const bb = entity.brain!.blackboard;
 
-    const detect_dist = stats.detect_dist ?? 400;
-    const lose_target_dist = stats.lose_target_dist ?? 600;
-    bb.set('detect_dist', detect_dist);
-    bb.set('detect_dist_sq', detect_dist * detect_dist);
-    bb.set('lose_target_dist', lose_target_dist);
-    bb.set('lose_target_dist_sq', lose_target_dist * lose_target_dist);
+    const detectDist = stats.detectDist ?? 400;
+    const loseTargetDist = stats.loseTargetDist ?? 600;
+    bb.set('detectDist', detectDist);
+    bb.set('detectDistSq', detectDist * detectDist);
+    bb.set('loseTargetDist', loseTargetDist);
+    bb.set('loseTargetDistSq', loseTargetDist * loseTargetDist);
 
     bb.set('health', entity.hp);
-    bb.set('max_health', entity.maxHp);
+    bb.set('maxHealth', entity.maxHp);
 
-    const e_pos = entity.getPos();
-    bb.set('pos', { x: e_pos.x, y: e_pos.y });
+    const selfPos = entity.getPos();
+    bb.set('pos', { x: selfPos.x, y: selfPos.y });
 
-    const stopDist = stats.follow_stop_dist ?? 40;
+    const stopDist = stats.followStopDist ?? 40;
 
-    bb.set('follow_stop_dist', stopDist);
-    bb.set('follow_up_dist', stopDist + 10);
+    bb.set('followStopDist', stopDist);
+    bb.set('followUpDist', stopDist + 10);
   }
 }
 
@@ -251,20 +251,20 @@ export class BTServiceInputListener extends BTService {
     const bb = entity.brain?.blackboard;
     if (bb) {
       if (GlobalInput.keys.size > 0) {
-        bb.set('pressed_keys', Array.from(GlobalInput.keys));
+        bb.set('pressedKeys', Array.from(GlobalInput.keys));
       } else {
-        bb.remove('pressed_keys');
+        bb.remove('pressedKeys');
       }
     }
   }
 
   protected override onAbort(entity: EntityAdapter): void {
-    entity.brain?.blackboard.remove('pressed_keys');
+    entity.brain?.blackboard.remove('pressedKeys');
     super.onAbort(entity);
   }
 
   protected override onClose(entity: EntityAdapter): void {
-    entity.brain?.blackboard.remove('pressed_keys');
+    entity.brain?.blackboard.remove('pressedKeys');
     super.onClose(entity);
   }
 
@@ -272,9 +272,9 @@ export class BTServiceInputListener extends BTService {
     const bb = entity.brain?.blackboard;
     if (!bb) return;
     if (GlobalInput.keys.size > 0) {
-      bb.set('pressed_keys', Array.from(GlobalInput.keys));
+      bb.set('pressedKeys', Array.from(GlobalInput.keys));
     } else {
-      bb.remove('pressed_keys');
+      bb.remove('pressedKeys');
     }
   }
 }
@@ -312,7 +312,7 @@ export class BTServiceInputController extends BTService {
 
   protected tickService(entity: EntityAdapter): void {
     const bb = entity.brain?.blackboard;
-    const keys = bb?.get('pressed_keys') || [];
+    const keys = bb?.get('pressedKeys') || [];
     const keysSet = new Set(keys);
 
     // Линия прицеливания (направление на курсор мыши либо текущий угол корпуса)

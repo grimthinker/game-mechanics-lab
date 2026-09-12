@@ -28,7 +28,8 @@ export class WorldSerializer {
 
       if (comp.brain) {
         const bbData = { ...comp.brain.blackboard.getData() };
-        delete bbData.pressed_keys;
+        delete bbData.pressedKeys;
+        delete (bbData as any).pressed_keys;
         data.components.brain = {
           blackboardData: JSON.parse(JSON.stringify(bbData)),
         };
@@ -121,9 +122,10 @@ export class WorldSerializer {
             const brain = this.app.world.getComponent(ent.id, 'brain');
             if (brain && brain.blackboard) {
               const sanitizedBBData = { ...comps.brain.blackboardData };
+              delete sanitizedBBData.pressedKeys;
               delete sanitizedBBData.pressed_keys;
               Object.assign(brain.blackboard.getData(), sanitizedBBData);
-              brain.blackboard.remove('pressed_keys');
+              brain.blackboard.remove('pressedKeys');
             }
           }
         }

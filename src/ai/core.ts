@@ -34,9 +34,9 @@ export interface BTNodeDTO {
 }
 
 export interface EntityUtils {
-  get_all_entities: () => EntityAdapter[];
-  get_entity: (id: string) => EntityAdapter | undefined;
-  get_path: (start: Point, end: Point, navmesh_radius_type?: StandardRadius) => Promise<Point[]>;
+  getAllEntities: () => EntityAdapter[];
+  getEntity: (id: string) => EntityAdapter | undefined;
+  getPath: (start: Point, end: Point, navmesh_radius_type?: StandardRadius) => Promise<Point[]>;
 }
 
 export type AttackStatus = 'idle' | 'attacking' | 'cooldown';
@@ -223,30 +223,30 @@ export type PathKeys = {
 }[keyof BBData];
 
 type SquaredStats = {
-  [K in keyof BehaviorStatsConfig as `${K}_sq`]: number;
+  [K in keyof BehaviorStatsConfig as `${K}Sq`]: number;
 };
 
 export interface BBData extends BehaviorStatsConfig, SquaredStats {
-  local_time: number;
-  pressed_keys?: string[];
-  target_id: string;
-  best_candidate_id: string | undefined;
-  is_engaged: boolean;
-  current_path: Point[];
-  patrol_points: Point[];
-  current_patrol_index: number;
-  patrol_route_tmp: Point[];
+  localTime: number;
+  pressedKeys?: string[];
+  targetId: string;
+  bestCandidateId: string | undefined;
+  isEngaged: boolean;
+  currentPath: Point[];
+  patrolPoints: Point[];
+  currentPatrolIndex: number;
+  patrolRouteTmp: Point[];
   health: number;
-  max_health: number;
+  maxHealth: number;
   pos: Point;
 }
 
 export interface BehaviorStatsConfig {
-  detect_dist: number;
-  lose_target_dist: number;
-  in_pos_dist: number;
-  follow_stop_dist: number;
-  follow_up_dist: number;
+  detectDist: number;
+  loseTargetDist: number;
+  inPosDist: number;
+  followStopDist: number;
+  followUpDist: number;
 }
 
 export enum MOB_RELATIONS {

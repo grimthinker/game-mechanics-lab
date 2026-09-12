@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { World } from '../ecs/World';
-
 import { useResizable } from '../hooks/useResizable';
 
-export interface SelectionBottomPanelProps {
+export interface MultiSelectionDrawerProps {
   selectedEntityIds: string[];
   selectedEntityId: string | null;
   world: World | null | undefined;
@@ -23,7 +22,7 @@ const ARCHETYPE_LABELS: Record<string, { label: string; icon: string }> = {
   marker: { label: 'Маркеры', icon: '📍' },
 };
 
-export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
+export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
   selectedEntityIds,
   selectedEntityId,
   world,
@@ -34,7 +33,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
   onClearSelection,
   onDeleteSelected,
 }) => {
-  // Унифицированный ресайз высоты нижней панели (вызывается строго до любых условий)
+  // Унифицированный ресайз высоты нижней шторки (вызывается строго до любых условий)
   const {
     size: panelHeight,
     isResizing,
@@ -44,7 +43,7 @@ export const SelectionBottomPanel: React.FC<SelectionBottomPanelProps> = ({
     initialSize: 150,
     minSize: 90,
     maxSize: () => Math.max(90, window.innerHeight - 200),
-    direction: 'vertical-inverted',
+    direction: 'resize-top',
   });
 
   // Автоматическое скрытие: панель активна только при групповом выделении (2+ сущности)

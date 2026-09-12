@@ -95,6 +95,7 @@ export class GameApp {
   }
 
   public onFrame: (() => void) | null = null;
+  public onHistoryChange: (() => void) | null = null;
 
   private lastTime: number = 0;
   private isRunning: boolean = false;
@@ -655,6 +656,9 @@ export class GameApp {
   public commitHistory(description: string = 'Изменение'): void {
     if (this.gameMode !== GameMode.EDITOR || this.isHistoryAction) return;
     this.history.pushState(this.captureHistoryRecord(description));
+    if (this.onHistoryChange) {
+      this.onHistoryChange();
+    }
   }
 
   public undo(): boolean {
@@ -666,6 +670,9 @@ export class GameApp {
       const target = this.history.undo(current);
       if (target) {
         this.restoreHistoryRecord(target);
+        if (this.onHistoryChange) {
+          this.onHistoryChange();
+        }
         return true;
       }
     } finally {
@@ -683,6 +690,9 @@ export class GameApp {
       const target = this.history.redo(current);
       if (target) {
         this.restoreHistoryRecord(target);
+        if (this.onHistoryChange) {
+          this.onHistoryChange();
+        }
         return true;
       }
     } finally {

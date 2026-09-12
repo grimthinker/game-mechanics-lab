@@ -164,7 +164,7 @@ export class EntityAdapter implements IMovable, EntityController {
   public get brain(): BTLogicComponent | undefined {
     return this.getComponent('brain') as BTLogicComponent | undefined;
   }
-  public get attack_status(): AttackStatus {
+  public get attackStatus(): AttackStatus {
     const activeAttacks = this.getComponent('activeAttacks');
     const currentAttack = activeAttacks?.attacks[0];
     if (!currentAttack) return 'idle';
@@ -180,7 +180,7 @@ export class EntityAdapter implements IMovable, EntityController {
   public get timeScaleMultiplier(): number {
     return this.getComponent('timeScale')?.multiplier.current ?? 1.0;
   }
-  public get attack_phase(): 'prep' | 'cast' | 'recovery' | null {
+  public get attackPhase(): 'prep' | 'cast' | 'recovery' | null {
     const activeAttacks = this.getComponent('activeAttacks');
     return activeAttacks?.attacks[0]?.phase ?? null;
   }
@@ -188,15 +188,15 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.getComponent('input');
     return input?.wantsAttack ?? false;
   }
-  public get ai_stats(): BehaviorStatsConfig {
+  public get aiStats(): BehaviorStatsConfig {
     const aiStats = this.getComponent('aiStats');
     const custom = aiStats?.stats;
     return {
-      detect_dist: custom?.detect_dist ?? LOGIC_CONFIG.detect_dist,
-      lose_target_dist: custom?.lose_target_dist ?? LOGIC_CONFIG.lose_target_dist,
-      in_pos_dist: custom?.in_pos_dist ?? LOGIC_CONFIG.in_pos_dist,
-      follow_stop_dist: custom?.follow_stop_dist ?? LOGIC_CONFIG.follow_stop_dist,
-      follow_up_dist: custom?.follow_up_dist ?? LOGIC_CONFIG.follow_up_dist,
+      detectDist: custom?.detectDist ?? LOGIC_CONFIG.detectDist,
+      loseTargetDist: custom?.loseTargetDist ?? LOGIC_CONFIG.loseTargetDist,
+      inPosDist: custom?.inPosDist ?? LOGIC_CONFIG.inPosDist,
+      followStopDist: custom?.followStopDist ?? LOGIC_CONFIG.followStopDist,
+      followUpDist: custom?.followUpDist ?? LOGIC_CONFIG.followUpDist,
     };
   }
 
@@ -306,8 +306,8 @@ export class EntityAdapter implements IMovable, EntityController {
     }
     return true;
   }
-  public attack(_id_target?: string, slotIndex?: number): boolean {
-    const input = this.getComponent('input');
+  public attack(targetId?: string, slotIndex?: number): boolean {
+    const input = this.getInputIfActive();
     if (input) {
       input.wantsAttack = true;
       input.attackSlotIndex = slotIndex;

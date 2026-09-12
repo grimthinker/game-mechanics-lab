@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export type ResizeDirection = 'horizontal' | 'vertical' | 'vertical-inverted';
+export type ResizeDirection = 'horizontal' | 'vertical' | 'resize-top' | 'vertical-inverted';
 
 export interface UseResizableOptions {
   storageKey: string;
@@ -48,10 +48,10 @@ export function useResizable({
 
     const handleMouseMove = (e: MouseEvent) => {
       const currentCoord = direction === 'horizontal' ? e.clientX : e.clientY;
-      const delta =
-        direction === 'vertical-inverted'
-          ? startCoordRef.current - currentCoord
-          : currentCoord - startCoordRef.current;
+      const isTopResizing = direction === 'resize-top' || direction === 'vertical-inverted';
+      const delta = isTopResizing
+        ? startCoordRef.current - currentCoord
+        : currentCoord - startCoordRef.current;
 
       const max = typeof maxSize === 'function' ? maxSize() : maxSize;
       const newSize = Math.max(minSize, Math.min(max, startSizeRef.current + delta));

@@ -81,7 +81,7 @@ export class BTCooldown extends BTDecorator {
   }
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
-    const currentTime = (ctx.brain!.blackboard.get('local_time') ?? 0) * 1000;
+    const currentTime = (ctx.brain!.blackboard.get('localTime') ?? 0) * 1000;
 
     if (currentTime - this.lastExecutionTime < this.params.cooldownMs) {
       return NodeStatus.FAILURE;
@@ -120,8 +120,8 @@ export class BTRepeater extends BTDecorator {
 export class BTDecoratorCheckEngaged extends BTDecorator {
   public static readonly nodeName = 'Проверка боя';
   public static readonly description =
-    'Проверяет, находится ли цель на расстоянии ближе или равном engage_dist единицам, иначе прерывает дочерний узел';
-  public static readonly defaultParams = { engage_dist: 1000 };
+    'Проверяет, находится ли цель на расстоянии ближе или равном engageDist единицам, иначе прерывает дочерний узел';
+  public static readonly defaultParams = { engageDist: 1000 };
 
   private params: typeof BTDecoratorCheckEngaged.defaultParams;
 
@@ -132,18 +132,18 @@ export class BTDecoratorCheckEngaged extends BTDecorator {
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
     const bb = ctx.brain!.blackboard;
-    const target_id = bb.get('target_id');
+    const targetId = bb.get('targetId');
 
-    if (target_id === undefined) return NodeStatus.FAILURE;
+    if (targetId === undefined) return NodeStatus.FAILURE;
 
-    const target = ctx.utils.get_entity(target_id);
+    const target = ctx.utils.getEntity(targetId);
 
     if (!target?.getPos()) return NodeStatus.FAILURE;
 
     const dist = vec2_distance_to(ctx.getPos(), target.getPos());
-    const is_engaged = dist <= this.params.engage_dist;
+    const isEngaged = dist <= this.params.engageDist;
 
-    if (!is_engaged) {
+    if (!isEngaged) {
       if (this.child.isRunning()) {
         this.child.abort(ctx);
       }
@@ -164,13 +164,13 @@ export class BTDecoratorIsTargetAlive extends BTDecorator {
   }
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
-    const target_id = ctx.brain!.blackboard.get('target_id');
-    if (target_id === undefined) {
+    const targetId = ctx.brain!.blackboard.get('targetId');
+    if (targetId === undefined) {
       if (this.child.isRunning()) this.child.abort(ctx);
       return NodeStatus.FAILURE;
     }
 
-    const target = ctx.utils.get_entity(target_id);
+    const target = ctx.utils.getEntity(targetId);
     if (!target || !target.isAlive) {
       if (this.child.isRunning()) {
         this.child.abort(ctx);

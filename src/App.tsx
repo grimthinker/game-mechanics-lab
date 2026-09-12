@@ -15,13 +15,14 @@ import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
 import { GameHUD } from './components/GameHUD';
 import { CanvasHUD } from './components/CanvasHUD';
-import { SelectionBottomPanel } from './components/SelectionBottomPanel';
+import { MultiSelectionDrawer } from './components/MultiSelectionDrawer';
 import { PlacementMode } from './types';
 import { GameMode } from './constants';
 import { GizmoTool } from './gizmos/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './editor.css';
 import { createZoneConfig } from './ecs/archetypes';
+import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -30,6 +31,8 @@ export const App: React.FC = () => {
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
   const [snapshot, setSnapshot] = useState<any>(null);
+  const snapshotRef = useRef<any>(null);
+  snapshotRef.current = snapshot;
   const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
   const [showUIOverlays, setShowUIOverlays] = useState<boolean>(true);
   const [showAIDebug, setShowAIDebug] = useState<boolean>(false);
@@ -37,7 +40,7 @@ export const App: React.FC = () => {
   const [leftDockTab, setLeftDockTab] = useState<DockTab>('hierarchy');
   const [pieMenuState, setPieMenuState] = useState<PieMenuState | null>(null);
 
-  const setGizmoToolSync = useCallback((tool: GizmoTool) => {
+  const applyGizmoTool = useCallback((tool: GizmoTool) => {
     setGizmoTool(tool);
     if (appRef.current) appRef.current.gizmoTool = tool;
   }, []);
@@ -48,26 +51,26 @@ export const App: React.FC = () => {
 
   const modeRef = useRef(mode);
 
-  const setShowUIOverlaysSync = useCallback((val: boolean) => {
+  const applyShowUIOverlays = useCallback((val: boolean) => {
     setShowUIOverlays(val);
     if (appRef.current) appRef.current.showUIOverlays = val;
     updateStatsRef.current();
   }, []);
 
-  const setShowAIDebugSync = useCallback((val: boolean) => {
+  const applyShowAIDebug = useCallback((val: boolean) => {
     setShowAIDebug(val);
     if (appRef.current) appRef.current.showAIDebug = val;
     updateStatsRef.current();
   }, []);
 
-  const setModeSync = useCallback((m: GameMode) => {
+  const applyGameMode = useCallback((m: GameMode) => {
     setMode(m);
     modeRef.current = m;
     setPieMenuState(null);
     if (appRef.current) appRef.current.gameMode = m;
   }, []);
 
-  const setGlobalTimeScaleSync = useCallback((val: number) => {
+  const applyGlobalTimeScale = useCallback((val: number) => {
     setGlobalTimeScale(val);
     if (appRef.current) appRef.current.globalTimeScale = val;
   }, []);
@@ -121,7 +124,7 @@ export const App: React.FC = () => {
           ([_, comp]) => comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
         );
       if (!isAnyPlayerAlive) {
-        setModeSync(GameMode.SIMULATION);
+        applyGameMode(GameMode.SIMULATION);
         app.isPaused = true;
         setIsPaused(true);
       }
@@ -155,7 +158,7 @@ export const App: React.FC = () => {
       setBtData(null);
       setBtBlackboard(null);
     }
-  }, [setModeSync]);
+  }, [applyGameMode]);
 
   const updateStatsRef = useRef(updateStats);
   updateStatsRef.current = updateStats;
@@ -193,11 +196,13 @@ export const App: React.FC = () => {
     if (!app || !canvas) return;
     app.camera.reset(canvas);
     updateStats();
+    saveWorldToStorage(app, snapshotRef.current);
   }, [closePieMenu, updateStats]);
 
   const createNewWorld = useCallback(() => {
     closePieMenu();
     setSnapshot(null);
+    snapshotRef.current = null;
     const app = appRef.current;
     if (!app) return;
 
@@ -208,6 +213,7 @@ export const App: React.FC = () => {
     };
 
     app.initDefaultWorld(spawnPos);
+    saveWorldToStorage(app);
     syncPlayerControls();
     updateStats();
   }, [closePieMenu, syncPlayerControls, updateStats]);
@@ -225,14 +231,26 @@ export const App: React.FC = () => {
 
     app.start();
     app.onFrame = () => updateStatsRef.current();
-
-    // Создание начального мира при первом запуске
-    const canvas = app.canvas;
-    const spawnPos = {
-      x: canvas ? canvas.width / 2 : 300,
-      y: canvas ? canvas.height / 2 : 300,
+    app.onHistoryChange = () => {
+      saveWorldToStorage(app, snapshotRef.current);
     };
-    app.initDefaultWorld(spawnPos);
+
+    // Восстановление мира из автосохранения либо создание дефолтного мира
+    const autoSave = loadWorldFromStorage();
+    if (autoSave && autoSave.world) {
+      app.deserializeWorld(autoSave.world);
+      if (autoSave.camera) {
+        app.camera.deserialize(autoSave.camera);
+      }
+    } else {
+      const canvas = app.canvas;
+      const spawnPos = {
+        x: canvas ? canvas.width / 2 : 300,
+        y: canvas ? canvas.height / 2 : 300,
+      };
+      app.initDefaultWorld(spawnPos);
+      saveWorldToStorage(app);
+    }
     updateStatsRef.current();
 
     return () => {
@@ -240,6 +258,31 @@ export const App: React.FC = () => {
       appRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Автосохранение при закрытии/скрытии вкладки браузера
+  useEffect(() => {
+    const handleSave = () => {
+      if (appRef.current) {
+        saveWorldToStorage(appRef.current, snapshotRef.current);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleSave();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleSave);
+    window.addEventListener('pagehide', handleSave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleSave);
+      window.removeEventListener('pagehide', handleSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const togglePause = useCallback(() => {
@@ -262,42 +305,52 @@ export const App: React.FC = () => {
     if (snapshot) {
       app.deserializeWorld(snapshot);
       setSnapshot(null);
+      snapshotRef.current = null;
     }
-    setModeSync(GameMode.EDITOR);
+    applyGameMode(GameMode.EDITOR);
     app.isPaused = true;
     setIsPaused(true);
     app.selectEntity(null);
     app.hoverEntity(null);
     updateStats();
-  }, [snapshot, updateStats, setModeSync]);
+    saveWorldToStorage(app);
+  }, [snapshot, updateStats, applyGameMode]);
 
   const goToSimulation = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
+    let currentSnapshot = snapshot;
     if (modeRef.current === GameMode.EDITOR) {
-      setSnapshot(app.serializeWorld());
+      currentSnapshot = app.serializeWorld();
+      setSnapshot(currentSnapshot);
+      snapshotRef.current = currentSnapshot;
     }
-    setModeSync(GameMode.SIMULATION);
+    applyGameMode(GameMode.SIMULATION);
     app.isPaused = false;
     setIsPaused(false);
     app.selectEntity(null);
     app.hoverEntity(null);
     updateStats();
-  }, [updateStats, setModeSync]);
+    saveWorldToStorage(app, currentSnapshot);
+  }, [updateStats, applyGameMode, snapshot]);
 
   const goToGame = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
+    let currentSnapshot = snapshot;
     if (modeRef.current === GameMode.EDITOR) {
-      setSnapshot(app.serializeWorld());
+      currentSnapshot = app.serializeWorld();
+      setSnapshot(currentSnapshot);
+      snapshotRef.current = currentSnapshot;
     }
-    setGlobalTimeScaleSync(1.0); // Возвращаем нормальную скорость времени для игры
-    setModeSync(GameMode.GAME);
+    applyGlobalTimeScale(1.0); // Возвращаем нормальную скорость времени для игры
+    applyGameMode(GameMode.GAME);
     app.isPaused = false;
     setIsPaused(false);
     updateStats();
-  }, [updateStats, setModeSync, setGlobalTimeScaleSync]);
+    saveWorldToStorage(app, currentSnapshot);
+  }, [updateStats, applyGameMode, applyGlobalTimeScale, snapshot]);
 
   const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
@@ -376,7 +429,7 @@ export const App: React.FC = () => {
     onUndo: handleUndo,
     onRedo: handleRedo,
     onExitGame: goToEditor,
-    onSetGizmoTool: setGizmoToolSync,
+    onSetGizmoTool: applyGizmoTool,
     onCancelGizmo: handleCancelGizmo,
     onClosePieMenu: handleClosePieMenuViaShortcut,
   });
@@ -420,8 +473,10 @@ export const App: React.FC = () => {
                 const app = appRef.current;
                 if (app) {
                   setSnapshot(null);
+                  snapshotRef.current = null;
                   app.deserializeWorld(data);
                   app.history.clear();
+                  saveWorldToStorage(app);
                   syncPlayerControls();
                   updateStats();
                 }
@@ -434,7 +489,7 @@ export const App: React.FC = () => {
           isPaused={isPaused}
           togglePause={togglePause}
           globalTimeScale={globalTimeScale}
-          setGlobalTimeScale={setGlobalTimeScaleSync}
+          setGlobalTimeScale={applyGlobalTimeScale}
           canUndo={appRef.current?.history.canUndo() ?? false}
           canRedo={appRef.current?.history.canRedo() ?? false}
           onUndo={handleUndo}
@@ -449,9 +504,9 @@ export const App: React.FC = () => {
             }
           }}
           showUIOverlays={showUIOverlays}
-          setShowUIOverlays={setShowUIOverlaysSync}
+          setShowUIOverlays={applyShowUIOverlays}
           showAIDebug={showAIDebug}
-          setShowAIDebug={setShowAIDebugSync}
+          setShowAIDebug={applyShowAIDebug}
         />
       )}
 
@@ -496,7 +551,7 @@ export const App: React.FC = () => {
               cursorWorldPos={cursorWorldPos}
               onResetCamera={handleResetCamera}
               gizmoTool={gizmoTool}
-              onSelectGizmoTool={setGizmoToolSync}
+              onSelectGizmoTool={applyGizmoTool}
             />
           )}
 
@@ -507,7 +562,7 @@ export const App: React.FC = () => {
 
           {/* Нижняя панель группового выделения (Drawer) */}
           {mode !== GameMode.GAME && (
-            <SelectionBottomPanel
+            <MultiSelectionDrawer
               selectedEntityIds={selectedEntityIds}
               selectedEntityId={selectedEntityId}
               world={appRef.current?.world}

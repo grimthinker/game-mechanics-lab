@@ -2,12 +2,12 @@ import { AIEventType, EntityUtils } from './core';
 import type { EntityAdapter } from '../EntityAdapter';
 
 export function createBTAISystem(utils: EntityUtils) {
-  function update_context(ctx: EntityAdapter, data: { dt: number }) {
+  function updateContext(ctx: EntityAdapter, data: { dt: number }) {
     ctx.dt = data.dt;
     ctx.utils = utils; // Ensure utils reference is available on context
   }
 
-  function process_events(ctx: EntityAdapter) {
+  function processEvents(ctx: EntityAdapter) {
     const queue = ctx.brain?.event_queue;
     const bb = ctx.brain?.blackboard;
     if (!queue || !bb) return;
@@ -17,12 +17,12 @@ export function createBTAISystem(utils: EntityUtils) {
 
       switch (event.type) {
         case AIEventType.SET_TARGET:
-          bb.set('target_id', event.payload.target_id);
-          bb.set('is_engaged', false);
+          bb.set('targetId', event.payload.targetId ?? event.payload.target_id);
+          bb.set('isEngaged', false);
           break;
         case AIEventType.SET_PATROL_POINTS:
-          bb.set('patrol_points', event.payload.points);
-          bb.set('current_patrol_index', 0);
+          bb.set('patrolPoints', event.payload.points);
+          bb.set('currentPatrolIndex', 0);
           break;
         case AIEventType.APPLY_EFFECT:
           break;
@@ -33,19 +33,19 @@ export function createBTAISystem(utils: EntityUtils) {
   }
 
   function update(dt: number) {
-    const entities = utils.get_all_entities();
+    const entities = utils.getAllEntities();
     for (const ctx of entities) {
       const ts = ctx.timeScaleMultiplier;
       const localDt = dt * ts;
 
       const bb = ctx.brain?.blackboard;
       if (bb) {
-        const currentLocalTime = (bb.get('local_time') as number) ?? 0;
-        bb.set('local_time', currentLocalTime + localDt);
+        const currentLocalTime = (bb.get('localTime') as number) ?? 0;
+        bb.set('localTime', currentLocalTime + localDt);
       }
 
-      update_context(ctx, { dt: localDt });
-      process_events(ctx);
+      updateContext(ctx, { dt: localDt });
+      processEvents(ctx);
       ctx.brain?.root_node.tick(ctx);
     }
   }

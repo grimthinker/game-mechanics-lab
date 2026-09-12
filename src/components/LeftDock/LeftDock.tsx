@@ -60,7 +60,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
     initialSize: 240,
     minSize: 100,
     maxSize: 500,
-    direction: 'vertical-inverted',
+    direction: 'resize-top',
   });
 
   return (

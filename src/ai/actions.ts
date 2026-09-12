@@ -10,14 +10,14 @@ export class BTConditionValidTarget extends BTSimpleAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const target_id = bb.get('target_id');
+    const targetId = bb.get('targetId');
 
-    if (target_id === undefined) return NodeStatus.FAILURE;
-    const target = entity.utils.get_entity(target_id);
+    if (targetId === undefined) return NodeStatus.FAILURE;
+    const target = entity.utils.getEntity(targetId);
 
     if (!target?.isAlive) {
-      bb.remove('target_id');
-      bb.remove('is_engaged');
+      bb.remove('targetId');
+      bb.remove('isEngaged');
       return NodeStatus.FAILURE;
     }
     return NodeStatus.SUCCESS;
@@ -31,49 +31,49 @@ export class BTConditionEngaged extends BTSimpleAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const target_id = bb.get('target_id');
-    if (target_id === undefined) return NodeStatus.FAILURE;
+    const targetId = bb.get('targetId');
+    if (targetId === undefined) return NodeStatus.FAILURE;
 
-    const target = entity.utils.get_entity(target_id);
-    const t_pos = target?.getPos();
+    const target = entity.utils.getEntity(targetId);
+    const targetPos = target?.getPos();
 
-    if (!t_pos) return NodeStatus.FAILURE;
+    if (!targetPos) return NodeStatus.FAILURE;
 
-    const e_pos = entity.getPos();
-    const dist = vec2_distance_to(e_pos, t_pos);
-    let is_engaged = bb.get('is_engaged') || false;
+    const selfPos = entity.getPos();
+    const dist = vec2_distance_to(selfPos, targetPos);
+    let isEngaged = bb.get('isEngaged') || false;
 
-    if (is_engaged) {
-      if (dist > LOGIC_CONFIG.follow_up_dist) is_engaged = false;
+    if (isEngaged) {
+      if (dist > LOGIC_CONFIG.followUpDist) isEngaged = false;
     } else {
-      if (dist <= LOGIC_CONFIG.follow_stop_dist) is_engaged = true;
+      if (dist <= LOGIC_CONFIG.followStopDist) isEngaged = true;
     }
 
-    bb.set('is_engaged', is_engaged);
-    return is_engaged ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+    bb.set('isEngaged', isEngaged);
+    return isEngaged ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
   }
   protected onAbort() {}
 }
 
 export class BTActionPursue extends BTAction {
-  private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('current_path');
-  private readonly stopDistSq: number = LOGIC_CONFIG.follow_stop_dist ** 2;
+  private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('currentPath');
+  private readonly stopDistSq: number = LOGIC_CONFIG.followStopDist ** 2;
   public static readonly nodeName = 'Преследовать цель';
-  public static readonly description = 'Преследовать цель, если она есть и есть путь current_path';
+  public static readonly description = 'Преследовать цель, если она есть и есть путь currentPath';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const target_id = bb.get('target_id');
-    if (target_id === undefined) return NodeStatus.FAILURE;
+    const targetId = bb.get('targetId');
+    if (targetId === undefined) return NodeStatus.FAILURE;
 
-    const target = entity.utils.get_entity(target_id);
-    const t_pos = target?.getPos();
+    const target = entity.utils.getEntity(targetId);
+    const targetPos = target?.getPos();
 
-    if (!t_pos) return NodeStatus.FAILURE;
+    if (!targetPos) return NodeStatus.FAILURE;
 
-    const e_pos = entity.getPos();
-    const dx = t_pos.x - e_pos.x;
-    const dy = t_pos.y - e_pos.y;
+    const selfPos = entity.getPos();
+    const dx = targetPos.x - selfPos.x;
+    const dy = targetPos.y - selfPos.y;
 
     if (dx * dx + dy * dy <= this.stopDistSq) {
       entity.stop();
@@ -85,35 +85,35 @@ export class BTActionPursue extends BTAction {
   }
 
   protected stopAction(entity: EntityAdapter): void {
-    entity.brain!.blackboard.remove('current_path');
+    entity.brain!.blackboard.remove('currentPath');
     this.movementNode.abort(entity);
   }
 }
 
 export class BTActionPatrol extends BTAction {
-  private movementNode = new BTActionFollowPathSmooth('patrol_route_tmp');
+  private movementNode = new BTActionFollowPathSmooth('patrolRouteTmp');
   public static readonly nodeName = 'Патруль';
   public static readonly description =
-    'Двигаться вдоль пути patrol_points, если они есть, иначе возвращает FAILURE';
+    'Двигаться вдоль пути patrolPoints, если они есть, иначе возвращает FAILURE';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const points = bb.get('patrol_points');
+    const points = bb.get('patrolPoints');
 
     if (!points || points.length === 0) return NodeStatus.FAILURE;
 
-    let index = bb.get('current_patrol_index') || 0;
+    let index = bb.get('currentPatrolIndex') || 0;
 
-    if (!bb.has('patrol_route_tmp')) {
-      bb.set('patrol_route_tmp', [points[index]]);
+    if (!bb.has('patrolRouteTmp')) {
+      bb.set('patrolRouteTmp', [points[index]]);
     }
 
     const status = this.movementNode.tick(entity);
 
     if (status === NodeStatus.SUCCESS) {
       index = (index + 1) % points.length;
-      bb.set('current_patrol_index', index);
-      bb.remove('patrol_route_tmp');
+      bb.set('currentPatrolIndex', index);
+      bb.remove('patrolRouteTmp');
       return NodeStatus.RUNNING;
     }
 
@@ -121,7 +121,7 @@ export class BTActionPatrol extends BTAction {
   }
 
   protected stopAction(entity: EntityAdapter): void {
-    entity.brain!.blackboard.remove('patrol_route_tmp');
+    entity.brain!.blackboard.remove('patrolRouteTmp');
     this.movementNode.abort(entity);
   }
 }
@@ -143,9 +143,9 @@ export class BTActionAttack extends BTAction {
   }
 
   protected onOpen(entity: EntityAdapter): void {
-    const target_id = entity.brain!.blackboard.get('target_id');
+    const targetId = entity.brain!.blackboard.get('targetId');
     entity.stop();
-    entity.attack(target_id, this.params.slotIndex);
+    entity.attack(targetId, this.params.slotIndex);
     this.hasStarted = false;
   }
 
@@ -154,7 +154,7 @@ export class BTActionAttack extends BTAction {
     const isAttackingInECS =
       this.params.slotIndex !== undefined
         ? entity.isSlotBusy(this.params.slotIndex)
-        : entity.attack_status !== 'idle';
+        : entity.attackStatus !== 'idle';
 
     if (isAttackingInECS) {
       this.hasStarted = true;
@@ -183,13 +183,13 @@ export class BTActionAttack extends BTAction {
 
 export class BTCommandForgetTarget extends BTSimpleAction {
   public static readonly nodeName = 'Забыть цель';
-  public static readonly description = 'Сбрасывает цель, состояние is_engaged и текущий путь';
+  public static readonly description = 'Сбрасывает цель, состояние isEngaged и текущий путь';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    bb.remove('target_id');
-    bb.remove('is_engaged');
-    bb.remove('current_path');
+    bb.remove('targetId');
+    bb.remove('isEngaged');
+    bb.remove('currentPath');
     entity.stop();
     return NodeStatus.SUCCESS;
   }
@@ -197,15 +197,15 @@ export class BTCommandForgetTarget extends BTSimpleAction {
 
 export class BTCommandAcceptCandidate extends BTSimpleAction {
   public static readonly nodeName = 'Принять цель';
-  public static readonly description = 'Принять цель, указанную в best_candidate_id, если она есть';
+  public static readonly description = 'Принять цель, указанную в bestCandidateId, если она есть';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const candidate = bb.get('best_candidate_id');
+    const candidate = bb.get('bestCandidateId');
 
     if (candidate !== undefined) {
-      bb.set('target_id', candidate);
-      bb.remove('best_candidate_id');
+      bb.set('targetId', candidate);
+      bb.remove('bestCandidateId');
       return NodeStatus.SUCCESS;
     }
     return NodeStatus.FAILURE;
@@ -237,11 +237,11 @@ export class BTWait extends BTAction {
   }
 
   protected onOpen(ctx: EntityAdapter): void {
-    this.startTime = ctx.brain!.blackboard.get('local_time') ?? 0;
+    this.startTime = ctx.brain!.blackboard.get('localTime') ?? 0;
   }
 
   protected onTick(ctx: EntityAdapter): NodeStatus {
-    const currentTime = ctx.brain!.blackboard.get('local_time') ?? 0;
+    const currentTime = ctx.brain!.blackboard.get('localTime') ?? 0;
     if (currentTime - this.startTime >= this.params.duration) {
       return NodeStatus.SUCCESS;
     }
@@ -265,16 +265,16 @@ export class BTActionRotateToPos extends BTAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const target_id = bb.get('target_id');
-    if (target_id === undefined) return NodeStatus.FAILURE;
+    const targetId = bb.get('targetId');
+    if (targetId === undefined) return NodeStatus.FAILURE;
 
-    const target = entity.utils.get_entity(target_id);
-    const t_pos = target?.getPos();
-    if (!t_pos) return NodeStatus.FAILURE;
+    const target = entity.utils.getEntity(targetId);
+    const targetPos = target?.getPos();
+    if (!targetPos) return NodeStatus.FAILURE;
 
-    const e_pos = entity.getPos();
-    const dx = t_pos.x - e_pos.x;
-    const dy = t_pos.y - e_pos.y;
+    const selfPos = entity.getPos();
+    const dx = targetPos.x - selfPos.x;
+    const dy = targetPos.y - selfPos.y;
 
     if (dx === 0 && dy === 0) return NodeStatus.SUCCESS;
 
@@ -324,36 +324,36 @@ export class BTActionStopTurn extends BTSimpleAction {
 export class BTActionFollowPathSmooth extends BTAction {
   public static readonly nodeName = 'Двигаться по пути (плавно)';
   public static readonly description =
-    'Двигаться по пути current_path с одновременным плавным поворотом';
+    'Двигаться по пути currentPath с одновременным плавным поворотом';
 
-  constructor(private path_key: PathKeys = 'current_path') {
+  constructor(private pathKey: PathKeys = 'currentPath') {
     super();
   }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const path = bb.get(this.path_key) || [];
+    const path = bb.get(this.pathKey) || [];
 
     if (path.length === 0) {
       entity.stop();
       return NodeStatus.SUCCESS;
     }
 
-    const e_pos = entity.getPos();
-    while (path.length > 0 && this.getDist(e_pos, path[0]) <= LOGIC_CONFIG.in_pos_dist) {
+    const selfPos = entity.getPos();
+    while (path.length > 0 && this.getDist(selfPos, path[0]) <= LOGIC_CONFIG.inPosDist) {
       path.shift();
     }
 
     if (path.length === 0) {
       entity.stop();
-      bb.remove(this.path_key);
+      bb.remove(this.pathKey);
       return NodeStatus.SUCCESS;
     }
 
     // Расчет вектора и угла к следующей путевой точке
     const target = path[0];
-    const dx = target.x - e_pos.x;
-    const dy = target.y - e_pos.y;
+    const dx = target.x - selfPos.x;
+    const dy = target.y - selfPos.y;
     const dist = Math.hypot(dx, dy);
 
     if (dist > 0.001) {

@@ -2,6 +2,14 @@ import { Point } from './types';
 
 import { CAMERA_CONFIG } from '../config/cameraConfig';
 
+export interface CameraState {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+  yaw: number;
+  pitch: number;
+}
+
 export class Camera {
   public scale: number = CAMERA_CONFIG.defaultZoom;
   public offsetX: number = 0;
@@ -141,5 +149,36 @@ export class Camera {
     this.offsetY = canvas.height / 2;
     this.yaw = 0;
     this.pitch = CAMERA_CONFIG.defaultPitch;
+  }
+
+  public serialize(): CameraState {
+    return {
+      scale: this.scale,
+      offsetX: this.offsetX,
+      offsetY: this.offsetY,
+      yaw: this.yaw,
+      pitch: this.pitch,
+    };
+  }
+
+  public deserialize(data: Partial<CameraState>): void {
+    if (typeof data.scale === 'number' && !Number.isNaN(data.scale)) {
+      this.scale = Math.min(this.maxScale, Math.max(this.minScale, data.scale));
+    }
+    if (typeof data.offsetX === 'number' && !Number.isNaN(data.offsetX)) {
+      this.offsetX = data.offsetX;
+    }
+    if (typeof data.offsetY === 'number' && !Number.isNaN(data.offsetY)) {
+      this.offsetY = data.offsetY;
+    }
+    if (typeof data.yaw === 'number' && !Number.isNaN(data.yaw)) {
+      this.yaw = data.yaw;
+    }
+    if (typeof data.pitch === 'number' && !Number.isNaN(data.pitch)) {
+      this.pitch = Math.max(
+        CAMERA_CONFIG.minPitch,
+        Math.min(Math.PI / 2 - CAMERA_CONFIG.maxPitchOffset, data.pitch)
+      );
+    }
   }
 }

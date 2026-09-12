@@ -17,7 +17,7 @@ export function vec2_distance_to(start: Point, end: Point): number {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-export function now_with_ms() {
+export function nowInSeconds(): number {
   return Date.now() / 1000;
 }
 
