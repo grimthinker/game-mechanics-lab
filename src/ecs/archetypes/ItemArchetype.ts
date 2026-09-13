@@ -28,7 +28,7 @@ export function assembleItem(
     type: 'weapon',
     maxStack: 1,
     size: 10,
-    equipType: null,
+    equipTypes: [],
     equippable: false,
     equipTimeMultiplier: 1.0,
   };
@@ -90,7 +90,10 @@ export function assembleItem(
       defense: createStat(as.defense ?? 0),
       flatReduction: createStat(as.flatReduction ?? 0),
     });
-  } else if (itemData.type === 'bag') {
+  }
+
+  // 5.1. Наличие встроенного инвентаря (сумка или карманы на броне/предмете)
+  if (config.inventory || itemData.type === 'bag') {
     const w = config.inventory?.size.width ?? 6;
     const h = config.inventory?.size.height ?? 4;
     const slots =
@@ -101,6 +104,13 @@ export function assembleItem(
     world.addComponent(id, 'inventory', {
       size: { width: w, height: h },
       slots,
+    });
+  }
+
+  // 5.2. Наличие собственных областей экипировки у предмета (пояс, разгрузка, подвес)
+  if (config.equip && config.equip.equipmentAreas && config.equip.equipmentAreas.length > 0) {
+    world.addComponent(id, 'equip', {
+      equipmentAreas: JSON.parse(JSON.stringify(config.equip.equipmentAreas)),
     });
   }
 

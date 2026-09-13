@@ -787,19 +787,19 @@ export class CanvasRenderer implements IRenderer {
       const dotRadius = VISUAL_CONFIG.pickupInteraction.dotRadius / camera.scale;
 
       // Расчет дальности взаимодействия ячейки (interactDist)
-      const equip = world.getComponent(id, 'equip');
+      const slotsComp = world.getComponent(id, 'interactionSlots');
       const physStats = world.getComponent(id, 'physicsStats');
       const creatureRadius = physStats?.radius.current ?? 16;
       let interactDist: number | undefined = undefined;
 
-      if (equip && interactionAction.slotIndex !== undefined) {
-        interactDist = equip.interactionSlots[interactionAction.slotIndex]?.interactDist;
+      if (slotsComp && interactionAction.slotIndex !== undefined) {
+        interactDist = slotsComp.slots[interactionAction.slotIndex]?.interactDist;
       }
 
       // Если индекс не указан, берем свободную ячейку с максимальной дальностью
-      if (interactDist === undefined && equip) {
+      if (interactDist === undefined && slotsComp) {
         let maxDist = -1;
-        for (const slot of equip.interactionSlots) {
+        for (const slot of slotsComp.slots) {
           if (slot.itemId === null && slot.interactDist > maxDist) {
             maxDist = slot.interactDist;
           }

@@ -1,12 +1,13 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { applyDamage } from '../utils/health';
+import { getAllEquippedDescendants } from '../utils/hierarchy';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
-    const entities = world.getEntitiesWith('equip', 'activeAttacks', 'health', 'input');
+    const entities = world.getEntitiesWith('interactionSlots', 'activeAttacks', 'health', 'input');
 
-    for (const [id, { equip, activeAttacks, health, input }] of entities) {
+    for (const [id, { interactionSlots, activeAttacks, health, input }] of entities) {
       if (!health.isAlive) continue;
 
       if (input.wantsAttack && !input.isRunning) {
@@ -14,7 +15,7 @@ export class AttackSystem {
         let chosenSlotIndex = -1;
 
         if (input.attackSlotIndex !== undefined) {
-          const slot = equip.interactionSlots[input.attackSlotIndex];
+          const slot = interactionSlots.slots[input.attackSlotIndex];
           if (slot && slot.itemId !== null && !busySlots.has(input.attackSlotIndex)) {
             const item = world.getComponent(slot.itemId, 'item');
             if (item?.type === 'weapon') {
@@ -22,7 +23,7 @@ export class AttackSystem {
             }
           }
         } else {
-          chosenSlotIndex = equip.interactionSlots.findIndex((s, idx) => {
+          chosenSlotIndex = interactionSlots.slots.findIndex((s, idx) => {
             if (s.itemId === null || busySlots.has(idx)) return false;
             const item = world.getComponent(s.itemId, 'item');
             return item?.type === 'weapon';
@@ -30,7 +31,7 @@ export class AttackSystem {
         }
 
         if (chosenSlotIndex !== -1) {
-          const weaponSlot = equip.interactionSlots[chosenSlotIndex];
+          const weaponSlot = interactionSlots.slots[chosenSlotIndex];
           const weaponId = weaponSlot.itemId!;
           const wStats = world.getComponent(weaponId, 'weaponStats');
 
@@ -53,7 +54,7 @@ export class AttackSystem {
       for (let i = activeAttacks.attacks.length - 1; i >= 0; i--) {
         const atk = activeAttacks.attacks[i];
 
-        const slot = equip.interactionSlots[atk.slotIndex];
+        const slot = interactionSlots.slots[atk.slotIndex];
         const isStillEquipped = slot && slot.itemId === atk.weaponId;
         const wStats = isStillEquipped
           ? world.getComponent(atk.weaponId, 'weaponStats')
@@ -136,16 +137,12 @@ export class AttackSystem {
         flatReduction += selfArmor.flatReduction.current;
       }
 
-      const targetEquip = world.getComponent(targetId, 'equip');
-      if (targetEquip) {
-        for (const area of targetEquip.equipmentAreas) {
-          for (const itemId of area.itemIds) {
-            const aStats = world.getComponent(itemId, 'armorStats');
-            if (aStats) {
-              defense += aStats.defense.current;
-              flatReduction += aStats.flatReduction.current;
-            }
-          }
+      const allEquippedItemIds = getAllEquippedDescendants(world, targetId);
+      for (const itemId of allEquippedItemIds) {
+        const aStats = world.getComponent(itemId, 'armorStats');
+        if (aStats) {
+          defense += aStats.defense.current;
+          flatReduction += aStats.flatReduction.current;
         }
       }
 

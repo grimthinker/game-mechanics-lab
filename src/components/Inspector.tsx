@@ -30,6 +30,7 @@ import { MetaInspector } from './inspector/MetaInspector';
 import { MovementInspector } from './inspector/MovementInspector';
 import { PhysicsInspector } from './inspector/PhysicsInspector';
 import { StealthInspector } from './inspector/StealthInspector';
+import { calculateTotalEntityWeight } from '../ecs/utils/hierarchy';
 
 interface Breadcrumb {
   id: string;
@@ -143,7 +144,6 @@ export const Inspector: React.FC<InspectorProps> = ({
     setDraftDestructible(meta?.destructible ?? false);
 
     const physStats = world.getComponent(targetId, 'physicsStats');
-    const physBody = world.getComponent(targetId, 'physicsBody');
     if (physStats) {
       setDraftPhysics({
         radius: physStats.radius.base,
@@ -215,7 +215,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       setDraftWeapon({
         name: meta?.name ?? item?.name ?? 'Оружие',
         size: item?.size ?? 10,
-        equipType: item?.equipType ?? null,
+        equipTypes: item?.equipTypes ?? [],
         equippable: item?.equippable ?? false,
         equipTimeMultiplier: item?.equipTimeMultiplier ?? 1.0,
         baseDamage: wStats.baseDamage.base,
@@ -243,7 +243,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         ? {
             name: meta?.name ?? item?.name ?? 'Броня',
             size: item?.size ?? 20,
-            equipType: item?.equipType ?? 'torso',
+            equipTypes: item?.equipTypes ?? ['torso'],
             equippable: item?.equippable ?? true,
             equipTimeMultiplier: item?.equipTimeMultiplier ?? 1.0,
             defense: aStats.defense.base,
@@ -254,11 +254,11 @@ export const Inspector: React.FC<InspectorProps> = ({
 
     const inv = world.getComponent(targetId, 'inventory');
     setDraftBag(
-      inv && item?.type === 'bag'
+      inv
         ? {
-            name: meta?.name ?? item.name,
+            name: meta?.name ?? item?.name ?? 'Инвентарь',
             size: item?.size ?? 10,
-            equipType: item?.equipType ?? 'torso',
+            equipTypes: item?.equipTypes ?? ['torso'],
             equippable: item?.equippable ?? true,
             equipTimeMultiplier: item?.equipTimeMultiplier ?? 1.0,
             width: inv.size.width,
@@ -526,8 +526,8 @@ export const Inspector: React.FC<InspectorProps> = ({
         item.size = draftWeapon.size;
         changed = true;
       }
-      if (item.equipType !== draftWeapon.equipType) {
-        item.equipType = draftWeapon.equipType;
+      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftWeapon.equipTypes)) {
+        item.equipTypes = draftWeapon.equipTypes ? [...draftWeapon.equipTypes] : [];
         changed = true;
       }
       if (item.equippable !== draftWeapon.equippable) {
@@ -585,8 +585,8 @@ export const Inspector: React.FC<InspectorProps> = ({
         item.size = draftArmor.size;
         changed = true;
       }
-      if (item.equipType !== draftArmor.equipType) {
-        item.equipType = draftArmor.equipType;
+      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftArmor.equipTypes)) {
+        item.equipTypes = draftArmor.equipTypes ? [...draftArmor.equipTypes] : [];
         changed = true;
       }
       if (item.equippable !== draftArmor.equippable) {
@@ -634,6 +634,47 @@ export const Inspector: React.FC<InspectorProps> = ({
     }
   }, [draftArmor]);
 
+  useEffect(() => {
+    if (!targetId || !world || isReadOnly || !draftBag) return;
+    let changed = false;
+    const item = world.getComponent(targetId, 'item');
+    const inv = world.getComponent(targetId, 'inventory');
+
+    if (item) {
+      if (item.size !== draftBag.size) {
+        item.size = draftBag.size;
+        changed = true;
+      }
+      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftBag.equipTypes)) {
+        item.equipTypes = draftBag.equipTypes ? [...draftBag.equipTypes] : [];
+        changed = true;
+      }
+      if (item.equippable !== draftBag.equippable) {
+        item.equippable = draftBag.equippable;
+        changed = true;
+      }
+      if (item.equipTimeMultiplier !== draftBag.equipTimeMultiplier) {
+        item.equipTimeMultiplier = draftBag.equipTimeMultiplier;
+        changed = true;
+      }
+    }
+
+    if (inv && isBagEmpty) {
+      if (inv.size.width !== draftBag.width || inv.size.height !== draftBag.height) {
+        inv.size = { width: draftBag.width, height: draftBag.height };
+        inv.slots = Array.from({ length: draftBag.height }, () =>
+          Array.from({ length: draftBag.width }, () => ({ itemId: null, count: 0 }))
+        );
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      requestCommit('Изменение параметров инвентаря');
+      onUpdateStats();
+    }
+  }, [draftBag]);
+
   if (!targetId || !world || !world.getEntity(targetId)) {
     return (
       <div
@@ -657,6 +698,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   }
 
   const currentArchetype = world.getComponent(targetId, 'tag')?.archetype;
+  const interactionSlotsComp = world.getComponent(targetId, 'interactionSlots');
   const equip = world.getComponent(targetId, 'equip');
   const inv = world.getComponent(targetId, 'inventory');
   const isBagEmpty = !inv || inv.slots.every((r) => r.every((c) => !c.itemId));
@@ -754,6 +796,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   onChange={(p: any) => setDraftPhysics((prev: any) => ({ ...prev, ...p }))}
                   isReadOnly={isReadOnly}
                   isStandardRadiusOnly={isStandardRadiusOnly}
+                  totalWeight={calculateTotalEntityWeight(world, targetId)}
                 />
               </div>
             </details>
@@ -923,12 +966,12 @@ export const Inspector: React.FC<InspectorProps> = ({
             </details>
           )}
 
-          {/* Инлайн-редактирование экипировки */}
-          {equip && equip.interactionSlots.length > 0 && (
+          {/* Ячейки взаимодействия (только для существ) */}
+          {interactionSlotsComp && interactionSlotsComp.slots.length > 0 && (
             <details open>
-              <summary style={summaryStyle}>Ячейки взаимодействия</summary>
+              <summary style={summaryStyle}>Ячейки взаимодействия (Руки)</summary>
               <div style={contentStyle}>
-                {equip.interactionSlots.map((slot) => {
+                {interactionSlotsComp.slots.map((slot) => {
                   const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
                   return (
                     <div
@@ -972,7 +1015,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           marginTop: '4px',
                         }}
                       >
-                        Сила:
+                        Сила (кг):
                         <input
                           type="number"
                           disabled={isReadOnly}
@@ -1012,20 +1055,58 @@ export const Inspector: React.FC<InspectorProps> = ({
             </details>
           )}
 
-          {equip && equip.equipmentAreas.length > 0 && (
-            <details open>
-              <summary style={summaryStyle}>Области экипировки</summary>
-              <div style={contentStyle}>
-                {equip.equipmentAreas.map((area) => {
+          {/* Области экипировки (на существах ИЛИ предметах) */}
+          <details open>
+            <summary style={summaryStyle}>
+              <span>Области экипировки {equip ? `(${equip.equipmentAreas.length})` : '(0)'}</span>
+              {!isReadOnly && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: '#27ae60',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    let targetEquip = world.getComponent(targetId, 'equip');
+                    if (!targetEquip) {
+                      targetEquip = {
+                        equipmentAreas: [],
+                      };
+                      world.addComponent(targetId, 'equip', targetEquip);
+                    }
+                    const areaId = `slot_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
+                    targetEquip.equipmentAreas.push({
+                      id: areaId,
+                      name: 'Новый слот',
+                      type: 'belt_slot',
+                      space: 10,
+                      itemIds: [],
+                    });
+                    requestCommit('Добавление области экипировки');
+                    onUpdateStats();
+                  }}
+                >
+                  + Слот
+                </button>
+              )}
+            </summary>
+            <div style={contentStyle}>
+              {equip && equip.equipmentAreas.length > 0 ? (
+                equip.equipmentAreas.map((area, idx) => {
                   let usedSpace = 0;
                   for (const id of area.itemIds) {
                     const item = world.getComponent(id, 'item');
                     if (item) usedSpace += item.size;
                   }
                   const isOverloaded = usedSpace > area.space;
+
                   return (
                     <div
-                      key={`area_${area.id}`}
+                      key={`area_${area.id || idx}`}
                       style={{
                         marginBottom: '8px',
                         padding: '10px',
@@ -1038,6 +1119,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                         style={{
                           display: 'flex',
                           justifyContent: 'space-between',
+                          alignItems: 'center',
                           marginBottom: '8px',
                         }}
                       >
@@ -1046,7 +1128,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                           type="text"
                           value={area.name}
                           style={{
-                            width: '50%',
+                            width: '45%',
                             padding: '2px',
                             fontSize: '12px',
                             fontWeight: 'bold',
@@ -1061,58 +1143,91 @@ export const Inspector: React.FC<InspectorProps> = ({
                             onUpdateStats();
                           }}
                         />
-                        <span
-                          style={{ fontSize: '11px', color: isOverloaded ? '#e74c3c' : '#888' }}
-                        >
-                          {usedSpace} /{' '}
-                          <input
-                            disabled={isReadOnly}
-                            type="number"
-                            value={area.space}
-                            style={{
-                              width: '40px',
-                              padding: '0',
-                              background: 'transparent',
-                              color: 'inherit',
-                              border: 'none',
-                              borderBottom: '1px solid #444',
-                            }}
-                            onChange={(e) => {
-                              area.space = Math.max(1, +e.target.value);
-                              requestCommit('Объем области');
-                              onUpdateStats();
-                            }}
-                          />
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span
+                            style={{ fontSize: '11px', color: isOverloaded ? '#e74c3c' : '#888' }}
+                          >
+                            {usedSpace} /{' '}
+                            <input
+                              disabled={isReadOnly}
+                              type="number"
+                              value={area.space}
+                              style={{
+                                width: '36px',
+                                padding: '0',
+                                background: 'transparent',
+                                color: 'inherit',
+                                border: 'none',
+                                borderBottom: '1px solid #444',
+                              }}
+                              onChange={(e) => {
+                                area.space = Math.max(1, +e.target.value);
+                                requestCommit('Объем области');
+                                onUpdateStats();
+                              }}
+                            />
+                          </span>
+                          {!isReadOnly && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (area.itemIds.length > 0) {
+                                  alert(
+                                    'Нельзя удалить область экипировки, пока в ней есть предметы!'
+                                  );
+                                  return;
+                                }
+                                equip.equipmentAreas.splice(idx, 1);
+                                requestCommit('Удаление области экипировки');
+                                onUpdateStats();
+                              }}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#e74c3c',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                padding: '0 2px',
+                              }}
+                              title="Удалить слот"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
+
                       <label
                         style={{
                           fontSize: '11px',
                           display: 'flex',
                           justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '6px',
                         }}
                       >
-                        Тип:
-                        <select
+                        Тип слота:
+                        <input
                           disabled={isReadOnly}
+                          type="text"
                           value={area.type}
-                          style={{ width: '60%', padding: '2px' }}
+                          list="area_types_list"
+                          style={{ width: '65%', padding: '2px 4px', fontSize: '11px' }}
                           onChange={(e) => {
                             area.type = e.target.value;
                             requestCommit('Тип области');
                             onUpdateStats();
                           }}
-                        >
+                        />
+                        <datalist id="area_types_list">
                           {STANDARD_EQUIPMENT_AREA_TYPES.map((t) => (
                             <option key={t} value={t}>
                               {EQUIPMENT_AREA_TYPE_LABELS[t] || t}
                             </option>
                           ))}
-                          {!STANDARD_EQUIPMENT_AREA_TYPES.includes(area.type as any) && (
-                            <option value={area.type}>{area.type}</option>
-                          )}
-                        </select>
+                        </datalist>
                       </label>
+
                       <div
                         style={{
                           marginTop: '8px',
@@ -1126,6 +1241,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                         {area.itemIds.length > 0 ? (
                           area.itemIds.map((itemId) => {
                             const it = world.getComponent(itemId, 'item');
+                            const itWeight = calculateTotalEntityWeight(world, itemId);
                             return (
                               <button
                                 key={itemId}
@@ -1136,30 +1252,75 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   backgroundColor: '#1e3d29',
                                   color: '#ecf0f1',
                                   textAlign: 'left',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
                                 }}
                                 onClick={() => pushPath(itemId, it?.name || 'Предмет')}
                               >
-                                {it ? it.name : itemId}{' '}
-                                <span style={{ float: 'right', color: '#888' }}>{it?.size}</span>
+                                <span>{it ? it.name : itemId}</span>
+                                <span style={{ color: '#888' }}>
+                                  V:{it?.size ?? 0} | {itWeight}кг
+                                </span>
                               </button>
                             );
                           })
                         ) : (
-                          <span style={{ color: '#777', fontSize: '12px' }}>Пусто</span>
+                          <span style={{ color: '#777', fontSize: '11px' }}>Слот свободен</span>
                         )}
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            </details>
-          )}
+                })
+              ) : (
+                <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
+                  Нет областей экипировки. Нажмите "+ Слот", чтобы добавить.
+                </div>
+              )}
+            </div>
+          </details>
 
-          {/* Инвентарь (Сетка) */}
-          {inv && (
-            <details open>
-              <summary style={summaryStyle}>Содержимое сумки</summary>
-              <div style={contentStyle}>
+          {/* Инвентарь (Сетка хранения) */}
+          <details open>
+            <summary style={summaryStyle}>
+              <span>Сетка инвентаря</span>
+              {currentArchetype === 'item' && !isReadOnly && (
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  style={{
+                    backgroundColor: inv ? '#c0392b' : '#27ae60',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (inv) {
+                      if (isBagEmpty) {
+                        world.removeComponent(targetId, 'inventory');
+                        requestCommit('Удаление инвентаря');
+                        onUpdateStats();
+                      } else {
+                        alert('Нельзя удалить инвентарь, пока в нем есть предметы!');
+                      }
+                    } else {
+                      world.addComponent(targetId, 'inventory', {
+                        size: { width: 4, height: 2 },
+                        slots: Array.from({ length: 2 }, () =>
+                          Array.from({ length: 4 }, () => ({ itemId: null, count: 0 }))
+                        ),
+                      });
+                      requestCommit('Добавление инвентаря');
+                      onUpdateStats();
+                    }
+                  }}
+                >
+                  {inv ? 'Удалить сетку' : '+ Добавить сетку'}
+                </button>
+              )}
+            </summary>
+            <div style={contentStyle}>
+              {inv ? (
                 <div
                   style={{
                     display: 'grid',
@@ -1204,9 +1365,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                     })
                   )}
                 </div>
-              </div>
-            </details>
-          )}
+              ) : (
+                <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
+                  Инвентарь отсутствует.
+                </div>
+              )}
+            </div>
+          </details>
         </form>
 
         {/* Кнопка удаления для корневой сущности инспектора */}

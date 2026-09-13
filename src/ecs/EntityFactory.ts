@@ -55,7 +55,7 @@ export class EntityFactory {
             type: 'bag',
             maxStack: 1,
             size: 10,
-            equipType: 'torso',
+            equipTypes: ['torso'],
             equippable: true,
             equipTimeMultiplier: 1.0,
           },

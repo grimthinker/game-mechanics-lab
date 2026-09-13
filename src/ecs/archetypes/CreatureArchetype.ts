@@ -12,6 +12,7 @@ import {
   RenderableComponent,
   isValidStandardRadius,
   EquipmentComponent,
+  InteractionSlotsComponent,
 } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
@@ -144,14 +145,20 @@ export function assembleCreature(
   });
   aiSystem.initBotBrain(world, id, behavior);
 
-  // 8. Экипировка и атаки
-  const equipComp: EquipmentComponent = config.equip
-    ? JSON.parse(JSON.stringify(config.equip))
+  // 8. Манипуляторы (руки), экипировка и атаки
+  const interactionSlotsComp: InteractionSlotsComponent = config.interactionSlots
+    ? JSON.parse(JSON.stringify(config.interactionSlots))
     : {
-        interactionSlots: [
+        slots: [
           { id: 'hand_left', interactDist: 25, strength: 11, itemId: null },
           { id: 'hand_right', interactDist: 25, strength: 11, itemId: null },
         ],
+      };
+  world.addComponent(id, 'interactionSlots', interactionSlotsComp);
+
+  const equipComp: EquipmentComponent = config.equip
+    ? JSON.parse(JSON.stringify(config.equip))
+    : {
         equipmentAreas: [
           { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
           { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
@@ -163,7 +170,6 @@ export function assembleCreature(
           { id: 'feet_2', name: 'Ступня правая', type: 'feet', space: 10, itemIds: [] },
         ],
       };
-
   world.addComponent(id, 'equip', equipComp);
   world.addComponent(id, 'activeAttacks', { attacks: [] });
 

@@ -4,6 +4,11 @@ import { CollisionCategory, EntityId, COLLISION_MASK_ALL, COLLISION_MASK_NONE } 
 import { Circle } from 'detect-collisions';
 import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
 import { Radians } from '../../utils';
+import {
+  calculateTotalEntityWeight,
+  isDescendantOf,
+  isItemEquippableToArea,
+} from '../utils/hierarchy';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -25,10 +30,90 @@ export class InteractionSystem {
     return InteractionSystem.requestPickup(world, entityId, targetItemId);
   }
 
-  private processPickupIntents(world: World): void {
-    const intents = world.getEntitiesWith('pickupIntent', 'equip', 'transform', 'health');
+  public static requestEquip(
+    world: World,
+    entityId: EntityId,
+    slotIndex: number,
+    areaId: string,
+    containerId?: EntityId
+  ): boolean {
+    const health = world.getComponent(entityId, 'health');
+    if (!health || !health.isAlive) return false;
+    if (world.getComponent(entityId, 'interactionAction')) return false;
 
-    for (const [id, { pickupIntent, equip, transform, health }] of intents) {
+    const slotsComp = world.getComponent(entityId, 'interactionSlots');
+    const slot = slotsComp?.slots[slotIndex];
+    if (!slot || !slot.itemId) return false;
+
+    const targetContainerId = containerId ?? entityId;
+    const containerEquip = world.getComponent(targetContainerId, 'equip');
+    const area = containerEquip?.equipmentAreas.find((a) => a.id === areaId);
+    if (!area) return false;
+
+    const item = world.getComponent(slot.itemId, 'item');
+    if (!item || !isItemEquippableToArea(item, area.type)) return false;
+    if (isDescendantOf(world, targetContainerId, slot.itemId)) return false;
+
+    world.addComponent(entityId, 'interactionAction', {
+      type: 'equip',
+      slotIndex,
+      areaId,
+      containerId: targetContainerId,
+      timer: GAMEPLAY_CONFIG.pickupReachDuration * (item.equipTimeMultiplier || 1.0),
+      totalDuration: GAMEPLAY_CONFIG.pickupReachDuration * (item.equipTimeMultiplier || 1.0),
+    });
+
+    return true;
+  }
+
+  public static requestUnequip(
+    world: World,
+    entityId: EntityId,
+    slotIndex: number,
+    areaId: string,
+    targetItemId: EntityId,
+    containerId?: EntityId
+  ): boolean {
+    const health = world.getComponent(entityId, 'health');
+    if (!health || !health.isAlive) return false;
+    if (world.getComponent(entityId, 'interactionAction')) return false;
+
+    const slotsComp = world.getComponent(entityId, 'interactionSlots');
+    const slot = slotsComp?.slots[slotIndex];
+    if (!slot || slot.itemId !== null) return false;
+
+    const targetContainerId = containerId ?? entityId;
+    const containerEquip = world.getComponent(targetContainerId, 'equip');
+    const area = containerEquip?.equipmentAreas.find((a) => a.id === areaId);
+    if (!area || !area.itemIds.includes(targetItemId)) return false;
+
+    const totalWeight = calculateTotalEntityWeight(world, targetItemId);
+    if (totalWeight > slot.strength * 2) return false;
+
+    const item = world.getComponent(targetItemId, 'item');
+
+    world.addComponent(entityId, 'interactionAction', {
+      type: 'unequip',
+      slotIndex,
+      areaId,
+      targetId: targetItemId,
+      containerId: targetContainerId,
+      timer: GAMEPLAY_CONFIG.pickupReachDuration * (item?.equipTimeMultiplier || 1.0),
+      totalDuration: GAMEPLAY_CONFIG.pickupReachDuration * (item?.equipTimeMultiplier || 1.0),
+    });
+
+    return true;
+  }
+
+  private processPickupIntents(world: World): void {
+    const intents = world.getEntitiesWith(
+      'pickupIntent',
+      'interactionSlots',
+      'transform',
+      'health'
+    );
+
+    for (const [id, { pickupIntent, interactionSlots, transform, health }] of intents) {
       world.removeComponent(id, 'pickupIntent');
 
       if (!health.isAlive) continue;
@@ -67,7 +152,7 @@ export class InteractionSystem {
       let bestSlotIndex = -1;
       let maxStrength = -Infinity;
 
-      equip.interactionSlots.forEach((slot, index) => {
+      interactionSlots.slots.forEach((slot, index) => {
         if (slot.itemId === null && distBetweenBorders <= slot.interactDist) {
           if (slot.strength > maxStrength) {
             maxStrength = slot.strength;
@@ -115,12 +200,12 @@ export class InteractionSystem {
       if (action.phase === 'lift') {
         const currentRatio = Math.min(1, Math.max(0, action.timer / (action.totalDuration || 1)));
         const targetId = action.targetId;
-        const equip = world.getComponent(entityId, 'equip');
+        const slotsComp = world.getComponent(entityId, 'interactionSlots');
         const transform = world.getComponent(entityId, 'transform');
 
-        if (equip && action.slotIndex !== undefined && targetId) {
-          if (equip.interactionSlots[action.slotIndex]?.itemId === targetId) {
-            equip.interactionSlots[action.slotIndex].itemId = null;
+        if (slotsComp && action.slotIndex !== undefined && targetId) {
+          if (slotsComp.slots[action.slotIndex]?.itemId === targetId) {
+            slotsComp.slots[action.slotIndex].itemId = null;
           }
         }
 
@@ -187,9 +272,14 @@ export class InteractionSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
     this.processPickupIntents(world);
 
-    const entities = world.getEntitiesWith('interactionAction', 'equip', 'transform', 'health');
+    const entities = world.getEntitiesWith(
+      'interactionAction',
+      'interactionSlots',
+      'transform',
+      'health'
+    );
 
-    for (const [id, { interactionAction, equip, transform, health }] of entities) {
+    for (const [id, { interactionAction, interactionSlots, transform, health }] of entities) {
       const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
       const localDt = dt * ts;
 
@@ -215,7 +305,7 @@ export class InteractionSystem {
             const targetId = interactionAction.targetId;
             const slot =
               interactionAction.slotIndex !== undefined
-                ? equip.interactionSlots[interactionAction.slotIndex]
+                ? interactionSlots.slots[interactionAction.slotIndex]
                 : undefined;
             const targetEntity = targetId ? world.getEntity(targetId) : undefined;
             const targetItem = targetId ? world.getComponent(targetId, 'item') : undefined;
@@ -268,8 +358,8 @@ export class InteractionSystem {
               isOutOfReach = true;
             }
 
-            const weight = targetPhysStats.weight.current;
-            if (isOutOfReach || weight > slot.strength * 2) {
+            const totalWeight = calculateTotalEntityWeight(world, targetId);
+            if (isOutOfReach || totalWeight > slot.strength * 2) {
               const currentRatio = Math.min(
                 1,
                 Math.max(0, 1 - interactionAction.timer / (interactionAction.totalDuration || 1))
@@ -318,7 +408,7 @@ export class InteractionSystem {
             );
             const maxTime = Math.max(minTime, GAMEPLAY_CONFIG.maxInteractionTime);
             const maxCapacity = Math.max(1, slot.strength * 2);
-            const weightRatio = Math.min(1, Math.max(0, weight / maxCapacity));
+            const weightRatio = Math.min(1, Math.max(0, totalWeight / maxCapacity));
             const stage2Duration = minTime + weightRatio * (maxTime - minTime);
 
             interactionAction.phase = 'lift';
@@ -352,23 +442,33 @@ export class InteractionSystem {
           interactionAction.slotIndex !== undefined &&
           interactionAction.areaId
         ) {
-          const slot = equip.interactionSlots[interactionAction.slotIndex];
-          const area = equip.equipmentAreas.find((a) => a.id === interactionAction.areaId);
+          const slot = interactionSlots.slots[interactionAction.slotIndex];
+          const containerId = interactionAction.containerId ?? id;
+          const containerEquip = world.getComponent(containerId, 'equip');
+          const area = containerEquip?.equipmentAreas.find(
+            (a) => a.id === interactionAction.areaId
+          );
 
-          if (slot && slot.itemId && area) {
+          if (slot && slot.itemId && area && containerEquip) {
             const itemId = slot.itemId;
             const item = world.getComponent(itemId, 'item');
 
-            if (item && item.equippable && item.equipType === area.type) {
-              let currentSize = 0;
-              for (const aItemId of area.itemIds) {
-                const aItem = world.getComponent(aItemId, 'item');
-                if (aItem) currentSize += aItem.size;
-              }
+            if (item && isItemEquippableToArea(item, area.type)) {
+              if (!isDescendantOf(world, containerId, itemId)) {
+                let currentSize = 0;
+                for (const aItemId of area.itemIds) {
+                  const aItem = world.getComponent(aItemId, 'item');
+                  if (aItem) currentSize += aItem.size;
+                }
 
-              if (currentSize + item.size <= area.space) {
-                area.itemIds.push(itemId);
-                slot.itemId = null;
+                if (currentSize + item.size <= area.space) {
+                  area.itemIds.push(itemId);
+                  slot.itemId = null;
+                  world.addComponent(itemId, 'ownership', {
+                    ownerId: containerId,
+                    status: 'equipped',
+                  });
+                }
               }
             }
           }
@@ -378,18 +478,25 @@ export class InteractionSystem {
           interactionAction.areaId &&
           interactionAction.targetId
         ) {
-          const slot = equip.interactionSlots[interactionAction.slotIndex];
-          const area = equip.equipmentAreas.find((a) => a.id === interactionAction.areaId);
+          const slot = interactionSlots.slots[interactionAction.slotIndex];
+          const containerId = interactionAction.containerId ?? id;
+          const containerEquip = world.getComponent(containerId, 'equip');
+          const area = containerEquip?.equipmentAreas.find(
+            (a) => a.id === interactionAction.areaId
+          );
 
           if (slot && slot.itemId === null && area) {
             const itemIdx = area.itemIds.indexOf(interactionAction.targetId);
             if (itemIdx !== -1) {
-              const physStats = world.getComponent(interactionAction.targetId, 'physicsStats');
-              const weight = physStats?.weight.current ?? 1;
+              const totalWeight = calculateTotalEntityWeight(world, interactionAction.targetId);
 
-              if (weight <= slot.strength * 2) {
+              if (totalWeight <= slot.strength * 2) {
                 area.itemIds.splice(itemIdx, 1);
                 slot.itemId = interactionAction.targetId;
+                world.addComponent(interactionAction.targetId, 'ownership', {
+                  ownerId: id,
+                  status: 'equipped',
+                });
               }
             }
           }
@@ -406,11 +513,11 @@ export class InteractionSystem {
     entityId: EntityId,
     slotIndex: number
   ): void {
-    const equip = world.getComponent(entityId, 'equip');
+    const slotsComp = world.getComponent(entityId, 'interactionSlots');
     const transform = world.getComponent(entityId, 'transform');
-    if (!equip || !transform) return;
+    if (!slotsComp || !transform) return;
 
-    const slot = equip.interactionSlots[slotIndex];
+    const slot = slotsComp.slots[slotIndex];
     if (!slot || slot.itemId === null) return;
 
     const itemId = slot.itemId;

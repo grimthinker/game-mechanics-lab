@@ -16,6 +16,7 @@ import {
   HitZoneConfig,
   EntityComponents,
   EquipmentComponent,
+  InteractionSlotsComponent,
   InteractionPhase,
   InteractionActionComponent,
 } from './ecs/types';
@@ -23,6 +24,7 @@ import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from
 import { LOGIC_CONFIG } from './ai/config';
 import { Point } from './types';
 import { Radians } from './utils';
+import { calculateTotalEntityWeight } from './ecs/utils/hierarchy';
 
 export class EntityAdapter implements IMovable, EntityController {
   public dt: number = 0;
@@ -104,6 +106,9 @@ export class EntityAdapter implements IMovable, EntityController {
   public get baseWeight(): number {
     return this.getComponent('physicsStats')?.weight.base ?? this.weight;
   }
+  public get totalWeight(): number {
+    return calculateTotalEntityWeight(this.world, this.id);
+  }
   public get isSolid(): boolean {
     return this.getComponent('physicsStats')?.isSolid ?? true;
   }
@@ -172,6 +177,9 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get equip(): EquipmentComponent | undefined {
     return this.getComponent('equip');
+  }
+  public get interactionSlots(): InteractionSlotsComponent | undefined {
+    return this.getComponent('interactionSlots');
   }
   public get interactionAction(): InteractionActionComponent | undefined {
     return this.getComponent('interactionAction');
@@ -385,14 +393,14 @@ export class EntityAdapter implements IMovable, EntityController {
     return activeAttacks?.attacks.some((a) => a.weaponId === weaponId) ?? false;
   }
   public getFreeWeaponSlots(): { slotIndex: number; weaponId: EntityId }[] {
-    const equip = this.getComponent('equip');
+    const slotsComp = this.getComponent('interactionSlots');
     const activeAttacks = this.getComponent('activeAttacks');
-    if (!equip) return [];
+    if (!slotsComp) return [];
 
     const busySlots = new Set(activeAttacks?.attacks.map((a) => a.slotIndex));
     const freeSlots: { slotIndex: number; weaponId: EntityId }[] = [];
 
-    equip.interactionSlots.forEach((slot, index) => {
+    slotsComp.slots.forEach((slot, index) => {
       if (slot.itemId !== null && !busySlots.has(index)) {
         const item = this.world.getComponent(slot.itemId, 'item');
         if (item?.type === 'weapon') {

@@ -74,11 +74,9 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
       if (comp.aiStats?.behavior.current && comp.aiStats.behavior.current !== 'IdleTree') {
         badges.push({ label: 'AI', color: '#2980b9' });
       }
-      if (
-        comp.equip &&
-        (comp.equip.interactionSlots.some((s) => s.itemId) ||
-          comp.equip.equipmentAreas.some((a) => a.itemIds.length > 0))
-      ) {
+      const hasHandItems = comp.interactionSlots?.slots.some((s) => s.itemId);
+      const hasAreaItems = comp.equip?.equipmentAreas.some((a) => a.itemIds.length > 0);
+      if (hasHandItems || hasAreaItems) {
         badges.push({ label: 'ЭКИП', color: '#8e44ad' });
       }
       if (comp.inventory && comp.inventory.slots.some((row) => row.some((cell) => cell.itemId))) {

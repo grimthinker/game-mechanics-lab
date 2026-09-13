@@ -52,11 +52,13 @@ export function createDefaultCreatureConfig(behavior: string = 'PlayerTree'): En
     ai: {
       behavior,
     },
-    equip: {
-      interactionSlots: [
+    interactionSlots: {
+      slots: [
         { id: 'hand_left', interactDist: 15, strength: 50, itemId: null },
         { id: 'hand_right', interactDist: 15, strength: 50, itemId: null },
       ],
+    },
+    equip: {
       equipmentAreas: [
         { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
         { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },

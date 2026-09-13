@@ -291,9 +291,12 @@ export class GameApp {
           size: { ...comp.inventory.size },
         };
       }
+      if (comp.interactionSlots) {
+        config.interactionSlots = JSON.parse(JSON.stringify(comp.interactionSlots));
+        config.interactionSlots!.slots.forEach((s) => (s.itemId = null));
+      }
       if (comp.equip) {
         config.equip = JSON.parse(JSON.stringify(comp.equip));
-        config.equip!.interactionSlots.forEach((s) => (s.itemId = null));
         config.equip!.equipmentAreas.forEach((a) => (a.itemIds = []));
       }
       if (comp.gizmo) {
@@ -377,18 +380,17 @@ export class GameApp {
       }
     }
 
-    const eq = this.world.getComponent(id, 'equip');
-    if (eq) {
-      if (eq.interactionSlots) {
-        for (const slot of eq.interactionSlots) {
-          if (slot.itemId) this.deleteEntityRecursive(slot.itemId);
-        }
+    const slotsComp = this.world.getComponent(id, 'interactionSlots');
+    if (slotsComp) {
+      for (const slot of slotsComp.slots) {
+        if (slot.itemId) this.deleteEntityRecursive(slot.itemId);
       }
-      if (eq.equipmentAreas) {
-        for (const area of eq.equipmentAreas) {
-          for (const itemId of area.itemIds) {
-            this.deleteEntityRecursive(itemId);
-          }
+    }
+    const eq = this.world.getComponent(id, 'equip');
+    if (eq && eq.equipmentAreas) {
+      for (const area of eq.equipmentAreas) {
+        for (const itemId of area.itemIds) {
+          this.deleteEntityRecursive(itemId);
         }
       }
     }
@@ -514,7 +516,7 @@ export class GameApp {
           type: 'weapon',
           maxStack: 1,
           size: 10,
-          equipType: null,
+          equipTypes: [],
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
@@ -545,7 +547,7 @@ export class GameApp {
           type: 'weapon',
           maxStack: 1,
           size: 10,
-          equipType: null,
+          equipTypes: [],
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
@@ -578,7 +580,7 @@ export class GameApp {
           type: 'weapon',
           maxStack: 1,
           size: 10,
-          equipType: null,
+          equipTypes: [],
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
@@ -609,7 +611,7 @@ export class GameApp {
           type: 'armor',
           maxStack: 1,
           size: 20,
-          equipType: 'torso',
+          equipTypes: ['torso'],
           equippable: true,
           equipTimeMultiplier: 1.0,
         },
@@ -631,7 +633,7 @@ export class GameApp {
           type: 'armor',
           maxStack: 1,
           size: 10,
-          equipType: 'head',
+          equipTypes: ['head'],
           equippable: true,
           equipTimeMultiplier: 1.0,
         },

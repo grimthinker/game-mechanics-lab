@@ -25,9 +25,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
   // Определение экипированного оружия
   let weaponName = 'Кулаки';
   if (playerId) {
-    const equip = world.getComponent(playerId, 'equip');
-    if (equip) {
-      for (const slot of equip.interactionSlots) {
+    const slotsComp = world.getComponent(playerId, 'interactionSlots');
+    if (slotsComp) {
+      for (const slot of slotsComp.slots) {
         if (slot.itemId) {
           const item = world.getComponent(slot.itemId, 'item');
           if (item?.type === 'weapon') {

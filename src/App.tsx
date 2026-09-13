@@ -820,7 +820,7 @@ export const App: React.FC = () => {
                                 type: 'weapon',
                                 maxStack: 1,
                                 size: 10,
-                                equipType: null,
+                                equipTypes: [],
                                 equippable: false,
                                 equipTimeMultiplier: 1.0,
                               },

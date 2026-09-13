@@ -10,7 +10,7 @@ import { Degrees } from '../../../utils';
 export interface WeaponFormValues {
   name: string;
   size: number;
-  equipType: string | null;
+  equipTypes: string[];
   equippable: boolean;
   equipTimeMultiplier: number;
   baseDamage: number;
@@ -29,74 +29,179 @@ export interface WeaponFormValues {
 export const CommonItemFormFields: React.FC<{
   values: {
     size: number;
-    equipType: string | null;
+    equipTypes: string[];
     equippable: boolean;
     equipTimeMultiplier: number;
   };
   onChange: (
     v: Partial<{
       size: number;
-      equipType: string | null;
+      equipTypes: string[];
       equippable: boolean;
       equipTimeMultiplier: number;
     }>
   ) => void;
   isReadOnly?: boolean;
-}> = ({ values, onChange, isReadOnly }) => (
-  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-    <label>
-      Размер предмета (size):
-      <input
-        disabled={isReadOnly}
-        type="number"
-        value={values.size}
-        min={1}
-        max={100}
-        onChange={(e) => onChange({ size: Number(e.target.value) })}
-      />
-    </label>
-    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <input
-        disabled={isReadOnly}
-        type="checkbox"
-        checked={values.equippable}
-        onChange={(e) => onChange({ equippable: e.target.checked })}
-      />
-      Можно помещать в области экипировки
-    </label>
-    {values.equippable && (
+}> = ({ values, onChange, isReadOnly }) => {
+  const currentTypes = values.equipTypes ?? [];
+  const [customTypeInput, setCustomTypeInput] = React.useState('');
+
+  const toggleType = (t: string) => {
+    let next: string[];
+    if (currentTypes.includes(t)) {
+      next = currentTypes.filter((x) => x !== t);
+    } else {
+      next = [...currentTypes, t];
+    }
+    onChange({
+      equipTypes: next,
+    });
+  };
+
+  const addCustomType = () => {
+    const trimmed = customTypeInput.trim();
+    if (trimmed && !currentTypes.includes(trimmed)) {
+      const next = [...currentTypes, trimmed];
+      onChange({
+        equipTypes: next,
+      });
+      setCustomTypeInput('');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
       <label>
-        Тип экипировки:
-        <select
+        Размер предмета (size):
+        <input
           disabled={isReadOnly}
-          value={values.equipType || 'torso'}
-          onChange={(e) => onChange({ equipType: e.target.value || null })}
-        >
-          {STANDARD_EQUIPMENT_AREA_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {EQUIPMENT_AREA_TYPE_LABELS[t] || t}
-            </option>
-          ))}
-          {values.equipType && !STANDARD_EQUIPMENT_AREA_TYPES.includes(values.equipType as any) && (
-            <option value={values.equipType}>{values.equipType}</option>
-          )}
-        </select>
+          type="number"
+          value={values.size}
+          min={1}
+          max={100}
+          onChange={(e) => onChange({ size: Number(e.target.value) })}
+        />
       </label>
-    )}
-    <label>
-      Множитель времени экипирования:
-      <input
-        disabled={isReadOnly}
-        type="number"
-        value={values.equipTimeMultiplier}
-        min={0.1}
-        max={10}
-        step={0.1}
-        onChange={(e) => onChange({ equipTimeMultiplier: Number(e.target.value) })}
-      />
-    </label>
-  </div>
-);
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input
+          disabled={isReadOnly}
+          type="checkbox"
+          checked={values.equippable}
+          onChange={(e) => onChange({ equippable: e.target.checked })}
+        />
+        Можно помещать в области экипировки
+      </label>
+      {values.equippable && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            padding: '8px',
+            backgroundColor: '#1a1a1a',
+            borderRadius: '4px',
+            border: '1px solid #333',
+          }}
+        >
+          <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
+            Допустимые типы областей экипировки:
+          </span>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '4px',
+              maxHeight: '130px',
+              overflowY: 'auto',
+            }}
+          >
+            {STANDARD_EQUIPMENT_AREA_TYPES.map((t) => (
+              <label
+                key={t}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  cursor: isReadOnly ? 'default' : 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  disabled={isReadOnly}
+                  checked={currentTypes.includes(t)}
+                  onChange={() => toggleType(t)}
+                />
+                <span title={t}>{EQUIPMENT_AREA_TYPE_LABELS[t] || t}</span>
+              </label>
+            ))}
+            {currentTypes
+              .filter((t) => !STANDARD_EQUIPMENT_AREA_TYPES.includes(t as any))
+              .map((customT) => (
+                <label
+                  key={customT}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '10px',
+                    color: '#2ecc71',
+                    cursor: isReadOnly ? 'default' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={isReadOnly}
+                    checked={true}
+                    onChange={() => toggleType(customT)}
+                  />
+                  <span>{customT} (свой)</span>
+                </label>
+              ))}
+          </div>
+
+          {!isReadOnly && (
+            <div style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
+              <input
+                type="text"
+                placeholder="Свой тип слота..."
+                value={customTypeInput}
+                onChange={(e) => setCustomTypeInput(e.target.value)}
+                style={{ flex: 1, padding: '2px 4px', fontSize: '11px' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCustomType();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ padding: '2px 6px', fontSize: '11px', backgroundColor: '#2980b9' }}
+                onClick={addCustomType}
+              >
+                +
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      <label>
+        Множитель времени экипирования:
+        <input
+          disabled={isReadOnly}
+          type="number"
+          value={values.equipTimeMultiplier}
+          min={0.1}
+          max={10}
+          step={0.1}
+          onChange={(e) => onChange({ equipTimeMultiplier: Number(e.target.value) })}
+        />
+      </label>
+    </div>
+  );
+};
 
 export const WeaponFormFields: React.FC<{
   values: WeaponFormValues;
@@ -261,7 +366,7 @@ export const WeaponFormFields: React.FC<{
 export interface ArmorFormValues {
   name: string;
   size: number;
-  equipType: string | null;
+  equipTypes: string[];
   equippable: boolean;
   equipTimeMultiplier: number;
   defense: number;
@@ -312,7 +417,7 @@ export const ArmorFormFields: React.FC<{
 export interface BagFormValues {
   name: string;
   size: number;
-  equipType: string | null;
+  equipTypes: string[];
   equippable: boolean;
   equipTimeMultiplier: number;
   width: number;

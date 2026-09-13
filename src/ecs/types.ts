@@ -224,7 +224,7 @@ export interface ItemData {
   type: ItemType;
   maxStack: number;
   size: number;
-  equipType: string | null;
+  equipTypes: string[];
   equippable: boolean;
   equipTimeMultiplier: number;
 }
@@ -253,6 +253,12 @@ export const STANDARD_EQUIPMENT_AREA_TYPES = [
   'hands',
   'legs',
   'feet',
+  'waist',
+  'belt_slot',
+  'sheath',
+  'holster',
+  'sling',
+  'pouch',
 ] as const;
 
 export type StandardEquipmentAreaType = (typeof STANDARD_EQUIPMENT_AREA_TYPES)[number];
@@ -264,6 +270,12 @@ export const EQUIPMENT_AREA_TYPE_LABELS: Record<string, string> = {
   hands: 'Руки (hands)',
   legs: 'Ноги (legs)',
   feet: 'Ступни (feet)',
+  waist: 'Пояс / Талия (waist)',
+  belt_slot: 'Крепление пояса (belt_slot)',
+  sheath: 'Ножны (sheath)',
+  holster: 'Кобура (holster)',
+  sling: 'Подвес / Ремень (sling)',
+  pouch: 'Подсумок / Карман (pouch)',
 };
 
 export interface EquipmentArea {
@@ -275,8 +287,11 @@ export interface EquipmentArea {
 }
 
 export interface EquipmentComponent {
-  interactionSlots: InteractionSlot[];
   equipmentAreas: EquipmentArea[];
+}
+
+export interface InteractionSlotsComponent {
+  slots: InteractionSlot[];
 }
 
 export type InteractionPhase = 'reach' | 'lift' | 'abort_reach' | 'abort_lift';
@@ -286,6 +301,7 @@ export interface InteractionActionComponent {
   targetId?: string;
   slotIndex?: number;
   areaId?: string;
+  containerId?: EntityId;
   timer: number;
   totalDuration: number;
   phase?: InteractionPhase;
@@ -365,6 +381,7 @@ export interface EntityComponents {
   brain?: BTLogicComponent;
   inventory?: InventoryComponent;
   equip?: EquipmentComponent;
+  interactionSlots?: InteractionSlotsComponent;
   interactionAction?: InteractionActionComponent;
   stanceTransition?: StanceTransitionComponent;
   pickupIntent?: PickupIntentComponent;
@@ -393,6 +410,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'item',
   'inventory',
   'equip',
+  'interactionSlots',
   'interactionAction',
   'stanceTransition',
   'meta',
@@ -406,7 +424,6 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'input',
   'timeScale',
 ] as const;
-
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
 
@@ -594,6 +611,7 @@ export interface EntityConfig {
   item?: ItemData;
   inventory?: InventorySetup;
   equip?: EquipmentComponent;
+  interactionSlots?: InteractionSlotsComponent;
   meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
   transform?: TransformComponent;

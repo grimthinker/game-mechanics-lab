@@ -54,26 +54,58 @@ export class WorldSerializer {
         entityMap.set(ent.id, ent);
       }
 
+      const injectOwnershipRecursive = (
+        parentId: string,
+        childId: string,
+        status: 'equipped' | 'inventory'
+      ) => {
+        const childEnt = entityMap.get(childId);
+        if (!childEnt || !childEnt.components) return;
+
+        childEnt.components.ownership = { ownerId: parentId, status };
+
+        if (childEnt.components.interactionSlots?.slots) {
+          for (const slot of childEnt.components.interactionSlots.slots) {
+            if (slot.itemId) {
+              injectOwnershipRecursive(childId, slot.itemId, 'equipped');
+            }
+          }
+        }
+
+        if (childEnt.components.equip?.equipmentAreas) {
+          for (const area of childEnt.components.equip.equipmentAreas) {
+            if (Array.isArray(area.itemIds)) {
+              for (const subItemId of area.itemIds) {
+                injectOwnershipRecursive(childId, subItemId, 'equipped');
+              }
+            }
+          }
+        }
+
+        if (childEnt.components.inventory?.slots) {
+          for (const row of childEnt.components.inventory.slots) {
+            for (const cell of row) {
+              if (cell.itemId) {
+                injectOwnershipRecursive(childId, cell.itemId, 'inventory');
+              }
+            }
+          }
+        }
+      };
+
       for (const ent of data.entities) {
         if (!ent.components) continue;
 
-        const injectOwnership = (itemId: string, status: 'equipped' | 'inventory') => {
-          const childEnt = entityMap.get(itemId);
-          if (childEnt && childEnt.components) {
-            childEnt.components.ownership = { ownerId: ent.id, status };
+        if (ent.components.interactionSlots?.slots) {
+          for (const slot of ent.components.interactionSlots.slots) {
+            if (slot.itemId) injectOwnershipRecursive(ent.id, slot.itemId, 'equipped');
           }
-        };
-
-        if (ent.components.equip) {
-          if (ent.components.equip.interactionSlots) {
-            for (const slot of ent.components.equip.interactionSlots) {
-              if (slot.itemId) injectOwnership(slot.itemId, 'equipped');
-            }
-          }
-          if (ent.components.equip.equipmentAreas) {
-            for (const area of ent.components.equip.equipmentAreas) {
-              for (const id of area.itemIds) {
-                injectOwnership(id, 'equipped');
+        }
+        if (ent.components.equip?.equipmentAreas) {
+          for (const area of ent.components.equip.equipmentAreas) {
+            if (Array.isArray(area.itemIds)) {
+              for (const subItemId of area.itemIds) {
+                injectOwnershipRecursive(ent.id, subItemId, 'equipped');
               }
             }
           }
@@ -81,7 +113,7 @@ export class WorldSerializer {
         if (ent.components.inventory?.slots) {
           for (const row of ent.components.inventory.slots) {
             for (const cell of row) {
-              if (cell.itemId) injectOwnership(cell.itemId, 'inventory');
+              if (cell.itemId) injectOwnershipRecursive(ent.id, cell.itemId, 'inventory');
             }
           }
         }
@@ -310,7 +342,7 @@ export class WorldSerializer {
           }
         }
 
-        if (comps.equip) {
+        if (comps.interactionSlots) {
           if (!this.app.world.getComponent(ent.id, 'activeAttacks')) {
             this.app.world.addComponent(ent.id, 'activeAttacks', { attacks: [] });
           }
