@@ -38,16 +38,25 @@ export function killEntity(world: World, id: EntityId): void {
     velocity.currentTurnSpeed = 0 as Radians;
   }
 
+  world.removeComponent(id, 'stanceTransition');
+
   const movementStats = world.getComponent(id, 'movementStats');
   if (movementStats) {
+    removeModifier(movementStats.maxSpeed, 'stance_speed');
     removeModifier(movementStats.maxSpeed, 'state_run_speed');
     removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
     removeModifier(movementStats.maxSpeed, 'attack_slow_move');
     removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
+    removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
     removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
     removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
     removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
     removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
+  }
+
+  const stealthStats = world.getComponent(id, 'stealthStats');
+  if (stealthStats) {
+    removeModifier(stealthStats.stealthPower, 'stance_stealth');
   }
 
   const activeAttacks = world.getComponent(id, 'activeAttacks');
@@ -57,6 +66,7 @@ export function killEntity(world: World, id: EntityId): void {
 
   const meta = world.getComponent(id, 'meta');
   if (meta) {
+    meta.stance = 'prone';
     meta.movementMode = 'immobile';
     meta.directionMode = 'immobile';
     meta.actionMode = 'idle';

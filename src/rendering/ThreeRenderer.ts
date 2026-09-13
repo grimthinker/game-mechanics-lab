@@ -198,7 +198,23 @@ export class ThreeRenderer implements IRenderer {
       // Определяем высоту 3D-модели для позиционирования UI над ней
       let meshHeight = 40;
       if (isObstacle) meshHeight = 60;
-      if (archetype === 'zone') meshHeight = 2;
+      else if (archetype === 'zone') meshHeight = 2;
+      else if (archetype === 'creature') {
+        const STANCE_H: Record<string, number> = { standing: 40, crouching: 28, prone: 14 };
+        const transition = world.getComponent(id, 'stanceTransition');
+        if (transition && transition.totalDuration > 0) {
+          const progress = Math.min(
+            1,
+            Math.max(0, 1 - transition.timer / transition.totalDuration)
+          );
+          const fromH = STANCE_H[transition.fromStance] || 40;
+          const toH = STANCE_H[transition.toStance] || 40;
+          meshHeight = fromH + (toH - fromH) * progress;
+        } else {
+          const currentStance = meta?.stance || 'standing';
+          meshHeight = STANCE_H[currentStance] || 40;
+        }
+      }
 
       // Проекция 3D точки (верхушка меша) на 2D экран
       const pos3D = new THREE.Vector3(transform.x, meshHeight + 5, transform.y);

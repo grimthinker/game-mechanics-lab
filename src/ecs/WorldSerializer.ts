@@ -157,6 +157,15 @@ export class WorldSerializer {
         if (comps.movementStats) {
           normalizeStat(comps.movementStats.maxSpeed);
           normalizeStat(comps.movementStats.maxTurnSpeed);
+          normalizeStat(comps.movementStats.standToCrouchTime);
+          normalizeStat(comps.movementStats.crouchToStandTime);
+          normalizeStat(comps.movementStats.standToProneTime);
+          normalizeStat(comps.movementStats.proneToStandTime);
+          normalizeStat(comps.movementStats.crouchToProneTime);
+          normalizeStat(comps.movementStats.proneToCrouchTime);
+          comps.movementStats.proneSpeedMultiplier =
+            comps.movementStats.proneSpeedMultiplier ?? 0.2;
+          comps.movementStats.proneTurnMultiplier = comps.movementStats.proneTurnMultiplier ?? 0.3;
           comps.movementStats.strafeSpeedMultiplier =
             comps.movementStats.strafeSpeedMultiplier ?? 0.8;
           comps.movementStats.backwardSpeedMultiplier =
@@ -173,6 +182,8 @@ export class WorldSerializer {
 
         if (comps.stealthStats) {
           normalizeStat(comps.stealthStats.stealthPower);
+          comps.stealthStats.proneStealthMultiplier =
+            comps.stealthStats.proneStealthMultiplier ?? 3.0;
         }
 
         if (comps.weaponStats) {
@@ -294,6 +305,7 @@ export class WorldSerializer {
               isSlowWalking: false,
               wantsAttack: false,
               attackSlotIndex: undefined,
+              desiredStance: 'standing',
             });
           }
         }

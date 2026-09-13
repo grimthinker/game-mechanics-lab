@@ -40,7 +40,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
   }
 
   const meta = playerId ? world.getComponent(playerId, 'meta') : null;
-  const stance = meta?.stance === 'crouching' ? 'Присед' : 'Стоя';
+  const currentStance = meta?.stance;
+  const stance =
+    currentStance === 'prone'
+      ? 'Лёжа'
+      : currentStance === 'crouching'
+        ? 'Присед'
+        : currentStance && currentStance.includes('_to_')
+          ? 'Переход...'
+          : 'Стоя';
   const moveMode =
     meta?.movementMode === 'sprinting'
       ? 'Спринт'
@@ -201,6 +209,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
         </span>
         <span>
           <strong style={{ color: '#fff' }}>C</strong> Присед
+        </span>
+        <span>
+          <strong style={{ color: '#fff' }}>V</strong> Лечь
         </span>
       </div>
     </>

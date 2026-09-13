@@ -96,12 +96,39 @@ export class ThreeSyncSystem {
           }
         });
 
-        // Сплющивание при смерти
+        // Высота меша и сплющивание при стойке или смерти
         const health = world.getComponent(id, 'health');
         if (health && !health.isAlive) {
           obj.scale.set(1, 0.1, 1);
+          obj.position.y = 2;
+        } else if (archetype === 'creature') {
+          const STANCE_HEIGHTS: Record<string, number> = {
+            standing: 40,
+            crouching: 28,
+            prone: 14,
+          };
+          const transition = world.getComponent(id, 'stanceTransition');
+          let currentHeight = 40;
+
+          if (transition && transition.totalDuration > 0) {
+            const progress = Math.min(
+              1,
+              Math.max(0, 1 - transition.timer / transition.totalDuration)
+            );
+            const fromH = STANCE_HEIGHTS[transition.fromStance] || 40;
+            const toH = STANCE_HEIGHTS[transition.toStance] || 40;
+            currentHeight = fromH + (toH - fromH) * progress;
+          } else {
+            const currentStance = world.getComponent(id, 'meta')?.stance || 'standing';
+            currentHeight = STANCE_HEIGHTS[currentStance] || 40;
+          }
+
+          const scaleY = currentHeight / 40;
+          obj.scale.set(1, scaleY, 1);
+          obj.position.y = 0;
         } else {
           obj.scale.set(1, 1, 1);
+          obj.position.y = 0;
         }
 
         // Динамическое обновление материала зоны при изменении эффекта в редакторе

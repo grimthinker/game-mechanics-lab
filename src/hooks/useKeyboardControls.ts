@@ -8,7 +8,7 @@ interface UseKeyboardControlsProps {
   mode: GameMode;
 }
 
-const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c', 'x', ' ']);
+const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c', 'v', 'x', ' ']);
 
 const getKeyName = (e: KeyboardEvent): string => {
   switch (e.code) {
@@ -25,6 +25,8 @@ const getKeyName = (e: KeyboardEvent): string => {
       return 'shift';
     case 'KeyC':
       return 'c';
+    case 'KeyV':
+      return 'v';
     case 'KeyX':
       return 'x';
     case 'Space':
@@ -86,6 +88,29 @@ export const useKeyboardControls = ({
         return;
       }
 
+      // Клавиши C (присед) и V (лечь) работают как взаимоисключающие тумблеры положения
+      if (key === 'c') {
+        if (GlobalInput.keys.has('c')) {
+          GlobalInput.keys.delete('c');
+        } else {
+          GlobalInput.keys.add('c');
+          GlobalInput.keys.delete('v');
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (key === 'v') {
+        if (GlobalInput.keys.has('v')) {
+          GlobalInput.keys.delete('v');
+        } else {
+          GlobalInput.keys.add('v');
+          GlobalInput.keys.delete('c');
+        }
+        e.preventDefault();
+        return;
+      }
+
       if (GlobalInput.keys.has(key)) return;
 
       GlobalInput.keys.add(key);
@@ -99,8 +124,8 @@ export const useKeyboardControls = ({
       }
       const key = getKeyName(e);
       if (!CONTROL_KEYS.has(key)) return;
-      // Состояние тумблера X не сбрасывается при отпускании клавиши
-      if (key === 'x') return;
+      // Состояние тумблеров X, C, V не сбрасывается при отпускании клавиши
+      if (key === 'x' || key === 'c' || key === 'v') return;
 
       GlobalInput.keys.delete(key);
     };

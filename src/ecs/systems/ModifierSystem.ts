@@ -19,6 +19,12 @@ export class ModifierSystem {
       if (comp.movementStats) {
         this.tickStatModifiers(comp.movementStats.maxSpeed, localDt);
         this.tickStatModifiers(comp.movementStats.maxTurnSpeed, localDt);
+        this.tickStatModifiers(comp.movementStats.standToCrouchTime, localDt);
+        this.tickStatModifiers(comp.movementStats.crouchToStandTime, localDt);
+        this.tickStatModifiers(comp.movementStats.standToProneTime, localDt);
+        this.tickStatModifiers(comp.movementStats.proneToStandTime, localDt);
+        this.tickStatModifiers(comp.movementStats.crouchToProneTime, localDt);
+        this.tickStatModifiers(comp.movementStats.proneToCrouchTime, localDt);
       }
       if (comp.stealthStats) {
         this.tickStatModifiers(comp.stealthStats.stealthPower, localDt);

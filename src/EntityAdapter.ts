@@ -66,8 +66,11 @@ export class EntityAdapter implements IMovable, EntityController {
   public get behavior(): string {
     return this.getComponent('aiStats')?.behavior.current ?? 'IdleTree';
   }
-  public get stance(): 'standing' | 'crouching' {
+  public get stance(): import('./ecs/types').CreatureStance {
     return this.getComponent('meta')?.stance ?? 'standing';
+  }
+  public get desiredStance(): import('./ecs/types').BaseCreatureStance {
+    return this.getComponent('input')?.desiredStance ?? 'standing';
   }
   public get movementMode(): CreatureMovementMode {
     return this.getComponent('meta')?.movementMode ?? 'immobile';
@@ -148,6 +151,24 @@ export class EntityAdapter implements IMovable, EntityController {
   }
   public get crouchTurnMultiplier(): number {
     return this.getComponent('movementStats')?.crouchTurnMultiplier ?? 1.2;
+  }
+  public get proneSpeedMultiplier(): number {
+    return this.getComponent('movementStats')?.proneSpeedMultiplier ?? 0.2;
+  }
+  public get proneTurnMultiplier(): number {
+    return this.getComponent('movementStats')?.proneTurnMultiplier ?? 0.3;
+  }
+  public get proneStealthMultiplier(): number {
+    return this.getComponent('stealthStats')?.proneStealthMultiplier ?? 3.0;
+  }
+  public get isProne(): boolean {
+    return this.stance === 'prone';
+  }
+  public get isCrouching(): boolean {
+    return this.stance === 'crouching';
+  }
+  public get isStanding(): boolean {
+    return this.stance === 'standing';
   }
   public get equip(): EquipmentComponent | undefined {
     return this.getComponent('equip');
@@ -268,15 +289,28 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.getComponent('input');
     if (input) input.isRunning = false;
   }
-  public startCrouching(): void {
+  public setDesiredStance(stance: import('./ecs/types').BaseCreatureStance): void {
     const input = this.getInputIfActive();
     if (input) {
-      input.isCrouching = true;
+      input.desiredStance = stance;
+      input.isCrouching = stance === 'crouching';
     }
   }
+  public startCrouching(): void {
+    this.setDesiredStance('crouching');
+  }
   public stopCrouching(): void {
-    const input = this.getComponent('input');
-    if (input) input.isCrouching = false;
+    if (this.desiredStance === 'crouching') {
+      this.setDesiredStance('standing');
+    }
+  }
+  public startProne(): void {
+    this.setDesiredStance('prone');
+  }
+  public stopProne(): void {
+    if (this.desiredStance === 'prone') {
+      this.setDesiredStance('standing');
+    }
   }
   public startWalking(): void {
     const input = this.getInputIfActive();

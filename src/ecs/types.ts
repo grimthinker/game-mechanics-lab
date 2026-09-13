@@ -205,6 +205,7 @@ export interface InputComponent {
   isSlowWalking: boolean;
   wantsAttack: boolean;
   attackSlotIndex?: number;
+  desiredStance?: BaseCreatureStance;
 }
 
 export interface HealthComponent {
@@ -304,13 +305,31 @@ export interface ActiveAttackComponent {
   attacks: ActiveAttack[];
 }
 
-export type CreatureStance = 'standing' | 'crouching';
+export type BaseCreatureStance = 'standing' | 'crouching' | 'prone';
+
+export type TransitionCreatureStance =
+  | 'stand_to_crouch'
+  | 'crouch_to_stand'
+  | 'crouch_to_prone'
+  | 'prone_to_crouch'
+  | 'stand_to_prone'
+  | 'prone_to_stand';
+
+export type CreatureStance = BaseCreatureStance | TransitionCreatureStance;
+
+export interface StanceTransitionComponent {
+  fromStance: BaseCreatureStance;
+  toStance: BaseCreatureStance;
+  timer: number;
+  totalDuration: number;
+  transitionStance: TransitionCreatureStance;
+}
 
 export type CreatureMovementMode = 'immobile' | 'turning' | 'walking' | 'jogging' | 'sprinting';
 
 export type CreatureDirectionMode = 'forward' | 'strafe' | 'backward' | 'immobile';
 
-export type CreatureActionMode = 'idle' | 'attacking' | 'pickup' | 'equipping';
+export type CreatureActionMode = 'idle' | 'attacking' | 'pickup' | 'equipping' | 'stance_changing';
 
 export interface CreatureMetaComponent {
   name: string;
@@ -347,6 +366,7 @@ export interface EntityComponents {
   inventory?: InventoryComponent;
   equip?: EquipmentComponent;
   interactionAction?: InteractionActionComponent;
+  stanceTransition?: StanceTransitionComponent;
   pickupIntent?: PickupIntentComponent;
   activeAttacks?: ActiveAttackComponent;
   item?: ItemComponent;
@@ -374,6 +394,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'inventory',
   'equip',
   'interactionAction',
+  'stanceTransition',
   'meta',
   'ownership',
   'gizmo',
@@ -435,15 +456,23 @@ export interface MovementConfig {
   maxTurnSpeed: Radians;
   runSpeedMultiplier?: number;
   crouchSpeedMultiplier?: number;
+  proneSpeedMultiplier?: number;
   walkSpeedMultiplier?: number;
   runTurnMultiplier?: number;
   crouchTurnMultiplier?: number;
+  proneTurnMultiplier?: number;
   strafeSpeedMultiplier?: number;
   backwardSpeedMultiplier?: number;
   strafeTurnMultiplier?: number;
   backwardTurnMultiplier?: number;
   pickupSpeedMultiplier?: number;
   pickupTurnMultiplier?: number;
+  standToCrouchTime?: number;
+  crouchToStandTime?: number;
+  standToProneTime?: number;
+  proneToStandTime?: number;
+  crouchToProneTime?: number;
+  proneToCrouchTime?: number;
 }
 
 export interface MovementStatsComponent {
@@ -451,21 +480,30 @@ export interface MovementStatsComponent {
   maxTurnSpeed: StatValue<number>;
   runSpeedMultiplier: number;
   crouchSpeedMultiplier: number;
+  proneSpeedMultiplier: number;
   walkSpeedMultiplier: number;
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
+  proneTurnMultiplier: number;
   strafeSpeedMultiplier: number;
   backwardSpeedMultiplier: number;
   strafeTurnMultiplier: number;
   backwardTurnMultiplier: number;
   pickupSpeedMultiplier: number;
   pickupTurnMultiplier: number;
+  standToCrouchTime: StatValue<number>;
+  crouchToStandTime: StatValue<number>;
+  standToProneTime: StatValue<number>;
+  proneToStandTime: StatValue<number>;
+  crouchToProneTime: StatValue<number>;
+  proneToCrouchTime: StatValue<number>;
 }
 
 export interface StealthConfig {
   stealthPower: number;
   runStealthMultiplier: number;
   crouchStealthMultiplier?: number;
+  proneStealthMultiplier?: number;
   walkStealthMultiplier?: number;
   turnInPlaceStealthMultiplier?: number;
   immobileStealthMultiplier?: number;
@@ -475,6 +513,7 @@ export interface StealthStatsComponent {
   stealthPower: StatValue<number>;
   runStealthMultiplier: number;
   crouchStealthMultiplier: number;
+  proneStealthMultiplier: number;
   walkStealthMultiplier: number;
   turnInPlaceStealthMultiplier: number;
   immobileStealthMultiplier: number;

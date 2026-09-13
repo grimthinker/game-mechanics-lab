@@ -3,6 +3,7 @@ import React from 'react';
 export interface StealthInspectorValues {
   stealthPower: number;
   crouchStealthMultiplier: number;
+  proneStealthMultiplier: number;
   runStealthMultiplier: number;
   walkStealthMultiplier: number;
   turnInPlaceStealthMultiplier: number;
@@ -44,6 +45,20 @@ export const StealthInspector: React.FC<StealthInspectorProps> = ({
         step={0.1}
         onChange={(e) =>
           onChange({ crouchStealthMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель скрытности лежа (prone):
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.proneStealthMultiplier}
+        min={1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ proneStealthMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
         }
       />
     </label>

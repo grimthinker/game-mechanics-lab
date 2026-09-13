@@ -92,10 +92,13 @@ export const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) =
               <kbd>LShift</kbd> Спринт (удержание)
             </li>
             <li>
-              <kbd>X</kbd> Шаг (переключатель)
+              <kbd>X</kbd> Шаг (тумблер)
             </li>
             <li>
-              <kbd>C</kbd> Присед (удержание)
+              <kbd>C</kbd> Присед (тумблер)
+            </li>
+            <li>
+              <kbd>V</kbd> Лечь (тумблер)
             </li>
           </ul>
         </div>

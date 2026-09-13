@@ -11,6 +11,36 @@ import { addModifier, removeModifier } from '../stats/StatEvaluator';
 import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
 import { LOGIC_CONFIG } from '../../ai/config';
 
+import { BaseCreatureStance, TransitionCreatureStance, MovementStatsComponent } from '../types';
+
+function getTransitionStance(
+  from: BaseCreatureStance,
+  to: BaseCreatureStance
+): TransitionCreatureStance {
+  if (from === 'standing' && to === 'crouching') return 'stand_to_crouch';
+  if (from === 'crouching' && to === 'standing') return 'crouch_to_stand';
+  if (from === 'crouching' && to === 'prone') return 'crouch_to_prone';
+  if (from === 'prone' && to === 'crouching') return 'prone_to_crouch';
+  if (from === 'standing' && to === 'prone') return 'stand_to_prone';
+  return 'prone_to_stand';
+}
+
+function getTransitionDuration(
+  from: BaseCreatureStance,
+  to: BaseCreatureStance,
+  stats: MovementStatsComponent
+): number {
+  if (from === 'standing' && to === 'crouching')
+    return Math.max(0.01, stats.standToCrouchTime.current);
+  if (from === 'crouching' && to === 'standing')
+    return Math.max(0.01, stats.crouchToStandTime.current);
+  if (from === 'standing' && to === 'prone') return Math.max(0.01, stats.standToProneTime.current);
+  if (from === 'prone' && to === 'standing') return Math.max(0.01, stats.proneToStandTime.current);
+  if (from === 'crouching' && to === 'prone')
+    return Math.max(0.01, stats.crouchToProneTime.current);
+  return Math.max(0.01, stats.proneToCrouchTime.current);
+}
+
 export class MovementSystem {
   public update(dt: number, world: World): void {
     const entities = world.getEntitiesWith(
@@ -42,14 +72,15 @@ export class MovementSystem {
           velocity.currentSpeed = 0;
           velocity.currentTurnSpeed = 0 as Radians;
         }
-        removeModifier(movementStats.maxSpeed, 'stance_crouch_speed');
+        world.removeComponent(id, 'stanceTransition');
+        removeModifier(movementStats.maxSpeed, 'stance_speed');
         removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
         removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
         removeModifier(movementStats.maxSpeed, 'attack_slow_move');
         removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
         removeModifier(movementStats.maxSpeed, 'dir_strafe_speed');
         removeModifier(movementStats.maxSpeed, 'dir_back_speed');
-        removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
         removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
         removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
@@ -82,23 +113,124 @@ export class MovementSystem {
         }
       }
 
-      // 1. Положение существа (Stance)
-      const stance: CreatureStance = input.isCrouching ? 'crouching' : 'standing';
+      // 1. Положение существа (Stance State Machine & Transitions)
+      let currentBaseStance: BaseCreatureStance = 'standing';
+      if (meta.stance === 'crouching') currentBaseStance = 'crouching';
+      else if (meta.stance === 'prone') currentBaseStance = 'prone';
 
-      if (stance === 'crouching') {
-        addModifier(movementStats.maxSpeed, {
-          id: 'stance_crouch_speed',
-          type: ModifierType.PERCENT_MULT,
-          value: movementStats.crouchSpeedMultiplier,
+      const desiredStance: BaseCreatureStance =
+        input.desiredStance ?? (input.isCrouching ? 'crouching' : currentBaseStance);
+
+      const activeTransition = world.getComponent(id, 'stanceTransition');
+
+      if (activeTransition) {
+        // Проверка отмены: если игрок запросил возврат к исходной стойке fromStance
+        if (desiredStance === activeTransition.fromStance) {
+          const progress = Math.min(
+            1,
+            Math.max(0, 1 - activeTransition.timer / (activeTransition.totalDuration || 1))
+          );
+          const originalFrom = activeTransition.fromStance;
+          const originalTo = activeTransition.toStance;
+          const fullReverseDuration = getTransitionDuration(
+            originalTo,
+            originalFrom,
+            movementStats
+          );
+          const returnDuration = Math.max(0.01, progress * fullReverseDuration);
+
+          activeTransition.fromStance = originalTo;
+          activeTransition.toStance = originalFrom;
+          activeTransition.timer = returnDuration;
+          activeTransition.totalDuration = returnDuration;
+          activeTransition.transitionStance = getTransitionStance(originalTo, originalFrom);
+          meta.stance = activeTransition.transitionStance;
+        }
+
+        activeTransition.timer -= localDt;
+        if (activeTransition.timer <= 0) {
+          meta.stance = activeTransition.toStance;
+          world.removeComponent(id, 'stanceTransition');
+        } else {
+          meta.stance = activeTransition.transitionStance;
+        }
+      } else if (desiredStance !== currentBaseStance) {
+        const transStance = getTransitionStance(currentBaseStance, desiredStance);
+        const duration = getTransitionDuration(currentBaseStance, desiredStance, movementStats);
+        world.addComponent(id, 'stanceTransition', {
+          fromStance: currentBaseStance,
+          toStance: desiredStance,
+          timer: duration,
+          totalDuration: duration,
+          transitionStance: transStance,
         });
-        addModifier(movementStats.maxTurnSpeed, {
-          id: 'stance_crouch_turn',
+        meta.stance = transStance;
+      } else if (meta.stance !== currentBaseStance) {
+        meta.stance = currentBaseStance;
+      }
+
+      // Запрет спринта при смене стойки или если персонаж не стоит в полный рост
+      if (meta.stance !== 'standing') {
+        input.isRunning = false;
+      }
+
+      // Расчет множителей скорости и поворота для текущей стойки
+      let stanceSpeedMult = 1.0;
+      let stanceTurnMult = 1.0;
+
+      const crouchSpd = movementStats.crouchSpeedMultiplier;
+      const crouchTurn = movementStats.crouchTurnMultiplier;
+      const proneSpd = movementStats.proneSpeedMultiplier;
+      const proneTurn = movementStats.proneTurnMultiplier;
+
+      switch (meta.stance) {
+        case 'standing':
+          stanceSpeedMult = 1.0;
+          stanceTurnMult = 1.0;
+          break;
+        case 'crouching':
+          stanceSpeedMult = crouchSpd;
+          stanceTurnMult = crouchTurn;
+          break;
+        case 'prone':
+          stanceSpeedMult = proneSpd;
+          stanceTurnMult = proneTurn;
+          break;
+        case 'stand_to_crouch':
+        case 'crouch_to_stand':
+          stanceSpeedMult = (1.0 + crouchSpd) / 2;
+          stanceTurnMult = (1.0 + crouchTurn) / 2;
+          break;
+        case 'stand_to_prone':
+        case 'prone_to_stand':
+          stanceSpeedMult = (1.0 + proneSpd) / 2;
+          stanceTurnMult = (1.0 + proneTurn) / 2;
+          break;
+        case 'crouch_to_prone':
+        case 'prone_to_crouch':
+          stanceSpeedMult = (crouchSpd + proneSpd) / 2;
+          stanceTurnMult = (crouchTurn + proneTurn) / 2;
+          break;
+      }
+
+      if (stanceSpeedMult !== 1.0) {
+        addModifier(movementStats.maxSpeed, {
+          id: 'stance_speed',
           type: ModifierType.PERCENT_MULT,
-          value: movementStats.crouchTurnMultiplier,
+          value: stanceSpeedMult,
         });
       } else {
-        removeModifier(movementStats.maxSpeed, 'stance_crouch_speed');
-        removeModifier(movementStats.maxTurnSpeed, 'stance_crouch_turn');
+        removeModifier(movementStats.maxSpeed, 'stance_speed');
+      }
+
+      if (stanceTurnMult !== 1.0) {
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'stance_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: stanceTurnMult,
+        });
+      } else {
+        removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
       }
 
       // 2. Поворот корпуса / взгляда существа (независимо от вектора движения)
@@ -209,7 +341,7 @@ export class MovementSystem {
         directionMode = 'immobile';
       }
 
-      // 4.5. Определение режима активности (Action Mode)
+      // 4.5. Определение режима активности (Action Mode для UI)
       let actionMode: CreatureActionMode = 'idle';
       if (activeAttacks.attacks.length > 0) {
         actionMode = 'attacking';
@@ -217,13 +349,18 @@ export class MovementSystem {
         actionMode = 'pickup';
       } else if (interactionAction?.type === 'equip' || interactionAction?.type === 'unequip') {
         actionMode = 'equipping';
+      } else if (world.getComponent(id, 'stanceTransition')) {
+        actionMode = 'stance_changing';
       }
 
       // 5. Определение вида движения (Movement Mode): чисто локомоция
       let movementMode: CreatureMovementMode = 'immobile';
 
       if (hasMoveInput || velocity.currentSpeed > 1) {
-        if (input.isRunning && directionMode === 'forward' && actionMode === 'idle') {
+        // В положении лежа (prone) и любых переходах с ним (ложится/встает) разрешен только шаг
+        if (meta.stance === 'prone' || meta.stance?.includes('prone')) {
+          movementMode = 'walking';
+        } else if (input.isRunning && directionMode === 'forward' && meta.stance === 'standing') {
           movementMode = 'sprinting';
         } else if (input.isSlowWalking) {
           movementMode = 'walking';
@@ -411,7 +548,6 @@ export class MovementSystem {
       }
 
       // 10. Обновление метаданных сущности
-      meta.stance = stance;
       meta.movementMode = movementMode;
       meta.directionMode = directionMode;
       meta.actionMode = actionMode;

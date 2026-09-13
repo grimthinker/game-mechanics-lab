@@ -157,8 +157,32 @@ export class CanvasRenderSyncSystem {
             renderable.zIndex = RENDER_Z_INDEX.CORPSES;
           } else {
             renderable.zIndex = RENDER_Z_INDEX.CREATURES;
-            // 1. Основная заливка отображает положение (Stance)
-            circlePrim.fill = stance === 'crouching' ? '#9b59b6' : '#34495e';
+            // 1. Основная заливка отображает положение (Stance) с плавным переходом цвета
+            const STANCE_RGB: Record<string, [number, number, number]> = {
+              standing: [52, 73, 94], // #34495e
+              crouching: [155, 89, 182], // #9b59b6
+              prone: [121, 85, 72], // #795548 (коричневый)
+            };
+
+            const transition = world.getComponent(id, 'stanceTransition');
+            if (transition && transition.totalDuration > 0) {
+              const progress = Math.min(
+                1,
+                Math.max(0, 1 - transition.timer / transition.totalDuration)
+              );
+              const fromRGB = STANCE_RGB[transition.fromStance] || STANCE_RGB.standing;
+              const toRGB = STANCE_RGB[transition.toStance] || STANCE_RGB.standing;
+              const r = Math.round(fromRGB[0] + (toRGB[0] - fromRGB[0]) * progress);
+              const g = Math.round(fromRGB[1] + (toRGB[1] - fromRGB[1]) * progress);
+              const b = Math.round(fromRGB[2] + (toRGB[2] - fromRGB[2]) * progress);
+              circlePrim.fill = `rgb(${r}, ${g}, ${b})`;
+            } else if (stance === 'crouching') {
+              circlePrim.fill = '#9b59b6';
+            } else if (stance === 'prone') {
+              circlePrim.fill = '#795548';
+            } else {
+              circlePrim.fill = '#34495e';
+            }
 
             // Граница: игрок / бот
             const behavior = aiStats?.behavior?.current ?? 'IdleTree';

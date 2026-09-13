@@ -6,15 +6,23 @@ export interface MovementInspectorValues {
   maxTurnSpeed: Degrees;
   runSpeedMultiplier: number;
   crouchSpeedMultiplier: number;
+  proneSpeedMultiplier: number;
   walkSpeedMultiplier: number;
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
+  proneTurnMultiplier: number;
   strafeSpeedMultiplier: number;
   backwardSpeedMultiplier: number;
   strafeTurnMultiplier: number;
   backwardTurnMultiplier: number;
   pickupSpeedMultiplier: number;
   pickupTurnMultiplier: number;
+  standToCrouchTime: number;
+  crouchToStandTime: number;
+  standToProneTime: number;
+  proneToStandTime: number;
+  crouchToProneTime: number;
+  proneToCrouchTime: number;
 }
 
 export interface MovementInspectorProps {
@@ -82,6 +90,20 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
       />
     </label>
     <label>
+      Множитель скорости лежа (prone):
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.proneSpeedMultiplier}
+        min={0.05}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ proneSpeedMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
       Множитель скорости замедленного шага:
       <input
         disabled={isReadOnly}
@@ -120,6 +142,20 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
         step={0.1}
         onChange={(e) =>
           onChange({ crouchTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель поворота лежа (prone):
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.proneTurnMultiplier}
+        min={0.05}
+        max={10}
+        step={0.05}
+        onChange={(e) =>
+          onChange({ proneTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
         }
       />
     </label>
@@ -207,5 +243,86 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
         }
       />
     </label>
+    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #333' }}>
+      <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
+        Время переходов (сек):
+      </span>
+      <div
+        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '6px' }}
+      >
+        <label style={{ fontSize: '11px' }}>
+          Стоя → Присед:
+          <input
+            disabled={isReadOnly}
+            type="number"
+            value={values.standToCrouchTime}
+            min={0.01}
+            max={5}
+            step={0.05}
+            onChange={(e) => onChange({ standToCrouchTime: Number(e.target.value) })}
+          />
+        </label>
+        <label style={{ fontSize: '11px' }}>
+          Присед → Стоя:
+          <input
+            disabled={isReadOnly}
+            type="number"
+            value={values.crouchToStandTime}
+            min={0.01}
+            max={5}
+            step={0.05}
+            onChange={(e) => onChange({ crouchToStandTime: Number(e.target.value) })}
+          />
+        </label>
+        <label style={{ fontSize: '11px' }}>
+          Стоя → Лежа:
+          <input
+            disabled={isReadOnly}
+            type="number"
+            value={values.standToProneTime}
+            min={0.01}
+            max={5}
+            step={0.05}
+            onChange={(e) => onChange({ standToProneTime: Number(e.target.value) })}
+          />
+        </label>
+        <label style={{ fontSize: '11px' }}>
+          Лежа → Стоя:
+          <input
+            disabled={isReadOnly}
+            type="number"
+            value={values.proneToStandTime}
+            min={0.01}
+            max={5}
+            step={0.05}
+            onChange={(e) => onChange({ proneToStandTime: Number(e.target.value) })}
+          />
+        </label>
+        <label style={{ fontSize: '11px' }}>
+          Присед → Лежа:
+          <input
+            disabled={isReadOnly}
+            type="number"
+            value={values.crouchToProneTime}
+            min={0.01}
+            max={5}
+            step={0.05}
+            onChange={(e) => onChange({ crouchToProneTime: Number(e.target.value) })}
+          />
+        </label>
+        <label style={{ fontSize: '11px' }}>
+          Лежа → Присед:
+          <input
+            disabled={isReadOnly}
+            type="number"
+            value={values.proneToCrouchTime}
+            min={0.01}
+            max={5}
+            step={0.05}
+            onChange={(e) => onChange({ proneToCrouchTime: Number(e.target.value) })}
+          />
+        </label>
+      </div>
+    </div>
   </div>
 );

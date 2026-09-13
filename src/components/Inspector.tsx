@@ -167,15 +167,23 @@ export const Inspector: React.FC<InspectorProps> = ({
             maxTurnSpeed: rad2Deg(moveStats.maxTurnSpeed.base) as Degrees,
             runSpeedMultiplier: moveStats.runSpeedMultiplier,
             crouchSpeedMultiplier: moveStats.crouchSpeedMultiplier,
+            proneSpeedMultiplier: moveStats.proneSpeedMultiplier ?? 0.2,
             walkSpeedMultiplier: moveStats.walkSpeedMultiplier ?? 0.5,
             runTurnMultiplier: moveStats.runTurnMultiplier,
             crouchTurnMultiplier: moveStats.crouchTurnMultiplier,
+            proneTurnMultiplier: moveStats.proneTurnMultiplier ?? 0.3,
             strafeSpeedMultiplier: moveStats.strafeSpeedMultiplier ?? 0.8,
             backwardSpeedMultiplier: moveStats.backwardSpeedMultiplier ?? 0.6,
             strafeTurnMultiplier: moveStats.strafeTurnMultiplier ?? 0.8,
             backwardTurnMultiplier: moveStats.backwardTurnMultiplier ?? 0.6,
             pickupSpeedMultiplier: moveStats.pickupSpeedMultiplier ?? 0.5,
             pickupTurnMultiplier: moveStats.pickupTurnMultiplier ?? 1.1,
+            standToCrouchTime: moveStats.standToCrouchTime?.base ?? 0.1,
+            crouchToStandTime: moveStats.crouchToStandTime?.base ?? 0.1,
+            standToProneTime: moveStats.standToProneTime?.base ?? 0.5,
+            proneToStandTime: moveStats.proneToStandTime?.base ?? 1.0,
+            crouchToProneTime: moveStats.crouchToProneTime?.base ?? 0.5,
+            proneToCrouchTime: moveStats.proneToCrouchTime?.base ?? 1.0,
           }
         : null
     );
@@ -186,6 +194,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         ? {
             stealthPower: stealthStats.stealthPower.base,
             crouchStealthMultiplier: stealthStats.crouchStealthMultiplier,
+            proneStealthMultiplier: stealthStats.proneStealthMultiplier ?? 3.0,
             runStealthMultiplier: stealthStats.runStealthMultiplier,
             walkStealthMultiplier: stealthStats.walkStealthMultiplier ?? 1.3,
             turnInPlaceStealthMultiplier: stealthStats.turnInPlaceStealthMultiplier ?? 1.5,
@@ -356,6 +365,10 @@ export const Inspector: React.FC<InspectorProps> = ({
         ms.crouchSpeedMultiplier = draftMovement.crouchSpeedMultiplier;
         changed = true;
       }
+      if (ms.proneSpeedMultiplier !== draftMovement.proneSpeedMultiplier) {
+        ms.proneSpeedMultiplier = draftMovement.proneSpeedMultiplier;
+        changed = true;
+      }
       if (ms.walkSpeedMultiplier !== draftMovement.walkSpeedMultiplier) {
         ms.walkSpeedMultiplier = draftMovement.walkSpeedMultiplier;
         changed = true;
@@ -366,6 +379,34 @@ export const Inspector: React.FC<InspectorProps> = ({
       }
       if (ms.crouchTurnMultiplier !== draftMovement.crouchTurnMultiplier) {
         ms.crouchTurnMultiplier = draftMovement.crouchTurnMultiplier;
+        changed = true;
+      }
+      if (ms.proneTurnMultiplier !== draftMovement.proneTurnMultiplier) {
+        ms.proneTurnMultiplier = draftMovement.proneTurnMultiplier;
+        changed = true;
+      }
+      if (ms.standToCrouchTime && ms.standToCrouchTime.base !== draftMovement.standToCrouchTime) {
+        setBaseStat(ms.standToCrouchTime, draftMovement.standToCrouchTime);
+        changed = true;
+      }
+      if (ms.crouchToStandTime && ms.crouchToStandTime.base !== draftMovement.crouchToStandTime) {
+        setBaseStat(ms.crouchToStandTime, draftMovement.crouchToStandTime);
+        changed = true;
+      }
+      if (ms.standToProneTime && ms.standToProneTime.base !== draftMovement.standToProneTime) {
+        setBaseStat(ms.standToProneTime, draftMovement.standToProneTime);
+        changed = true;
+      }
+      if (ms.proneToStandTime && ms.proneToStandTime.base !== draftMovement.proneToStandTime) {
+        setBaseStat(ms.proneToStandTime, draftMovement.proneToStandTime);
+        changed = true;
+      }
+      if (ms.crouchToProneTime && ms.crouchToProneTime.base !== draftMovement.crouchToProneTime) {
+        setBaseStat(ms.crouchToProneTime, draftMovement.crouchToProneTime);
+        changed = true;
+      }
+      if (ms.proneToCrouchTime && ms.proneToCrouchTime.base !== draftMovement.proneToCrouchTime) {
+        setBaseStat(ms.proneToCrouchTime, draftMovement.proneToCrouchTime);
         changed = true;
       }
       if (ms.strafeSpeedMultiplier !== draftMovement.strafeSpeedMultiplier) {
@@ -410,6 +451,10 @@ export const Inspector: React.FC<InspectorProps> = ({
       }
       if (st.crouchStealthMultiplier !== draftStealth.crouchStealthMultiplier) {
         st.crouchStealthMultiplier = draftStealth.crouchStealthMultiplier;
+        changed = true;
+      }
+      if (st.proneStealthMultiplier !== draftStealth.proneStealthMultiplier) {
+        st.proneStealthMultiplier = draftStealth.proneStealthMultiplier;
         changed = true;
       }
       if (st.runStealthMultiplier !== draftStealth.runStealthMultiplier) {
@@ -672,7 +717,12 @@ export const Inspector: React.FC<InspectorProps> = ({
           <details open>
             <summary style={summaryStyle}>Имя и Трансформация</summary>
             <div style={contentStyle}>
-              <MetaInspector name={draftName} onChange={setDraftName} isReadOnly={isReadOnly} />
+              <MetaInspector
+                name={draftName}
+                onChange={setDraftName}
+                isReadOnly={isReadOnly}
+                stance={world.getComponent(targetId, 'meta')?.stance}
+              />
               {currentArchetype === 'obstacle' && (
                 <label
                   style={{

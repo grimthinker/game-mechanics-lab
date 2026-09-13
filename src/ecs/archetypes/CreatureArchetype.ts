@@ -83,15 +83,23 @@ export function assembleCreature(
     maxTurnSpeed: createStat(maxTurnSpeed),
     runSpeedMultiplier: config.movement?.runSpeedMultiplier ?? 1.5,
     crouchSpeedMultiplier: config.movement?.crouchSpeedMultiplier ?? 0.5,
+    proneSpeedMultiplier: config.movement?.proneSpeedMultiplier ?? 0.2,
     walkSpeedMultiplier: config.movement?.walkSpeedMultiplier ?? 0.5,
     runTurnMultiplier: config.movement?.runTurnMultiplier ?? 0.8,
     crouchTurnMultiplier: config.movement?.crouchTurnMultiplier ?? 0.8,
+    proneTurnMultiplier: config.movement?.proneTurnMultiplier ?? 0.3,
     strafeSpeedMultiplier: config.movement?.strafeSpeedMultiplier ?? 0.8,
     backwardSpeedMultiplier: config.movement?.backwardSpeedMultiplier ?? 0.6,
     strafeTurnMultiplier: config.movement?.strafeTurnMultiplier ?? 0.8,
     backwardTurnMultiplier: config.movement?.backwardTurnMultiplier ?? 0.6,
     pickupSpeedMultiplier: config.movement?.pickupSpeedMultiplier ?? 0.5,
     pickupTurnMultiplier: config.movement?.pickupTurnMultiplier ?? 1.1,
+    standToCrouchTime: createStat(config.movement?.standToCrouchTime ?? 0.1),
+    crouchToStandTime: createStat(config.movement?.crouchToStandTime ?? 0.1),
+    standToProneTime: createStat(config.movement?.standToProneTime ?? 0.5),
+    proneToStandTime: createStat(config.movement?.proneToStandTime ?? 1.0),
+    crouchToProneTime: createStat(config.movement?.crouchToProneTime ?? 0.5),
+    proneToCrouchTime: createStat(config.movement?.proneToCrouchTime ?? 1.0),
   });
   world.addComponent(id, 'velocity', {
     vx: 0,
@@ -114,6 +122,7 @@ export function assembleCreature(
     isSlowWalking: false,
     wantsAttack: false,
     attackSlotIndex: undefined,
+    desiredStance: 'standing',
   });
 
   // 6. Скрытность
@@ -122,6 +131,7 @@ export function assembleCreature(
     stealthPower: createStat(stealthPower),
     runStealthMultiplier: config.stealth?.runStealthMultiplier ?? 0.5,
     crouchStealthMultiplier: config.stealth?.crouchStealthMultiplier ?? 1.5,
+    proneStealthMultiplier: config.stealth?.proneStealthMultiplier ?? 3.0,
     walkStealthMultiplier: config.stealth?.walkStealthMultiplier ?? 1.3,
     turnInPlaceStealthMultiplier: config.stealth?.turnInPlaceStealthMultiplier ?? 1.5,
     immobileStealthMultiplier: config.stealth?.immobileStealthMultiplier ?? 2.0,

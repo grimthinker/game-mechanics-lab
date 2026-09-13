@@ -8,7 +8,7 @@ export class StealthSystem {
 
     for (const [_id, { stealthStats, health, meta }] of entities) {
       if (!health.isAlive) {
-        removeModifier(stealthStats.stealthPower, 'stance_crouch_stealth');
+        removeModifier(stealthStats.stealthPower, 'stance_stealth');
         removeModifier(stealthStats.stealthPower, 'mode_sprint_stealth');
         removeModifier(stealthStats.stealthPower, 'mode_walk_stealth');
         removeModifier(stealthStats.stealthPower, 'mode_turning_stealth');
@@ -23,15 +23,43 @@ export class StealthSystem {
 
       removeModifier(stealthStats.stealthPower, 'state_dead_stealth');
 
-      // 1. Модификатор положения (Stance)
-      if (meta.stance === 'crouching') {
+      // 1. Модификатор положения (Stance) с усреднением для переходных стоек
+      let stanceStealthMult = 1.0;
+      const crouchSt = stealthStats.crouchStealthMultiplier;
+      const proneSt = stealthStats.proneStealthMultiplier;
+
+      switch (meta.stance) {
+        case 'crouching':
+          stanceStealthMult = crouchSt;
+          break;
+        case 'prone':
+          stanceStealthMult = proneSt;
+          break;
+        case 'stand_to_crouch':
+        case 'crouch_to_stand':
+          stanceStealthMult = (1.0 + crouchSt) / 2;
+          break;
+        case 'stand_to_prone':
+        case 'prone_to_stand':
+          stanceStealthMult = (1.0 + proneSt) / 2;
+          break;
+        case 'crouch_to_prone':
+        case 'prone_to_crouch':
+          stanceStealthMult = (crouchSt + proneSt) / 2;
+          break;
+        default:
+          stanceStealthMult = 1.0;
+          break;
+      }
+
+      if (stanceStealthMult !== 1.0) {
         addModifier(stealthStats.stealthPower, {
-          id: 'stance_crouch_stealth',
+          id: 'stance_stealth',
           type: ModifierType.PERCENT_MULT,
-          value: stealthStats.crouchStealthMultiplier,
+          value: stanceStealthMult,
         });
       } else {
-        removeModifier(stealthStats.stealthPower, 'stance_crouch_stealth');
+        removeModifier(stealthStats.stealthPower, 'stance_stealth');
       }
 
       // 2. Модификатор вида движения (Movement Mode), актуализированный в MovementSystem
