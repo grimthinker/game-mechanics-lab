@@ -169,8 +169,8 @@ export class MovementSystem {
         meta.stance = currentBaseStance;
       }
 
-      // Запрет спринта при смене стойки или если персонаж не стоит в полный рост
-      if (meta.stance !== 'standing') {
+      // Запрет спринта только в положении лежа и во всех переходах, связанных с prone
+      if (meta.stance === 'prone' || meta.stance?.includes('prone')) {
         input.isRunning = false;
       }
 
@@ -360,7 +360,14 @@ export class MovementSystem {
         // В положении лежа (prone) и любых переходах с ним (ложится/встает) разрешен только шаг
         if (meta.stance === 'prone' || meta.stance?.includes('prone')) {
           movementMode = 'walking';
-        } else if (input.isRunning && directionMode === 'forward' && meta.stance === 'standing') {
+        } else if (
+          input.isRunning &&
+          directionMode === 'forward' &&
+          (meta.stance === 'standing' ||
+            meta.stance === 'crouching' ||
+            meta.stance === 'stand_to_crouch' ||
+            meta.stance === 'crouch_to_stand')
+        ) {
           movementMode = 'sprinting';
         } else if (input.isSlowWalking) {
           movementMode = 'walking';

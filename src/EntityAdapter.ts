@@ -282,7 +282,6 @@ export class EntityAdapter implements IMovable, EntityController {
     const input = this.getInputIfActive();
     if (input) {
       input.isRunning = true;
-      input.isCrouching = false;
     }
   }
   public stopRunning(): void {
