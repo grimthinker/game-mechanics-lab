@@ -5,7 +5,6 @@ import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
 import { BTLogicComponent, BTNodeDTO } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
-import { createDefaultCreatureConfig } from './Creature';
 import { LeftDock, DockTab } from './components/LeftDock/LeftDock';
 import { PieMenu } from './components/PieMenu/PieMenu';
 import { PieMenuState } from './components/PieMenu/types';
@@ -23,6 +22,7 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './editor.css';
 import { createZoneConfig } from './ecs/archetypes';
 import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
+import { findActiveBrain } from './ecs/utils/anatomy';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -148,7 +148,14 @@ export const App: React.FC = () => {
     }
 
     if (targetId) {
-      const brain = app.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
+      let brain = app.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
+      if (!brain) {
+        const activeBrainId = findActiveBrain(app.world, targetId);
+        if (activeBrainId) {
+          brain = app.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
+        }
+      }
+
       if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 100) {
         lastBTUpdateRef.current = now;
         setBtData(!brain || !brain.root_node ? null : serializeBTNode(brain.root_node));
@@ -380,9 +387,11 @@ export const App: React.FC = () => {
 
   const handleQuickSpawn = useCallback((type: 'player' | 'attacker') => {
     const behavior = type === 'player' ? 'PlayerTree' : 'AttackerTree';
+    const name = type === 'player' ? 'Игрок' : 'Бот-атакующий';
     setPlacementMode({
-      kind: 'entity',
-      config: createDefaultCreatureConfig(behavior),
+      kind: 'modular',
+      behavior,
+      name,
     });
   }, []);
 
@@ -523,6 +532,9 @@ export const App: React.FC = () => {
             }}
             onFocusEntity={handleFocusEntity}
             onSelectSpawnPreset={handleSelectSpawnPreset}
+            onSelectModular={(behavior, name) =>
+              setPlacementMode({ kind: 'modular', behavior, name })
+            }
             btData={btData}
             btBlackboard={btBlackboard}
             activeTab={leftDockTab}
@@ -700,9 +712,13 @@ export const App: React.FC = () => {
                           const app = appRef.current;
                           if (!app) return;
                           app.commitHistory('Спавн игрока');
-                          const id = app.spawnEntity(
-                            createDefaultCreatureConfig('PlayerTree'),
-                            pieMenuState.worldPos
+                          const id = app.entityFactory.spawnModularHumanoid(
+                            app.world,
+                            app.physics,
+                            app.aiSystem,
+                            pieMenuState.worldPos,
+                            'PlayerTree',
+                            'Игрок'
                           );
                           app.selectEntity(id, true);
                           syncPlayerControls();
@@ -717,9 +733,13 @@ export const App: React.FC = () => {
                           const app = appRef.current;
                           if (!app) return;
                           app.commitHistory('Спавн атакующего бота');
-                          const id = app.spawnEntity(
-                            createDefaultCreatureConfig('AttackerTree'),
-                            pieMenuState.worldPos
+                          const id = app.entityFactory.spawnModularHumanoid(
+                            app.world,
+                            app.physics,
+                            app.aiSystem,
+                            pieMenuState.worldPos,
+                            'AttackerTree',
+                            'Бот-атакующий'
                           );
                           app.selectEntity(id, true);
                           syncPlayerControls();

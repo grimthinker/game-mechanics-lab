@@ -1,9 +1,12 @@
 import { World } from './World';
 import { PhysicsSystem } from './systems/PhysicsSystem';
 import { AISystem } from './systems/AISystem';
-import { EntityId, EntityConfig } from './types';
+import { EntityId, EntityConfig, CollisionCategory, COLLISION_MASK_ALL } from './types';
 import { Point } from '../types';
 import { ARCHETYPE_ASSEMBLERS, detectArchetype } from './archetypes';
+import { assembleBodyPart } from './archetypes/BodyPartArchetype';
+import { Circle } from 'detect-collisions';
+import { createStat } from './stats/StatEvaluator';
 
 export class EntityFactory {
   public generateId(prefix: string = 'ent'): EntityId {
@@ -25,57 +28,283 @@ export class EntityFactory {
     const assembler = ARCHETYPE_ASSEMBLERS[archetype] ?? ARCHETYPE_ASSEMBLERS.creature;
     assembler(world, physics, aiSystem, id, config, position);
 
-    if (archetype === 'creature') {
-      this.setupDefaultCreatureEquipment(world, physics, aiSystem, id, position);
-    }
-
     return id;
   }
 
-  private setupDefaultCreatureEquipment(
+  public spawnModularHumanoid(
     world: World,
     physics: PhysicsSystem,
     aiSystem: AISystem,
-    creatureId: EntityId,
-    position?: Point
-  ): void {
-    const equip = world.getComponent(creatureId, 'equip');
-    if (!equip) return;
+    position: Point,
+    behavior: string = 'IdleTree',
+    name: string = 'Существо'
+  ): EntityId {
+    const rootId = this.generateId('creature');
+    world.createEntity(rootId);
 
-    const torsoArea = equip.equipmentAreas.find((a) => a.type === 'torso');
-    if (torsoArea && torsoArea.itemIds.length === 0) {
-      const bagId = this.spawnEntity(
-        world,
-        physics,
-        aiSystem,
+    // Abstract Root Setup
+    const rootConfig: EntityConfig = { ai: { behavior }, meta: { name, entityType: 'creature' } };
+    ARCHETYPE_ASSEMBLERS.creature(world, physics, aiSystem, rootId, rootConfig, position);
+
+    // Initial Physics and Render for Root (required for anatomy system and rendering)
+    const radius = 16;
+    world.addComponent(rootId, 'physicsStats', {
+      radius: createStat(radius),
+      weight: createStat(10),
+      isSolid: true,
+    });
+    const body = new Circle({ x: position.x, y: position.y }, radius);
+    body.isStatic = false;
+    world.addComponent(rootId, 'physicsBody', {
+      body,
+      isStatic: false,
+      category: CollisionCategory.CREATURE,
+      mask: COLLISION_MASK_ALL,
+    });
+    physics.registerBody(rootId, body);
+
+    world.addComponent(rootId, 'renderable', {
+      zIndex: 40,
+      isVisible: true,
+      syncWithTransform: true,
+      primitives: [
         {
-          tag: { archetype: 'item', subType: 'bag' },
-          item: {
-            name: 'Сумка',
-            type: 'bag',
-            maxStack: 1,
-            size: 10,
-            equipTypes: ['torso'],
-            equippable: true,
-            equipTimeMultiplier: 1.0,
-          },
-          physics: {
-            radius: 16,
-            weight: 1,
-            isSolid: true,
-          },
-          ownership: {
-            ownerId: creatureId,
-            status: 'equipped',
-          },
-          inventory: {
-            size: { width: 6, height: 4 },
+          kind: 'circle',
+          radius,
+          fill: '#34495e',
+          stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
+          strokeWidth: 2,
+        },
+        {
+          kind: 'polygon',
+          points: [
+            { x: radius, y: 0 },
+            { x: 0, y: -radius },
+            { x: 0, y: radius },
+          ],
+          fill: '#7f8c8d',
+          stroke: '#95a5a6',
+          strokeWidth: 1.5,
+        },
+      ],
+    });
+
+    // Body Parts Generation
+    const torsoId = this.generateId('part_torso');
+    const headId = this.generateId('part_head');
+    const armLId = this.generateId('part_arm_l');
+    const armRId = this.generateId('part_arm_r');
+    const legLId = this.generateId('part_leg_l');
+    const legRId = this.generateId('part_leg_r');
+
+    // Torso
+    world.createEntity(torsoId);
+    assembleBodyPart(
+      world,
+      physics,
+      aiSystem,
+      torsoId,
+      {
+        tag: { archetype: 'bodyPart', subType: 'torso' },
+        meta: { name: 'Туловище' },
+        physics: { radius: 12, weight: 15, size: 20 },
+        socketDef: {
+          sockets: {
+            neck: { type: 'neck', size: 10, strength: 50 },
+            l_shoulder: { type: 'shoulder', size: 10, strength: 40 },
+            r_shoulder: { type: 'shoulder', size: 10, strength: 40 },
+            l_hip: { type: 'hip', size: 12, strength: 50 },
+            r_hip: { type: 'hip', size: 12, strength: 50 },
           },
         },
-        position,
-        this.generateId('item_bag')
-      );
-      torsoArea.itemIds.push(bagId);
+        socketLink: {
+          links: {
+            neck: { targetEntityId: headId, targetSocketId: 'base', currentStrength: 50 },
+            l_shoulder: { targetEntityId: armLId, targetSocketId: 'base', currentStrength: 40 },
+            r_shoulder: { targetEntityId: armRId, targetSocketId: 'base', currentStrength: 40 },
+            l_hip: { targetEntityId: legLId, targetSocketId: 'base', currentStrength: 50 },
+            r_hip: { targetEntityId: legRId, targetSocketId: 'base', currentStrength: 50 },
+          },
+        },
+        equip: {
+          equipmentAreas: [
+            { id: 'torso', name: 'Туловище', type: 'torso', space: 40, itemIds: [] },
+            { id: 'waist', name: 'Пояс', type: 'waist', space: 15, itemIds: [] },
+          ],
+        },
+      },
+      position
+    );
+
+    // Head
+    world.createEntity(headId);
+    assembleBodyPart(
+      world,
+      physics,
+      aiSystem,
+      headId,
+      {
+        tag: { archetype: 'bodyPart', subType: 'head' },
+        meta: { name: 'Голова' },
+        physics: { radius: 8, weight: 5, size: 10 },
+        socketDef: { sockets: { base: { type: 'neck', size: 10, strength: 50 } } },
+        socketLink: {
+          links: { base: { targetEntityId: torsoId, targetSocketId: 'neck', currentStrength: 50 } },
+        },
+        bodyBrain: { power: 100, isActive: true, rootEntityId: rootId },
+        equip: {
+          equipmentAreas: [
+            { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
+            { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
+          ],
+        },
+      },
+      position
+    );
+    aiSystem.initBotBrain(world, headId, behavior);
+    // Left Arm
+    world.createEntity(armLId);
+    assembleBodyPart(
+      world,
+      physics,
+      aiSystem,
+      armLId,
+      {
+        tag: { archetype: 'bodyPart', subType: 'arm' },
+        meta: { name: 'Левая рука' },
+        physics: { radius: 6, weight: 4, size: 10 },
+        socketDef: { sockets: { base: { type: 'shoulder', size: 10, strength: 40 } } },
+        socketLink: {
+          links: {
+            base: { targetEntityId: torsoId, targetSocketId: 'l_shoulder', currentStrength: 40 },
+          },
+        },
+        interactionSlots: {
+          slots: [{ id: 'hand_left', interactDist: 25, strength: 15, itemId: null }],
+        },
+        equip: {
+          equipmentAreas: [
+            { id: 'hands_l', name: 'Левая рука', type: 'hands', space: 10, itemIds: [] },
+          ],
+        },
+      },
+      position
+    );
+
+    // Right Arm
+    world.createEntity(armRId);
+    assembleBodyPart(
+      world,
+      physics,
+      aiSystem,
+      armRId,
+      {
+        tag: { archetype: 'bodyPart', subType: 'arm' },
+        meta: { name: 'Правая рука' },
+        physics: { radius: 6, weight: 4, size: 10 },
+        socketDef: { sockets: { base: { type: 'shoulder', size: 10, strength: 40 } } },
+        socketLink: {
+          links: {
+            base: { targetEntityId: torsoId, targetSocketId: 'r_shoulder', currentStrength: 40 },
+          },
+        },
+        interactionSlots: {
+          slots: [{ id: 'hand_right', interactDist: 25, strength: 15, itemId: null }],
+        },
+        equip: {
+          equipmentAreas: [
+            { id: 'hands_r', name: 'Правая рука', type: 'hands', space: 10, itemIds: [] },
+          ],
+        },
+      },
+      position
+    );
+
+    // Left Leg
+    world.createEntity(legLId);
+    assembleBodyPart(
+      world,
+      physics,
+      aiSystem,
+      legLId,
+      {
+        tag: { archetype: 'bodyPart', subType: 'leg' },
+        meta: { name: 'Левая нога' },
+        physics: { radius: 7, weight: 6, size: 12 },
+        socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
+        socketLink: {
+          links: {
+            base: { targetEntityId: torsoId, targetSocketId: 'l_hip', currentStrength: 50 },
+          },
+        },
+        equip: {
+          equipmentAreas: [
+            { id: 'legs_l', name: 'Левая нога', type: 'legs', space: 10, itemIds: [] },
+            { id: 'feet_l', name: 'Левая ступня', type: 'feet', space: 5, itemIds: [] },
+          ],
+        },
+      },
+      position
+    );
+
+    // Right Leg
+    world.createEntity(legRId);
+    assembleBodyPart(
+      world,
+      physics,
+      aiSystem,
+      legRId,
+      {
+        tag: { archetype: 'bodyPart', subType: 'leg' },
+        meta: { name: 'Правая нога' },
+        physics: { radius: 7, weight: 6, size: 12 },
+        socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
+        socketLink: {
+          links: {
+            base: { targetEntityId: torsoId, targetSocketId: 'r_hip', currentStrength: 50 },
+          },
+        },
+        equip: {
+          equipmentAreas: [
+            { id: 'legs_r', name: 'Правая нога', type: 'legs', space: 10, itemIds: [] },
+            { id: 'feet_r', name: 'Правая ступня', type: 'feet', space: 5, itemIds: [] },
+          ],
+        },
+      },
+      position
+    );
+
+    // Give the torso a bag by default
+    const bagId = this.generateId('item_bag');
+    world.createEntity(bagId);
+    ARCHETYPE_ASSEMBLERS.item(
+      world,
+      physics,
+      aiSystem,
+      bagId,
+      {
+        tag: { archetype: 'item', subType: 'bag' },
+        item: {
+          name: 'Сумка',
+          type: 'bag',
+          maxStack: 1,
+          size: 10,
+          equipTypes: ['torso'],
+          equippable: true,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 16, weight: 1, isSolid: true },
+        ownership: { ownerId: torsoId, status: 'equipped' },
+        inventory: { size: { width: 6, height: 4 } },
+      },
+      position
+    );
+
+    const torsoEquip = world.getComponent(torsoId, 'equip');
+    if (torsoEquip) {
+      torsoEquip.equipmentAreas.find((a) => a.type === 'torso')?.itemIds.push(bagId);
     }
+
+    return rootId;
   }
 }

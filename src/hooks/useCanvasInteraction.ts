@@ -267,6 +267,17 @@ export const useCanvasInteraction = ({
         app.commitHistory('Спавн объекта');
         const spawnedId = app.spawnEntity(placementMode.config, point);
         app.selectEntity(spawnedId, true);
+      } else if (placementMode.kind === 'modular') {
+        app.commitHistory('Спавн составного существа');
+        const spawnedId = app.entityFactory.spawnModularHumanoid(
+          app.world,
+          app.physics,
+          app.aiSystem,
+          point,
+          placementMode.behavior,
+          placementMode.name
+        );
+        app.selectEntity(spawnedId, true);
       }
       setPlacementMode(null);
       syncPlayerControls();

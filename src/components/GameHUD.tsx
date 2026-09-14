@@ -1,5 +1,6 @@
 import React from 'react';
 import { World } from '../ecs/World';
+import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 
 export interface GameHUDProps {
   world: World | null | undefined;
@@ -25,15 +26,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
   // Определение экипированного оружия
   let weaponName = 'Кулаки';
   if (playerId) {
-    const slotsComp = world.getComponent(playerId, 'interactionSlots');
-    if (slotsComp) {
-      for (const slot of slotsComp.slots) {
-        if (slot.itemId) {
-          const item = world.getComponent(slot.itemId, 'item');
-          if (item?.type === 'weapon') {
-            weaponName = item.name;
-            break;
-          }
+    const aggSlots = getAggregatedInteractionSlots(world, playerId);
+    for (const slotInfo of aggSlots) {
+      if (slotInfo.slot.itemId) {
+        const item = world.getComponent(slotInfo.slot.itemId, 'item');
+        if (item?.type === 'weapon') {
+          weaponName = item.name;
+          break;
         }
       }
     }

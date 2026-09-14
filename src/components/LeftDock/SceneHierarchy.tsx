@@ -53,6 +53,31 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
       const health = comp.health;
 
       const archetype = tag?.archetype ?? meta?.entityType ?? 'creature';
+
+      // Части тела, прикрепленные к существу, не должны захламлять дерево сцены.
+      // Доступ к ним осуществляется через Инспектор существа (вкладка "Анатомия").
+      if (archetype === 'bodyPart') {
+        // Если часть тела оторвана и лежит на земле как лут:
+        if (comp.item && !comp.ownership) {
+          const name = meta?.name ?? item?.name ?? 'Часть тела';
+          if (q && !name.toLowerCase().includes(q) && !id.toLowerCase().includes(q)) {
+            continue;
+          }
+          groups.item.push({
+            id,
+            name,
+            icon: '🥩',
+            badges: [{ label: 'ЧАСТЬ', color: '#e67e22' }],
+          });
+        }
+        continue;
+      }
+
+      // Предметы, которые экипированы или находятся в чужом инвентаре, не отображаем на верхнем уровне сцены
+      if (archetype === 'item' && comp.ownership) {
+        continue;
+      }
+
       const name = meta?.name ?? item?.name ?? id;
 
       if (q && !name.toLowerCase().includes(q) && !id.toLowerCase().includes(q)) {
@@ -64,6 +89,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
         if (item.type === 'weapon') icon = '⚔️';
         else if (item.type === 'armor') icon = '🛡️';
         else if (item.type === 'bag') icon = '🎒';
+        else if (item.type === 'bodyPart') icon = '🥩';
       }
 
       const hp = health
@@ -98,7 +124,9 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
     return groups;
   }, [world, search]);
 
-  const totalCount = world ? world.getAllEntities().length : 0;
+  const totalCount = useMemo(() => {
+    return Object.values(groupedEntities).reduce((acc, list) => acc + list.length, 0);
+  }, [groupedEntities]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>

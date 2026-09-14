@@ -145,9 +145,13 @@ export class WorldSerializer {
           comps.renderable.isVisible = false;
         }
 
-        // Инициализация мозга и восстановление памяти (blackboard) для сущностей с ИИ
-        if (comps.aiStats) {
-          const behaviorId = comps.aiStats.behavior?.current ?? 'IdleTree';
+        // Инициализация мозга и восстановление памяти (blackboard) для сущностей с bodyBrain
+        if (comps.bodyBrain) {
+          let behaviorId = 'IdleTree';
+          if (comps.bodyBrain.rootEntityId) {
+            const rootEnt = entityMap.get(comps.bodyBrain.rootEntityId);
+            behaviorId = rootEnt?.components?.aiStats?.behavior?.current ?? 'IdleTree';
+          }
           this.app.aiSystem.initBotBrain(this.app.world, ent.id, behaviorId);
 
           if (comps.brain?.blackboardData) {
@@ -258,7 +262,8 @@ export class WorldSerializer {
                   ? 'obstacle'
                   : 'creature');
 
-          if (archetype !== 'marker') {
+          // Части тела (bodyPart) внутри существ или сборок никогда не получают физическое тело напрямую
+          if (archetype !== 'marker' && archetype !== 'bodyPart') {
             if (archetype === 'obstacle') {
               const points = comps.physicsStats.points ?? [
                 { x: -50, y: -20 },

@@ -21,6 +21,7 @@ import {
   ArmorFormFields,
   BagFormFields,
   WeaponFormValues,
+  CommonItemFormFields,
 } from './modals/forms/FormFields';
 import { DEFAULT_ZONE_PARAMS, ZoneTypeParams } from '../Weapon';
 import { deg2Rad, rad2Deg, Degrees } from '../utils';
@@ -30,7 +31,7 @@ import { MetaInspector } from './inspector/MetaInspector';
 import { MovementInspector } from './inspector/MovementInspector';
 import { PhysicsInspector } from './inspector/PhysicsInspector';
 import { StealthInspector } from './inspector/StealthInspector';
-import { calculateTotalEntityWeight } from '../ecs/utils/hierarchy';
+import { calculateTotalEntityWeight, getAnatomyParts } from '../ecs/utils/hierarchy';
 
 interface Breadcrumb {
   id: string;
@@ -95,7 +96,19 @@ export const Inspector: React.FC<InspectorProps> = ({
   const targetId = path.length > 0 ? path[path.length - 1].id : null;
 
   const pushPath = (id: string, label: string) => {
-    setPath((prev) => [...prev, { id, label }]);
+    setPath((prev) => {
+      // Если кликнули по уже открытой сущности — ничего не делаем
+      if (prev.length > 0 && prev[prev.length - 1].id === id) {
+        return prev;
+      }
+      // Если сущность уже есть в цепочке навигации — возвращаемся к ней (срезаем путь)
+      const existingIndex = prev.findIndex((crumb) => crumb.id === id);
+      if (existingIndex !== -1) {
+        return prev.slice(0, existingIndex + 1);
+      }
+      // Иначе добавляем новый шаг в историю
+      return [...prev, { id, label }];
+    });
   };
 
   const popPath = (index: number) => {
@@ -126,6 +139,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [draftWeapon, setDraftWeapon] = useState<WeaponFormValues | null>(null);
   const [draftArmor, setDraftArmor] = useState<any>(null);
   const [draftBag, setDraftBag] = useState<any>(null);
+  const [draftGenericItem, setDraftGenericItem] = useState<any>(null);
 
   const zoneParamsMapRef = useRef<Record<HitZoneType, ZoneTypeParams>>({
     angle: { ...DEFAULT_ZONE_PARAMS.angle },
@@ -266,6 +280,18 @@ export const Inspector: React.FC<InspectorProps> = ({
           }
         : null
     );
+
+    if (item && item.type === 'bodyPart') {
+      setDraftGenericItem({
+        name: meta?.name ?? item.name,
+        size: item.size,
+        equipTypes: item.equipTypes,
+        equippable: item.equippable,
+        equipTimeMultiplier: item.equipTimeMultiplier,
+      });
+    } else {
+      setDraftGenericItem(null);
+    }
   }, [targetId, world]);
 
   // --- Автоматическая синхронизация Draft -> ECS ---
@@ -635,6 +661,34 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftArmor]);
 
   useEffect(() => {
+    if (!targetId || !world || isReadOnly || !draftGenericItem) return;
+    let changed = false;
+    const item = world.getComponent(targetId, 'item');
+    if (item && item.type === 'bodyPart') {
+      if (item.size !== draftGenericItem.size) {
+        item.size = draftGenericItem.size;
+        changed = true;
+      }
+      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftGenericItem.equipTypes)) {
+        item.equipTypes = [...draftGenericItem.equipTypes];
+        changed = true;
+      }
+      if (item.equippable !== draftGenericItem.equippable) {
+        item.equippable = draftGenericItem.equippable;
+        changed = true;
+      }
+      if (item.equipTimeMultiplier !== draftGenericItem.equipTimeMultiplier) {
+        item.equipTimeMultiplier = draftGenericItem.equipTimeMultiplier;
+        changed = true;
+      }
+    }
+    if (changed) {
+      requestCommit('Изменение параметров предмета');
+      onUpdateStats();
+    }
+  }, [draftGenericItem]);
+
+  useEffect(() => {
     if (!targetId || !world || isReadOnly || !draftBag) return;
     let changed = false;
     const item = world.getComponent(targetId, 'item');
@@ -704,6 +758,12 @@ export const Inspector: React.FC<InspectorProps> = ({
   const isBagEmpty = !inv || inv.slots.every((r) => r.every((c) => !c.itemId));
   const isStandardRadiusOnly = currentArchetype === 'creature';
 
+  const hasAssembly = world.getComponent(targetId, 'assemblyRoot') !== undefined;
+  const anatomyParts =
+    currentArchetype === 'creature' || currentArchetype === 'bodyPart' || hasAssembly
+      ? getAnatomyParts(world, targetId)
+      : [];
+
   return (
     <div
       style={{
@@ -733,7 +793,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         }}
       >
         {path.map((crumb, idx) => (
-          <React.Fragment key={crumb.id}>
+          <React.Fragment key={`${crumb.id}_${idx}`}>
             <span
               style={{
                 cursor: idx < path.length - 1 ? 'pointer' : 'default',
@@ -962,6 +1022,57 @@ export const Inspector: React.FC<InspectorProps> = ({
                   isReadOnly={isReadOnly}
                   isBagInventoryEmpty={isBagEmpty}
                 />
+              </div>
+            </details>
+          )}
+
+          {draftGenericItem && (
+            <details open>
+              <summary style={summaryStyle}>Параметры части тела (как предмета)</summary>
+              <div style={contentStyle}>
+                <CommonItemFormFields
+                  values={draftGenericItem}
+                  onChange={(p: any) => setDraftGenericItem((prev: any) => ({ ...prev, ...p }))}
+                  isReadOnly={isReadOnly}
+                />
+              </div>
+            </details>
+          )}
+
+          {anatomyParts.length > 1 && (
+            <details open>
+              <summary style={summaryStyle}>Анатомия ({anatomyParts.length} частей)</summary>
+              <div style={contentStyle}>
+                {anatomyParts.map((partId) => {
+                  const meta = world.getComponent(partId, 'meta');
+                  const brain = world.getComponent(partId, 'bodyBrain');
+                  const isRoot = partId === targetId;
+                  return (
+                    <div
+                      key={partId}
+                      onClick={() => pushPath(partId, meta?.name || partId)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        borderBottom: '1px solid #333',
+                        cursor: 'pointer',
+                        backgroundColor: isRoot ? '#1b4332' : 'transparent',
+                        borderRadius: '4px',
+                        marginBottom: '4px',
+                      }}
+                    >
+                      <span style={{ color: isRoot ? '#2ecc71' : '#ecf0f1', fontSize: '12px' }}>
+                        {meta?.name || partId}
+                      </span>
+                      {brain && (
+                        <span style={{ fontSize: '10px', color: '#f1c40f', fontWeight: 'bold' }}>
+                          [Мозг: {brain.power}]
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </details>
           )}

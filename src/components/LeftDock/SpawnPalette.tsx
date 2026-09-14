@@ -1,11 +1,11 @@
 import React from 'react';
 import { EntityConfig } from '../../ecs/types';
-import { createDefaultCreatureConfig } from '../../Creature';
 import { createZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
 
 interface SpawnPaletteProps {
   onSelectPreset: (config: EntityConfig) => void;
+  onSelectModular: (behavior: string, name: string) => void;
 }
 
 interface PaletteItem {
@@ -13,7 +13,8 @@ interface PaletteItem {
   name: string;
   description: string;
   icon: string;
-  createConfig: () => EntityConfig;
+  createConfig?: () => EntityConfig;
+  onClick?: () => void;
 }
 
 interface PaletteCategory {
@@ -21,7 +22,7 @@ interface PaletteCategory {
   items: PaletteItem[];
 }
 
-export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset }) => {
+export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSelectModular }) => {
   const categories: PaletteCategory[] = [
     {
       title: 'Существа',
@@ -29,35 +30,23 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset }) =>
         {
           id: 'creature_player',
           name: 'Игрок',
-          description: 'Управление WASD, дерево PlayerTree',
+          description: 'Модульное существо, дерево PlayerTree',
           icon: '🎮',
-          createConfig: () => {
-            const config = createDefaultCreatureConfig('PlayerTree');
-            if (config.meta) config.meta.name = 'Игрок';
-            return config;
-          },
+          onClick: () => onSelectModular('PlayerTree', 'Игрок'),
         },
         {
           id: 'creature_attacker',
           name: 'Бот-атакующий',
           description: 'Поиск цели, преследование, AttackerTree',
           icon: '⚔️',
-          createConfig: () => {
-            const config = createDefaultCreatureConfig('AttackerTree');
-            if (config.meta) config.meta.name = 'Бот-атакующий';
-            return config;
-          },
+          onClick: () => onSelectModular('AttackerTree', 'Бот-атакующий'),
         },
         {
           id: 'creature_idle',
           name: 'Мирный бот',
-          description: 'Существо без активного поведения',
+          description: 'Модульное существо без активного поведения',
           icon: '👤',
-          createConfig: () => {
-            const config = createDefaultCreatureConfig('IdleTree');
-            if (config.meta) config.meta.name = 'Мирный бот';
-            return config;
-          },
+          onClick: () => onSelectModular('IdleTree', 'Мирный бот'),
         },
       ],
     },
@@ -415,12 +404,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset }) =>
           >
             {category.title}
           </div>
-
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {category.items.map((item) => (
               <div
                 key={item.id}
-                onClick={() => onSelectPreset(item.createConfig())}
+                onClick={() => {
+                  if (item.onClick) item.onClick();
+                  else if (item.createConfig) onSelectPreset(item.createConfig());
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

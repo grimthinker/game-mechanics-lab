@@ -43,21 +43,17 @@ export class AISystem {
 
   private getAllAIEntities(): EntityAdapter[] {
     const result: EntityAdapter[] = [];
-    const entities = this.world.getEntitiesWith(
-      'meta',
-      'transform',
-      'input',
-      'aiStats',
-      'health',
-      'brain'
-    );
+    const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'aiStats', 'health');
 
     // Собираем все ID существующих в мире сущностей для корректной очистки кэша
     const allWorldIds = new Set(this.world.getAllEntities().map(([id]) => id));
 
     for (const [id] of entities) {
       const adapter = this.getEntityAdapter(id);
-      if (adapter) result.push(adapter);
+      // Если у корня или в его анатомическом графе есть активный мозг — добавляем в обработку
+      if (adapter && adapter.brain) {
+        result.push(adapter);
+      }
     }
 
     // Очистка кэша от удаленных из мира сущностей (любого типа)

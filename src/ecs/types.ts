@@ -43,7 +43,41 @@ export interface PhysicsBodyComponent {
 }
 
 export type EntityArchetype =
-  'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'particles' | 'obstacle';
+  'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'particles' | 'obstacle' | 'bodyPart';
+
+export type SocketType = string;
+
+export interface SocketDef {
+  type: SocketType;
+  size: number;
+  maxChildSize?: number;
+  strength: number;
+}
+
+export interface SocketDefComponent {
+  sockets: Record<string, SocketDef>;
+}
+
+export interface SocketLink {
+  targetEntityId: string;
+  targetSocketId: string;
+  currentStrength: number;
+}
+
+export interface SocketLinkComponent {
+  links: Record<string, SocketLink>;
+}
+
+export interface BrainComponent {
+  power: number;
+  isActive: boolean;
+  rootEntityId?: string;
+}
+
+export interface AssemblyRootComponent {
+  rootPartId: string;
+  partIds: string[];
+}
 
 export interface TagComponent {
   archetype: EntityArchetype;
@@ -217,7 +251,7 @@ export interface HealthComponent {
   healthBarTimer?: number;
 }
 
-export type ItemType = 'weapon' | 'armor' | 'bag';
+export type ItemType = 'weapon' | 'armor' | 'bag' | 'bodyPart';
 
 export interface ItemData {
   name: string;
@@ -300,6 +334,7 @@ export interface InteractionActionComponent {
   type: 'pickup' | 'equip' | 'unequip';
   targetId?: string;
   slotIndex?: number;
+  partId?: string;
   areaId?: string;
   containerId?: EntityId;
   timer: number;
@@ -394,6 +429,10 @@ export interface EntityComponents {
   weaponZone?: HitZoneConfig;
   armorStats?: ArmorStatsComponent;
   timeScale?: TimeScaleComponent;
+  socketDef?: SocketDefComponent;
+  socketLink?: SocketLinkComponent;
+  bodyBrain?: BrainComponent;
+  assemblyRoot?: AssemblyRootComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -423,6 +462,10 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'activeAttacks',
   'input',
   'timeScale',
+  'socketDef',
+  'socketLink',
+  'bodyBrain',
+  'assemblyRoot',
 ] as const;
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
@@ -441,6 +484,7 @@ export type InventorySize = {
 export interface PhysicsConfig {
   radius: number;
   weight: number;
+  size?: number;
   isSolid?: boolean;
   points?: Point[];
 }
@@ -448,6 +492,7 @@ export interface PhysicsConfig {
 export interface PhysicsStatsComponent {
   radius: StatValue<number>;
   weight: StatValue<number>;
+  size?: number;
   isSolid: boolean;
   points?: Point[];
 }
@@ -619,11 +664,16 @@ export interface EntityConfig {
   weaponZone?: HitZoneConfig;
   armorStats?: Partial<ArmorCombatConfig>;
   timeScale?: TimeScaleComponent;
+  socketDef?: SocketDefComponent;
+  socketLink?: SocketLinkComponent;
+  bodyBrain?: BrainComponent;
+  assemblyRoot?: AssemblyRootComponent;
 }
 
 export interface ActiveAttack {
   weaponId: EntityId;
   slotIndex: number;
+  partId?: string;
   phase: 'prep' | 'cast' | 'recovery';
   timer: number;
   totalDuration: number;

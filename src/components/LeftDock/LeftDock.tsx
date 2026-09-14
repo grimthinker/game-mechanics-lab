@@ -8,13 +8,13 @@ import { BTGraph } from '../BTGraph';
 import { useResizable } from '../../hooks/useResizable';
 
 export type DockTab = 'hierarchy' | 'palette' | 'bt';
-
 export interface LeftDockProps {
   world: World | null | undefined;
   selectedEntityId: string | null;
   onSelectEntity: (id: string) => void;
   onFocusEntity: (id: string) => void;
   onSelectSpawnPreset: (config: EntityConfig) => void;
+  onSelectModular: (behavior: string, name: string) => void;
   btData: BTNodeDTO | null;
   btBlackboard: Record<string, any> | null;
   activeTab?: DockTab;
@@ -27,6 +27,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   onSelectEntity,
   onFocusEntity,
   onSelectSpawnPreset,
+  onSelectModular,
   btData,
   btBlackboard,
   activeTab: externalTab,
@@ -149,7 +150,9 @@ export const LeftDock: React.FC<LeftDockProps> = ({
           />
         )}
 
-        {activeTab === 'palette' && <SpawnPalette onSelectPreset={onSelectSpawnPreset} />}
+        {activeTab === 'palette' && (
+          <SpawnPalette onSelectPreset={onSelectSpawnPreset} onSelectModular={onSelectModular} />
+        )}
 
         {activeTab === 'bt' && (
           <div

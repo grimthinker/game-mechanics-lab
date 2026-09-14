@@ -15,6 +15,7 @@ import { IRenderer, RenderContext } from './IRenderer';
 import { GizmoRenderer } from '../gizmos/GizmoRenderer';
 import { GizmoRenderData } from '../gizmos/types';
 import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
+import { findActiveBrain } from '../ecs/utils/anatomy';
 
 export class CanvasRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
@@ -193,7 +194,15 @@ export class CanvasRenderer implements IRenderer {
 
     for (const id of selectedIds) {
       const transform = world.getComponent(id, 'transform');
-      const brain = world.getComponent(id, 'brain') as any; // BTLogicComponent
+      let brain = world.getComponent(id, 'brain') as any; // BTLogicComponent
+
+      if (!brain) {
+        const activeBrainId = findActiveBrain(world, id);
+        if (activeBrainId) {
+          brain = world.getComponent(activeBrainId, 'brain');
+        }
+      }
+
       if (!transform || !brain) continue;
 
       const bb = brain.blackboard;
@@ -644,10 +653,17 @@ export class CanvasRenderer implements IRenderer {
     for (const [id, entity] of entities) {
       if (!this.isEntityAlive(world, id)) continue;
 
+      const tag = world.getComponent(id, 'tag');
+      const archetype = tag?.archetype ?? entity.meta?.entityType;
+
+      // Части тела, предметы и маркеры не должны показывать полоски HP и имена над существом
+      if (archetype === 'bodyPart' || archetype === 'item' || archetype === 'marker') {
+        continue;
+      }
+
       const transform = entity.transform;
       const meta = entity.meta;
-      const tag = world.getComponent(id, 'tag');
-      const isObstacle = tag?.archetype === 'obstacle';
+      const isObstacle = archetype === 'obstacle';
 
       if (isObstacle) {
         if (!meta?.destructible) continue;

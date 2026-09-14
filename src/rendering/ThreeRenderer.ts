@@ -170,8 +170,8 @@ export class ThreeRenderer implements IRenderer {
       const tag = world.getComponent(id, 'tag');
       const archetype = tag?.archetype ?? entity.meta?.entityType;
 
-      // Имена для предметов показываются через тултип, а маркеры в 3D скрыты
-      if (archetype === 'item' || archetype === 'marker') continue;
+      // Имена для предметов показываются через тултип, маркеры и части тела скрыты в общем оверлее
+      if (archetype === 'item' || archetype === 'marker' || archetype === 'bodyPart') continue;
 
       const health = world.getComponent(id, 'health');
       if (health && !health.isAlive) continue;

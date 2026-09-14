@@ -20,6 +20,7 @@ const ARCHETYPE_LABELS: Record<string, { label: string; icon: string }> = {
   obstacle: { label: 'Препятствия', icon: '🧱' },
   zone: { label: 'Зоны', icon: '🌀' },
   marker: { label: 'Маркеры', icon: '📍' },
+  bodyPart: { label: 'Части тел', icon: '🥩' },
 };
 
 export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({

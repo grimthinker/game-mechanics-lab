@@ -91,16 +91,21 @@ export class CanvasRenderSyncSystem {
         continue;
       }
 
-      // 2.5 Синхронизация предметов
+      // 2.5 Синхронизация предметов (включая оторванные связки частей тел)
       if (archetype === 'item') {
         const physStats = world.getComponent(id, 'physicsStats');
-        if (physStats) {
+        if (physStats && renderable.isVisible) {
           const radius = physStats.radius.current;
           const rectPrim = renderable.primitives[0];
           if (rectPrim && rectPrim.kind === 'rect') {
             const size = radius * 1.6;
             rectPrim.width = size;
             rectPrim.height = size;
+
+            // Оранжевый цвет для связок плоти
+            if (tag?.subType === 'bodyPart') {
+              rectPrim.fill = '#e67e22';
+            }
           }
         }
       }

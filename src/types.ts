@@ -5,4 +5,5 @@ export interface Point {
   y: number;
 }
 
-export type PlacementMode = { kind: 'entity'; config: EntityConfig };
+export type PlacementMode =
+  { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; behavior: string; name: string };

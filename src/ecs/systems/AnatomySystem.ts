@@ -1,0 +1,316 @@
+import { World } from '../World';
+import { PhysicsSystem } from './PhysicsSystem';
+import { EntityId, CollisionCategory, COLLISION_MASK_ALL, RENDER_Z_INDEX } from '../types';
+import {
+  traverseAnatomyGraph,
+  calculateSystemWeightAndRadius,
+  findActiveBrain,
+} from '../utils/anatomy';
+import { Circle } from 'detect-collisions';
+import { setBaseStat, createStat } from '../stats/StatEvaluator';
+
+export class AnatomySystem {
+  public update(dt: number, world: World, physics: PhysicsSystem): void {
+    const bodyParts = world.getEntitiesWith('socketDef');
+    const visitedGraphs = new Set<EntityId>();
+
+    for (const [partId] of bodyParts) {
+      if (visitedGraphs.has(partId)) continue;
+
+      // 1. Получаем весь связанный граф частей тела
+      const graph = traverseAnatomyGraph(world, partId);
+      graph.forEach((id) => visitedGraphs.add(id));
+
+      // 2. Ищем активный мозг и считаем общие физические статы системы
+      const brainId = findActiveBrain(world, partId);
+      const { totalWeight, maxRadius } = calculateSystemWeightAndRadius(world, partId);
+
+      // 3. Вычисляем суммарный габарит связки как корень из суммы квадратов размеров всех частей
+      let sumSqSize = 0;
+      for (const id of graph) {
+        const pStats = world.getComponent(id, 'physicsStats');
+        const partSize = pStats?.size ?? 10;
+        sumSqSize += partSize * partSize;
+      }
+      const calculatedSize = Math.max(1, Math.round(Math.sqrt(sumSqSize)));
+
+      // 4. Распределяем логику: живое существо или предметная связка?
+      if (brainId) {
+        this.handleCreatureGraph(world, physics, graph, brainId, totalWeight, maxRadius);
+      } else {
+        this.handleItemGraph(world, physics, graph, totalWeight, maxRadius, calculatedSize);
+      }
+    }
+  }
+
+  private handleCreatureGraph(
+    world: World,
+    physics: PhysicsSystem,
+    graph: EntityId[],
+    brainId: EntityId,
+    totalWeight: number,
+    maxRadius: number
+  ): void {
+    const brain = world.getComponent(brainId, 'bodyBrain')!;
+    let rootId = brain.rootEntityId;
+
+    // Если у мозга нет корня — создаем абстрактный корень существа
+    if (!rootId || !world.getEntity(rootId)) {
+      rootId = `creature_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      world.createEntity(rootId);
+      brain.rootEntityId = rootId;
+
+      if (!world.getComponent(rootId, 'transform'))
+        world.addComponent(rootId, 'transform', { x: 0, y: 0, angle: 0 });
+      if (!world.getComponent(rootId, 'input'))
+        world.addComponent(rootId, 'input', {
+          desiredMoveVector: null,
+          turnDirection: 0,
+          turnRatio: 0,
+          isMovingForward: false,
+          isRunning: false,
+          isCrouching: false,
+          isSlowWalking: false,
+          wantsAttack: false,
+          desiredStance: 'standing',
+        });
+    }
+
+    // Регистрируем связку анатомии на Корне
+    world.addComponent(rootId, 'assemblyRoot', { rootPartId: brainId, partIds: graph });
+    world.removeComponent(rootId, 'item'); // Корень существа — не предмет
+
+    // 1. Агрегация физических свойств в Root
+    let rootPhysStats = world.getComponent(rootId, 'physicsStats');
+    if (!rootPhysStats) {
+      world.addComponent(rootId, 'physicsStats', {
+        radius: createStat(maxRadius),
+        weight: createStat(totalWeight),
+        isSolid: true,
+      });
+      rootPhysStats = world.getComponent(rootId, 'physicsStats')!;
+    } else {
+      setBaseStat(rootPhysStats.radius, maxRadius);
+      setBaseStat(rootPhysStats.weight, totalWeight);
+    }
+
+    let rootPhysBody = world.getComponent(rootId, 'physicsBody');
+    const rootTransform = world.getComponent(rootId, 'transform') ?? { x: 0, y: 0, angle: 0 };
+    if (!rootPhysBody) {
+      const body = new Circle({ x: rootTransform.x, y: rootTransform.y }, Math.max(1, maxRadius));
+      body.isStatic = false;
+      world.addComponent(rootId, 'physicsBody', {
+        body,
+        isStatic: false,
+        category: CollisionCategory.CREATURE,
+        mask: COLLISION_MASK_ALL,
+      });
+      physics.registerBody(rootId, body);
+    } else if (rootPhysBody.body instanceof Circle) {
+      rootPhysBody.body.r = Math.max(1, maxRadius);
+      rootPhysBody.category = CollisionCategory.CREATURE;
+    }
+
+    // 2. Логика ног
+    let legCount = 0;
+    for (const id of graph) {
+      const tag = world.getComponent(id, 'tag');
+      const meta = world.getComponent(id, 'meta');
+      if (tag?.subType === 'leg' || meta?.name.toLowerCase().includes('ног')) {
+        legCount++;
+      }
+    }
+
+    if (legCount < 2) {
+      const input = world.getComponent(rootId, 'input');
+      if (input) {
+        input.desiredStance = 'prone';
+      }
+    }
+
+    // 3. Синхронизация: части тела следуют за корнем и не имеют своих коллайдеров/предметов
+    for (const partId of graph) {
+      const partTransform = world.getComponent(partId, 'transform');
+      if (partTransform) {
+        partTransform.x = rootTransform.x;
+        partTransform.y = rootTransform.y;
+        partTransform.angle = rootTransform.angle;
+      }
+      // Очищаем физику и свойства предметов с самих частей тела (они внутри существа)
+      const physBody = world.getComponent(partId, 'physicsBody');
+      if (physBody) {
+        physics.unregisterBody(physBody.body);
+        world.removeComponent(partId, 'physicsBody');
+      }
+      world.removeComponent(partId, 'item');
+    }
+  }
+
+  private handleItemGraph(
+    world: World,
+    physics: PhysicsSystem,
+    graph: EntityId[],
+    totalWeight: number,
+    maxRadius: number,
+    maxSize: number
+  ): void {
+    // 1. Очищаем старые корни существ, которые потеряли мозг и чьи части теперь стали предметом
+    const existingRoots = world.getEntitiesWith('assemblyRoot');
+    for (const [id, comp] of existingRoots) {
+      const tag = world.getComponent(id, 'tag');
+      if (
+        tag?.archetype === 'creature' &&
+        comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))
+      ) {
+        const phys = world.getComponent(id, 'physicsBody');
+        if (phys) physics.unregisterBody(phys.body);
+        world.removeEntity(id);
+      }
+    }
+
+    // 2. Находим центральную часть (максимум связей) для ориентации в пространстве
+    let anchorPartId = graph[0];
+    let maxLinks = -1;
+    for (const id of graph) {
+      const linkComp = world.getComponent(id, 'socketLink');
+      const linksCount = linkComp ? Object.keys(linkComp.links).length : 0;
+      if (linksCount > maxLinks) {
+        maxLinks = linksCount;
+        anchorPartId = id;
+      }
+    }
+
+    // 3. Ищем существующий абстрактный Корень-предмет для этой связки
+    const assemblyRoots = world.getEntitiesWith('assemblyRoot');
+    let rootItemId = assemblyRoots.find(([id, comp]) => {
+      const isItem = world.getComponent(id, 'tag')?.archetype === 'item';
+      return isItem && graph.includes(comp.assemblyRoot.rootPartId);
+    })?.[0];
+
+    const anchorTransform = world.getComponent(anchorPartId, 'transform') ?? {
+      x: 0,
+      y: 0,
+      angle: 0,
+    };
+
+    // 3. Если Корня-предмета нет — создаем абстрактную сущность-обертку
+    if (!rootItemId || !world.getEntity(rootItemId)) {
+      rootItemId = `item_assembly_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      world.createEntity(rootItemId);
+      world.addComponent(rootItemId, 'transform', {
+        x: anchorTransform.x,
+        y: anchorTransform.y,
+        angle: anchorTransform.angle,
+      });
+    }
+
+    // Настраиваем свойства абстрактного Корня-предмета
+    world.addComponent(rootItemId, 'tag', { archetype: 'item', subType: 'bodyPart' });
+    world.addComponent(rootItemId, 'meta', { name: 'Часть тела', entityType: 'item' });
+    world.addComponent(rootItemId, 'assemblyRoot', { rootPartId: anchorPartId, partIds: graph });
+
+    // Добавляем компонент предмета на Корень (сами части тела остаются нетронутыми!)
+    let itemComp = world.getComponent(rootItemId, 'item');
+    if (!itemComp) {
+      world.addComponent(rootItemId, 'item', {
+        name: 'Часть тела',
+        type: 'bodyPart',
+        maxStack: 1,
+        size: maxSize,
+        equipTypes: [],
+        equippable: false,
+        equipTimeMultiplier: 1.0,
+      });
+    } else {
+      itemComp.size = maxSize;
+    }
+
+    // Статы физики на Корне
+    let rootPhysStats = world.getComponent(rootItemId, 'physicsStats');
+    if (!rootPhysStats) {
+      world.addComponent(rootItemId, 'physicsStats', {
+        radius: createStat(maxRadius),
+        weight: createStat(totalWeight),
+        size: maxSize,
+        isSolid: true,
+      });
+      rootPhysStats = world.getComponent(rootItemId, 'physicsStats')!;
+    } else {
+      setBaseStat(rootPhysStats.radius, maxRadius);
+      setBaseStat(rootPhysStats.weight, totalWeight);
+      rootPhysStats.size = maxSize;
+    }
+
+    const rootItemTransform = world.getComponent(rootItemId, 'transform') ?? anchorTransform;
+    const ownership = world.getComponent(rootItemId, 'ownership');
+
+    // 4. Физическое тело и рендер для Корня-предмета на полу
+    if (!ownership) {
+      let physBody = world.getComponent(rootItemId, 'physicsBody');
+      if (!physBody) {
+        const body = new Circle(
+          { x: rootItemTransform.x, y: rootItemTransform.y },
+          Math.max(1, maxRadius)
+        );
+        body.isStatic = false;
+        world.addComponent(rootItemId, 'physicsBody', {
+          body,
+          isStatic: false,
+          category: CollisionCategory.ITEM,
+          mask: COLLISION_MASK_ALL,
+        });
+        physics.registerBody(rootItemId, body);
+      } else if (physBody.body instanceof Circle) {
+        physBody.body.r = Math.max(1, maxRadius);
+        physBody.category = CollisionCategory.ITEM;
+      }
+
+      // Визуал лежащей связки на полу
+      let renderable = world.getComponent(rootItemId, 'renderable');
+      const boxSize = maxRadius * 1.6;
+      if (!renderable) {
+        world.addComponent(rootItemId, 'renderable', {
+          zIndex: RENDER_Z_INDEX.ITEMS,
+          isVisible: true,
+          syncWithTransform: true,
+          primitives: [{ kind: 'rect', width: boxSize, height: boxSize, fill: '#e67e22' }],
+        });
+      } else {
+        renderable.isVisible = true;
+        if (renderable.primitives[0] && renderable.primitives[0].kind === 'rect') {
+          renderable.primitives[0].width = boxSize;
+          renderable.primitives[0].height = boxSize;
+        }
+      }
+    } else {
+      // Предмет поднят в инвентарь — отключаем физику и скрываем визуал
+      const physBody = world.getComponent(rootItemId, 'physicsBody');
+      if (physBody) {
+        physics.unregisterBody(physBody.body);
+        world.removeComponent(rootItemId, 'physicsBody');
+      }
+      const renderable = world.getComponent(rootItemId, 'renderable');
+      if (renderable) {
+        renderable.isVisible = false;
+      }
+    }
+
+    // 5. Синхронизируем положение частей тела с Корнем-предметом
+    for (const partId of graph) {
+      const partTransform = world.getComponent(partId, 'transform');
+      if (partTransform) {
+        partTransform.x = rootItemTransform.x;
+        partTransform.y = rootItemTransform.y;
+        partTransform.angle = rootItemTransform.angle;
+      }
+      // Очищаем физику, item и renderable с индивидуальных частей тела
+      const physBody = world.getComponent(partId, 'physicsBody');
+      if (physBody) {
+        physics.unregisterBody(physBody.body);
+        world.removeComponent(partId, 'physicsBody');
+      }
+      world.removeComponent(partId, 'item');
+      world.removeComponent(partId, 'renderable');
+    }
+  }
+}

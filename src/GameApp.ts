@@ -8,6 +8,7 @@ import { AISystem } from './ecs/systems/AISystem';
 import { CanvasRenderSyncSystem } from './ecs/systems/CanvasRenderSyncSystem';
 import { InteractionSystem } from './ecs/systems/InteractionSystem';
 import { AreaEffectorSystem } from './ecs/systems/AreaEffectorSystem';
+import { AnatomySystem } from './ecs/systems/AnatomySystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
@@ -21,11 +22,11 @@ import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
 import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
-import { createDefaultCreatureConfig } from './Creature';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { deg2Rad, Radians } from './utils';
 import { HistoryManager, HistoryRecord } from './history/HistoryManager';
 import { GizmoTool, GizmoHandle, GizmoDragState, GizmoInitialEntityData } from './gizmos/types';
+import { getAnatomyParts } from './ecs/utils/hierarchy';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -42,6 +43,7 @@ export class GameApp {
   private attackSystem: AttackSystem;
   private damageSystem: DamageSystem;
   public aiSystem: AISystem;
+  private anatomySystem: AnatomySystem;
   private canvasRenderSyncSystem: CanvasRenderSyncSystem;
   private threeSyncSystem: ThreeSyncSystem | null = null;
   public interactionSystem: InteractionSystem;
@@ -116,6 +118,7 @@ export class GameApp {
     this.attackSystem = new AttackSystem();
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
+    this.anatomySystem = new AnatomySystem();
     this.canvasRenderSyncSystem = new CanvasRenderSyncSystem();
     this.interactionSystem = new InteractionSystem();
     this.areaEffectorSystem = new AreaEffectorSystem();
@@ -372,6 +375,18 @@ export class GameApp {
   private deleteEntityRecursive(id: string): void {
     if (!this.world.getEntity(id)) return;
 
+    // Каскадное удаление анатомических частей тела при удалении существа или связки частей
+    const tag = this.world.getComponent(id, 'tag');
+    const isAssembly = this.world.getComponent(id, 'assemblyRoot');
+    if (tag?.archetype === 'creature' || isAssembly) {
+      const parts = getAnatomyParts(this.world, id);
+      for (const partId of parts) {
+        if (partId !== id) {
+          this.deleteEntityRecursive(partId);
+        }
+      }
+    }
+
     // Каскадное удаление привязанных дочерних сущностей (ауры, зоны и т.д.)
     const attachedEntities = this.world.getEntitiesWith('attachment');
     for (const [childId, { attachment }] of attachedEntities) {
@@ -429,7 +444,14 @@ export class GameApp {
       y: this.canvas.height / 2,
     };
 
-    this.spawnEntity(createDefaultCreatureConfig('PlayerTree'), spawnPos);
+    this.entityFactory.spawnModularHumanoid(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      spawnPos,
+      'PlayerTree',
+      'Игрок'
+    );
     this.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 180, y: spawnPos.y });
     this.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 180, y: spawnPos.y });
     this.spawnEntity(
@@ -749,6 +771,9 @@ export class GameApp {
       this.updatePlayerAim(worldPoint);
     }
 
+    // AnatomySystem работает перед модификаторами и физикой,
+    // чтобы актуализировать графы и базовые статы (вес/радиус)
+    this.anatomySystem.update(dt, this.world, this.physics);
     this.modifierSystem.update(dt, this.world);
     this.aiSystem.update(dt, this.world);
     this.interactionSystem.update(dt, this.world, this.physics);

@@ -211,10 +211,12 @@ export class ThreeSyncSystem {
       const geo = new THREE.BoxGeometry(w, h, d);
       mainMesh = new THREE.Mesh(geo, this.matObstacle);
       mainMesh.position.y = h / 2;
-    } else if (archetype === 'item') {
+    } else if (archetype === 'item' || archetype === 'bodyPart') {
       const item = world.getComponent(id, 'item');
       let mat = this.matWeapon;
-      if (item?.type === 'armor') mat = this.matArmor;
+      if (archetype === 'bodyPart')
+        mat = this.matEnemy; // Красновато-коричневый оттенок плоти
+      else if (item?.type === 'armor') mat = this.matArmor;
       else if (item?.type === 'bag') mat = this.matBag;
 
       const size = radius * 1.5;

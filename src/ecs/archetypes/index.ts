@@ -5,6 +5,7 @@ import { assembleItem } from './ItemArchetype';
 import { assembleMarker } from './MarkerArchetype';
 import { assembleZone } from './ZoneArchetype';
 import { assembleObstacle } from './ObstacleArchetype';
+import { assembleBodyPart } from './BodyPartArchetype';
 
 export * from './types';
 export * from './CreatureArchetype';
@@ -12,6 +13,7 @@ export * from './ItemArchetype';
 export * from './MarkerArchetype';
 export * from './ZoneArchetype';
 export * from './ObstacleArchetype';
+export * from './BodyPartArchetype';
 
 export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   creature: assembleCreature,
@@ -21,6 +23,7 @@ export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   obstacle: assembleObstacle,
   projectile: assembleCreature,
   particles: assembleMarker,
+  bodyPart: assembleBodyPart,
 };
 
 export function detectArchetype(config: EntityConfig): EntityArchetype {

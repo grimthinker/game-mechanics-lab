@@ -8,11 +8,60 @@ import {
   EquipmentComponent,
   InventoryComponent,
   PhysicsStatsComponent,
+  InteractionSlot,
 } from '../types';
+import { traverseAnatomyGraph, findActiveBrain } from './anatomy';
+
+export interface AggregatedSlot {
+  partId: EntityId;
+  localSlotIndex: number;
+  globalSlotIndex: number;
+  slot: InteractionSlot;
+}
 
 /**
- * Поднимается вверх по цепочке владения (ownership.ownerId) и находит корневую сущность.
- * Если корень — существо (archetype: creature), возвращает его ID.
+ * Возвращает все части тела, привязанные к абстрактному корню существа (или саму часть, если это предмет)
+ */
+export function getAnatomyParts(world: World, rootEntityId: EntityId): EntityId[] {
+  if (world.getComponent(rootEntityId, 'socketDef')) {
+    return traverseAnatomyGraph(world, rootEntityId).sort();
+  }
+  const assembly = world.getComponent(rootEntityId, 'assemblyRoot');
+  if (assembly) {
+    return traverseAnatomyGraph(world, assembly.rootPartId).sort();
+  }
+  const brains = world.getEntitiesWith('bodyBrain');
+  for (const [partId, { bodyBrain }] of brains) {
+    if (bodyBrain.rootEntityId === rootEntityId) {
+      return traverseAnatomyGraph(world, partId).sort();
+    }
+  }
+  return [rootEntityId];
+}
+
+/**
+ * Собирает слоты взаимодействия (руки) со всех частей тела в единый плоский массив
+ */
+export function getAggregatedInteractionSlots(
+  world: World,
+  rootEntityId: EntityId
+): AggregatedSlot[] {
+  const parts = getAnatomyParts(world, rootEntityId);
+  const result: AggregatedSlot[] = [];
+  let globalIdx = 0;
+  for (const partId of parts) {
+    const comp = world.getComponent(partId, 'interactionSlots');
+    if (comp) {
+      comp.slots.forEach((slot, localIdx) => {
+        result.push({ partId, localSlotIndex: localIdx, globalSlotIndex: globalIdx++, slot });
+      });
+    }
+  }
+  return result;
+}
+
+/**
+ * Поднимается вверх по цепочке владения (ownership.ownerId) и анатомии (brain.rootEntityId).
  */
 export function getRootOwner(world: World, entityId: EntityId): EntityId | null {
   const visited = new Set<EntityId>();
@@ -20,10 +69,28 @@ export function getRootOwner(world: World, entityId: EntityId): EntityId | null 
 
   while (current && !visited.has(current)) {
     visited.add(current);
+
+    const brain = world.getComponent(current, 'bodyBrain');
+    if (brain && brain.rootEntityId) {
+      return brain.rootEntityId;
+    }
+
+    const socketDef = world.getComponent(current, 'socketDef');
+    if (socketDef) {
+      const activeBrainId = findActiveBrain(world, current);
+      if (activeBrainId) {
+        const activeBrain = world.getComponent(activeBrainId, 'bodyBrain');
+        if (activeBrain && activeBrain.rootEntityId) {
+          return activeBrain.rootEntityId;
+        }
+      }
+    }
+
     const tag: TagComponent | undefined = world.getComponent(current, 'tag');
     if (tag?.archetype === 'creature') {
       return current;
     }
+
     const ownership: OwnershipComponent | undefined = world.getComponent(current, 'ownership');
     if (!ownership || !ownership.ownerId) {
       return current;
@@ -35,32 +102,52 @@ export function getRootOwner(world: World, entityId: EntityId): EntityId | null 
 }
 
 /**
- * Проверяет, является ли potentialDescendantId потомком ancestorId (вложен внутрь по цепочке ownership).
- * Предотвращает циклические вложения контейнеров друг в друга.
+ * Проверяет, является ли potentialDescendantId потомком ancestorId по владению или анатомии.
  */
 export function isDescendantOf(
   world: World,
-  potentialDescendantId: EntityId,
+  descendantId: EntityId,
   ancestorId: EntityId
 ): boolean {
-  if (potentialDescendantId === ancestorId) return true;
+  if (descendantId === ancestorId) return true;
 
   const visited = new Set<EntityId>();
-  let current: EntityId | undefined = potentialDescendantId;
+  let current: EntityId | undefined = descendantId;
 
   while (current && !visited.has(current)) {
     visited.add(current);
+    if (current === ancestorId) return true;
+
     const ownership: OwnershipComponent | undefined = world.getComponent(current, 'ownership');
-    if (!ownership || !ownership.ownerId) return false;
-    if (ownership.ownerId === ancestorId) return true;
-    current = ownership.ownerId;
+    if (ownership && ownership.ownerId) {
+      current = ownership.ownerId;
+      continue;
+    }
+
+    const socketDef = world.getComponent(current, 'socketDef');
+    if (socketDef) {
+      const activeBrainId = findActiveBrain(world, current);
+      if (activeBrainId) {
+        const activeBrain = world.getComponent(activeBrainId, 'bodyBrain');
+        if (activeBrain && activeBrain.rootEntityId === ancestorId) {
+          return true;
+        }
+      } else {
+        const assembly = world.getComponent(ancestorId, 'assemblyRoot');
+        if (assembly && (assembly.partIds?.includes(current) || assembly.rootPartId === current)) {
+          return true;
+        }
+      }
+    }
+
+    break;
   }
 
   return false;
 }
 
 /**
- * Рекурсивно собирает все ID предметов, находящихся во всех областях экипировки сущности и её подуровней.
+ * Рекурсивно собирает все ID предметов, находящихся во всех областях экипировки существа и его частей.
  */
 export function getAllEquippedDescendants(world: World, rootEntityId: EntityId): EntityId[] {
   const result: EntityId[] = [];
@@ -81,12 +168,14 @@ export function getAllEquippedDescendants(world: World, rootEntityId: EntityId):
     }
   }
 
-  traverse(rootEntityId);
+  const parts = getAnatomyParts(world, rootEntityId);
+  for (const partId of parts) traverse(partId);
+
   return result;
 }
 
 /**
- * Рекурсивно собирает все ID предметов, содержащихся в сущности (и в equip.equipmentAreas, и в inventory.slots).
+ * Рекурсивно собирает все ID предметов, содержащихся в сущности (экипировка + инвентарь).
  */
 export function getAllContainedItems(world: World, rootEntityId: EntityId): EntityId[] {
   const result: EntityId[] = [];
@@ -119,7 +208,9 @@ export function getAllContainedItems(world: World, rootEntityId: EntityId): Enti
     }
   }
 
-  traverse(rootEntityId);
+  const parts = getAnatomyParts(world, rootEntityId);
+  for (const partId of parts) traverse(partId);
+
   return result;
 }
 
@@ -170,7 +261,7 @@ export function isItemEquippableToArea(item: ItemData, areaType: string): boolea
 }
 
 /**
- * Ищет область экипировки в дереве персонажа (на самом существе или на его экипированных предметах).
+ * Ищет область экипировки в дереве персонажа (на частях существа или на экипированных предметах).
  */
 export function findEquipmentAreaInHierarchy(
   world: World,
@@ -186,10 +277,13 @@ export function findEquipmentAreaInHierarchy(
     }
   }
 
-  const rootEquip = world.getComponent(rootEntityId, 'equip');
-  const rootArea = rootEquip?.equipmentAreas.find((a) => a.id === areaId);
-  if (rootArea) {
-    return { containerId: rootEntityId, area: rootArea };
+  const parts = getAnatomyParts(world, rootEntityId);
+  for (const partId of parts) {
+    const partEquip = world.getComponent(partId, 'equip');
+    const partArea = partEquip?.equipmentAreas.find((a) => a.id === areaId);
+    if (partArea) {
+      return { containerId: partId, area: partArea };
+    }
   }
 
   const descendants = getAllEquippedDescendants(world, rootEntityId);

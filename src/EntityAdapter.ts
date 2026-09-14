@@ -24,7 +24,8 @@ import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from
 import { LOGIC_CONFIG } from './ai/config';
 import { Point } from './types';
 import { Radians } from './utils';
-import { calculateTotalEntityWeight } from './ecs/utils/hierarchy';
+import { calculateTotalEntityWeight, getAggregatedInteractionSlots } from './ecs/utils/hierarchy';
+import { findActiveBrain } from './ecs/utils/anatomy';
 
 export class EntityAdapter implements IMovable, EntityController {
   public dt: number = 0;
@@ -191,7 +192,14 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.interactionAction?.phase ?? null;
   }
   public get brain(): BTLogicComponent | undefined {
-    return this.getComponent('brain') as BTLogicComponent | undefined;
+    let b = this.getComponent('brain') as BTLogicComponent | undefined;
+    if (!b) {
+      const activeBrainId = findActiveBrain(this.world, this.id);
+      if (activeBrainId) {
+        b = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
+      }
+    }
+    return b;
   }
   public get attackStatus(): AttackStatus {
     const activeAttacks = this.getComponent('activeAttacks');
@@ -393,18 +401,17 @@ export class EntityAdapter implements IMovable, EntityController {
     return activeAttacks?.attacks.some((a) => a.weaponId === weaponId) ?? false;
   }
   public getFreeWeaponSlots(): { slotIndex: number; weaponId: EntityId }[] {
-    const slotsComp = this.getComponent('interactionSlots');
+    const aggSlots = getAggregatedInteractionSlots(this.world, this.id);
     const activeAttacks = this.getComponent('activeAttacks');
-    if (!slotsComp) return [];
 
-    const busySlots = new Set(activeAttacks?.attacks.map((a) => a.slotIndex));
+    const busyGlobalIndices = new Set(activeAttacks?.attacks.map((a: any) => a.slotIndex));
     const freeSlots: { slotIndex: number; weaponId: EntityId }[] = [];
 
-    slotsComp.slots.forEach((slot, index) => {
-      if (slot.itemId !== null && !busySlots.has(index)) {
-        const item = this.world.getComponent(slot.itemId, 'item');
+    aggSlots.forEach((info: any) => {
+      if (info.slot.itemId !== null && !busyGlobalIndices.has(info.globalSlotIndex)) {
+        const item = this.world.getComponent(info.slot.itemId, 'item');
         if (item?.type === 'weapon') {
-          freeSlots.push({ slotIndex: index, weaponId: slot.itemId });
+          freeSlots.push({ slotIndex: info.globalSlotIndex, weaponId: info.slot.itemId });
         }
       }
     });

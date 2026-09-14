@@ -1,45 +1,54 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { applyDamage } from '../utils/health';
-import { getAllEquippedDescendants } from '../utils/hierarchy';
+import { getAllEquippedDescendants, getAggregatedInteractionSlots } from '../utils/hierarchy';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
-    const entities = world.getEntitiesWith('interactionSlots', 'activeAttacks', 'health', 'input');
+    // В новой архитектуре слоты могут быть на частях тела, поэтому запрашиваем корневые сущности с activeAttacks
+    const entities = world.getEntitiesWith('activeAttacks', 'health', 'input');
 
-    for (const [id, { interactionSlots, activeAttacks, health, input }] of entities) {
+    for (const [id, { activeAttacks, health, input }] of entities) {
       if (!health.isAlive) continue;
 
+      const aggSlots = getAggregatedInteractionSlots(world, id);
+
       if (input.wantsAttack && !input.isRunning) {
-        const busySlots = new Set(activeAttacks.attacks.map((a) => a.slotIndex));
-        let chosenSlotIndex = -1;
+        const busyGlobalIndices = new Set(activeAttacks.attacks.map((a) => a.slotIndex));
+        let chosenGlobalIndex = -1;
 
         if (input.attackSlotIndex !== undefined) {
-          const slot = interactionSlots.slots[input.attackSlotIndex];
-          if (slot && slot.itemId !== null && !busySlots.has(input.attackSlotIndex)) {
-            const item = world.getComponent(slot.itemId, 'item');
+          const slotInfo = aggSlots[input.attackSlotIndex];
+          if (
+            slotInfo &&
+            slotInfo.slot.itemId !== null &&
+            !busyGlobalIndices.has(input.attackSlotIndex)
+          ) {
+            const item = world.getComponent(slotInfo.slot.itemId, 'item');
             if (item?.type === 'weapon') {
-              chosenSlotIndex = input.attackSlotIndex;
+              chosenGlobalIndex = input.attackSlotIndex;
             }
           }
         } else {
-          chosenSlotIndex = interactionSlots.slots.findIndex((s, idx) => {
-            if (s.itemId === null || busySlots.has(idx)) return false;
-            const item = world.getComponent(s.itemId, 'item');
+          chosenGlobalIndex = aggSlots.findIndex((info) => {
+            if (info.slot.itemId === null || busyGlobalIndices.has(info.globalSlotIndex))
+              return false;
+            const item = world.getComponent(info.slot.itemId, 'item');
             return item?.type === 'weapon';
           });
         }
 
-        if (chosenSlotIndex !== -1) {
-          const weaponSlot = interactionSlots.slots[chosenSlotIndex];
-          const weaponId = weaponSlot.itemId!;
+        if (chosenGlobalIndex !== -1) {
+          const weaponSlotInfo = aggSlots[chosenGlobalIndex];
+          const weaponId = weaponSlotInfo.slot.itemId!;
           const wStats = world.getComponent(weaponId, 'weaponStats');
 
           if (wStats) {
             const prepTime = wStats.prepTime.current;
             activeAttacks.attacks.push({
               weaponId,
-              slotIndex: chosenSlotIndex,
+              slotIndex: chosenGlobalIndex,
+              partId: weaponSlotInfo.partId,
               phase: 'prep',
               timer: prepTime,
               totalDuration: prepTime,
@@ -54,8 +63,24 @@ export class AttackSystem {
       for (let i = activeAttacks.attacks.length - 1; i >= 0; i--) {
         const atk = activeAttacks.attacks[i];
 
-        const slot = interactionSlots.slots[atk.slotIndex];
-        const isStillEquipped = slot && slot.itemId === atk.weaponId;
+        let isStillEquipped = false;
+        if (atk.partId) {
+          const slotsComp = world.getComponent(atk.partId, 'interactionSlots');
+          // Если часть тела оторвали и у нее больше нет компонента или слота, атака отменится
+          if (slotsComp) {
+            // Для восстановления локального индекса ищем слот по weaponId
+            const slot = slotsComp.slots.find((s) => s.itemId === atk.weaponId);
+            isStillEquipped = !!slot;
+          }
+        } else {
+          // Fallback на старую логику для совместимости, если partId нет
+          const slotsComp = world.getComponent(id, 'interactionSlots');
+          if (slotsComp) {
+            const slot = slotsComp.slots[atk.slotIndex];
+            isStillEquipped = slot && slot.itemId === atk.weaponId;
+          }
+        }
+
         const wStats = isStillEquipped
           ? world.getComponent(atk.weaponId, 'weaponStats')
           : undefined;
