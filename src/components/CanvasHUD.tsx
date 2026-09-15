@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Camera } from '../Camera';
 import { Point } from '../types';
-import { CAMERA_CONFIG } from '../config/cameraConfig';
 import { GizmoTool } from '../gizmos/types';
+import { t } from '../locales';
+import { CAMERA_CONFIG } from '../config/cameraConfig';
 
 export interface CanvasHUDProps {
   camera: Camera | null | undefined;
@@ -63,11 +64,11 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ color: '#888' }}>Зум:</span>
+          <span style={{ color: '#888' }}>{t('hud.zoom')}</span>
           <strong style={{ color: '#fff' }}>{scalePercent}%</strong>
           <button
             onClick={onResetCamera}
-            title="Сбросить камеру к центру мира (Масштаб 100%)"
+            title={t('hud.resetTitle')}
             style={{
               backgroundColor: '#2c3e50',
               border: 'none',
@@ -79,19 +80,19 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               marginLeft: '2px',
             }}
           >
-            ⌖ Сброс
+            {t('hud.reset')}
           </button>
         </div>
 
         <div style={{ borderLeft: '1px solid #333', paddingLeft: '8px' }}>
-          <span style={{ color: '#888' }}>Камера: </span>
+          <span style={{ color: '#888' }}>{t('hud.camera')} </span>
           <span style={{ color: '#3498db' }}>
             X:{cameraX} Y:{cameraY}
           </span>
         </div>
 
         <div style={{ borderLeft: '1px solid #333', paddingLeft: '8px' }}>
-          <span style={{ color: '#888' }}>Курсор: </span>
+          <span style={{ color: '#888' }}>{t('hud.cursor')} </span>
           {cursorWorldPos ? (
             <span style={{ color: '#2ecc71' }}>
               X:{cursorWorldPos.x} Y:{cursorWorldPos.y}
@@ -112,10 +113,10 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               paddingLeft: '8px',
             }}
           >
-            <span style={{ color: '#888' }}>Гизмо:</span>
+            <span style={{ color: '#888' }}>{t('hud.gizmo')}</span>
             <button
               onClick={() => onSelectGizmoTool('select')}
-              title="Выбор [Q] (без манипулятора)"
+              title={t('hud.gizmoSelect')}
               style={{
                 backgroundColor: gizmoTool === 'select' ? '#2980b9' : '#2c3e50',
                 border: 'none',
@@ -131,7 +132,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
             </button>
             <button
               onClick={() => onSelectGizmoTool('translate')}
-              title="Сдвиг по осям [W] (Translate)"
+              title={t('hud.gizmoTranslate')}
               style={{
                 backgroundColor: gizmoTool === 'translate' ? '#2980b9' : '#2c3e50',
                 border: 'none',
@@ -147,7 +148,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
             </button>
             <button
               onClick={() => onSelectGizmoTool('rotate')}
-              title="Вращение [E] (Rotate)"
+              title={t('hud.gizmoRotate')}
               style={{
                 backgroundColor: gizmoTool === 'rotate' ? '#2980b9' : '#2c3e50',
                 border: 'none',
@@ -166,7 +167,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
 
         <button
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-          title="Настройки чувствительности камеры"
+          title={t('hud.sensitivityBtnTitle')}
           style={{
             backgroundColor: isSettingsOpen ? '#2980b9' : '#2c3e50',
             border: 'none',
@@ -214,13 +215,13 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               paddingBottom: '4px',
             }}
           >
-            Чувствительность камеры
+            {t('hud.sensitivityTitle')}
           </div>
 
           {/* Ползунок скорости панорамирования */}
           <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#bbb' }}>
-              <span>Сдвиг (СКМ):</span>
+              <span>{t('hud.panSpeed')}</span>
               <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>{panSpeed.toFixed(1)}x</span>
             </div>
             <input
@@ -241,7 +242,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           {/* Ползунок скорости поворота и наклона */}
           <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#bbb' }}>
-              <span>Поворот/Наклон (Alt):</span>
+              <span>{t('hud.rotateSpeed')}</span>
               <span style={{ color: '#f39c12', fontWeight: 'bold' }}>
                 {rotateSpeed.toFixed(1)}x
               </span>
@@ -279,7 +280,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               alignSelf: 'flex-end',
             }}
           >
-            Сброс ({CAMERA_CONFIG.defaultPanSpeed}x)
+            {t('common.reset')} ({CAMERA_CONFIG.defaultPanSpeed}x)
           </button>
         </div>
       )}

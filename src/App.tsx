@@ -24,6 +24,7 @@ import { createZoneConfig } from './ecs/archetypes';
 import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
 import { findActiveBrain } from './ecs/utils/anatomy';
 import { EDITOR_CONFIG } from './config/editorConfig';
+import { t } from './locales';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -388,7 +389,7 @@ export const App: React.FC = () => {
 
   const handleQuickSpawn = useCallback((type: 'player' | 'attacker') => {
     const behavior = type === 'player' ? 'PlayerTree' : 'AttackerTree';
-    const name = type === 'player' ? 'Игрок' : 'Бот-атакующий';
+    const name = type === 'player' ? t('palette.player') : t('palette.attacker');
     setPlacementMode({
       kind: 'modular',
       behavior,
@@ -491,7 +492,7 @@ export const App: React.FC = () => {
                   updateStats();
                 }
               } catch {
-                alert('Ошибка при чтении JSON файла мира!');
+                alert(t('app.jsonReadError'));
               }
             };
             reader.readAsText(file);
@@ -622,13 +623,13 @@ export const App: React.FC = () => {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
               }}
             >
-              <span>Выберите место для спавна на поле</span>
+              <span>{t('app.placementPrompt')}</span>
               <button
                 className="btn btn-sm"
                 style={{ backgroundColor: '#c0392b' }}
                 onClick={() => setPlacementMode(null)}
               >
-                Отмена
+                {t('common.cancel')}
               </button>
             </div>
           )}
@@ -641,7 +642,7 @@ export const App: React.FC = () => {
                 pieMenuState.targetEntityId
                   ? appRef.current?.world.getComponent(pieMenuState.targetEntityId, 'meta')?.name ||
                     pieMenuState.targetEntityId
-                  : 'Быстрый спавн'
+                  : t('app.pieQuickSpawn')
               }
               onClose={closePieMenu}
               items={
@@ -651,8 +652,10 @@ export const App: React.FC = () => {
                         id: 'clone',
                         label:
                           pieMenuState.targetEntityIds.length > 1
-                            ? `Клон (${pieMenuState.targetEntityIds.length})`
-                            : 'Клонировать',
+                            ? t('pieMenu.cloneCount', {
+                                count: pieMenuState.targetEntityIds.length,
+                              })
+                            : t('pieMenu.clone'),
                         icon: '📑',
                         color: '#27ae60',
                         onSelect: () => {
@@ -669,7 +672,7 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'focus',
-                        label: 'Фокус',
+                        label: t('pieMenu.focus'),
                         icon: '🎯',
                         color: '#3498db',
                         onSelect: () => {
@@ -680,7 +683,7 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'inspect_bt',
-                        label: 'Дерево BT',
+                        label: t('pieMenu.inspectBt'),
                         icon: '🧠',
                         color: '#9b59b6',
                         onSelect: () => {
@@ -695,8 +698,10 @@ export const App: React.FC = () => {
                         id: 'delete',
                         label:
                           pieMenuState.targetEntityIds.length > 1
-                            ? `Удалить (${pieMenuState.targetEntityIds.length})`
-                            : 'Удалить',
+                            ? t('pieMenu.deleteCount', {
+                                count: pieMenuState.targetEntityIds.length,
+                              })
+                            : t('pieMenu.delete'),
                         icon: '🗑️',
                         danger: true,
                         onSelect: () => {
@@ -707,19 +712,19 @@ export const App: React.FC = () => {
                   : [
                       {
                         id: 'spawn_player',
-                        label: 'Игрок',
+                        label: t('pieMenu.player'),
                         icon: '🎮',
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory('Спавн игрока');
+                          app.commitHistory(t('history.spawnPlayer'));
                           const id = app.entityFactory.spawnModularHumanoid(
                             app.world,
                             app.physics,
                             app.aiSystem,
                             pieMenuState.worldPos,
                             'PlayerTree',
-                            'Игрок'
+                            t('palette.player')
                           );
                           app.selectEntity(id, true);
                           syncPlayerControls();
@@ -728,19 +733,19 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'spawn_attacker',
-                        label: 'Бот',
+                        label: t('pieMenu.attacker'),
                         icon: '⚔️',
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory('Спавн атакующего бота');
+                          app.commitHistory(t('history.spawnAttacker'));
                           const id = app.entityFactory.spawnModularHumanoid(
                             app.world,
                             app.physics,
                             app.aiSystem,
                             pieMenuState.worldPos,
                             'AttackerTree',
-                            'Бот-атакующий'
+                            t('palette.attacker')
                           );
                           app.selectEntity(id, true);
                           syncPlayerControls();
@@ -749,17 +754,17 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'spawn_wall',
-                        label: 'Стена',
+                        label: t('pieMenu.wall'),
                         icon: '🧱',
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory('Спавн стены');
+                          app.commitHistory(t('history.spawnWall'));
                           const id = app.spawnEntity(
                             {
                               tag: { archetype: 'obstacle' },
                               meta: {
-                                name: 'Каменная стена',
+                                name: t('palette.wall'),
                                 entityType: 'obstacle',
                                 destructible: false,
                               },
@@ -779,17 +784,17 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'spawn_crate',
-                        label: 'Ящик',
+                        label: t('pieMenu.crate'),
                         icon: '📦',
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory('Спавн ящика');
+                          app.commitHistory(t('history.spawnCrate'));
                           const id = app.spawnEntity(
                             {
                               tag: { archetype: 'obstacle' },
                               meta: {
-                                name: 'Деревянный ящик',
+                                name: t('palette.crate'),
                                 entityType: 'obstacle',
                                 destructible: true,
                               },
@@ -810,14 +815,14 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'spawn_fire_zone',
-                        label: 'Зона огня',
+                        label: t('pieMenu.fireZone'),
                         icon: '🔥',
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory('Спавн зоны огня');
+                          app.commitHistory(t('history.spawnFireZone'));
                           const id = app.spawnEntity(
-                            createZoneConfig('damage', 70, 15, 'Зона огня'),
+                            createZoneConfig('damage', 70, 15, t('palette.zoneFire')),
                             pieMenuState.worldPos
                           );
                           app.selectEntity(id, true);
@@ -827,17 +832,17 @@ export const App: React.FC = () => {
                       },
                       {
                         id: 'spawn_spear',
-                        label: 'Копьё',
+                        label: t('pieMenu.spear'),
                         icon: '🗡️',
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory('Спавн оружия');
+                          app.commitHistory(t('history.spawnSpear'));
                           const id = app.spawnEntity(
                             {
                               tag: { archetype: 'item', subType: 'weapon' },
                               item: {
-                                name: 'Копьё пронзания',
+                                name: t('palette.spear'),
                                 type: 'weapon',
                                 maxStack: 1,
                                 size: 10,

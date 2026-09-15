@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../locales';
 
 export interface HotkeysModalProps {
   isOpen: boolean;
@@ -16,96 +17,94 @@ export const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) =
       }}
     >
       <div className="modal-backdrop" onClick={onClose} />
+
       <div className="modal-dialog" style={{ maxWidth: '500px' }}>
-        <h3>Горячие клавиши</h3>
+        <h3>{t('hotkeys.title')}</h3>
 
         <div style={{ marginTop: '12px' }}>
-          <h4 style={{ color: '#bdc3c7', marginBottom: '8px' }}>Глобальные:</h4>
+          <h4 style={{ color: '#bdc3c7', marginBottom: '8px' }}>{t('hotkeys.globalSection')}</h4>
           <ul
             className="control-keys"
             style={{ paddingLeft: '20px', margin: 0, color: '#ecf0f1', lineHeight: '1.8' }}
           >
             <li>
-              <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> Отмена / Повтор действия
+              <kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd> {t('hotkeys.ctrlZY')}
             </li>
             <li>
-              <kbd>U</kbd> Открыть/Скрыть Дерево поведения (BT)
+              <kbd>U</kbd> {t('hotkeys.keyU')}
             </li>
             <li>
-              <kbd>Пробел</kbd> Пауза / Возобновление (в режиме Симуляции)
+              <kbd>Space</kbd> {t('hotkeys.spacePause')}
             </li>
           </ul>
 
           <h4 style={{ color: '#bdc3c7', marginTop: '16px', marginBottom: '8px' }}>
-            Манипуляторы и спавн (в Редакторе):
+            {t('hotkeys.gizmoSection')}
           </h4>
           <ul
             className="control-keys"
             style={{ paddingLeft: '20px', margin: 0, color: '#ecf0f1', lineHeight: '1.8' }}
           >
             <li>
-              <kbd>ПКМ</kbd> Контекстное радиальное меню (Pie Menu)
+              <kbd>RMB</kbd> {t('hotkeys.rmbPie')}
             </li>
             <li>
-              <kbd>Q</kbd> / <kbd>W</kbd> / <kbd>E</kbd> Режимы: Выбор / Сдвиг / Поворот
+              <kbd>Q</kbd> / <kbd>W</kbd> / <kbd>E</kbd> {t('hotkeys.qweModes')}
             </li>
             <li>
-              <kbd>Shift</kbd> (при драге манипулятора) Сетка 10 px / Шаг угла 15°
+              <kbd>Shift</kbd> {t('hotkeys.shiftSnap')}
             </li>
             <li>
-              <kbd>Ctrl+P</kbd> Быстрый спавн игрока
+              <kbd>Ctrl+P</kbd> {t('hotkeys.ctrlP')}
             </li>
             <li>
-              <kbd>Ctrl+B</kbd> Быстрый спавн бота
+              <kbd>Ctrl+B</kbd> {t('hotkeys.ctrlB')}
             </li>
             <li>
-              <kbd>Ctrl+I</kbd> Добавить предмет
+              <kbd>Ctrl+I</kbd> {t('hotkeys.ctrlI')}
             </li>
             <li>
-              <kbd>Delete</kbd> Удалить выделенные объекты
+              <kbd>Delete</kbd> {t('hotkeys.deleteKey')}
             </li>
           </ul>
 
           <h4 style={{ color: '#bdc3c7', marginTop: '16px', marginBottom: '8px' }}>
-            Управление в игре:
+            {t('hotkeys.gameSection')}
           </h4>
           <ul
             className="control-keys"
             style={{ paddingLeft: '20px', margin: 0, color: '#ecf0f1', lineHeight: '1.8' }}
           >
             <li>
-              <kbd>W</kbd> / <kbd>S</kbd> Движение вперед / назад
+              <kbd>W / A / S / D</kbd> {t('hotkeys.wasdMove')}
             </li>
             <li>
-              <kbd>A</kbd> / <kbd>D</kbd> Стрейф влево / вправо
+              <kbd>Mouse</kbd> {t('hotkeys.mouseAim')}
             </li>
             <li>
-              <kbd>Мышь</kbd> Направление взгляда / прицеливание
+              <kbd>Space</kbd> {t('hotkeys.spaceAttack')}
             </li>
             <li>
-              <kbd>Пробел</kbd> Атака оружием
+              <kbd>LCtrl + LMB</kbd> {t('hotkeys.ctrlLmbPickup')}
             </li>
             <li>
-              <kbd>LCtrl</kbd> + <kbd>ЛКМ</kbd> Подобрать предмет
+              <kbd>LShift</kbd> {t('hotkeys.lShiftSprint')}
             </li>
             <li>
-              <kbd>LShift</kbd> Спринт (удержание)
+              <kbd>X</kbd> {t('hotkeys.keyXWalk')}
             </li>
             <li>
-              <kbd>X</kbd> Шаг (тумблер)
+              <kbd>C</kbd> {t('hotkeys.keyCCrouch')}
             </li>
             <li>
-              <kbd>C</kbd> Присед (тумблер)
-            </li>
-            <li>
-              <kbd>V</kbd> Лечь (тумблер)
+              <kbd>V</kbd> {t('hotkeys.keyVProne')}
             </li>
           </ul>
         </div>
 
         <div className="modal-actions" style={{ marginTop: '20px' }}>
           <button type="button" className="btn btn-primary" onClick={onClose}>
-            Закрыть
+            {t('common.close')}
           </button>
         </div>
       </div>

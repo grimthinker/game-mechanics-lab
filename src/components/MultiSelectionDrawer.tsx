@@ -1,6 +1,7 @@
 import React from 'react';
 import { World } from '../ecs/World';
 import { useResizable } from '../hooks/useResizable';
+import { t } from '../locales';
 
 export interface MultiSelectionDrawerProps {
   selectedEntityIds: string[];
@@ -14,14 +15,14 @@ export interface MultiSelectionDrawerProps {
   onDeleteSelected: () => void;
 }
 
-const ARCHETYPE_LABELS: Record<string, { label: string; icon: string }> = {
-  creature: { label: 'Существа', icon: '👤' },
-  item: { label: 'Предметы', icon: '📦' },
-  obstacle: { label: 'Препятствия', icon: '🧱' },
-  zone: { label: 'Зоны', icon: '🌀' },
-  marker: { label: 'Маркеры', icon: '📍' },
-  bodyPart: { label: 'Части тел', icon: '🥩' },
-};
+const getArchetypeLabels = (): Record<string, { label: string; icon: string }> => ({
+  creature: { label: t('selectionDrawer.creatures'), icon: '👤' },
+  item: { label: t('selectionDrawer.items'), icon: '📦' },
+  obstacle: { label: t('selectionDrawer.obstacles'), icon: '🧱' },
+  zone: { label: t('selectionDrawer.zones'), icon: '🌀' },
+  marker: { label: t('selectionDrawer.markers'), icon: '📍' },
+  bodyPart: { label: t('selectionDrawer.bodyParts'), icon: '🥩' },
+});
 
 export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
   selectedEntityIds,
@@ -60,8 +61,9 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
     const item = world.getComponent(id, 'item');
     const health = world.getComponent(id, 'health');
 
+    const labels = getArchetypeLabels();
     const archetype = tag?.archetype ?? meta?.entityType ?? 'creature';
-    let icon = ARCHETYPE_LABELS[archetype]?.icon ?? '❓';
+    let icon = labels[archetype]?.icon ?? '❓';
 
     if (archetype === 'item' && item) {
       if (item.type === 'weapon') icon = '⚔️';
@@ -74,6 +76,8 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
 
     return { name, icon, archetype, hp };
   };
+
+  const labels = getArchetypeLabels();
 
   return (
     <div
@@ -108,7 +112,6 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
           backgroundColor: isResizing ? '#2196f3' : 'transparent',
           transition: 'background-color 0.15s',
         }}
-        title="Потяните для изменения высоты панели"
       />
 
       {/* Верхняя строка управления: Фильтры + Кнопки */}
@@ -133,9 +136,9 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
               textTransform: 'uppercase',
             }}
           >
-            Фильтр рамки:
+            {t('selectionDrawer.filterTitle')}
           </span>
-          {Object.entries(ARCHETYPE_LABELS).map(([arch, { label, icon }]) => (
+          {Object.entries(labels).map(([arch, { label, icon }]) => (
             <label
               key={arch}
               style={{
@@ -162,7 +165,8 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: '#aaa', marginRight: '6px' }}>
-            Выбрано: <strong style={{ color: '#2ecc71' }}>{selectedEntityIds.length}</strong>
+            {t('selectionDrawer.selectedCount')}{' '}
+            <strong style={{ color: '#2ecc71' }}>{selectedEntityIds.length}</strong>
           </span>
           {selectedEntityIds.length > 0 && (
             <>
@@ -176,7 +180,7 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
                   color: '#fff',
                 }}
               >
-                Снять выделение
+                {t('selectionDrawer.clearSelection')}
               </button>
               <button
                 className="btn btn-sm"
@@ -188,14 +192,14 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
                   color: '#fff',
                 }}
               >
-                Удалить ({selectedEntityIds.length})
+                {t('selectionDrawer.deleteCount', { count: selectedEntityIds.length })}
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* Сетка сущностей (стиль проводника Windows) */}
+      {/* Сетка сущностей */}
       <div
         style={{
           flex: 1,
@@ -212,8 +216,7 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
           <div
             style={{ color: '#666', fontSize: '12px', padding: '10px 4px', fontStyle: 'italic' }}
           >
-            Нет выбранных сущностей. Выделите рамкой (зажав ЛКМ на пустом месте) или кликните по
-            объекту.
+            {t('selectionDrawer.emptyHint')}
           </div>
         ) : (
           selectedEntityIds.map((id) => {
@@ -239,7 +242,7 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
                   boxSizing: 'border-box',
                   transition: 'background-color 0.15s, border-color 0.15s',
                 }}
-                title={`${data.name} (${id})\nКлик — выбрать и просмотреть в Инспекторе`}
+                title={`${data.name} (${id})`}
               >
                 <span style={{ fontSize: '14px' }}>{data.icon}</span>
                 <div
@@ -276,7 +279,7 @@ export const MultiSelectionDrawer: React.FC<MultiSelectionDrawerProps> = ({
                     fontSize: '12px',
                     padding: '0 2px',
                   }}
-                  title="Исключить из выбора"
+                  title={t('selectionDrawer.excludeTitle')}
                 >
                   ✕
                 </button>

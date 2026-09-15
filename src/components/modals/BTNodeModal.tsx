@@ -1,5 +1,6 @@
 import React from 'react';
 import { BTNodeDTO } from '../../ai/core';
+import { t } from '../../locales';
 
 export interface BTNodeModalProps {
   selectedNode: BTNodeDTO | null;
@@ -19,31 +20,36 @@ export const BTNodeModal: React.FC<BTNodeModalProps> = ({ selectedNode, onClose 
       }}
     >
       <div className="modal-backdrop" onClick={onClose} />
+
       <div className="modal-dialog">
         <h3>{selectedNode.name}</h3>
         <p className="modal-subtitle" style={{ textTransform: 'uppercase' }}>
-          Тип: {selectedNode.category}
-          {selectedNode.status && ` — Статус: ${selectedNode.status}`}
+          {t('btModal.type')} {selectedNode.category}
+          {selectedNode.status && ` — ${t('btModal.status')} ${selectedNode.status}`}
         </p>
 
         <div style={{ margin: '12px 0', fontSize: '14px', lineHeight: '1.5' }}>
-          <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '6px' }}>Описание:</h4>
+          <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '6px' }}>
+            {t('btModal.description')}
+          </h4>
           <p style={{ color: '#ecf0f1', margin: 0 }}>
-            {selectedNode.description || 'Описание отсутствует.'}
+            {selectedNode.description || t('btModal.noDescription')}
           </p>
         </div>
 
         {selectedNode.timeToNextTick !== undefined && (
           <div style={{ margin: '12px 0', fontSize: '13px' }}>
             <span style={{ color: '#00e5ff', fontWeight: 'bold' }}>
-              ⏱️ До следующего тика: {selectedNode.timeToNextTick.toFixed(2)} с
+              {t('btModal.timeToNextTick', { time: selectedNode.timeToNextTick.toFixed(2) })}
             </span>
           </div>
         )}
 
         {hasParameters && (
           <div style={{ marginTop: '12px' }}>
-            <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>Параметры:</h4>
+            <h4 style={{ fontSize: '13px', color: '#bdc3c7', marginBottom: '8px' }}>
+              {t('btModal.parameters')}
+            </h4>
             <div
               style={{
                 backgroundColor: '#111',
@@ -76,7 +82,7 @@ export const BTNodeModal: React.FC<BTNodeModalProps> = ({ selectedNode, onClose 
 
         <div className="modal-actions" style={{ marginTop: '16px' }}>
           <button type="button" className="btn btn-primary" onClick={onClose}>
-            Закрыть
+            {t('common.close')}
           </button>
         </div>
       </div>

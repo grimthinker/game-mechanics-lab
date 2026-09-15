@@ -2,6 +2,7 @@ import { Body, Circle, Polygon } from 'detect-collisions';
 import { Point } from '../types';
 import { BehaviorStatsConfig, BTLogicComponent } from '../ai/core';
 import { Radians } from '../utils';
+import { t } from '../locales';
 
 export type EntityId = string;
 
@@ -307,18 +308,42 @@ export const STANDARD_EQUIPMENT_AREA_TYPES = [
 export type StandardEquipmentAreaType = (typeof STANDARD_EQUIPMENT_AREA_TYPES)[number];
 
 export const EQUIPMENT_AREA_TYPE_LABELS: Record<string, string> = {
-  head: 'Голова (head)',
-  neck: 'Шея (neck)',
-  torso: 'Туловище (torso)',
-  hands: 'Руки (hands)',
-  legs: 'Ноги (legs)',
-  feet: 'Ступни (feet)',
-  waist: 'Пояс / Талия (waist)',
-  belt_slot: 'Крепление пояса (belt_slot)',
-  sheath: 'Ножны (sheath)',
-  holster: 'Кобура (holster)',
-  sling: 'Подвес / Ремень (sling)',
-  pouch: 'Подсумок / Карман (pouch)',
+  get head() {
+    return t('equipmentAreas.head');
+  },
+  get neck() {
+    return t('equipmentAreas.neck');
+  },
+  get torso() {
+    return t('equipmentAreas.torso');
+  },
+  get hands() {
+    return t('equipmentAreas.hands');
+  },
+  get legs() {
+    return t('equipmentAreas.legs');
+  },
+  get feet() {
+    return t('equipmentAreas.feet');
+  },
+  get waist() {
+    return t('equipmentAreas.waist');
+  },
+  get belt_slot() {
+    return t('equipmentAreas.belt_slot');
+  },
+  get sheath() {
+    return t('equipmentAreas.sheath');
+  },
+  get holster() {
+    return t('equipmentAreas.holster');
+  },
+  get sling() {
+    return t('equipmentAreas.sling');
+  },
+  get pouch() {
+    return t('equipmentAreas.pouch');
+  },
 };
 
 export interface EquipmentArea {

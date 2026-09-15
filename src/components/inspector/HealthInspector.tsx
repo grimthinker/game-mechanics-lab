@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../../locales';
 
 export interface HealthInspectorValues {
   hp: number;
@@ -18,7 +19,7 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({
 }) => (
   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
     <label>
-      Текущее HP:
+      {t('healthInspector.currentHp')}
       <input
         disabled={isReadOnly}
         type="number"
@@ -29,7 +30,7 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({
       />
     </label>
     <label>
-      Базовое макс. HP:
+      {t('healthInspector.maxHp')}
       <input
         disabled={isReadOnly}
         type="number"

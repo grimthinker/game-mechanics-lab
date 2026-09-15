@@ -6,6 +6,7 @@ import { SceneHierarchy } from './SceneHierarchy';
 import { SpawnPalette } from './SpawnPalette';
 import { BTGraph } from '../BTGraph';
 import { useResizable } from '../../hooks/useResizable';
+import { t } from '../../locales';
 
 export type DockTab = 'hierarchy' | 'palette' | 'bt';
 export interface LeftDockProps {
@@ -103,7 +104,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
             cursor: 'pointer',
           }}
         >
-          Иерархия
+          {t('dock.hierarchy')}
         </button>
         <button
           onClick={() => setActiveTab('palette')}
@@ -119,7 +120,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
             cursor: 'pointer',
           }}
         >
-          Палитра
+          {t('dock.palette')}
         </button>
         <button
           onClick={() => setActiveTab('bt')}
@@ -135,7 +136,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
             cursor: 'pointer',
           }}
         >
-          Дерево (BT)
+          {t('dock.bt')}
         </button>
       </div>
 
@@ -165,7 +166,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
                 <div
                   style={{ color: '#777', padding: '24px', textAlign: 'center', fontSize: '12px' }}
                 >
-                  У выбранного объекта нет дерева поведения
+                  {t('dock.noBt')}
                 </div>
               )}
             </div>
@@ -180,7 +181,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
                 borderTop: '1px solid #3a3a3a',
                 borderBottom: '1px solid #111',
               }}
-              title="Перетащите для изменения высоты окна памяти"
+              title="Resize"
             />
 
             {/* Окно памяти Blackboard */}
@@ -196,7 +197,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
               }}
             >
               <div style={{ fontWeight: 'bold', color: '#ffcc00', marginBottom: '6px' }}>
-                🧠 Память бота (Blackboard)
+                {t('dock.blackboardTitle')}
               </div>
               {btBlackboard && Object.keys(btBlackboard).length > 0 ? (
                 Object.entries(btBlackboard).map(([k, v]) => (
@@ -216,7 +217,9 @@ export const LeftDock: React.FC<LeftDockProps> = ({
                   </div>
                 ))
               ) : (
-                <div style={{ color: '#666', fontStyle: 'italic' }}>Память пуста</div>
+                <div style={{ color: '#666', fontStyle: 'italic' }}>
+                  {t('dock.blackboardEmpty')}
+                </div>
               )}
             </div>
           </div>

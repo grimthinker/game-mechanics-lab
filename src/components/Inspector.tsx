@@ -35,6 +35,7 @@ import {
   getAllEquippedDescendants,
 } from '../ecs/utils/hierarchy';
 import { EDITOR_CONFIG } from '../config/editorConfig';
+import { t } from '../locales';
 
 interface Breadcrumb {
   id: string;
@@ -171,7 +172,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             }}
           >
             <span style={{ fontSize: '10px', color: '#aaa' }}>
-              {isOpen ? 'Свернуть' : 'Развернуть'}
+              {isOpen ? t('common.collapse') : t('common.expand')}
             </span>
             <span
               style={{
@@ -388,7 +389,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       destructible: draftDestructible,
     });
     if (changed) {
-      requestCommit('Изменение имени');
+      requestCommit(t('history.nameChange'));
       onUpdateStats();
     }
   }, [draftName, draftDestructible]);
@@ -397,7 +398,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftPhysics || !app) return;
     const changed = app.updateEntityPhysics(targetId, draftPhysics);
     if (changed) {
-      requestCommit('Изменение физики');
+      requestCommit(t('history.physicsChange'));
       onUpdateStats();
     }
   }, [draftPhysics]);
@@ -406,7 +407,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftHealth || !app) return;
     const changed = app.updateEntityHealth(targetId, draftHealth);
     if (changed) {
-      requestCommit('Изменение здоровья');
+      requestCommit(t('history.healthChange'));
       onUpdateStats();
     }
   }, [draftHealth]);
@@ -415,7 +416,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftFunctionalHealth || !app) return;
     const changed = app.updateEntityFunctionalHealth(targetId, draftFunctionalHealth);
     if (changed) {
-      requestCommit('Изменение функциональной прочности');
+      requestCommit(t('history.fpChange'));
       onUpdateStats();
     }
   }, [draftFunctionalHealth]);
@@ -424,7 +425,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftMovement || !app) return;
     const changed = app.updateEntityMovementStats(targetId, draftMovement);
     if (changed) {
-      requestCommit('Изменение параметров движения');
+      requestCommit(t('history.movementChange'));
       onUpdateStats();
     }
   }, [draftMovement]);
@@ -433,7 +434,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftStealth || !app) return;
     const changed = app.updateEntityStealthStats(targetId, draftStealth);
     if (changed) {
-      requestCommit('Изменение скрытности');
+      requestCommit(t('history.stealthChange'));
       onUpdateStats();
     }
   }, [draftStealth]);
@@ -442,7 +443,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftAI || !app) return;
     const changed = app.updateEntityAIBehavior(targetId, draftAI);
     if (changed) {
-      requestCommit('Изменение поведения AI');
+      requestCommit(t('history.aiChange'));
       onUpdateStats();
     }
   }, [draftAI]);
@@ -451,7 +452,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftZone || !app) return;
     const changed = app.updateEntityAreaEffector(targetId, draftZone);
     if (changed) {
-      requestCommit('Настройка зоны эффектора');
+      requestCommit(t('history.effectorChange'));
       onUpdateStats();
     }
   }, [draftZone]);
@@ -460,7 +461,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftWeapon || !app) return;
     const changed = app.updateEntityWeapon(targetId, draftWeapon);
     if (changed) {
-      requestCommit('Изменение параметров оружия');
+      requestCommit(t('history.weaponChange'));
       onUpdateStats();
     }
   }, [draftWeapon]);
@@ -469,7 +470,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftArmor || !app) return;
     const changed = app.updateEntityArmor(targetId, draftArmor);
     if (changed) {
-      requestCommit('Изменение параметров брони');
+      requestCommit(t('history.armorChange'));
       onUpdateStats();
     }
   }, [draftArmor]);
@@ -478,7 +479,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftGenericItem || !app) return;
     const changed = app.updateEntityGenericItem(targetId, draftGenericItem);
     if (changed) {
-      requestCommit('Изменение параметров предмета');
+      requestCommit(t('history.genericItemChange'));
       onUpdateStats();
     }
   }, [draftGenericItem]);
@@ -487,7 +488,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     if (!targetId || !world || isReadOnly || !draftBag || !app) return;
     const changed = app.updateEntityBag(targetId, draftBag, isBagEmpty);
     if (changed) {
-      requestCommit('Изменение параметров инвентаря');
+      requestCommit(t('history.bagChange'));
       onUpdateStats();
     }
   }, [draftBag]);
@@ -508,7 +509,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         }}
       >
         <p className="selection-hint" style={{ textAlign: 'center', marginTop: '50px' }}>
-          Ничего не выбрано
+          {t('inspector.nothingSelected')}
         </p>
       </div>
     );
@@ -581,7 +582,7 @@ export const Inspector: React.FC<InspectorProps> = ({
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
           {renderSection(
             'meta',
-            'Имя и Трансформация',
+            t('inspector.meta'),
             <>
               <MetaInspector
                 name={draftName}
@@ -605,7 +606,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     checked={draftDestructible}
                     onChange={(e) => setDraftDestructible(e.target.checked)}
                   />
-                  Разрушаемый объект
+                  {t('inspector.destructible')}
                 </label>
               )}
             </>
@@ -614,7 +615,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftPhysics &&
             renderSection(
               'physics',
-              'Физика',
+              t('inspector.physics'),
               <PhysicsInspector
                 values={draftPhysics}
                 onChange={(p: any) => setDraftPhysics((prev: any) => ({ ...prev, ...p }))}
@@ -629,7 +630,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             !hasAssembly &&
             renderSection(
               'health',
-              'Структурная прочность (СП)',
+              t('inspector.health'),
               <>
                 <HealthInspector
                   values={draftHealth}
@@ -661,7 +662,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftFunctionalHealth &&
             renderSection(
               'functionalHealth',
-              'Функциональная прочность (ФП)',
+              t('inspector.functionalHealth'),
               <>
                 {(() => {
                   const fp = draftFunctionalHealth.fp;
@@ -671,13 +672,13 @@ export const Inspector: React.FC<InspectorProps> = ({
                   const percent = Math.max(0, Math.min(100, ((fp - minFp) / totalRange) * 100));
 
                   let color = '#2ecc71'; // Зеленый (>0)
-                  let statusText = 'Функционирует';
+                  let statusText = t('inspector.statusFunctional');
                   if (fp <= 0 && fp > -maxFp) {
                     color = '#f39c12'; // Оранжевый/Желтый
-                    statusText = 'Травмировано / Отключено';
+                    statusText = t('inspector.statusDisabled');
                   } else if (fp <= -maxFp) {
                     color = '#e74c3c'; // Красный
-                    statusText = 'Критическая травма / Уничтожено';
+                    statusText = t('inspector.statusCritical');
                   }
 
                   return (
@@ -775,7 +776,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {world.getComponent(targetId, 'socketLink') &&
             renderSection(
               'sockets',
-              'Соединения сокетов',
+              t('inspector.sockets'),
               <>
                 {Object.entries(world.getComponent(targetId, 'socketLink')!.links).map(
                   ([socketId, link]) => {
@@ -830,7 +831,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   socketId,
                                   Number(e.target.value)
                                 );
-                                requestCommit('Изменение прочности связи');
+                                requestCommit(t('history.socketStrengthChange'));
                                 onUpdateStats();
                               }
                             }}
@@ -846,7 +847,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftMovement &&
             renderSection(
               'movement',
-              'Движение',
+              t('inspector.movement'),
               <MovementInspector
                 values={draftMovement}
                 onChange={(p: any) => setDraftMovement((prev: any) => ({ ...prev, ...p }))}
@@ -857,7 +858,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftStealth &&
             renderSection(
               'stealth',
-              'Скрытность',
+              t('inspector.stealth'),
               <StealthInspector
                 values={draftStealth}
                 onChange={(p: any) => setDraftStealth((prev: any) => ({ ...prev, ...p }))}
@@ -868,14 +869,14 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftAI &&
             renderSection(
               'ai',
-              'Поведение (ИИ)',
+              t('inspector.ai'),
               <AIInspector behavior={draftAI} onChange={setDraftAI} isReadOnly={isReadOnly} />
             )}
 
           {draftZone &&
             renderSection(
               'effector',
-              'Свойства зоны (Area Effector)',
+              t('inspector.effector'),
               <AreaEffectorInspector
                 values={draftZone}
                 onChange={(p: any) => setDraftZone((prev: any) => ({ ...prev, ...p }))}
@@ -886,7 +887,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftWeapon &&
             renderSection(
               'weapon',
-              'Оружие и зона атаки',
+              t('inspector.weapon'),
               <WeaponFormFields
                 values={draftWeapon}
                 onChange={(p: any) => setDraftWeapon((prev) => (prev ? { ...prev, ...p } : null))}
@@ -920,7 +921,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftArmor &&
             renderSection(
               'armor',
-              currentArchetype === 'creature' ? 'Собственная броня' : 'Параметры брони',
+              currentArchetype === 'creature' ? t('inspector.ownArmor') : t('inspector.armor'),
               <>
                 {currentArchetype !== 'creature' && (
                   <ArmorFormFields
@@ -971,7 +972,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftBag &&
             renderSection(
               'bag',
-              'Сумка / Инвентарь',
+              t('inspector.bag'),
               <BagFormFields
                 values={draftBag}
                 onChange={(p: any) => setDraftBag((prev: any) => ({ ...prev, ...p }))}
@@ -983,7 +984,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {draftGenericItem &&
             renderSection(
               'genericItem',
-              'Параметры части тела (как предмета)',
+              t('inspector.genericItem'),
               <CommonItemFormFields
                 values={draftGenericItem}
                 onChange={(p: any) => setDraftGenericItem((prev: any) => ({ ...prev, ...p }))}
@@ -994,7 +995,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {anatomyParts.length > 1 &&
             renderSection(
               'anatomy',
-              `Анатомия (${anatomyParts.length} частей)`,
+              t('inspector.anatomy', { count: anatomyParts.length }),
               <>
                 {anatomyParts.map((partId) => {
                   const meta = world.getComponent(partId, 'meta');
@@ -1033,7 +1034,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {currentArchetype === 'creature'
             ? renderSection(
                 'slots',
-                'Ячейки взаимодействия (Руки)',
+                t('inspector.slots'),
                 <>
                   {getAggregatedInteractionSlots(world, targetId).length > 0 ? (
                     getAggregatedInteractionSlots(world, targetId).map((info) => {
@@ -1081,7 +1082,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   app.updateEntityInteractionSlot(info.partId, {
                                     interactDist: Math.max(1, +e.target.value),
                                   });
-                                  requestCommit('Настройка ячейки');
+                                  requestCommit(t('history.slotConfigure'));
                                   onUpdateStats();
                                 }
                               }}
@@ -1106,7 +1107,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                   app.updateEntityInteractionSlot(info.partId, {
                                     strength: Math.max(1, +e.target.value),
                                   });
-                                  requestCommit('Настройка ячейки');
+                                  requestCommit(t('history.slotConfigure'));
                                   onUpdateStats();
                                 }
                               }}
@@ -1133,7 +1134,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 Настроить: {slotItem.name}
                               </button>
                             ) : (
-                              <span style={{ color: '#777', fontSize: '12px' }}>Пусто</span>
+                              <span style={{ color: '#777', fontSize: '12px' }}>
+                                {t('common.empty')}
+                              </span>
                             )}
                           </div>
                         </div>
@@ -1141,7 +1144,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     })
                   ) : (
                     <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
-                      У существа нет частей тела с руками.
+                      {t('inspector.noHands')}
                     </div>
                   )}
                 </>
@@ -1149,7 +1152,7 @@ export const Inspector: React.FC<InspectorProps> = ({
             : interactionSlotsComp &&
               renderSection(
                 'slots',
-                'Ячейка взаимодействия (Рука)',
+                t('inspector.singleSlot'),
                 <>
                   {(() => {
                     const slot = interactionSlotsComp;
@@ -1183,7 +1186,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             style={{ width: '60px', padding: '2px' }}
                             onChange={(e) => {
                               slot.interactDist = Math.max(1, +e.target.value);
-                              requestCommit('Настройка ячейки');
+                              requestCommit(t('history.slotConfigure'));
                               onUpdateStats();
                             }}
                           />
@@ -1204,7 +1207,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                             style={{ width: '60px', padding: '2px' }}
                             onChange={(e) => {
                               slot.strength = Math.max(1, +e.target.value);
-                              requestCommit('Настройка ячейки');
+                              requestCommit(t('history.slotConfigure'));
                               onUpdateStats();
                             }}
                           />
@@ -1230,7 +1233,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                               Настроить: {slotItem.name}
                             </button>
                           ) : (
-                            <span style={{ color: '#777', fontSize: '12px' }}>Пусто</span>
+                            <span style={{ color: '#777', fontSize: '12px' }}>
+                              {t('common.empty')}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1251,7 +1256,7 @@ export const Inspector: React.FC<InspectorProps> = ({
               }}
             >
               <span>
-                Области экипировки{' '}
+                {t('inspector.equip')}{' '}
                 {(() => {
                   let count = equip?.equipmentAreas?.length ?? 0;
                   const isCreatureOrAssembly = currentArchetype === 'creature' || hasAssembly;
@@ -1278,12 +1283,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                     e.stopPropagation();
                     if (app) {
                       app.addEquipmentArea(targetId);
-                      requestCommit('Добавление области экипировки');
+                      requestCommit(t('history.equipAdd'));
                       onUpdateStats();
                     }
                   }}
                 >
-                  + Слот
+                  {t('inspector.addSlot')}
                 </button>
               )}
             </div>,
@@ -1362,7 +1367,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 app.updateEquipmentArea(containerId, area.id, {
                                   name: e.target.value,
                                 });
-                                requestCommit('Имя области');
+                                requestCommit(t('history.equipName'));
                                 onUpdateStats();
                               }
                             }}
@@ -1389,7 +1394,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                     app.updateEquipmentArea(containerId, area.id, {
                                       space: Math.max(1, +e.target.value),
                                     });
-                                    requestCommit('Объем области');
+                                    requestCommit(t('history.equipSpace'));
                                     onUpdateStats();
                                   }
                                 }}
@@ -1400,14 +1405,12 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 type="button"
                                 onClick={() => {
                                   if (area.itemIds.length > 0) {
-                                    alert(
-                                      'Нельзя удалить область экипировки, пока в ней есть предметы!'
-                                    );
+                                    alert(t('inspector.equipRemoveWarn'));
                                     return;
                                   }
                                   if (app) {
                                     app.removeEquipmentArea(containerId, area.id);
-                                    requestCommit('Удаление области экипировки');
+                                    requestCommit(t('history.equipRemove'));
                                     onUpdateStats();
                                   }
                                 }}
@@ -1476,7 +1479,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                                 app.updateEquipmentArea(containerId, area.id, {
                                   type: e.target.value,
                                 });
-                                requestCommit('Тип области');
+                                requestCommit(t('history.equipType'));
                                 onUpdateStats();
                               }
                             }}
@@ -1517,17 +1520,19 @@ export const Inspector: React.FC<InspectorProps> = ({
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                   }}
-                                  onClick={() => pushPath(itemId, it?.name || 'Предмет')}
+                                  onClick={() => pushPath(itemId, it?.name || itemId)}
                                 >
                                   <span>{it ? it.name : itemId}</span>
                                   <span style={{ color: '#888' }}>
-                                    V:{it?.size ?? 0} | {itWeight}кг
+                                    V:{it?.size ?? 0} | {itWeight}kg
                                   </span>
                                 </button>
                               );
                             })
                           ) : (
-                            <span style={{ color: '#777', fontSize: '11px' }}>Слот свободен</span>
+                            <span style={{ color: '#777', fontSize: '11px' }}>
+                              {t('inspector.slotFree')}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -1536,8 +1541,8 @@ export const Inspector: React.FC<InspectorProps> = ({
                 ) : (
                   <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
                     {isCreatureOrAssembly
-                      ? 'У данного существа пока нет частей тела со слотами экипировки.'
-                      : 'Нет областей экипировки. Нажмите "+ Слот", чтобы добавить.'}
+                      ? t('inspector.noPartEquip')
+                      : t('inspector.noEquipAreas')}
                   </div>
                 );
               })()}
@@ -1570,7 +1575,9 @@ export const Inspector: React.FC<InspectorProps> = ({
                   width: '100%',
                 }}
               >
-                <span>Сетка инвентаря {bagName ? `(${bagName})` : ''}</span>
+                <span>
+                  {t('inspector.inventory')} {bagName ? `(${bagName})` : ''}
+                </span>
                 {currentArchetype === 'item' && !isReadOnly && (
                   <button
                     type="button"
@@ -1587,22 +1594,22 @@ export const Inspector: React.FC<InspectorProps> = ({
                         if (isBagEmpty) {
                           if (app) {
                             app.setEntityInventoryGrid(targetId, false);
-                            requestCommit('Удаление инвентаря');
+                            requestCommit(t('history.gridRemove'));
                             onUpdateStats();
                           }
                         } else {
-                          alert('Нельзя удалить инвентарь, пока в нем есть предметы!');
+                          alert(t('inspector.invRemoveWarn'));
                         }
                       } else {
                         if (app) {
                           app.setEntityInventoryGrid(targetId, true);
-                          requestCommit('Добавление инвентаря');
+                          requestCommit(t('history.gridAdd'));
                           onUpdateStats();
                         }
                       }
                     }}
                   >
-                    {inv ? 'Удалить сетку' : '+ Добавить сетку'}
+                    {inv ? t('inspector.removeGrid') : t('inspector.addGrid')}
                   </button>
                 )}
               </div>,
@@ -1654,7 +1661,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   </div>
                 ) : (
                   <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
-                    Инвентарь отсутствует. Наденьте сумку на туловище.
+                    {t('inspector.noInventory')}
                   </div>
                 )}
               </>
@@ -1670,7 +1677,7 @@ export const Inspector: React.FC<InspectorProps> = ({
               style={{ width: '100%', backgroundColor: '#c0392b' }}
               onClick={handleDeleteEntity}
             >
-              Удалить объект
+              {t('inspector.deleteObject')}
             </button>
           </div>
         )}

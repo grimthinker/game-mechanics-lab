@@ -1,11 +1,20 @@
 import { HitZoneType, HitZoneConfig, WeaponCombatConfig, StandardRadius } from './ecs/types';
 import { deg2Rad, Radians } from './utils';
+import { t } from './locales';
 
 export const HIT_ZONE_LABELS: Record<HitZoneType, string> = {
-  angle: 'Сектор',
-  radius: 'Аура',
-  forward_line: 'Прямая линия',
-  shrapnel: 'Шрапнель',
+  get angle() {
+    return t('weapons.angle');
+  },
+  get radius() {
+    return t('weapons.radius');
+  },
+  get forward_line() {
+    return t('weapons.forward_line');
+  },
+  get shrapnel() {
+    return t('weapons.shrapnel');
+  },
 };
 
 export interface ZoneTypeParams {

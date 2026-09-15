@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { World } from '../../ecs/World';
+import { t } from '../../locales';
 
 interface SceneHierarchyProps {
   world: World | null | undefined;
@@ -17,11 +18,21 @@ interface EntityHierarchyItem {
 }
 
 const ARCHETYPE_CONFIG: Record<string, { label: string; icon: string }> = {
-  creature: { label: 'Существа', icon: '👤' },
-  item: { label: 'Предметы', icon: '📦' },
-  obstacle: { label: 'Препятствия', icon: '🧱' },
-  zone: { label: 'Зоны', icon: '🌀' },
-  marker: { label: 'Маркеры', icon: '📍' },
+  get creature() {
+    return { label: t('selectionDrawer.creatures'), icon: '👤' };
+  },
+  get item() {
+    return { label: t('selectionDrawer.items'), icon: '📦' };
+  },
+  get obstacle() {
+    return { label: t('selectionDrawer.obstacles'), icon: '🧱' };
+  },
+  get zone() {
+    return { label: t('selectionDrawer.zones'), icon: '🌀' };
+  },
+  get marker() {
+    return { label: t('selectionDrawer.markers'), icon: '📍' };
+  },
 };
 
 export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
@@ -98,18 +109,18 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
 
       const badges: Array<{ label: string; color: string }> = [];
       if (comp.aiStats?.behavior.current && comp.aiStats.behavior.current !== 'IdleTree') {
-        badges.push({ label: 'AI', color: '#2980b9' });
+        badges.push({ label: t('hierarchy.badgeAi'), color: '#2980b9' });
       }
       const hasHandItems = !!comp.interactionSlots?.itemId;
       const hasAreaItems = comp.equip?.equipmentAreas.some((a) => a.itemIds.length > 0);
       if (hasHandItems || hasAreaItems) {
-        badges.push({ label: 'ЭКИП', color: '#8e44ad' });
+        badges.push({ label: t('hierarchy.badgeEquip'), color: '#8e44ad' });
       }
       if (comp.inventory && comp.inventory.slots.some((row) => row.some((cell) => cell.itemId))) {
-        badges.push({ label: 'ИНВ', color: '#27ae60' });
+        badges.push({ label: t('hierarchy.badgeInv'), color: '#27ae60' });
       }
       if (comp.areaEffector) {
-        badges.push({ label: 'ЗОНА', color: '#d35400' });
+        badges.push({ label: t('hierarchy.badgeZone'), color: '#d35400' });
       }
 
       const entityData: EntityHierarchyItem = { id, name, hp, icon, badges };
@@ -142,7 +153,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
       >
         <input
           type="text"
-          placeholder="Поиск сущностей..."
+          placeholder={t('hierarchy.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -157,7 +168,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
           }}
         />
         <span style={{ fontSize: '10px', color: '#777', flexShrink: 0 }}>
-          Всего: <strong style={{ color: '#aaa' }}>{totalCount}</strong>
+          {t('hierarchy.totalCount')} <strong style={{ color: '#aaa' }}>{totalCount}</strong>
         </span>
       </div>
 
@@ -195,7 +206,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
                       fontStyle: 'italic',
                     }}
                   >
-                    Пусто
+                    {t('hierarchy.empty')}
                   </div>
                 ) : (
                   list.map((entity) => {

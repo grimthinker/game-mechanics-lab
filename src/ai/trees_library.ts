@@ -19,6 +19,7 @@ import {
   BTServiceInputListener,
   BTServiceInputController,
 } from './services';
+import { t } from '../locales';
 
 export const BEHAVIOR_TREES: Record<string, () => BTNode> = {
   PlayerTree: () => PlayerTree(),
@@ -28,10 +29,18 @@ export const BEHAVIOR_TREES: Record<string, () => BTNode> = {
 };
 
 export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
-  PlayerTree: 'Игрок (WASD)',
-  AttackerTree: 'Атакующий бот',
-  CombatTree: 'Боевой режим',
-  IdleTree: 'Бездействие',
+  get PlayerTree() {
+    return t('trees.PlayerTree');
+  },
+  get AttackerTree() {
+    return t('trees.AttackerTree');
+  },
+  get CombatTree() {
+    return t('trees.CombatTree');
+  },
+  get IdleTree() {
+    return t('trees.IdleTree');
+  },
 };
 
 export function PlayerTree(): BTNode {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { CreatureStance } from '../../ecs/types';
+import { t } from '../../locales';
 
 export interface MetaInspectorProps {
   name: string;
@@ -16,10 +17,10 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
 }) => {
   const getStanceLabel = (s?: CreatureStance) => {
     if (!s) return null;
-    if (s === 'standing') return { text: 'Стоя', color: '#2980b9' };
-    if (s === 'crouching') return { text: 'Присед', color: '#8e44ad' };
-    if (s === 'prone') return { text: 'Лёжа', color: '#795548' };
-    return { text: `Переход (${s})`, color: '#d35400' };
+    if (s === 'standing') return { text: t('hud.standing'), color: '#2980b9' };
+    if (s === 'crouching') return { text: t('hud.crouching'), color: '#8e44ad' };
+    if (s === 'prone') return { text: t('hud.prone'), color: '#795548' };
+    return { text: `${t('hud.transition')} (${s})`, color: '#d35400' };
   };
 
   const stanceInfo = getStanceLabel(stance);
@@ -27,7 +28,7 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
       <label>
-        Имя / Название:
+        {t('metaInspector.nameLabel')}
         <input
           disabled={isReadOnly}
           type="text"
@@ -45,7 +46,7 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
             color: '#888',
           }}
         >
-          <span>Текущее положение:</span>
+          <span>{t('metaInspector.currentStance')}</span>
           <span
             style={{
               backgroundColor: stanceInfo.color,

@@ -14,21 +14,22 @@ import {
 import { Point } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
+import { t } from '../../locales';
 
 export function getDefaultZoneName(effect: ZoneEffectType, valuePerSec?: number): string {
   switch (effect) {
     case 'damage':
-      return 'Зона урона';
+      return t('zones.defaultNameDamage');
     case 'heal':
-      return 'Зона лечения';
+      return t('zones.defaultNameHeal');
     case 'repel':
-      return 'Силовое поле (Отталкивание)';
+      return t('zones.defaultNameRepel');
     case 'attract':
-      return 'Воронка (Притягивание)';
+      return t('zones.defaultNameAttract');
     case 'time_dilation':
       return valuePerSec !== undefined && valuePerSec > 1.0
-        ? 'Зона ускорения времени'
-        : 'Зона замедления времени';
+        ? t('zones.defaultNameTimeFast')
+        : t('zones.defaultNameTimeSlow');
   }
 }
 

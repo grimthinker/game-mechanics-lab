@@ -2,6 +2,7 @@ import React from 'react';
 import { EntityConfig } from '../../ecs/types';
 import { createZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
+import { t } from '../../locales';
 
 interface SpawnPaletteProps {
   onSelectPreset: (config: EntityConfig) => void;
@@ -25,43 +26,43 @@ interface PaletteCategory {
 export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSelectModular }) => {
   const categories: PaletteCategory[] = [
     {
-      title: 'Существа',
+      title: t('palette.categoryCreatures'),
       items: [
         {
           id: 'creature_player',
-          name: 'Игрок',
-          description: 'Модульное существо, дерево PlayerTree',
+          name: t('palette.player'),
+          description: t('palette.playerDesc'),
           icon: '🎮',
-          onClick: () => onSelectModular('PlayerTree', 'Игрок'),
+          onClick: () => onSelectModular('PlayerTree', t('palette.player')),
         },
         {
           id: 'creature_attacker',
-          name: 'Бот-атакующий',
-          description: 'Поиск цели, преследование, AttackerTree',
+          name: t('palette.attacker'),
+          description: t('palette.attackerDesc'),
           icon: '⚔️',
-          onClick: () => onSelectModular('AttackerTree', 'Бот-атакующий'),
+          onClick: () => onSelectModular('AttackerTree', t('palette.attacker')),
         },
         {
           id: 'creature_idle',
-          name: 'Мирный бот',
-          description: 'Модульное существо без активного поведения',
+          name: t('palette.idleBot'),
+          description: t('palette.idleBotDesc'),
           icon: '👤',
-          onClick: () => onSelectModular('IdleTree', 'Мирный бот'),
+          onClick: () => onSelectModular('IdleTree', t('palette.idleBot')),
         },
       ],
     },
     {
-      title: 'Оружие',
+      title: t('palette.categoryWeapons'),
       items: [
         {
           id: 'weapon_spear',
-          name: 'Копьё пронзания',
-          description: 'Атака прямой линией, дальность 150px',
+          name: t('palette.spear'),
+          description: t('palette.spearDesc'),
           icon: '🗡️',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'weapon' },
             item: {
-              name: 'Копьё пронзания',
+              name: t('palette.spear'),
               type: 'weapon',
               maxStack: 1,
               size: 10,
@@ -76,13 +77,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'weapon_shotgun',
-          name: 'Шрапнель',
-          description: 'Конусный залп из 5 лучей',
+          name: t('palette.shotgun'),
+          description: t('palette.shotgunDesc'),
           icon: '💥',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'weapon' },
             item: {
-              name: 'Шрапнельный дробовик',
+              name: t('palette.shotgun'),
               type: 'weapon',
               maxStack: 1,
               size: 10,
@@ -97,13 +98,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'weapon_aura',
-          name: 'Аура урона',
-          description: 'Круговая атака в радиусе 50px',
+          name: t('palette.auraWeapon'),
+          description: t('palette.auraWeaponDesc'),
           icon: '✨',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'weapon' },
             item: {
-              name: 'Аура разрушения',
+              name: t('palette.auraWeapon'),
               type: 'weapon',
               maxStack: 1,
               size: 10,
@@ -119,17 +120,17 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
       ],
     },
     {
-      title: 'Экипировка и Сумки',
+      title: t('palette.categoryEquipment'),
       items: [
         {
           id: 'armor_belt',
-          name: 'Тактический пояс',
-          description: 'Пояс со слотами под ножны, крепление и подсумок',
+          name: t('palette.tacticalBelt'),
+          description: t('palette.tacticalBeltDesc'),
           icon: '🥋',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'armor' },
             item: {
-              name: 'Тактический пояс',
+              name: t('palette.tacticalBelt'),
               type: 'armor',
               maxStack: 1,
               size: 5,
@@ -143,26 +144,32 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
               equipmentAreas: [
                 {
                   id: 'belt_sheath',
-                  name: 'Крепление ножен',
+                  name: 'belt_sheath',
                   type: 'sheath',
                   space: 15,
                   itemIds: [],
                 },
-                { id: 'belt_slot_1', name: 'Подвес 1', type: 'belt_slot', space: 10, itemIds: [] },
-                { id: 'belt_pouch_1', name: 'Карман пояса', type: 'pouch', space: 8, itemIds: [] },
+                {
+                  id: 'belt_slot_1',
+                  name: 'belt_slot_1',
+                  type: 'belt_slot',
+                  space: 10,
+                  itemIds: [],
+                },
+                { id: 'belt_pouch_1', name: 'belt_pouch_1', type: 'pouch', space: 8, itemIds: [] },
               ],
             },
           }),
         },
         {
           id: 'armor_vest',
-          name: 'Разгрузочный жилет',
-          description: 'Броня с карманами (3x2) и подвесом под кобуру',
+          name: t('palette.vest'),
+          description: t('palette.vestDesc'),
           icon: '🦺',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'armor' },
             item: {
-              name: 'Разгрузочный жилет',
+              name: t('palette.vest'),
               type: 'armor',
               maxStack: 1,
               size: 20,
@@ -177,14 +184,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
               equipmentAreas: [
                 {
                   id: 'vest_holster',
-                  name: 'Кобура жилета',
+                  name: 'vest_holster',
                   type: 'holster',
                   space: 10,
                   itemIds: [],
                 },
                 {
                   id: 'vest_pouch',
-                  name: 'Подсумок жилета',
+                  name: 'vest_pouch',
                   type: 'pouch',
                   space: 10,
                   itemIds: [],
@@ -195,13 +202,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'armor_chest',
-          name: 'Тяжёлый нагрудник',
-          description: 'Броня туловища (Защита: 25, Поглощение: 5)',
+          name: t('palette.chestplate'),
+          description: t('palette.chestplateDesc'),
           icon: '🛡️',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'armor' },
             item: {
-              name: 'Тяжёлый нагрудник',
+              name: t('palette.chestplate'),
               type: 'armor',
               maxStack: 1,
               size: 20,
@@ -215,13 +222,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'armor_helmet',
-          name: 'Стальной шлем',
-          description: 'Броня головы (Защита: 15, Поглощение: 2)',
+          name: t('palette.helmet'),
+          description: t('palette.helmetDesc'),
           icon: '⛑️',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'armor' },
             item: {
-              name: 'Стальной шлем',
+              name: t('palette.helmet'),
               type: 'armor',
               maxStack: 1,
               size: 10,
@@ -235,13 +242,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'bag_backpack',
-          name: 'Рюкзак',
-          description: 'Сумка для туловища, сетка 6x4 ячейки',
+          name: t('palette.backpack'),
+          description: t('palette.backpackDesc'),
           icon: '🎒',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'bag' },
             item: {
-              name: 'Рюкзак',
+              name: t('palette.backpack'),
               type: 'bag',
               maxStack: 1,
               size: 10,
@@ -256,16 +263,16 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
       ],
     },
     {
-      title: 'Препятствия',
+      title: t('palette.categoryObstacles'),
       items: [
         {
           id: 'obstacle_wall',
-          name: 'Каменная стена',
-          description: 'Неразрушаемое препятствие 100x40px',
+          name: t('palette.wall'),
+          description: t('palette.wallDesc'),
           icon: '🧱',
           createConfig: () => ({
             tag: { archetype: 'obstacle' },
-            meta: { name: 'Каменная стена', entityType: 'obstacle', destructible: false },
+            meta: { name: t('palette.wall'), entityType: 'obstacle', destructible: false },
             physics: {
               radius: 54,
               weight: 1000,
@@ -276,12 +283,12 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'obstacle_crate',
-          name: 'Деревянный ящик',
-          description: 'Разрушаемый объект, 100 HP, 60x60px',
+          name: t('palette.crate'),
+          description: t('palette.crateDesc'),
           icon: '📦',
           createConfig: () => ({
             tag: { archetype: 'obstacle' },
-            meta: { name: 'Деревянный ящик', entityType: 'obstacle', destructible: true },
+            meta: { name: t('palette.crate'), entityType: 'obstacle', destructible: true },
             health: { hp: 100, maxHp: 100 },
             physics: {
               radius: 42,
@@ -294,49 +301,71 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
       ],
     },
     {
-      title: 'Зоны',
+      title: t('palette.categoryZones'),
       items: [
         {
           id: 'zone_damage',
-          name: 'Зона огня (Урон)',
-          description: 'Наносит 15 урона в секунду',
+          name: t('palette.zoneFire'),
+          description: t('palette.zoneFireDesc'),
           icon: '🔥',
-          createConfig: () => createZoneConfig('damage', 70, 15, 'Зона огня'),
+          createConfig: () => createZoneConfig('damage', 70, 15, t('palette.zoneFire')),
         },
         {
           id: 'zone_heal',
-          name: 'Зона лечения',
-          description: 'Восстанавливает 15 HP в секунду',
+          name: t('palette.zoneHeal'),
+          description: t('palette.zoneHealDesc'),
           icon: '💚',
-          createConfig: () => createZoneConfig('heal', 70, 15, 'Зона лечения'),
+          createConfig: () => createZoneConfig('heal', 70, 15, t('palette.zoneHeal')),
         },
         {
           id: 'zone_repel',
-          name: 'Силовое поле',
-          description: 'Отталкивает существ наружу',
+          name: t('palette.zoneRepel'),
+          description: t('palette.zoneRepelDesc'),
           icon: '💨',
           createConfig: () =>
-            createZoneConfig('repel', 70, 200, 'Силовое поле', false, false, false, true, 7000, 0),
+            createZoneConfig(
+              'repel',
+              70,
+              200,
+              t('palette.zoneRepel'),
+              false,
+              false,
+              false,
+              true,
+              7000,
+              0
+            ),
         },
         {
           id: 'zone_attract',
-          name: 'Гравитационная воронка',
-          description: 'Притягивает существ к центру',
+          name: t('palette.zoneAttract'),
+          description: t('palette.zoneAttractDesc'),
           icon: '🌀',
           createConfig: () =>
-            createZoneConfig('attract', 70, 200, 'Воронка', false, false, false, true, 7000, 0),
+            createZoneConfig(
+              'attract',
+              70,
+              200,
+              t('palette.zoneAttract'),
+              false,
+              false,
+              false,
+              true,
+              7000,
+              0
+            ),
         },
         {
           id: 'zone_time_slow',
-          name: 'Зона замедления (0.5x)',
-          description: 'Замедляет локальное время вдвое (0.5x)',
+          name: t('palette.zoneTimeSlow'),
+          description: t('palette.zoneTimeSlowDesc'),
           icon: '⏳',
           createConfig: () =>
             createZoneConfig(
               'time_dilation',
               70,
               0.5,
-              'Зона замедления (0.5x)',
+              t('palette.zoneTimeSlow'),
               false,
               false,
               false,
@@ -345,15 +374,15 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'zone_time_fast',
-          name: 'Зона ускорения (1.8x)',
-          description: 'Ускоряет локальное время на 80% (1.8x)',
+          name: t('palette.zoneTimeFast'),
+          description: t('palette.zoneTimeFastDesc'),
           icon: '⚡',
           createConfig: () =>
             createZoneConfig(
               'time_dilation',
               70,
               1.8,
-              'Зона ускорения (1.8x)',
+              t('palette.zoneTimeFast'),
               false,
               false,
               false,
@@ -362,15 +391,15 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
         },
         {
           id: 'zone_time_vortex',
-          name: 'Воронка времени (Градиент)',
-          description: 'Плавное замедление от 0.2x в центре до 1.0x на краю',
+          name: t('palette.zoneTimeVortex'),
+          description: t('palette.zoneTimeVortexDesc'),
           icon: '🌀',
           createConfig: () =>
             createZoneConfig(
               'time_dilation',
               90,
               0.5,
-              'Воронка времени',
+              t('palette.zoneTimeVortex'),
               false,
               false,
               false,
@@ -386,7 +415,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '10px' }}>
       <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px' }}>
-        Выберите шаблон и кликните на поле карты для размещения:
+        {t('palette.subtitle')}
       </div>
 
       {categories.map((category) => (

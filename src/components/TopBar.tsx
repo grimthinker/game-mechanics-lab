@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { GameMode, THEME_COLORS } from '../constants';
+import { t, useLocale, setLocale } from '../locales';
 
 export interface TopBarProps {
   mode: GameMode;
@@ -57,6 +58,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   setShowAIDebug,
 }) => {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  const locale = useLocale();
 
   return (
     <div
@@ -82,7 +84,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             style={{ backgroundColor: '#2c3e50', color: '#fff', border: 'none' }}
             onClick={() => setIsFileMenuOpen(!isFileMenuOpen)}
           >
-            Файл ▼
+            {t('topbar.file')} ▼
           </button>
           {isFileMenuOpen && (
             <>
@@ -123,7 +125,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#333')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  Новый мир
+                  {t('topbar.newWorld')}
                 </button>
                 <button
                   style={{
@@ -141,7 +143,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#333')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  Сохранить (JSON)
+                  {t('topbar.saveJson')}
                 </button>
                 <button
                   style={{
@@ -159,7 +161,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#333')}
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
-                  Загрузить (JSON)
+                  {t('topbar.loadJson')}
                 </button>
                 <input
                   type="file"
@@ -190,9 +192,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             }}
             disabled={!canUndo}
             onClick={onUndo}
-            title="Отменить действие (Ctrl+Z)"
+            title="Ctrl+Z"
           >
-            ↶ Отмена
+            {t('topbar.undo')}
           </button>
           <button
             className="btn btn-sm"
@@ -204,9 +206,9 @@ export const TopBar: React.FC<TopBarProps> = ({
             }}
             disabled={!canRedo}
             onClick={onRedo}
-            title="Повторить действие (Ctrl+Y)"
+            title="Ctrl+Y"
           >
-            ↷ Повтор
+            {t('topbar.redo')}
           </button>
         </div>
       </div>
@@ -233,7 +235,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           }}
           onClick={goToEditor}
         >
-          Редактор
+          {t('topbar.editor')}
         </button>
         <button
           className="btn btn-sm"
@@ -245,7 +247,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           }}
           onClick={goToSimulation}
         >
-          Симуляция
+          {t('topbar.simulation')}
         </button>
         <button
           className="btn btn-sm"
@@ -257,7 +259,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           }}
           onClick={goToGame}
         >
-          Играть
+          {t('topbar.game')}
         </button>
 
         <div style={{ width: '1px', height: '20px', backgroundColor: '#444', margin: '0 4px' }} />
@@ -272,9 +274,9 @@ export const TopBar: React.FC<TopBarProps> = ({
           }}
           onClick={togglePause}
           disabled={mode === GameMode.GAME}
-          title="Пауза/Возобновление (Пробел)"
+          title="Space"
         >
-          {isPaused ? 'ПАУЗА' : '▶ ИДЕТ'}
+          {isPaused ? t('topbar.pause') : t('topbar.running')}
         </button>
 
         {mode === GameMode.SIMULATION && (
@@ -288,7 +290,7 @@ export const TopBar: React.FC<TopBarProps> = ({
               marginLeft: '4px',
             }}
           >
-            <span style={{ fontSize: '11px', color: '#bdc3c7' }}>Скорость:</span>
+            <span style={{ fontSize: '11px', color: '#bdc3c7' }}>{t('topbar.speed')}</span>
             <input
               type="range"
               min="0.05"
@@ -305,8 +307,8 @@ export const TopBar: React.FC<TopBarProps> = ({
         )}
       </div>
 
-      {/* Правая часть: Настройки отображения */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      {/* Правая часть: Настройки отображения и Язык */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button
           className="btn btn-sm"
           style={{
@@ -317,9 +319,8 @@ export const TopBar: React.FC<TopBarProps> = ({
             fontSize: '11px',
           }}
           onClick={onToggleRenderMode}
-          title="Переключить рендерер"
         >
-          {renderMode === '2d' ? '2D CANVAS' : '3D WEBGL'}
+          {renderMode === '2d' ? t('topbar.toggleRenderer2D') : t('topbar.toggleRenderer3D')}
         </button>
 
         <label
@@ -337,7 +338,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             checked={showUIOverlays}
             onChange={(e) => setShowUIOverlays(e.target.checked)}
           />
-          Имена и HP
+          {t('topbar.namesAndHp')}
         </label>
 
         <label
@@ -355,7 +356,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             checked={obstaclesEnabled}
             onChange={(e) => setObstaclesEnabled(e.target.checked)}
           />
-          Коллизии
+          {t('topbar.collisions')}
         </label>
 
         <label
@@ -366,7 +367,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             cursor: 'pointer',
             fontSize: '12px',
             color: '#f39c12',
-            marginLeft: '8px',
           }}
         >
           <input
@@ -375,8 +375,27 @@ export const TopBar: React.FC<TopBarProps> = ({
             onChange={(e) => setShowAIDebug(e.target.checked)}
             style={{ accentColor: '#f39c12' }}
           />
-          AI Debug
+          {t('topbar.aiDebug')}
         </label>
+
+        {/* Переключатель языка RU / EN */}
+        <button
+          className="btn btn-sm"
+          style={{
+            backgroundColor: '#1f2d3d',
+            color: '#3498db',
+            border: '1px solid #3498db',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            padding: '2px 8px',
+            fontSize: '11px',
+            cursor: 'pointer',
+          }}
+          onClick={() => setLocale(locale === 'ru' ? 'en' : 'ru')}
+          title="Switch Language / Сменить язык"
+        >
+          🌐 {locale.toUpperCase()}
+        </button>
 
         <button
           className="btn btn-sm"
@@ -390,7 +409,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             padding: 0,
           }}
           onClick={onOpenHotkeys}
-          title="Горячие клавиши"
+          title={t('topbar.hotkeysTitle')}
         >
           ?
         </button>

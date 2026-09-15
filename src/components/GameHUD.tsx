@@ -1,6 +1,7 @@
 import React from 'react';
 import { World } from '../ecs/World';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
+import { t } from '../locales';
 
 export interface GameHUDProps {
   world: World | null | undefined;
@@ -24,7 +25,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
   const hpPercent = Math.max(0, Math.min(100, (currentHp / (maxHp || 1)) * 100));
 
   // Определение экипированного оружия
-  let weaponName = 'Кулаки';
+  let weaponName = t('hud.fists');
   if (playerId) {
     const aggSlots = getAggregatedInteractionSlots(world, playerId);
     for (const slotInfo of aggSlots) {
@@ -42,19 +43,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
   const currentStance = meta?.stance;
   const stance =
     currentStance === 'prone'
-      ? 'Лёжа'
+      ? t('hud.prone')
       : currentStance === 'crouching'
-        ? 'Присед'
+        ? t('hud.crouching')
         : currentStance && currentStance.includes('_to_')
-          ? 'Переход...'
-          : 'Стоя';
+          ? t('hud.transition')
+          : t('hud.standing');
   const moveMode =
     meta?.movementMode === 'sprinting'
-      ? 'Спринт'
+      ? t('hud.sprint')
       : meta?.movementMode === 'walking'
-        ? 'Шаг'
-        : 'Бег';
-
+        ? t('hud.walk')
+        : t('hud.jog');
   return (
     <>
       {/* Верхняя левая панель: Статус персонажа */}
@@ -83,7 +83,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
             marginBottom: '8px',
           }}
         >
-          <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#3498db' }}>🎮 Игрок</span>
+          <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#3498db' }}>
+            {t('hud.player')}
+          </span>
           <span style={{ fontSize: '11px', color: '#aaa' }}>
             {stance} • {moveMode}
           </span>
@@ -99,7 +101,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
             borderTop: '1px solid #2e2e2e',
           }}
         >
-          <span style={{ color: '#888' }}>Оружие:</span>
+          <span style={{ color: '#888' }}>{t('hud.weapon')}</span>
           <span style={{ fontWeight: 'bold', color: '#f39c12' }}>⚔️ {weaponName}</span>
         </div>
       </div>
@@ -133,9 +135,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
           }}
           onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#c0392b')}
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(192, 57, 43, 0.85)')}
-          title="Вернуться в режим редактора"
         >
-          [ESC] Выйти в редактор
+          {t('hud.exitToEditor')}
         </button>
       </div>
 
@@ -160,22 +161,22 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
         }}
       >
         <span>
-          <strong style={{ color: '#fff' }}>WASD</strong> Движение
+          <strong style={{ color: '#fff' }}>WASD</strong> {t('hud.hintMove')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>Пробел</strong> Атака
+          <strong style={{ color: '#fff' }}>Space</strong> {t('hud.hintAttack')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>Shift</strong> Спринт
+          <strong style={{ color: '#fff' }}>Shift</strong> {t('hud.hintSprint')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>Ctrl+ЛКМ</strong> Подбор
+          <strong style={{ color: '#fff' }}>Ctrl+LMB</strong> {t('hud.hintPickup')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>C</strong> Присед
+          <strong style={{ color: '#fff' }}>C</strong> {t('hud.hintCrouch')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>V</strong> Лечь
+          <strong style={{ color: '#fff' }}>V</strong> {t('hud.hintProne')}
         </span>
       </div>
     </>

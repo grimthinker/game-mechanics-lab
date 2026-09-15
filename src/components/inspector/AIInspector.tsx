@@ -1,5 +1,6 @@
 import React from 'react';
 import { BEHAVIOR_TREE_NAMES } from '../../ai/trees_library';
+import { t } from '../../locales';
 
 export interface AIInspectorProps {
   behavior: string;
@@ -11,7 +12,7 @@ export const AIInspector: React.FC<AIInspectorProps> = ({ behavior, onChange, is
   <label
     style={{ display: 'flex', flexDirection: 'column', gap: '4px', width: '100%', minWidth: 0 }}
   >
-    Поведение (AI):
+    {t('aiInspector.behavior')}
     <select
       disabled={isReadOnly}
       value={behavior}

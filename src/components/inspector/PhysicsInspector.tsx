@@ -1,5 +1,6 @@
 import React from 'react';
 import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
+import { t } from '../../locales';
 
 export interface PhysicsInspectorValues {
   radius: number;
@@ -37,11 +38,11 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
         checked={values.isSolid}
         onChange={(e) => onChange({ isSolid: e.target.checked })}
       />
-      Участвует в коллизии
+      {t('physicsInspector.isSolid')}
     </label>
 
     <label>
-      Радиус (px):
+      {t('physicsInspector.radius')}
       {isStandardRadiusOnly ? (
         <select
           disabled={isReadOnly}
@@ -68,7 +69,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
     </label>
 
     <label>
-      Собственный вес (кг):
+      {t('physicsInspector.weight')}
       <input
         disabled={isReadOnly}
         type="number"
@@ -92,8 +93,8 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           borderRadius: '3px',
         }}
       >
-        <span>Полный вес с содержимым:</span>
-        <strong>{totalWeight} кг</strong>
+        <span>{t('physicsInspector.totalWeight')}</span>
+        <strong>{t('physicsInspector.weightKg', { weight: totalWeight })}</strong>
       </div>
     )}
   </div>
