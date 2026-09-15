@@ -9,12 +9,8 @@ import {
 import { destroyPartRecursive } from '../utils/anatomyDamage';
 import { Circle } from 'detect-collisions';
 import { setBaseStat, createStat } from '../stats/StatEvaluator';
-import {
-  evaluateConsciousness,
-  ConsciousnessState,
-  getLocomotionState,
-  getSensoryStats,
-} from '../utils/anatomyStatus';
+import { evaluateConsciousness, getLocomotionState, getSensoryStats } from '../utils/anatomyStatus';
+import { ConsciousnessState } from '../types';
 
 export class AnatomySystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
@@ -133,6 +129,23 @@ export class AnatomySystem {
       perception.hearingMaxDistance = sensory.hearing.maxDistance;
     }
 
+    // 0.6. Агрегация Локомоции и Сознания
+    const currentConsciousness = evaluateConsciousness(world, rootId);
+    let consciousnessComp = world.getComponent(rootId, 'consciousness');
+    if (!consciousnessComp) {
+      world.addComponent(rootId, 'consciousness', { state: currentConsciousness });
+    } else {
+      consciousnessComp.state = currentConsciousness;
+    }
+
+    const currentLocomotion = getLocomotionState(world, rootId);
+    let locomotionComp = world.getComponent(rootId, 'locomotionState');
+    if (!locomotionComp) {
+      world.addComponent(rootId, 'locomotionState', { ...currentLocomotion });
+    } else {
+      Object.assign(locomotionComp, currentLocomotion);
+    }
+
     // 1. Агрегация физических свойств в Root
     let rootPhysStats = world.getComponent(rootId, 'physicsStats');
     if (!rootPhysStats) {
@@ -165,8 +178,7 @@ export class AnatomySystem {
     }
 
     // 2. Логика ног: если стоять невозможно (0 целых ног) — принудительный prone
-    const locomotion = getLocomotionState(world, rootId);
-    if (!locomotion.canStand) {
+    if (!currentLocomotion.canStand) {
       const input = world.getComponent(rootId, 'input');
       if (input) {
         input.desiredStance = 'prone';

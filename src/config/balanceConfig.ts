@@ -80,5 +80,7 @@ export const BALANCE_CONFIG = {
     defaultHearingSensitivity: 1.0,
     /** Максимальная дальность слуха (px) */
     defaultHearingMaxDistance: 500,
+    /** Множитель характеристик сломанных органов чувств */
+    brokenSenseMultiplier: 0.5,
   },
 };

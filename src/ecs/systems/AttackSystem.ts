@@ -13,9 +13,8 @@ export class AttackSystem {
     for (const [id, { activeAttacks, health, input }] of entities) {
       if (!health.isAlive) continue;
 
-      const aggSlots = getAggregatedInteractionSlots(world, id);
-
       if (input.wantsAttack && !input.isRunning) {
+        const aggSlots = getAggregatedInteractionSlots(world, id);
         const busyGlobalIndices = new Set(activeAttacks.attacks.map((a) => a.slotIndex));
         let chosenGlobalIndex = -1;
 

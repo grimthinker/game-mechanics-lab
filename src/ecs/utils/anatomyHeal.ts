@@ -1,8 +1,8 @@
 import { World } from '../World';
-import { EntityId } from '../types';
+import { EntityId, ConsciousnessState } from '../types';
 import { getAnatomyParts } from './hierarchy';
 import { findActiveBrain } from './anatomy';
-import { evaluateConsciousness, ConsciousnessState } from './anatomyStatus';
+import { evaluateConsciousness } from './anatomyStatus';
 
 export function applyAnatomyHeal(
   world: World,

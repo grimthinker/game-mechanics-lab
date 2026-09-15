@@ -11,12 +11,12 @@ import { addModifier, removeModifier } from '../stats/StatEvaluator';
 import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
 import { LOGIC_CONFIG } from '../../ai/config';
 
-import { BaseCreatureStance, TransitionCreatureStance, MovementStatsComponent } from '../types';
 import {
-  evaluateConsciousness,
+  BaseCreatureStance,
+  TransitionCreatureStance,
+  MovementStatsComponent,
   ConsciousnessState,
-  getLocomotionState,
-} from '../utils/anatomyStatus';
+} from '../types';
 
 function getTransitionStance(
   from: BaseCreatureStance,
@@ -102,7 +102,10 @@ export class MovementSystem {
       }
 
       // 0. Оценка состояния сознания
-      const consciousness = evaluateConsciousness(world, id);
+      const consciousnessComp = world.getComponent(id, 'consciousness');
+      const consciousness = consciousnessComp
+        ? consciousnessComp.state
+        : ConsciousnessState.CONSCIOUS;
       if (consciousness === ConsciousnessState.UNCONSCIOUS) {
         input.desiredMoveVector = null;
         input.moveForward = 0;
@@ -118,7 +121,13 @@ export class MovementSystem {
       }
 
       // 0.5. Оценка состояния опорно-двигательного аппарата (ног)
-      const locomotion = getLocomotionState(world, id);
+      const locomotion = world.getComponent(id, 'locomotionState') || {
+        speedMult: 1.0,
+        turnMult: 1.0,
+        canSprint: true,
+        forceProneOnMove: false,
+        canStand: true,
+      };
 
       if (!locomotion.canSprint) {
         input.isRunning = false;

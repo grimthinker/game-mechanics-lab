@@ -1,5 +1,9 @@
 import { World } from '../World';
-import { EntityId } from '../types';
+import {
+  EntityId,
+  ConsciousnessState,
+  LocomotionStateComponent as LocomotionState,
+} from '../types';
 import { getAnatomyParts } from './hierarchy';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
@@ -21,17 +25,6 @@ export function getPartStatus(world: World, partId: EntityId): PartStatus {
   if (fp.current >= 0) return PartStatus.INTACT;
   if (fp.current > -maxFp) return PartStatus.BROKEN;
   return PartStatus.DESTROYED;
-}
-
-export interface LocomotionState {
-  speedMult: number;
-  turnMult: number;
-  canSprint: boolean;
-  forceProneOnMove: boolean;
-  canStand: boolean;
-  intactLegs: number;
-  brokenLegs: number;
-  destroyedLegs: number;
 }
 
 export function getLocomotionState(world: World, rootId: EntityId): LocomotionState {
@@ -184,14 +177,16 @@ export function getSensoryStats(world: World, rootId: EntityId): AggregatedSenso
   const intactEyes = eyes.filter((e) => e.status === PartStatus.INTACT);
   const brokenEyes = eyes.filter((e) => e.status === PartStatus.BROKEN);
 
+  const brokenMult = BALANCE_CONFIG.senses.brokenSenseMultiplier;
+
   if (intactEyes.length > 0) {
     visionFov = Math.max(...intactEyes.map((e) => e.fovAngle));
     visionClarity = Math.max(...intactEyes.map((e) => e.clarity));
     visionMaxDist = Math.max(...intactEyes.map((e) => e.maxDistance));
   } else if (brokenEyes.length > 0) {
-    visionFov = 0.5 * Math.max(...brokenEyes.map((e) => e.fovAngle));
-    visionClarity = 0.5 * Math.max(...brokenEyes.map((e) => e.clarity));
-    visionMaxDist = 0.5 * Math.max(...brokenEyes.map((e) => e.maxDistance));
+    visionFov = brokenMult * Math.max(...brokenEyes.map((e) => e.fovAngle));
+    visionClarity = brokenMult * Math.max(...brokenEyes.map((e) => e.clarity));
+    visionMaxDist = brokenMult * Math.max(...brokenEyes.map((e) => e.maxDistance));
   }
 
   // Агрегация слуха:
@@ -205,8 +200,8 @@ export function getSensoryStats(world: World, rootId: EntityId): AggregatedSenso
     hearingSens = Math.max(...intactEars.map((e) => e.sensitivity));
     hearingMaxDist = Math.max(...intactEars.map((e) => e.maxDistance));
   } else if (brokenEars.length > 0) {
-    hearingSens = 0.5 * Math.max(...brokenEars.map((e) => e.sensitivity));
-    hearingMaxDist = 0.5 * Math.max(...brokenEars.map((e) => e.maxDistance));
+    hearingSens = brokenMult * Math.max(...brokenEars.map((e) => e.sensitivity));
+    hearingMaxDist = brokenMult * Math.max(...brokenEars.map((e) => e.maxDistance));
   }
 
   return {
@@ -220,12 +215,6 @@ export function getSensoryStats(world: World, rootId: EntityId): AggregatedSenso
       maxDistance: hearingMaxDist,
     },
   };
-}
-
-export const enum ConsciousnessState {
-  CONSCIOUS = 'CONSCIOUS',
-  UNCONSCIOUS = 'UNCONSCIOUS',
-  DEAD = 'DEAD',
 }
 
 export function evaluateConsciousness(world: World, rootId: EntityId): ConsciousnessState {

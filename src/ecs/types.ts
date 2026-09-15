@@ -84,6 +84,27 @@ export interface AssemblyRootComponent {
 
 export interface LocomotionComponent {}
 
+export const enum ConsciousnessState {
+  CONSCIOUS = 'CONSCIOUS',
+  UNCONSCIOUS = 'UNCONSCIOUS',
+  DEAD = 'DEAD',
+}
+
+export interface ConsciousnessComponent {
+  state: ConsciousnessState;
+}
+
+export interface LocomotionStateComponent {
+  speedMult: number;
+  turnMult: number;
+  canSprint: boolean;
+  forceProneOnMove: boolean;
+  canStand: boolean;
+  intactLegs: number;
+  brokenLegs: number;
+  destroyedLegs: number;
+}
+
 export interface HeartComponent {
   requiresBrain: boolean;
 }
@@ -496,6 +517,8 @@ export interface EntityComponents {
   vision?: VisionStatsComponent;
   hearing?: HearingStatsComponent;
   perception?: PerceptionComponent;
+  consciousness?: ConsciousnessComponent;
+  locomotionState?: LocomotionStateComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -535,6 +558,8 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'vision',
   'hearing',
   'perception',
+  'consciousness',
+  'locomotionState',
 ] as const;
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];

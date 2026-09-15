@@ -5,12 +5,8 @@ import { getAnatomyParts, getRootOwner } from './hierarchy';
 import { findActiveBrain } from './anatomy';
 import { getPartArmor, getConnectionArmor, selectDamageTarget } from './combat';
 import { killEntity } from './health';
-import {
-  evaluateConsciousness,
-  ConsciousnessState,
-  getPartStatus,
-  PartStatus,
-} from './anatomyStatus';
+import { evaluateConsciousness, getPartStatus, PartStatus } from './anatomyStatus';
+import { ConsciousnessState } from '../types';
 import { BEHAVIOR_TREES } from '../../ai/trees_library';
 import { Circle } from 'detect-collisions';
 
