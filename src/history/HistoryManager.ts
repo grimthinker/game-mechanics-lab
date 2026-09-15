@@ -1,3 +1,5 @@
+import { EDITOR_CONFIG } from '../config/editorConfig';
+
 export interface HistoryRecord {
   description: string;
   worldSnapshot: any;
@@ -10,7 +12,7 @@ export class HistoryManager {
   private redoStack: HistoryRecord[] = [];
   private maxDepth: number;
 
-  constructor(maxDepth: number = 50) {
+  constructor(maxDepth: number = EDITOR_CONFIG.historyMaxDepth) {
     this.maxDepth = maxDepth;
   }
 

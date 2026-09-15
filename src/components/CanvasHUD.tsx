@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Camera } from '../Camera';
 import { Point } from '../types';
-import { CAMERA_CONFIG } from '../../config/cameraConfig';
+import { CAMERA_CONFIG } from '../config/cameraConfig';
 import { GizmoTool } from '../gizmos/types';
 
 export interface CanvasHUDProps {

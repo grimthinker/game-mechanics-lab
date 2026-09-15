@@ -12,6 +12,7 @@ import { GameMode } from '../constants';
 import { PlacementMode, Point } from '../types';
 
 import { PieMenuState } from '../components/PieMenu/types';
+import { EDITOR_CONFIG } from '../config/editorConfig';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -310,8 +311,8 @@ export const useCanvasInteraction = ({
     const point = app.getCanvasPoint(e.clientX, e.clientY);
     const rect = containerRef.current.getBoundingClientRect();
 
-    // Ограничиваем экранные координаты, чтобы радиальное меню радиусом 115px не обрезалось границами экрана
-    const margin = 135;
+    // Ограничиваем экранные координаты, чтобы радиальное меню не обрезалось границами экрана
+    const margin = EDITOR_CONFIG.pieMenuMargin;
     const maxX = Math.max(margin, rect.width - margin);
     const maxY = Math.max(margin, rect.height - margin);
     const screenPos = {

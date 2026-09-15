@@ -5,10 +5,11 @@ import { CollisionCategory, ModifierType } from '../types';
 import { applyDamage, applyHeal } from '../utils/health';
 import { addModifier } from '../stats/StatEvaluator';
 import { applyZoneDamageToCreature } from '../utils/anatomyDamage';
+import { EFFECTOR_CONFIG } from '../../config/effectorConfig';
 
 export class AreaEffectorSystem {
   private pulseTimer: number = 0;
-  private readonly PULSE_INTERVAL: number = 0.4; // Интервал между вспышками (2.5 раза в сек)
+  private readonly PULSE_INTERVAL: number = EFFECTOR_CONFIG.pulseInterval;
 
   public update(dt: number, world: World, physics: PhysicsSystem): void {
     this.pulseTimer += dt;

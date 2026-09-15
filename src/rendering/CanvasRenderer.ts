@@ -10,7 +10,7 @@ import {
   TransformComponent,
 } from '../ecs/types';
 import { Point } from '../types';
-import { VISUAL_CONFIG } from '../../config/visualConfig';
+import { VISUAL_CONFIG } from '../config/visualConfig';
 import { IRenderer, RenderContext } from './IRenderer';
 import { GizmoRenderer } from '../gizmos/GizmoRenderer';
 import { GizmoRenderData } from '../gizmos/types';

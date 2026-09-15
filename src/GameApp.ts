@@ -39,11 +39,13 @@ import { killEntity } from './ecs/utils/health';
 
 export { EntityAdapter } from './EntityAdapter';
 
+import { EDITOR_CONFIG } from './config/editorConfig';
+
 export class GameApp {
   private container: HTMLDivElement;
   private renderer: IRenderer;
   public world: World;
-  public history: HistoryManager = new HistoryManager(50);
+  public history: HistoryManager = new HistoryManager(EDITOR_CONFIG.historyMaxDepth);
   private isHistoryAction: boolean = false;
   private mouseScreenPos: Point | null = null;
   public physics: PhysicsSystem;
@@ -299,7 +301,7 @@ export class GameApp {
     return idMap.get(rootId)!;
   }
 
-  public duplicateEntities(ids: string[], offset: Point = { x: 30, y: 30 }): string[] {
+  public duplicateEntities(ids: string[], offset: Point = EDITOR_CONFIG.cloneOffset): string[] {
     const validIds = ids.filter((id) => this.world.getEntity(id));
     if (validIds.length === 0) return [];
 
@@ -1056,8 +1058,8 @@ export class GameApp {
     const minY = Math.min(start.y, current.y);
     const maxY = Math.max(start.y, current.y);
 
-    // Если клик без растягивания (< 5px) — клик по пустому месту сбрасывает выбор
-    if (Math.hypot(maxX - minX, maxY - minY) < 5) {
+    // Если клик без растягивания (< порога) — клик по пустому месту сбрасывает выбор
+    if (Math.hypot(maxX - minX, maxY - minY) < EDITOR_CONFIG.marqueeThresholdPx) {
       this.selectEntity(null, true);
       return [];
     }
@@ -1323,7 +1325,7 @@ export class GameApp {
       }
 
       if (shiftKey) {
-        const snapGrid = 10;
+        const snapGrid = EDITOR_CONFIG.gridSnapSize;
         rawDx = Math.round(rawDx / snapGrid) * snapGrid;
         rawDy = Math.round(rawDy / snapGrid) * snapGrid;
       }
@@ -1354,7 +1356,7 @@ export class GameApp {
       deltaAngle = Math.atan2(Math.sin(deltaAngle), Math.cos(deltaAngle));
 
       if (shiftKey) {
-        const snapStep = Math.PI / 12; // 15 градусов
+        const snapStep = EDITOR_CONFIG.angleSnapStep;
         deltaAngle = Math.round(deltaAngle / snapStep) * snapStep;
       }
 

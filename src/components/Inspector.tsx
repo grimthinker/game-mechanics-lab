@@ -34,6 +34,7 @@ import {
   getAggregatedInteractionSlots,
   getAllEquippedDescendants,
 } from '../ecs/utils/hierarchy';
+import { EDITOR_CONFIG } from '../config/editorConfig';
 
 interface Breadcrumb {
   id: string;
@@ -196,7 +197,7 @@ export const Inspector: React.FC<InspectorProps> = ({
       if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
       commitTimerRef.current = setTimeout(() => {
         onCommitHistory(desc);
-      }, 400);
+      }, EDITOR_CONFIG.inspectorDebounceMs);
     },
     [onCommitHistory]
   );

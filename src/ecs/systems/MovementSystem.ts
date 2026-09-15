@@ -8,7 +8,7 @@ import {
   ModifierType,
 } from '../types';
 import { addModifier, removeModifier } from '../stats/StatEvaluator';
-import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
+import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
 import { LOGIC_CONFIG } from '../../ai/config';
 
 import { BaseCreatureStance, TransitionCreatureStance, MovementStatsComponent } from '../types';

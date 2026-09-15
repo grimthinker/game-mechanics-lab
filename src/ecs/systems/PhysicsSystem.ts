@@ -8,7 +8,7 @@ import {
   COLLISION_MASK_NONE,
 } from '../types';
 import { Point } from '../../types';
-import { PHYSICS_CONFIG } from '../../../config/physicsConfig';
+import { PHYSICS_CONFIG } from '../../config/physicsConfig';
 
 export class PhysicsSystem {
   public system: System;

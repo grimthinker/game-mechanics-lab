@@ -1,5 +1,5 @@
-import { StandardRadius } from '../src/ecs/types';
-import { deg2Rad } from '../src/utils';
+import { StandardRadius } from '../ecs/types';
+import { deg2Rad } from '../utils';
 
 /**
  * Конфигурация баланса игровых сущностей и базовых характеристик существ по умолчанию

@@ -1,6 +1,6 @@
 import { Point } from './types';
 
-import { CAMERA_CONFIG } from '../config/cameraConfig';
+import { CAMERA_CONFIG } from './config/cameraConfig';
 
 export interface CameraState {
   scale: number;

@@ -1,4 +1,5 @@
 import { Camera } from '../Camera';
+import { GIZMO_CONFIG } from '../config/gizmoConfig';
 import { rad2Deg } from '../utils';
 import { GizmoRenderData } from './types';
 
@@ -60,11 +61,11 @@ export class GizmoRenderer {
     isDragging: boolean,
     dragDelta?: { x: number; y: number }
   ): void {
-    const axisLen = 65 * invScale;
-    const arrowHeadLen = 13 * invScale;
-    const arrowHeadHalfW = 6 * invScale;
-    const centerBoxSize = 14 * invScale;
-    const lineWidth = 2.5 * invScale;
+    const axisLen = GIZMO_CONFIG.translate.axisLength * invScale;
+    const arrowHeadLen = GIZMO_CONFIG.translate.arrowHeadLength * invScale;
+    const arrowHeadHalfW = GIZMO_CONFIG.translate.arrowHeadHalfWidth * invScale;
+    const centerBoxSize = GIZMO_CONFIG.translate.centerBoxSize * invScale;
+    const lineWidth = GIZMO_CONFIG.translate.lineWidth * invScale;
 
     const isHoveredCenter = hovered === 'center' || active === 'center';
     const isHoveredX = hovered === 'x' || active === 'x';
@@ -168,7 +169,7 @@ export class GizmoRenderer {
     dragDeltaAngle?: number,
     initialAngle?: number
   ): void {
-    const ringRadius = 55 * invScale;
+    const ringRadius = GIZMO_CONFIG.rotate.ringRadius * invScale;
     const isHovered = hovered === 'rotate' || active === 'rotate';
     const ringColor = isHovered ? '#ffffff' : '#3498db';
 
@@ -179,12 +180,12 @@ export class GizmoRenderer {
     ctx.lineWidth = (isHovered ? 3.0 : 2.0) * invScale;
     ctx.stroke();
 
-    // 2. Деления (засечки каждые 45 градусов)
+    // 2. Деления (засечки)
     ctx.save();
     ctx.strokeStyle = isHovered ? 'rgba(255,255,255,0.7)' : 'rgba(52, 152, 219, 0.6)';
     ctx.lineWidth = 1.5 * invScale;
-    for (let i = 0; i < 8; i++) {
-      const a = (i * Math.PI) / 4;
+    for (let i = 0; i < GIZMO_CONFIG.rotate.notchCount; i++) {
+      const a = (i * (Math.PI * 2)) / GIZMO_CONFIG.rotate.notchCount;
       const cosA = Math.cos(a);
       const sinA = Math.sin(a);
       ctx.beginPath();

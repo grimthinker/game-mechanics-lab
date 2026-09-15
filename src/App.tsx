@@ -23,6 +23,7 @@ import './editor.css';
 import { createZoneConfig } from './ecs/archetypes';
 import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
 import { findActiveBrain } from './ecs/utils/anatomy';
+import { EDITOR_CONFIG } from './config/editorConfig';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -661,7 +662,7 @@ export const App: React.FC = () => {
                             pieMenuState.targetEntityIds.length > 0
                               ? pieMenuState.targetEntityIds
                               : [pieMenuState.targetEntityId!];
-                          app.duplicateEntities(idsToClone, { x: 30, y: 30 });
+                          app.duplicateEntities(idsToClone, EDITOR_CONFIG.cloneOffset);
                           syncPlayerControls();
                           updateStats();
                         },
