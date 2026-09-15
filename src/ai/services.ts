@@ -30,6 +30,13 @@ export class BTServiceFindNearestTarget extends BTService {
     const loseDist = bb.get('loseTargetDist') ?? 600;
     const loseDistSq = bb.get('loseTargetDistSq') ?? loseDist * loseDist;
 
+    // При полной слепоте и глухоте (все органы чувств уничтожены) цель не может быть обнаружена или удерживаться
+    if (range <= 0) {
+      bb.remove('targetId');
+      bb.remove('bestCandidateId');
+      return;
+    }
+
     const currentTargetId = bb.get('targetId');
     if (currentTargetId !== undefined && currentTargetId !== null) {
       const target = entity.utils.getEntity(currentTargetId);
@@ -214,8 +221,30 @@ export class BTServiceSyncStats extends BTService {
     const stats = entity.aiStats;
     const bb = entity.brain!.blackboard;
 
-    const detectDist = stats.detectDist ?? 400;
-    const loseTargetDist = stats.loseTargetDist ?? 600;
+    let detectDist = stats.detectDist ?? 400;
+    let loseTargetDist = stats.loseTargetDist ?? 600;
+
+    // Синхронизация данных агрегированных органов чувств
+    const perception = entity.perception;
+    if (perception) {
+      const vDist = perception.visionMaxDistance;
+      const hDist = perception.hearingMaxDistance;
+
+      bb.set('visionFovAngle', perception.visionFovAngle);
+      bb.set('visionClarity', perception.visionClarity);
+      bb.set('visionMaxDist', vDist);
+      bb.set('visionMaxDistSq', vDist * vDist);
+
+      bb.set('hearingSensitivity', perception.hearingSensitivity);
+      bb.set('hearingMaxDist', hDist);
+      bb.set('hearingMaxDistSq', hDist * hDist);
+
+      // Актуализируем эффективную дистанцию обнаружения по максимуму из чувств существа
+      const effectiveSenseDist = Math.max(vDist, hDist);
+      detectDist = effectiveSenseDist;
+      loseTargetDist = effectiveSenseDist > 0 ? effectiveSenseDist * 1.5 : 0;
+    }
+
     bb.set('detectDist', detectDist);
     bb.set('detectDistSq', detectDist * detectDist);
     bb.set('loseTargetDist', loseTargetDist);

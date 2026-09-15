@@ -120,6 +120,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     armor: false, // Свернуто
     bag: false, // Свернуто
     genericItem: false, // Свернуто
+    heart: false, // Свернуто: Параметры сердца
+    senses: false, // Свернуто: Органы чувств
     anatomy: false, // Свернуто
     slots: false, // Свернуто
     equip: false, // Свернуто
@@ -217,6 +219,16 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [draftArmor, setDraftArmor] = useState<any>(null);
   const [draftBag, setDraftBag] = useState<any>(null);
   const [draftGenericItem, setDraftGenericItem] = useState<any>(null);
+  const [draftHeart, setDraftHeart] = useState<{ requiresBrain: boolean } | null>(null);
+  const [draftVision, setDraftVision] = useState<{
+    fovAngle: number;
+    clarity: number;
+    maxDistance: number;
+  } | null>(null);
+  const [draftHearing, setDraftHearing] = useState<{
+    sensitivity: number;
+    maxDistance: number;
+  } | null>(null);
 
   const zoneParamsMapRef = useRef<Record<HitZoneType, ZoneTypeParams>>({
     angle: { ...DEFAULT_ZONE_PARAMS.angle },
@@ -378,6 +390,30 @@ export const Inspector: React.FC<InspectorProps> = ({
     } else {
       setDraftGenericItem(null);
     }
+
+    const heartComp = world.getComponent(targetId, 'heart');
+    setDraftHeart(heartComp ? { requiresBrain: heartComp.requiresBrain } : null);
+
+    const visionComp = world.getComponent(targetId, 'vision');
+    setDraftVision(
+      visionComp
+        ? {
+            fovAngle: Math.round(rad2Deg(visionComp.fovAngle.base)),
+            clarity: visionComp.clarity.base,
+            maxDistance: visionComp.maxDistance.base,
+          }
+        : null
+    );
+
+    const hearingComp = world.getComponent(targetId, 'hearing');
+    setDraftHearing(
+      hearingComp
+        ? {
+            sensitivity: hearingComp.sensitivity.base,
+            maxDistance: hearingComp.maxDistance.base,
+          }
+        : null
+    );
   }, [targetId, world]);
 
   // --- Синхронизация Draft через методы GameApp ---
@@ -483,6 +519,37 @@ export const Inspector: React.FC<InspectorProps> = ({
       onUpdateStats();
     }
   }, [draftGenericItem]);
+
+  useEffect(() => {
+    if (!targetId || !world || isReadOnly || !draftHeart || !app) return;
+    const changed = app.updateEntityHeart(targetId, draftHeart);
+    if (changed) {
+      requestCommit(t('history.heartChange'));
+      onUpdateStats();
+    }
+  }, [draftHeart]);
+
+  useEffect(() => {
+    if (!targetId || !world || isReadOnly || !draftVision || !app) return;
+    const changed = app.updateEntityVision(targetId, {
+      fovAngle: deg2Rad(draftVision.fovAngle),
+      clarity: draftVision.clarity,
+      maxDistance: draftVision.maxDistance,
+    });
+    if (changed) {
+      requestCommit(t('history.visionChange'));
+      onUpdateStats();
+    }
+  }, [draftVision]);
+
+  useEffect(() => {
+    if (!targetId || !world || isReadOnly || !draftHearing || !app) return;
+    const changed = app.updateEntityHearing(targetId, draftHearing);
+    if (changed) {
+      requestCommit(t('history.hearingChange'));
+      onUpdateStats();
+    }
+  }, [draftHearing]);
 
   useEffect(() => {
     if (!targetId || !world || isReadOnly || !draftBag || !app) return;
@@ -608,6 +675,25 @@ export const Inspector: React.FC<InspectorProps> = ({
                   />
                   {t('inspector.destructible')}
                 </label>
+              )}
+              {world.getComponent(targetId, 'locomotion') && (
+                <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#f1c40f',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    marginTop: '6px',
+                    padding: '4px 6px',
+                    backgroundColor: '#1b1b1b',
+                    borderRadius: '4px',
+                    border: '1px solid #333',
+                  }}
+                >
+                  <span>🦵</span>
+                  <span>{t('inspector.locomotion')}</span>
+                </div>
               )}
             </>
           )}
@@ -771,6 +857,181 @@ export const Inspector: React.FC<InspectorProps> = ({
                   );
                 })()}
               </>
+            )}
+
+          {draftHeart &&
+            renderSection(
+              'heart',
+              t('inspector.heart'),
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    cursor: isReadOnly ? 'default' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={isReadOnly}
+                    checked={draftHeart.requiresBrain}
+                    onChange={(e) => setDraftHeart({ requiresBrain: e.target.checked })}
+                  />
+                  {t('inspector.requiresBrain')}
+                </label>
+              </div>
+            )}
+
+          {(draftVision || draftHearing) &&
+            renderSection(
+              'senses',
+              t('inspector.senses'),
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {draftVision && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
+                      {t('inspector.vision')}
+                    </span>
+                    <label
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {t('inspector.fovAngle')}
+                      <input
+                        disabled={isReadOnly}
+                        type="number"
+                        value={draftVision.fovAngle}
+                        min={10}
+                        max={360}
+                        step={5}
+                        style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
+                        onChange={(e) =>
+                          setDraftVision((prev) =>
+                            prev ? { ...prev, fovAngle: Number(e.target.value) } : null
+                          )
+                        }
+                      />
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {t('inspector.clarity')}
+                      <input
+                        disabled={isReadOnly}
+                        type="number"
+                        value={draftVision.clarity}
+                        min={0.1}
+                        max={5}
+                        step={0.1}
+                        style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
+                        onChange={(e) =>
+                          setDraftVision((prev) =>
+                            prev ? { ...prev, clarity: Number(e.target.value) } : null
+                          )
+                        }
+                      />
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {t('inspector.maxDistance')}
+                      <input
+                        disabled={isReadOnly}
+                        type="number"
+                        value={draftVision.maxDistance}
+                        min={10}
+                        max={2000}
+                        step={10}
+                        style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
+                        onChange={(e) =>
+                          setDraftVision((prev) =>
+                            prev ? { ...prev, maxDistance: Number(e.target.value) } : null
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {draftHearing && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      paddingTop: draftVision ? '8px' : 0,
+                      borderTop: draftVision ? '1px solid #333' : 'none',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2ecc71' }}>
+                      {t('inspector.hearing')}
+                    </span>
+                    <label
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {t('inspector.sensitivity')}
+                      <input
+                        disabled={isReadOnly}
+                        type="number"
+                        value={draftHearing.sensitivity}
+                        min={0.1}
+                        max={5}
+                        step={0.1}
+                        style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
+                        onChange={(e) =>
+                          setDraftHearing((prev) =>
+                            prev ? { ...prev, sensitivity: Number(e.target.value) } : null
+                          )
+                        }
+                      />
+                    </label>
+                    <label
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                      }}
+                    >
+                      {t('inspector.maxDistance')}
+                      <input
+                        disabled={isReadOnly}
+                        type="number"
+                        value={draftHearing.maxDistance}
+                        min={10}
+                        max={2000}
+                        step={10}
+                        style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
+                        onChange={(e) =>
+                          setDraftHearing((prev) =>
+                            prev ? { ...prev, maxDistance: Number(e.target.value) } : null
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
             )}
 
           {world.getComponent(targetId, 'socketLink') &&

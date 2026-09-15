@@ -197,6 +197,9 @@ export class EntityAdapter implements IMovable, EntityController {
   public get interactionPhase(): InteractionPhase | null {
     return this.interactionAction?.phase ?? null;
   }
+  public get perception(): import('./ecs/types').PerceptionComponent | undefined {
+    return this.getComponent('perception');
+  }
   public get brain(): BTLogicComponent | undefined {
     let b = this.getComponent('brain') as BTLogicComponent | undefined;
     if (!b) {

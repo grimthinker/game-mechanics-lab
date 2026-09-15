@@ -4,6 +4,7 @@ import { EntityUtils, Blackboard, BTLogicComponent } from '../../ai/core';
 import { createBTAISystem } from '../../ai/system';
 import { BEHAVIOR_TREES } from '../../ai/trees_library';
 import { EntityAdapter } from '../../EntityAdapter';
+import { ConsciousnessState, evaluateConsciousness } from '../utils/anatomyStatus';
 
 export class AISystem {
   private aiSystem: { update: (dt: number) => void };
@@ -50,9 +51,12 @@ export class AISystem {
 
     for (const [id] of entities) {
       const adapter = this.getEntityAdapter(id);
-      // Если у корня или в его анатомическом графе есть активный мозг — добавляем в обработку
+      // Если существо находится в сознании и имеет активный мозг — добавляем в обработку
       if (adapter && adapter.brain) {
-        result.push(adapter);
+        const consciousness = evaluateConsciousness(this.world, id);
+        if (consciousness === ConsciousnessState.CONSCIOUS) {
+          result.push(adapter);
+        }
       }
     }
 

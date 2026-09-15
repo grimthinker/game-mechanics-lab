@@ -239,6 +239,13 @@ export interface BBData extends BehaviorStatsConfig, SquaredStats {
   health: number;
   maxHealth: number;
   pos: Point;
+  visionFovAngle?: number;
+  visionClarity?: number;
+  visionMaxDist?: number;
+  visionMaxDistSq?: number;
+  hearingSensitivity?: number;
+  hearingMaxDist?: number;
+  hearingMaxDistSq?: number;
 }
 
 export interface BehaviorStatsConfig {

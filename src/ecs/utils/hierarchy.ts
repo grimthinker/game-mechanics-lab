@@ -12,11 +12,14 @@ import {
 } from '../types';
 import { traverseAnatomyGraph, findActiveBrain } from './anatomy';
 
+import { getPartStatus, PartStatus } from './anatomyStatus';
+
 export interface AggregatedSlot {
   partId: EntityId;
   localSlotIndex: number;
   globalSlotIndex: number;
   slot: InteractionSlot;
+  isBroken: boolean;
 }
 
 /**
@@ -51,7 +54,18 @@ export function getAggregatedInteractionSlots(
   for (const partId of parts) {
     const slot = world.getComponent(partId, 'interactionSlots');
     if (slot) {
-      result.push({ partId, localSlotIndex: 0, globalSlotIndex: globalIdx++, slot });
+      const status = getPartStatus(world, partId);
+      if (status === PartStatus.DESTROYED) {
+        continue; // Разрушенная рука не предоставляет доступный слот
+      }
+      const isBroken = status === PartStatus.BROKEN;
+      result.push({
+        partId,
+        localSlotIndex: 0,
+        globalSlotIndex: globalIdx++,
+        slot,
+        isBroken,
+      });
     }
   }
   return result;

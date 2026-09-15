@@ -78,4 +78,31 @@ export function assembleBodyPart(
     max: createStat(maxFp),
     isFunctional: true,
   });
+
+  // 12. Локомоция (Нога)
+  if (config.locomotion) {
+    world.addComponent(id, 'locomotion', {});
+  }
+
+  // 13. Ядро / Сердце
+  if (config.heart) {
+    world.addComponent(id, 'heart', { requiresBrain: config.heart.requiresBrain ?? true });
+  }
+
+  // 14. Зрение (Глаз)
+  if (config.vision) {
+    world.addComponent(id, 'vision', {
+      fovAngle: createStat(config.vision.fovAngle),
+      clarity: createStat(config.vision.clarity),
+      maxDistance: createStat(config.vision.maxDistance),
+    });
+  }
+
+  // 15. Слух (Ухо)
+  if (config.hearing) {
+    world.addComponent(id, 'hearing', {
+      sensitivity: createStat(config.hearing.sensitivity),
+      maxDistance: createStat(config.hearing.maxDistance),
+    });
+  }
 }

@@ -3,6 +3,7 @@ import { PhysicsSystem } from './PhysicsSystem';
 import { applyDamage } from '../utils/health';
 import { getAllEquippedDescendants, getAggregatedInteractionSlots } from '../utils/hierarchy';
 import { applyWeaponDamageToCreature } from '../utils/anatomyDamage';
+import { getPartStatus, PartStatus } from '../utils/anatomyStatus';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
@@ -22,6 +23,7 @@ export class AttackSystem {
           const slotInfo = aggSlots[input.attackSlotIndex];
           if (
             slotInfo &&
+            !slotInfo.isBroken &&
             slotInfo.slot.itemId !== null &&
             !busyGlobalIndices.has(input.attackSlotIndex)
           ) {
@@ -32,7 +34,11 @@ export class AttackSystem {
           }
         } else {
           chosenGlobalIndex = aggSlots.findIndex((info) => {
-            if (info.slot.itemId === null || busyGlobalIndices.has(info.globalSlotIndex))
+            if (
+              info.isBroken ||
+              info.slot.itemId === null ||
+              busyGlobalIndices.has(info.globalSlotIndex)
+            )
               return false;
             const item = world.getComponent(info.slot.itemId, 'item');
             return item?.type === 'weapon';
@@ -63,6 +69,15 @@ export class AttackSystem {
 
       for (let i = activeAttacks.attacks.length - 1; i >= 0; i--) {
         const atk = activeAttacks.attacks[i];
+
+        // Прерывание атаки, если рука была повреждена или уничтожена в процессе замаха/удара
+        if (atk.partId) {
+          const partStatus = getPartStatus(world, atk.partId);
+          if (partStatus !== PartStatus.INTACT) {
+            activeAttacks.attacks.splice(i, 1);
+            continue;
+          }
+        }
 
         let isStillEquipped = false;
         if (atk.partId) {

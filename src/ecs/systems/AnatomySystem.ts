@@ -9,6 +9,12 @@ import {
 import { destroyPartRecursive } from '../utils/anatomyDamage';
 import { Circle } from 'detect-collisions';
 import { setBaseStat, createStat } from '../stats/StatEvaluator';
+import {
+  evaluateConsciousness,
+  ConsciousnessState,
+  getLocomotionState,
+  getSensoryStats,
+} from '../utils/anatomyStatus';
 
 export class AnatomySystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
@@ -30,8 +36,9 @@ export class AnatomySystem {
       const graph = traverseAnatomyGraph(world, partId);
       graph.forEach((id) => visitedGraphs.add(id));
 
-      // 2. Ищем активный мозг и считаем общие физические статы системы
+      // 2. Ищем активные органы и проверяем жизнеспособность
       const brainId = findActiveBrain(world, partId);
+      const heartId = graph.find((id) => world.getComponent(id, 'heart') !== undefined);
       const { totalWeight, maxRadius } = calculateSystemWeightAndRadius(world, partId);
 
       // 3. Вычисляем суммарный габарит связки как корень из суммы квадратов размеров всех частей
@@ -43,9 +50,13 @@ export class AnatomySystem {
       }
       const calculatedSize = Math.max(1, Math.round(Math.sqrt(sumSqSize)));
 
-      // 4. Распределяем логику: живое существо или предметная связка?
-      if (brainId) {
-        this.handleCreatureGraph(world, physics, graph, brainId, totalWeight, maxRadius);
+      // 4. Проверяем жизнеспособность: существо ОБЯЗАНО иметь сердце и не быть мертвым
+      const consciousness = evaluateConsciousness(world, partId);
+      const isViableCreature = heartId !== undefined && consciousness !== ConsciousnessState.DEAD;
+
+      if (isViableCreature) {
+        const anchorId = brainId ?? heartId!;
+        this.handleCreatureGraph(world, physics, graph, anchorId, totalWeight, maxRadius);
       } else {
         this.handleItemGraph(world, physics, graph, totalWeight, maxRadius, calculatedSize);
       }
@@ -56,38 +67,71 @@ export class AnatomySystem {
     world: World,
     physics: PhysicsSystem,
     graph: EntityId[],
-    brainId: EntityId,
+    anchorId: EntityId,
     totalWeight: number,
     maxRadius: number
   ): void {
-    const brain = world.getComponent(brainId, 'bodyBrain')!;
-    let rootId = brain.rootEntityId;
+    const brain = world.getComponent(anchorId, 'bodyBrain');
+    let rootId = brain?.rootEntityId;
 
-    // Если у мозга нет корня — создаем абстрактный корень существа
+    // Если у якоря нет корня — ищем существующий корень существа
     if (!rootId || !world.getEntity(rootId)) {
-      rootId = `creature_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      world.createEntity(rootId);
-      brain.rootEntityId = rootId;
+      const existingRoot = world.getEntitiesWith('assemblyRoot').find(([id, comp]) => {
+        const tag = world.getComponent(id, 'tag');
+        return (
+          tag?.archetype === 'creature' &&
+          comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))
+        );
+      });
 
-      if (!world.getComponent(rootId, 'transform'))
-        world.addComponent(rootId, 'transform', { x: 0, y: 0, angle: 0 });
-      if (!world.getComponent(rootId, 'input'))
-        world.addComponent(rootId, 'input', {
-          desiredMoveVector: null,
-          turnDirection: 0,
-          turnRatio: 0,
-          isMovingForward: false,
-          isRunning: false,
-          isCrouching: false,
-          isSlowWalking: false,
-          wantsAttack: false,
-          desiredStance: 'standing',
-        });
+      if (existingRoot) {
+        rootId = existingRoot[0];
+      } else {
+        rootId = `creature_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        world.createEntity(rootId);
+        if (!world.getComponent(rootId, 'transform'))
+          world.addComponent(rootId, 'transform', { x: 0, y: 0, angle: 0 });
+        if (!world.getComponent(rootId, 'input'))
+          world.addComponent(rootId, 'input', {
+            desiredMoveVector: null,
+            turnDirection: 0,
+            turnRatio: 0,
+            isMovingForward: false,
+            isRunning: false,
+            isCrouching: false,
+            isSlowWalking: false,
+            wantsAttack: false,
+            desiredStance: 'standing',
+          });
+      }
+
+      if (brain) {
+        brain.rootEntityId = rootId;
+      }
     }
 
     // Регистрируем связку анатомии на Корне
-    world.addComponent(rootId, 'assemblyRoot', { rootPartId: brainId, partIds: graph });
+    world.addComponent(rootId, 'assemblyRoot', { rootPartId: anchorId, partIds: graph });
     world.removeComponent(rootId, 'item'); // Корень существа — не предмет
+
+    // 0.5. Агрегация органов чувств в PerceptionComponent
+    const sensory = getSensoryStats(world, rootId);
+    let perception = world.getComponent(rootId, 'perception');
+    if (!perception) {
+      world.addComponent(rootId, 'perception', {
+        visionFovAngle: sensory.vision.fovAngle,
+        visionClarity: sensory.vision.clarity,
+        visionMaxDistance: sensory.vision.maxDistance,
+        hearingSensitivity: sensory.hearing.sensitivity,
+        hearingMaxDistance: sensory.hearing.maxDistance,
+      });
+    } else {
+      perception.visionFovAngle = sensory.vision.fovAngle;
+      perception.visionClarity = sensory.vision.clarity;
+      perception.visionMaxDistance = sensory.vision.maxDistance;
+      perception.hearingSensitivity = sensory.hearing.sensitivity;
+      perception.hearingMaxDistance = sensory.hearing.maxDistance;
+    }
 
     // 1. Агрегация физических свойств в Root
     let rootPhysStats = world.getComponent(rootId, 'physicsStats');
@@ -120,17 +164,9 @@ export class AnatomySystem {
       rootPhysBody.category = CollisionCategory.CREATURE;
     }
 
-    // 2. Логика ног
-    let legCount = 0;
-    for (const id of graph) {
-      const tag = world.getComponent(id, 'tag');
-      const meta = world.getComponent(id, 'meta');
-      if (tag?.subType === 'leg' || meta?.name.toLowerCase().includes('ног')) {
-        legCount++;
-      }
-    }
-
-    if (legCount < 2) {
+    // 2. Логика ног: если стоять невозможно (0 целых ног) — принудительный prone
+    const locomotion = getLocomotionState(world, rootId);
+    if (!locomotion.canStand) {
       const input = world.getComponent(rootId, 'input');
       if (input) {
         input.desiredStance = 'prone';

@@ -82,6 +82,31 @@ export interface AssemblyRootComponent {
   partIds: string[];
 }
 
+export interface LocomotionComponent {}
+
+export interface HeartComponent {
+  requiresBrain: boolean;
+}
+
+export interface VisionStatsComponent {
+  fovAngle: StatValue<number>;
+  clarity: StatValue<number>;
+  maxDistance: StatValue<number>;
+}
+
+export interface HearingStatsComponent {
+  sensitivity: StatValue<number>;
+  maxDistance: StatValue<number>;
+}
+
+export interface PerceptionComponent {
+  visionFovAngle: number;
+  visionClarity: number;
+  visionMaxDistance: number;
+  hearingSensitivity: number;
+  hearingMaxDistance: number;
+}
+
 export interface TagComponent {
   archetype: EntityArchetype;
   subType?: string;
@@ -466,6 +491,11 @@ export interface EntityComponents {
   socketLink?: SocketLinkComponent;
   bodyBrain?: BrainComponent;
   assemblyRoot?: AssemblyRootComponent;
+  locomotion?: LocomotionComponent;
+  heart?: HeartComponent;
+  vision?: VisionStatsComponent;
+  hearing?: HearingStatsComponent;
+  perception?: PerceptionComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -500,6 +530,11 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'socketLink',
   'bodyBrain',
   'assemblyRoot',
+  'locomotion',
+  'heart',
+  'vision',
+  'hearing',
+  'perception',
 ] as const;
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
 export type StandardRadius = (typeof STANDARD_RADII)[number];
@@ -686,6 +721,17 @@ export interface InventorySetup {
   slots?: InventorySlot[][];
 }
 
+export interface VisionConfig {
+  fovAngle: number;
+  clarity: number;
+  maxDistance: number;
+}
+
+export interface HearingConfig {
+  sensitivity: number;
+  maxDistance: number;
+}
+
 export interface EntityConfig {
   tag?: TagComponent;
   renderable?: RenderableComponent;
@@ -713,6 +759,11 @@ export interface EntityConfig {
   socketLink?: SocketLinkComponent;
   bodyBrain?: BrainComponent;
   assemblyRoot?: AssemblyRootComponent;
+  locomotion?: LocomotionComponent;
+  heart?: HeartComponent;
+  vision?: VisionConfig;
+  hearing?: HearingConfig;
+  perception?: PerceptionComponent;
 }
 
 export interface ActiveAttack {

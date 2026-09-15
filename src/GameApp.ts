@@ -1826,6 +1826,57 @@ export class GameApp {
     return changed;
   }
 
+  public updateEntityHeart(id: string, patch: { requiresBrain?: boolean }): boolean {
+    const heart = this.world.getComponent(id, 'heart');
+    if (!heart) return false;
+    let changed = false;
+    if (patch.requiresBrain !== undefined && heart.requiresBrain !== patch.requiresBrain) {
+      heart.requiresBrain = patch.requiresBrain;
+      changed = true;
+    }
+    return changed;
+  }
+
+  public updateEntityVision(
+    id: string,
+    patch: { fovAngle?: number; clarity?: number; maxDistance?: number }
+  ): boolean {
+    const vision = this.world.getComponent(id, 'vision');
+    if (!vision) return false;
+    let changed = false;
+    if (patch.fovAngle !== undefined && vision.fovAngle.base !== patch.fovAngle) {
+      setBaseStat(vision.fovAngle, patch.fovAngle);
+      changed = true;
+    }
+    if (patch.clarity !== undefined && vision.clarity.base !== patch.clarity) {
+      setBaseStat(vision.clarity, patch.clarity);
+      changed = true;
+    }
+    if (patch.maxDistance !== undefined && vision.maxDistance.base !== patch.maxDistance) {
+      setBaseStat(vision.maxDistance, patch.maxDistance);
+      changed = true;
+    }
+    return changed;
+  }
+
+  public updateEntityHearing(
+    id: string,
+    patch: { sensitivity?: number; maxDistance?: number }
+  ): boolean {
+    const hearing = this.world.getComponent(id, 'hearing');
+    if (!hearing) return false;
+    let changed = false;
+    if (patch.sensitivity !== undefined && hearing.sensitivity.base !== patch.sensitivity) {
+      setBaseStat(hearing.sensitivity, patch.sensitivity);
+      changed = true;
+    }
+    if (patch.maxDistance !== undefined && hearing.maxDistance.base !== patch.maxDistance) {
+      setBaseStat(hearing.maxDistance, patch.maxDistance);
+      changed = true;
+    }
+    return changed;
+  }
+
   public updateEntityBag(id: string, patch: any, isBagEmpty: boolean): boolean {
     const item = this.world.getComponent(id, 'item');
     const inv = this.world.getComponent(id, 'inventory');

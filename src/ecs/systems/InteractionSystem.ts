@@ -12,6 +12,7 @@ import {
   AggregatedSlot,
 } from '../utils/hierarchy';
 import { findActiveBrain } from '../utils/anatomy';
+import { getPartStatus, PartStatus } from '../utils/anatomyStatus';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -49,7 +50,7 @@ export class InteractionSystem {
 
     const aggSlots = getAggregatedInteractionSlots(world, entityId);
     const slotInfo = aggSlots[slotIndex];
-    if (!slotInfo || !slotInfo.slot.itemId) return false;
+    if (!slotInfo || slotInfo.isBroken || !slotInfo.slot.itemId) return false;
 
     const targetContainerId = containerId ?? entityId;
     const containerEquip = world.getComponent(targetContainerId, 'equip');
@@ -90,7 +91,7 @@ export class InteractionSystem {
 
     const aggSlots = getAggregatedInteractionSlots(world, entityId);
     const slotInfo = aggSlots[slotIndex];
-    if (!slotInfo || slotInfo.slot.itemId !== null) return false;
+    if (!slotInfo || slotInfo.isBroken || slotInfo.slot.itemId !== null) return false;
 
     const targetContainerId = containerId ?? entityId;
     const containerEquip = world.getComponent(targetContainerId, 'equip');
@@ -160,7 +161,11 @@ export class InteractionSystem {
       let maxStrength = -Infinity;
 
       for (const info of aggSlots) {
-        if (info.slot.itemId === null && distBetweenBorders <= info.slot.interactDist) {
+        if (
+          !info.isBroken &&
+          info.slot.itemId === null &&
+          distBetweenBorders <= info.slot.interactDist
+        ) {
           if (info.slot.strength > maxStrength) {
             maxStrength = info.slot.strength;
             bestSlotInfo = info;
@@ -318,7 +323,12 @@ export class InteractionSystem {
               ? world.getComponent(targetId, 'ownership')
               : undefined;
 
+            const partStatus = interactionAction.partId
+              ? getPartStatus(world, interactionAction.partId)
+              : PartStatus.INTACT;
+
             if (
+              partStatus !== PartStatus.INTACT ||
               !targetId ||
               !targetEntity ||
               !slot ||

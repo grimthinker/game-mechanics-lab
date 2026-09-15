@@ -59,4 +59,26 @@ export const BALANCE_CONFIG = {
     /** Множитель скрытности в полностью неподвижном состоянии (максимальный бонус) */
     immobileStealthMultiplier: 2.0,
   },
+  locomotionPenalties: {
+    /** Множитель скорости при 1 целой и хотя бы 1 сломанной ноге */
+    oneLegBrokenSpeedMultiplier: 0.6,
+    /** Множитель поворота при 1 целой и хотя бы 1 сломанной ноге */
+    oneLegBrokenTurnMultiplier: 0.7,
+    /** Множитель скорости при 1 целой и всех остальных разрушенных ногах */
+    oneLegDestroyedSpeedMultiplier: 0.4,
+    /** Множитель поворота при 1 целой и всех остальных разрушенных ногах */
+    oneLegDestroyedTurnMultiplier: 0.5,
+  },
+  senses: {
+    /** Угол обзора зрения по умолчанию (135 градусов) */
+    defaultFovAngle: Math.PI * 0.75,
+    /** Базовая четкость зрения */
+    defaultVisionClarity: 1.0,
+    /** Максимальная дальность зрения (px) */
+    defaultVisionMaxDistance: 400,
+    /** Базовая чуткость слуха */
+    defaultHearingSensitivity: 1.0,
+    /** Максимальная дальность слуха (px) */
+    defaultHearingMaxDistance: 500,
+  },
 };

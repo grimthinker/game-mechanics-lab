@@ -1,6 +1,7 @@
 import { World } from '../World';
 import { EntityId } from '../types';
 import { calculateTotalEntityWeight } from './hierarchy';
+import { createStat } from '../stats/StatEvaluator';
 
 /**
  * Возвращает массив всех EntityId, соединенных в единый граф анатомии
@@ -72,6 +73,13 @@ export function findActiveBrain(world: World, startId: EntityId): EntityId | nul
   }
 
   const parts = traverseAnatomyGraph(world, actualStartId);
+
+  // Без сердца система частей тела не является существом — мозг не функционирует
+  const hasHeart = parts.some((pId) => world.getComponent(pId, 'heart') !== undefined);
+  if (!hasHeart) {
+    return null;
+  }
+
   let bestBrainId: EntityId | null = null;
   let maxPower = -Infinity;
 
@@ -173,15 +181,21 @@ export function canConnectSockets(
   const currentLinkA = world.getComponent(partA, 'socketLink')!;
   const currentLinkB = world.getComponent(partB, 'socketLink')!;
 
+  const connectionSocketSize = sockA.size + sockB.size;
+
   currentLinkA.links[socketIdA] = {
     targetEntityId: partB,
     targetSocketId: socketIdB,
     currentStrength: combinedStrength,
+    maxStrength: createStat(combinedStrength),
+    socketSize: connectionSocketSize,
   };
   currentLinkB.links[socketIdB] = {
     targetEntityId: partA,
     targetSocketId: socketIdA,
     currentStrength: combinedStrength,
+    maxStrength: createStat(combinedStrength),
+    socketSize: connectionSocketSize,
   };
 
   const allParts = traverseAnatomyGraph(world, partA);

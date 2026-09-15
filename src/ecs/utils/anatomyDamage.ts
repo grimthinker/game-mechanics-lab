@@ -1,17 +1,66 @@
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
-import { EntityId } from '../types';
-import { getAnatomyParts } from './hierarchy';
+import { EntityId, CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
+import { getAnatomyParts, getRootOwner } from './hierarchy';
 import { findActiveBrain } from './anatomy';
 import { getPartArmor, getConnectionArmor, selectDamageTarget } from './combat';
 import { killEntity } from './health';
+import {
+  evaluateConsciousness,
+  ConsciousnessState,
+  getPartStatus,
+  PartStatus,
+} from './anatomyStatus';
+import { BEHAVIOR_TREES } from '../../ai/trees_library';
+import { Circle } from 'detect-collisions';
 
-export function destroyPartRecursive(
+export function forceDropItemFromPart(
   world: World,
-  _physics: PhysicsSystem,
+  physics: PhysicsSystem,
   partId: EntityId
 ): void {
+  const slot = world.getComponent(partId, 'interactionSlots');
+  if (!slot || slot.itemId === null) return;
+
+  const itemId = slot.itemId;
+  slot.itemId = null;
+  world.removeComponent(itemId, 'ownership');
+
+  const partTransform = world.getComponent(partId, 'transform');
+  const dropX = partTransform ? partTransform.x : 0;
+  const dropY = partTransform ? partTransform.y : 0;
+
+  const itemTransform = world.getComponent(itemId, 'transform');
+  if (itemTransform) {
+    itemTransform.x = dropX;
+    itemTransform.y = dropY;
+  }
+
+  const renderable = world.getComponent(itemId, 'renderable');
+  if (renderable) {
+    renderable.isVisible = true;
+  }
+
+  const physStats = world.getComponent(itemId, 'physicsStats');
+  if (physStats) {
+    const body = new Circle({ x: dropX, y: dropY }, physStats.radius.current);
+    body.isStatic = false;
+    const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+    world.addComponent(itemId, 'physicsBody', {
+      body,
+      isStatic: false,
+      category: CollisionCategory.ITEM,
+      mask,
+    });
+    physics.registerBody(itemId, body);
+  }
+}
+
+export function destroyPartRecursive(world: World, physics: PhysicsSystem, partId: EntityId): void {
   if (!world.getEntity(partId)) return;
+
+  // Выбрасываем предмет из уничтожаемой части тела
+  forceDropItemFromPart(world, physics, partId);
 
   // 1. Находим все остальные части в мире и обрываем связи, ведущие к удаляемой части
   const allEntities = world.getAllEntities();
@@ -57,6 +106,17 @@ export function applyDamageToPart(
   } else {
     fp.current = nextFp;
     fp.isFunctional = fp.current >= 0;
+  }
+
+  // При полном разрушении руки (ФП <= -max) сбрасываем удерживаемый предмет и прерываем атаку
+  if (fp.current <= -fp.max.current) {
+    forceDropItemFromPart(world, physics, partId);
+
+    const rootId = getRootOwner(world, partId) ?? partId;
+    const activeAttacks = world.getComponent(rootId, 'activeAttacks');
+    if (activeAttacks) {
+      activeAttacks.attacks = activeAttacks.attacks.filter((a) => a.partId !== partId);
+    }
   }
 }
 
@@ -174,16 +234,8 @@ function handleDeadEndOverflow(
   partId: EntityId,
   overflow: number
 ): void {
-  const brainPartId = findActiveBrain(world, partId);
-  let isDead = false;
-  if (brainPartId) {
-    const brainFp = world.getComponent(brainPartId, 'functionalHealth');
-    if (brainFp && brainFp.current < -brainFp.max.current) {
-      isDead = true;
-    }
-  } else {
-    isDead = true;
-  }
+  const rootId = getRootOwner(world, partId) ?? partId;
+  const isDead = evaluateConsciousness(world, rootId) === ConsciousnessState.DEAD;
 
   if (isDead) {
     // Урон переходит в структурную прочность (СП / health) этой части тела
@@ -198,15 +250,85 @@ function handleDeadEndOverflow(
 }
 
 export function checkCreatureDeath(world: World, rootEntityId: EntityId): void {
-  const brainPartId = findActiveBrain(world, rootEntityId);
-  if (!brainPartId) {
+  const state = evaluateConsciousness(world, rootEntityId);
+
+  if (state === ConsciousnessState.DEAD) {
     killCreature(world, rootEntityId);
     return;
   }
 
-  const brainFp = world.getComponent(brainPartId, 'functionalHealth');
-  if (brainFp && brainFp.current < -brainFp.max.current) {
-    killCreature(world, rootEntityId);
+  const parts = getAnatomyParts(world, rootEntityId);
+
+  // Стирание дерева поведения (Brain Wipe) при полном разрушении мозга (ФП <= -max)
+  for (const partId of parts) {
+    const brainComp = world.getComponent(partId, 'bodyBrain');
+    if (brainComp) {
+      const brainStatus = getPartStatus(world, partId);
+      if (brainStatus === PartStatus.DESTROYED) {
+        const logicBrain = world.getComponent(partId, 'brain');
+        if (logicBrain) {
+          logicBrain.root_node = BEHAVIOR_TREES['IdleTree']();
+          const bb = logicBrain.blackboard;
+          if (bb) {
+            const localTime = bb.get('localTime');
+            const data = bb.getData();
+            for (const key of Object.keys(data)) {
+              bb.remove(key as any);
+            }
+            if (localTime !== undefined) {
+              bb.set('localTime', localTime);
+            }
+          }
+        }
+        const aiStats = world.getComponent(rootEntityId, 'aiStats');
+        if (aiStats) {
+          aiStats.behavior.current = 'IdleTree';
+        }
+      }
+    }
+  }
+
+  // Потеря сознания (UNCONSCIOUS)
+  if (state === ConsciousnessState.UNCONSCIOUS) {
+    for (const partId of parts) {
+      const logicBrain = world.getComponent(partId, 'brain');
+      if (logicBrain) {
+        const bb = logicBrain.blackboard;
+        if (bb) {
+          const localTime = bb.get('localTime');
+          const data = bb.getData();
+          for (const key of Object.keys(data)) {
+            bb.remove(key as any);
+          }
+          if (localTime !== undefined) {
+            bb.set('localTime', localTime);
+          }
+        }
+      }
+    }
+
+    const input = world.getComponent(rootEntityId, 'input');
+    if (input) {
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
+      input.turnDirection = 0;
+      input.turnRatio = 0;
+      input.isRunning = false;
+      input.wantsAttack = false;
+      input.attackSlotIndex = undefined;
+    }
+
+    const activeAttacks = world.getComponent(rootEntityId, 'activeAttacks');
+    if (activeAttacks) {
+      activeAttacks.attacks = [];
+    }
+
+    const meta = world.getComponent(rootEntityId, 'meta');
+    if (meta) {
+      meta.actionMode = 'idle';
+    }
   }
 }
 

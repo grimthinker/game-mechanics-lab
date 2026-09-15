@@ -7,6 +7,7 @@ import { ARCHETYPE_ASSEMBLERS, detectArchetype } from './archetypes';
 import { assembleBodyPart } from './archetypes/BodyPartArchetype';
 import { Circle } from 'detect-collisions';
 import { createStat } from './stats/StatEvaluator';
+import { BALANCE_CONFIG } from '../config/balanceConfig';
 
 export class EntityFactory {
   public generateId(prefix: string = 'ent'): EntityId {
@@ -89,6 +90,14 @@ export class EntityFactory {
       ],
     });
 
+    world.addComponent(rootId, 'perception', {
+      visionFovAngle: BALANCE_CONFIG.senses.defaultFovAngle,
+      visionClarity: BALANCE_CONFIG.senses.defaultVisionClarity,
+      visionMaxDistance: BALANCE_CONFIG.senses.defaultVisionMaxDistance,
+      hearingSensitivity: BALANCE_CONFIG.senses.defaultHearingSensitivity,
+      hearingMaxDistance: BALANCE_CONFIG.senses.defaultHearingMaxDistance,
+    });
+
     // Body Parts Generation
     const torsoId = this.generateId('part_torso');
     const headId = this.generateId('part_head');
@@ -115,7 +124,7 @@ export class EntityFactory {
       };
     };
 
-    // Torso
+    // Torso (Ядро / Сердце)
     world.createEntity(torsoId);
     assembleBodyPart(
       world,
@@ -126,6 +135,7 @@ export class EntityFactory {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Туловище' },
         physics: { radius: 12, weight: 15, size: 20 },
+        heart: { requiresBrain: true },
         socketDef: {
           sockets: {
             neck: { type: 'neck', size: 10, strength: 50 },
@@ -153,7 +163,7 @@ export class EntityFactory {
       position
     );
 
-    // Head
+    // Head (Мозг, Зрение, Слух)
     world.createEntity(headId);
     assembleBodyPart(
       world,
@@ -164,6 +174,15 @@ export class EntityFactory {
         tag: { archetype: 'bodyPart', subType: 'head' },
         meta: { name: 'Голова' },
         physics: { radius: 8, weight: 5, size: 10 },
+        vision: {
+          fovAngle: BALANCE_CONFIG.senses.defaultFovAngle,
+          clarity: BALANCE_CONFIG.senses.defaultVisionClarity,
+          maxDistance: BALANCE_CONFIG.senses.defaultVisionMaxDistance,
+        },
+        hearing: {
+          sensitivity: BALANCE_CONFIG.senses.defaultHearingSensitivity,
+          maxDistance: BALANCE_CONFIG.senses.defaultHearingMaxDistance,
+        },
         socketDef: { sockets: { base: { type: 'neck', size: 10, strength: 50 } } },
         socketLink: {
           links: {
@@ -243,7 +262,7 @@ export class EntityFactory {
       position
     );
 
-    // Left Leg
+    // Left Leg (Локомоция)
     world.createEntity(legLId);
     assembleBodyPart(
       world,
@@ -254,6 +273,7 @@ export class EntityFactory {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога' },
         physics: { radius: 7, weight: 6, size: 12 },
+        locomotion: {},
         socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
         socketLink: {
           links: {
@@ -269,7 +289,7 @@ export class EntityFactory {
       position
     );
 
-    // Right Leg
+    // Right Leg (Локомоция)
     world.createEntity(legRId);
     assembleBodyPart(
       world,
@@ -280,6 +300,7 @@ export class EntityFactory {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога' },
         physics: { radius: 7, weight: 6, size: 12 },
+        locomotion: {},
         socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
         socketLink: {
           links: {
@@ -294,7 +315,6 @@ export class EntityFactory {
       },
       position
     );
-
     // Give the torso a bag by default
     const bagId = this.generateId('item_bag');
     world.createEntity(bagId);

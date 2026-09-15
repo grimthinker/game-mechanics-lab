@@ -12,6 +12,11 @@ import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
 import { LOGIC_CONFIG } from '../../ai/config';
 
 import { BaseCreatureStance, TransitionCreatureStance, MovementStatsComponent } from '../types';
+import {
+  evaluateConsciousness,
+  ConsciousnessState,
+  getLocomotionState,
+} from '../utils/anatomyStatus';
 
 function getTransitionStance(
   from: BaseCreatureStance,
@@ -80,6 +85,7 @@ export class MovementSystem {
         removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
         removeModifier(movementStats.maxSpeed, 'dir_strafe_speed');
         removeModifier(movementStats.maxSpeed, 'dir_back_speed');
+        removeModifier(movementStats.maxSpeed, 'locomotion_speed');
         removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
         removeModifier(movementStats.maxTurnSpeed, 'mode_walk_turn');
@@ -88,10 +94,49 @@ export class MovementSystem {
         removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
         removeModifier(movementStats.maxTurnSpeed, 'dir_strafe_turn');
         removeModifier(movementStats.maxTurnSpeed, 'dir_back_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'locomotion_turn');
         meta.movementMode = 'immobile';
         meta.directionMode = 'immobile';
         meta.actionMode = 'idle';
         continue;
+      }
+
+      // 0. Оценка состояния сознания
+      const consciousness = evaluateConsciousness(world, id);
+      if (consciousness === ConsciousnessState.UNCONSCIOUS) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
+        input.turnDirection = 0;
+        input.turnRatio = 0;
+        input.isRunning = false;
+        input.wantsAttack = false;
+        input.attackSlotIndex = undefined;
+        input.desiredStance = 'prone';
+        meta.actionMode = 'idle';
+      }
+
+      // 0.5. Оценка состояния опорно-двигательного аппарата (ног)
+      const locomotion = getLocomotionState(world, id);
+
+      if (!locomotion.canSprint) {
+        input.isRunning = false;
+      }
+
+      if (!locomotion.canStand) {
+        input.desiredStance = 'prone';
+      }
+
+      const wantsToMove =
+        input.desiredMoveVector !== null ||
+        input.isMovingForward ||
+        (input.moveForward ?? 0) !== 0 ||
+        (input.moveStrafe ?? 0) !== 0;
+
+      // При 1 целой и всех остальных разрушенных ногах попытка движения роняет существо в prone
+      if (locomotion.forceProneOnMove && wantsToMove) {
+        input.desiredStance = 'prone';
       }
 
       const interactionAction = world.getComponent(id, 'interactionAction');
@@ -233,6 +278,27 @@ export class MovementSystem {
         });
       } else {
         removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
+      }
+
+      // Применение штрафов повреждения ног (Локомоция)
+      if (locomotion.speedMult !== 1.0) {
+        addModifier(movementStats.maxSpeed, {
+          id: 'locomotion_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: locomotion.speedMult,
+        });
+      } else {
+        removeModifier(movementStats.maxSpeed, 'locomotion_speed');
+      }
+
+      if (locomotion.turnMult !== 1.0) {
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'locomotion_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: locomotion.turnMult,
+        });
+      } else {
+        removeModifier(movementStats.maxTurnSpeed, 'locomotion_turn');
       }
 
       // 2. Поворот корпуса / взгляда существа (независимо от вектора движения)

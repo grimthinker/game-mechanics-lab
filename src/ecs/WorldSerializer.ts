@@ -236,6 +236,17 @@ export class WorldSerializer {
           normalizeStat(comps.timeScale.multiplier);
         }
 
+        if (comps.vision) {
+          normalizeStat(comps.vision.fovAngle);
+          normalizeStat(comps.vision.clarity);
+          normalizeStat(comps.vision.maxDistance);
+        }
+
+        if (comps.hearing) {
+          normalizeStat(comps.hearing.sensitivity);
+          normalizeStat(comps.hearing.maxDistance);
+        }
+
         // 3. Реставрация физического тела для объектов с физикой
         if (comps.tag?.archetype === 'marker' && comps.transform && !isPossessedItem) {
           const radius = comps.gizmo?.radius ?? 14;

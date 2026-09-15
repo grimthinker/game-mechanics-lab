@@ -2,6 +2,7 @@ import { World } from '../World';
 import { EntityId } from '../types';
 import { getAnatomyParts } from './hierarchy';
 import { findActiveBrain } from './anatomy';
+import { evaluateConsciousness, ConsciousnessState } from './anatomyStatus';
 
 export function applyAnatomyHeal(
   world: World,
@@ -61,20 +62,17 @@ export function applyAnatomyHeal(
     }
   }
 
-  // 3. Проверка на оживление существа при восстановлении мозга
+  // 3. Проверка восстановления жизнедеятельности и сознания через evaluateConsciousness
+  const consciousness = evaluateConsciousness(world, targetId);
   const rootHealth = world.getComponent(targetId, 'health');
-  const brainPartId = findActiveBrain(world, targetId);
-  if (brainPartId) {
-    const brainFp = world.getComponent(brainPartId, 'functionalHealth');
-    if (brainFp && brainFp.current >= 0) {
-      if (rootHealth && !rootHealth.isAlive) {
-        rootHealth.isAlive = true;
-        rootHealth.current = rootHealth.max.current;
-      }
-      const brainComp = world.getComponent(brainPartId, 'bodyBrain');
-      if (brainComp) {
-        brainComp.isActive = true;
-      }
+
+  if (consciousness !== ConsciousnessState.DEAD && rootHealth && !rootHealth.isAlive) {
+    rootHealth.isAlive = true;
+    rootHealth.current = rootHealth.max.current;
+    const parts = getAnatomyParts(world, targetId);
+    for (const pId of parts) {
+      const b = world.getComponent(pId, 'bodyBrain');
+      if (b) b.isActive = true;
     }
   }
 }
