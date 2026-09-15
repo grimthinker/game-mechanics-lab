@@ -98,6 +98,12 @@ export function applyDamage(
   if (!health || !health.isAlive) return;
 
   const tag = world.getComponent(id, 'tag');
+
+  // Согласно п. 10 ТЗ: существа и части тела являются неразрушаемыми объектами
+  if (tag?.archetype === 'creature' || tag?.archetype === 'bodyPart') {
+    return;
+  }
+
   const meta = world.getComponent(id, 'meta');
   if (tag?.archetype === 'obstacle' && meta?.destructible === false) {
     return;
@@ -119,20 +125,13 @@ export function applyDamage(
 /**
  * Восстанавливает здоровье живой сущности до предела максимального HP.
  */
+import { applyAnatomyHeal } from './anatomyHeal';
+
 export function applyHeal(
   world: World,
   id: EntityId,
   amount: number,
   triggerFlash: boolean = true
 ): void {
-  const health = world.getComponent(id, 'health');
-  if (!health || !health.isAlive) return;
-
-  if (health.current < health.max.current) {
-    const nextHp = Math.min(health.max.current, health.current + amount);
-    health.current = Math.round(nextHp * 100) / 100;
-    if (triggerFlash) {
-      health.healFlashTimer = 0.2;
-    }
-  }
+  applyAnatomyHeal(world, id, amount, triggerFlash);
 }

@@ -153,7 +153,13 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.getComponent('stealthStats')?.runStealthMultiplier ?? 0.5;
   }
   public get runTurnMultiplier(): number {
-    return this.getComponent('movementStats')?.runTurnMultiplier ?? 0.8;
+    return this.getComponent('movementStats')?.runTurnMultiplier ?? 0.7;
+  }
+  public get walkTurnMultiplier(): number {
+    return this.getComponent('movementStats')?.walkTurnMultiplier ?? 1.1;
+  }
+  public get turnInPlaceTurnMultiplier(): number {
+    return this.getComponent('movementStats')?.turnInPlaceTurnMultiplier ?? 1.2;
   }
   public get crouchTurnMultiplier(): number {
     return this.getComponent('movementStats')?.crouchTurnMultiplier ?? 1.2;

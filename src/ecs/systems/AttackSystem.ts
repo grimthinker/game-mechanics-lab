@@ -2,6 +2,7 @@ import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { applyDamage } from '../utils/health';
 import { getAllEquippedDescendants, getAggregatedInteractionSlots } from '../utils/hierarchy';
+import { applyWeaponDamageToCreature } from '../utils/anatomyDamage';
 
 export class AttackSystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
@@ -66,18 +67,13 @@ export class AttackSystem {
         let isStillEquipped = false;
         if (atk.partId) {
           const slotsComp = world.getComponent(atk.partId, 'interactionSlots');
-          // Если часть тела оторвали и у нее больше нет компонента или слота, атака отменится
           if (slotsComp) {
-            // Для восстановления локального индекса ищем слот по weaponId
-            const slot = slotsComp.slots.find((s) => s.itemId === atk.weaponId);
-            isStillEquipped = !!slot;
+            isStillEquipped = slotsComp.itemId === atk.weaponId;
           }
         } else {
-          // Fallback на старую логику для совместимости, если partId нет
           const slotsComp = world.getComponent(id, 'interactionSlots');
           if (slotsComp) {
-            const slot = slotsComp.slots[atk.slotIndex];
-            isStillEquipped = slot && slot.itemId === atk.weaponId;
+            isStillEquipped = slotsComp.itemId === atk.weaponId;
           }
         }
 
@@ -152,29 +148,39 @@ export class AttackSystem {
         rawDamage *= critMultiplier;
       }
 
-      // Учет брони цели: собственные характеристики существа + надетая экипировка
-      let defense = 0;
-      let flatReduction = 0;
+      const tag = world.getComponent(targetId, 'tag');
+      const hasAnatomy =
+        world.getComponent(targetId, 'assemblyRoot') ||
+        world.getComponent(targetId, 'socketDef') ||
+        tag?.archetype === 'creature';
 
-      const selfArmor = world.getComponent(targetId, 'armorStats');
-      if (selfArmor) {
-        defense += selfArmor.defense.current;
-        flatReduction += selfArmor.flatReduction.current;
-      }
+      if (hasAnatomy) {
+        applyWeaponDamageToCreature(world, physics, targetId, rawDamage);
+      } else {
+        // Учет брони для обычных предметов/препятствий
+        let defense = 0;
+        let flatReduction = 0;
 
-      const allEquippedItemIds = getAllEquippedDescendants(world, targetId);
-      for (const itemId of allEquippedItemIds) {
-        const aStats = world.getComponent(itemId, 'armorStats');
-        if (aStats) {
-          defense += aStats.defense.current;
-          flatReduction += aStats.flatReduction.current;
+        const selfArmor = world.getComponent(targetId, 'armorStats');
+        if (selfArmor) {
+          defense += selfArmor.defense.current;
+          flatReduction += selfArmor.flatReduction.current;
         }
+
+        const allEquippedItemIds = getAllEquippedDescendants(world, targetId);
+        for (const itemId of allEquippedItemIds) {
+          const aStats = world.getComponent(itemId, 'armorStats');
+          if (aStats) {
+            defense += aStats.defense.current;
+            flatReduction += aStats.flatReduction.current;
+          }
+        }
+
+        const mitigatedDamage = rawDamage * (1 - Math.min(0.9, Math.max(0, defense / 100)));
+        const finalDamage = Math.max(0, Math.round(mitigatedDamage - flatReduction));
+
+        applyDamage(world, targetId, finalDamage);
       }
-
-      const mitigatedDamage = rawDamage * (1 - Math.min(0.9, Math.max(0, defense / 100)));
-      const finalDamage = Math.max(0, Math.round(mitigatedDamage - flatReduction));
-
-      applyDamage(world, targetId, finalDamage);
     }
   }
 }

@@ -38,7 +38,6 @@ export function getAnatomyParts(world: World, rootEntityId: EntityId): EntityId[
   }
   return [rootEntityId];
 }
-
 /**
  * Собирает слоты взаимодействия (руки) со всех частей тела в единый плоский массив
  */
@@ -50,11 +49,9 @@ export function getAggregatedInteractionSlots(
   const result: AggregatedSlot[] = [];
   let globalIdx = 0;
   for (const partId of parts) {
-    const comp = world.getComponent(partId, 'interactionSlots');
-    if (comp) {
-      comp.slots.forEach((slot, localIdx) => {
-        result.push({ partId, localSlotIndex: localIdx, globalSlotIndex: globalIdx++, slot });
-      });
+    const slot = world.getComponent(partId, 'interactionSlots');
+    if (slot) {
+      result.push({ partId, localSlotIndex: 0, globalSlotIndex: globalIdx++, slot });
     }
   }
   return result;
@@ -147,7 +144,8 @@ export function isDescendantOf(
 }
 
 /**
- * Рекурсивно собирает все ID предметов, находящихся во всех областях экипировки существа и его частей.
+ * Рекурсивно собирает все ID предметов, находящихся во всех областях экипировки существа и его частей,
+ * а также в их ячейках взаимодействия.
  */
 export function getAllEquippedDescendants(world: World, rootEntityId: EntityId): EntityId[] {
   const result: EntityId[] = [];
@@ -156,6 +154,12 @@ export function getAllEquippedDescendants(world: World, rootEntityId: EntityId):
   function traverse(entityId: EntityId) {
     if (visited.has(entityId)) return;
     visited.add(entityId);
+
+    const slot = world.getComponent(entityId, 'interactionSlots');
+    if (slot && slot.itemId) {
+      result.push(slot.itemId);
+      traverse(slot.itemId);
+    }
 
     const equip = world.getComponent(entityId, 'equip');
     if (!equip || !equip.equipmentAreas) return;
@@ -175,7 +179,7 @@ export function getAllEquippedDescendants(world: World, rootEntityId: EntityId):
 }
 
 /**
- * Рекурсивно собирает все ID предметов, содержащихся в сущности (экипировка + инвентарь).
+ * Рекурсивно собирает все ID предметов, содержащихся в сущности (руки + экипировка + инвентарь).
  */
 export function getAllContainedItems(world: World, rootEntityId: EntityId): EntityId[] {
   const result: EntityId[] = [];
@@ -184,6 +188,12 @@ export function getAllContainedItems(world: World, rootEntityId: EntityId): Enti
   function traverse(entityId: EntityId) {
     if (visited.has(entityId)) return;
     visited.add(entityId);
+
+    const slot = world.getComponent(entityId, 'interactionSlots');
+    if (slot && slot.itemId) {
+      result.push(slot.itemId);
+      traverse(slot.itemId);
+    }
 
     const equip = world.getComponent(entityId, 'equip');
     if (equip && equip.equipmentAreas) {
@@ -216,7 +226,7 @@ export function getAllContainedItems(world: World, rootEntityId: EntityId): Enti
 
 /**
  * Рекурсивно рассчитывает суммарный вес сущности с учетом собственного веса,
- * всех экипированных в неё предметов и всех предметов в инвентаре.
+ * предметов в ячейках взаимодействия, экипировки и содержимого инвентарей.
  */
 export function calculateTotalEntityWeight(
   world: World,
@@ -228,6 +238,11 @@ export function calculateTotalEntityWeight(
 
   const physStats: PhysicsStatsComponent | undefined = world.getComponent(entityId, 'physicsStats');
   let total = physStats?.weight.current ?? 1;
+
+  const slot = world.getComponent(entityId, 'interactionSlots');
+  if (slot && slot.itemId) {
+    total += calculateTotalEntityWeight(world, slot.itemId, visited);
+  }
 
   const equip: EquipmentComponent | undefined = world.getComponent(entityId, 'equip');
   if (equip && equip.equipmentAreas) {

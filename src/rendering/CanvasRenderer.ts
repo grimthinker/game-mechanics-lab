@@ -16,6 +16,7 @@ import { GizmoRenderer } from '../gizmos/GizmoRenderer';
 import { GizmoRenderData } from '../gizmos/types';
 import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
 import { findActiveBrain } from '../ecs/utils/anatomy';
+import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 
 export class CanvasRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
@@ -687,31 +688,33 @@ export class CanvasRenderer implements IRenderer {
       const phys = world.getComponent(id, 'physicsBody');
       const radius = physStats?.radius.current ?? (phys?.body instanceof Circle ? phys.body.r : 16);
 
-      // Healthbar
-      this.ctx.save();
-      this.ctx.globalAlpha = overlayAlpha;
-      this.ctx.translate(transform.x, transform.y);
-      const barW = Math.max(
-        VISUAL_CONFIG.healthbar.minWidth,
-        radius * VISUAL_CONFIG.healthbar.radiusMultiplier
-      );
-      const barH = VISUAL_CONFIG.healthbar.height / camera.scale;
-      const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
-      this.ctx.fillStyle = VISUAL_CONFIG.healthbar.bgColor;
-      this.ctx.fillRect(
-        -barW / 2,
-        -radius - VISUAL_CONFIG.healthbar.offsetY / camera.scale,
-        barW,
-        barH
-      );
-      this.ctx.fillStyle = VISUAL_CONFIG.healthbar.fillColor;
-      this.ctx.fillRect(
-        -barW / 2,
-        -radius - VISUAL_CONFIG.healthbar.offsetY / camera.scale,
-        barW * hpRatio,
-        barH
-      );
-      this.ctx.restore();
+      // Healthbar отрисовывается только для разрушаемых препятствий (у существ здоровье временно отключено)
+      if (isObstacle) {
+        this.ctx.save();
+        this.ctx.globalAlpha = overlayAlpha;
+        this.ctx.translate(transform.x, transform.y);
+        const barW = Math.max(
+          VISUAL_CONFIG.healthbar.minWidth,
+          radius * VISUAL_CONFIG.healthbar.radiusMultiplier
+        );
+        const barH = VISUAL_CONFIG.healthbar.height / camera.scale;
+        const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
+        this.ctx.fillStyle = VISUAL_CONFIG.healthbar.bgColor;
+        this.ctx.fillRect(
+          -barW / 2,
+          -radius - VISUAL_CONFIG.healthbar.offsetY / camera.scale,
+          barW,
+          barH
+        );
+        this.ctx.fillStyle = VISUAL_CONFIG.healthbar.fillColor;
+        this.ctx.fillRect(
+          -barW / 2,
+          -radius - VISUAL_CONFIG.healthbar.offsetY / camera.scale,
+          barW * hpRatio,
+          barH
+        );
+        this.ctx.restore();
+      }
 
       // ID / Name Text
       this.ctx.save();
@@ -803,21 +806,29 @@ export class CanvasRenderer implements IRenderer {
       const dotRadius = VISUAL_CONFIG.pickupInteraction.dotRadius / camera.scale;
 
       // Расчет дальности взаимодействия ячейки (interactDist)
-      const slotsComp = world.getComponent(id, 'interactionSlots');
       const physStats = world.getComponent(id, 'physicsStats');
       const creatureRadius = physStats?.radius.current ?? 16;
       let interactDist: number | undefined = undefined;
 
-      if (slotsComp && interactionAction.slotIndex !== undefined) {
-        interactDist = slotsComp.slots[interactionAction.slotIndex]?.interactDist;
+      if (interactionAction.partId) {
+        const partSlot = world.getComponent(interactionAction.partId, 'interactionSlots');
+        if (partSlot) {
+          interactDist = partSlot.interactDist;
+        }
+      } else {
+        const slot = world.getComponent(id, 'interactionSlots');
+        if (slot) {
+          interactDist = slot.interactDist;
+        }
       }
 
-      // Если индекс не указан, берем свободную ячейку с максимальной дальностью
-      if (interactDist === undefined && slotsComp) {
+      // Если дальность не найдена напрямую, ищем свободную ячейку с максимальной дальностью
+      if (interactDist === undefined) {
+        const aggSlots = getAggregatedInteractionSlots(world, id);
         let maxDist = -1;
-        for (const slot of slotsComp.slots) {
-          if (slot.itemId === null && slot.interactDist > maxDist) {
-            maxDist = slot.interactDist;
+        for (const info of aggSlots) {
+          if (info.slot.itemId === null && info.slot.interactDist > maxDist) {
+            maxDist = info.slot.interactDist;
           }
         }
         if (maxDist > 0) interactDist = maxDist;

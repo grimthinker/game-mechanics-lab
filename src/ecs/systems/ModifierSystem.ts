@@ -16,6 +16,26 @@ export class ModifierSystem {
           comp.health.current = Math.min(comp.health.current, comp.health.max.current);
         }
       }
+      if (comp.functionalHealth?.max) {
+        const expired = this.tickStatModifiers(comp.functionalHealth.max, localDt);
+        if (expired) {
+          comp.functionalHealth.current = Math.min(
+            comp.functionalHealth.current,
+            comp.functionalHealth.max.current
+          );
+          comp.functionalHealth.current = Math.max(
+            comp.functionalHealth.current,
+            -2 * comp.functionalHealth.max.current
+          );
+        }
+      }
+      if (comp.socketLink?.links) {
+        for (const link of Object.values(comp.socketLink.links)) {
+          if (link.maxStrength) {
+            this.tickStatModifiers(link.maxStrength, localDt);
+          }
+        }
+      }
       if (comp.movementStats) {
         this.tickStatModifiers(comp.movementStats.maxSpeed, localDt);
         this.tickStatModifiers(comp.movementStats.maxTurnSpeed, localDt);

@@ -82,6 +82,8 @@ export class MovementSystem {
         removeModifier(movementStats.maxSpeed, 'dir_back_speed');
         removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_walk_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_turning_turn');
         removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
         removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
         removeModifier(movementStats.maxTurnSpeed, 'dir_strafe_turn');
@@ -383,7 +385,7 @@ export class MovementSystem {
         movementMode = 'immobile';
       }
 
-      // 6. Модификаторы от вида движения (спринт / шаг)
+      // 6. Модификаторы от вида движения (спринт / шаг / поворот на месте)
       if (movementMode === 'sprinting') {
         addModifier(movementStats.maxSpeed, {
           id: 'mode_sprint_speed',
@@ -397,6 +399,8 @@ export class MovementSystem {
           type: ModifierType.PERCENT_MULT,
           value: movementStats.runTurnMultiplier,
         });
+        removeModifier(movementStats.maxTurnSpeed, 'mode_walk_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_turning_turn');
       } else if (movementMode === 'walking') {
         addModifier(movementStats.maxSpeed, {
           id: 'mode_walk_speed',
@@ -404,11 +408,31 @@ export class MovementSystem {
           value: movementStats.walkSpeedMultiplier,
         });
         removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
+
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'mode_walk_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.walkTurnMultiplier,
+        });
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_turning_turn');
+      } else if (movementMode === 'turning') {
+        removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
+        removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
+
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'mode_turning_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: movementStats.turnInPlaceTurnMultiplier,
+        });
+        removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_walk_turn');
       } else {
         removeModifier(movementStats.maxSpeed, 'mode_sprint_speed');
         removeModifier(movementStats.maxSpeed, 'mode_walk_speed');
         removeModifier(movementStats.maxTurnSpeed, 'mode_sprint_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_walk_turn');
+        removeModifier(movementStats.maxTurnSpeed, 'mode_turning_turn');
       }
 
       // 7. Модификаторы от вида направления движения (в сторону / назад)

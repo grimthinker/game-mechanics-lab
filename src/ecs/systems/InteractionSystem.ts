@@ -210,10 +210,10 @@ export class InteractionSystem {
         const targetId = action.targetId;
         const transform = world.getComponent(entityId, 'transform');
 
-        if (action.partId && action.slotIndex !== undefined && targetId) {
+        if (action.partId && targetId) {
           const slotsComp = world.getComponent(action.partId, 'interactionSlots');
-          if (slotsComp && slotsComp.slots[action.slotIndex]?.itemId === targetId) {
-            slotsComp.slots[action.slotIndex].itemId = null;
+          if (slotsComp && slotsComp.itemId === targetId) {
+            slotsComp.itemId = null;
           }
         }
 
@@ -306,13 +306,9 @@ export class InteractionSystem {
 
           if (interactionAction.timer <= 0) {
             const targetId = interactionAction.targetId;
-            const slotsComp = interactionAction.partId
+            const slot = interactionAction.partId
               ? world.getComponent(interactionAction.partId, 'interactionSlots')
               : undefined;
-            const slot =
-              slotsComp && interactionAction.slotIndex !== undefined
-                ? slotsComp.slots[interactionAction.slotIndex]
-                : undefined;
             const targetEntity = targetId ? world.getEntity(targetId) : undefined;
             const targetItem = targetId ? world.getComponent(targetId, 'item') : undefined;
             const targetPhysStats = targetId
@@ -446,11 +442,9 @@ export class InteractionSystem {
         if (
           interactionAction.type === 'equip' &&
           interactionAction.partId &&
-          interactionAction.slotIndex !== undefined &&
           interactionAction.areaId
         ) {
-          const slotsComp = world.getComponent(interactionAction.partId, 'interactionSlots');
-          const slot = slotsComp?.slots[interactionAction.slotIndex];
+          const slot = world.getComponent(interactionAction.partId, 'interactionSlots');
           const containerId = interactionAction.containerId ?? id;
           const containerEquip = world.getComponent(containerId, 'equip');
           const area = containerEquip?.equipmentAreas.find(
@@ -483,12 +477,10 @@ export class InteractionSystem {
         } else if (
           interactionAction.type === 'unequip' &&
           interactionAction.partId &&
-          interactionAction.slotIndex !== undefined &&
           interactionAction.areaId &&
           interactionAction.targetId
         ) {
-          const slotsComp = world.getComponent(interactionAction.partId, 'interactionSlots');
-          const slot = slotsComp?.slots[interactionAction.slotIndex];
+          const slot = world.getComponent(interactionAction.partId, 'interactionSlots');
           const containerId = interactionAction.containerId ?? id;
           const containerEquip = world.getComponent(containerId, 'equip');
           const area = containerEquip?.equipmentAreas.find(

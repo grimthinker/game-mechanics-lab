@@ -60,12 +60,22 @@ export function assembleBodyPart(
   const posY = position?.y ?? 0;
   world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 });
 
-  // 10. Заглушка здоровья (неразрушаемые объекты в текущей итерации)
+  // 10. Структурная прочность (СП)
+  const maxHealth = config.health?.maxHp ?? 100;
   world.addComponent(id, 'health', {
-    current: 100,
-    max: createStat(100),
+    current: config.health?.hp ?? maxHealth,
+    max: createStat(maxHealth),
     isAlive: true,
+    destructible: config.health?.destructible ?? true,
     hitFlashTimer: 0,
     healFlashTimer: 0,
+  });
+
+  // 11. Функциональная прочность (ФП)
+  const maxFp = config.functionalHealth?.maxHp ?? 100;
+  world.addComponent(id, 'functionalHealth', {
+    current: config.functionalHealth?.hp ?? maxFp,
+    max: createStat(maxFp),
+    isFunctional: true,
   });
 }

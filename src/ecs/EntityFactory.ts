@@ -97,6 +97,24 @@ export class EntityFactory {
     const legLId = this.generateId('part_leg_l');
     const legRId = this.generateId('part_leg_r');
 
+    const createSocketLink = (
+      strA: number,
+      strB: number,
+      sizeA: number,
+      sizeB: number,
+      targetEntityId: string,
+      targetSocketId: string
+    ) => {
+      const strength = Math.min(strA, strB);
+      return {
+        targetEntityId,
+        targetSocketId,
+        currentStrength: strength,
+        maxStrength: createStat(strength),
+        socketSize: sizeA + sizeB,
+      };
+    };
+
     // Torso
     world.createEntity(torsoId);
     assembleBodyPart(
@@ -119,17 +137,16 @@ export class EntityFactory {
         },
         socketLink: {
           links: {
-            neck: { targetEntityId: headId, targetSocketId: 'base', currentStrength: 50 },
-            l_shoulder: { targetEntityId: armLId, targetSocketId: 'base', currentStrength: 40 },
-            r_shoulder: { targetEntityId: armRId, targetSocketId: 'base', currentStrength: 40 },
-            l_hip: { targetEntityId: legLId, targetSocketId: 'base', currentStrength: 50 },
-            r_hip: { targetEntityId: legRId, targetSocketId: 'base', currentStrength: 50 },
+            neck: createSocketLink(50, 50, 10, 10, headId, 'base'),
+            l_shoulder: createSocketLink(40, 40, 10, 10, armLId, 'base'),
+            r_shoulder: createSocketLink(40, 40, 10, 10, armRId, 'base'),
+            l_hip: createSocketLink(50, 50, 12, 12, legLId, 'base'),
+            r_hip: createSocketLink(50, 50, 12, 12, legRId, 'base'),
           },
         },
         equip: {
           equipmentAreas: [
-            { id: 'torso', name: 'Туловище', type: 'torso', space: 40, itemIds: [] },
-            { id: 'waist', name: 'Пояс', type: 'waist', space: 15, itemIds: [] },
+            { id: 'torso', name: 'Туловище', type: 'torso', space: 20, itemIds: [] },
           ],
         },
       },
@@ -149,19 +166,19 @@ export class EntityFactory {
         physics: { radius: 8, weight: 5, size: 10 },
         socketDef: { sockets: { base: { type: 'neck', size: 10, strength: 50 } } },
         socketLink: {
-          links: { base: { targetEntityId: torsoId, targetSocketId: 'neck', currentStrength: 50 } },
+          links: {
+            base: createSocketLink(50, 50, 10, 10, torsoId, 'neck'),
+          },
         },
         bodyBrain: { power: 100, isActive: true, rootEntityId: rootId },
         equip: {
-          equipmentAreas: [
-            { id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] },
-            { id: 'neck', name: 'Шея', type: 'neck', space: 10, itemIds: [] },
-          ],
+          equipmentAreas: [{ id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] }],
         },
       },
       position
     );
     aiSystem.initBotBrain(world, headId, behavior);
+
     // Left Arm
     world.createEntity(armLId);
     assembleBodyPart(
@@ -176,11 +193,14 @@ export class EntityFactory {
         socketDef: { sockets: { base: { type: 'shoulder', size: 10, strength: 40 } } },
         socketLink: {
           links: {
-            base: { targetEntityId: torsoId, targetSocketId: 'l_shoulder', currentStrength: 40 },
+            base: createSocketLink(40, 40, 10, 10, torsoId, 'l_shoulder'),
           },
         },
         interactionSlots: {
-          slots: [{ id: 'hand_left', interactDist: 25, strength: 15, itemId: null }],
+          id: 'hand_left',
+          interactDist: 25,
+          strength: 15,
+          itemId: null,
         },
         equip: {
           equipmentAreas: [
@@ -205,11 +225,14 @@ export class EntityFactory {
         socketDef: { sockets: { base: { type: 'shoulder', size: 10, strength: 40 } } },
         socketLink: {
           links: {
-            base: { targetEntityId: torsoId, targetSocketId: 'r_shoulder', currentStrength: 40 },
+            base: createSocketLink(40, 40, 10, 10, torsoId, 'r_shoulder'),
           },
         },
         interactionSlots: {
-          slots: [{ id: 'hand_right', interactDist: 25, strength: 15, itemId: null }],
+          id: 'hand_right',
+          interactDist: 25,
+          strength: 15,
+          itemId: null,
         },
         equip: {
           equipmentAreas: [
@@ -234,13 +257,12 @@ export class EntityFactory {
         socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
         socketLink: {
           links: {
-            base: { targetEntityId: torsoId, targetSocketId: 'l_hip', currentStrength: 50 },
+            base: createSocketLink(50, 50, 12, 12, torsoId, 'l_hip'),
           },
         },
         equip: {
           equipmentAreas: [
-            { id: 'legs_l', name: 'Левая нога', type: 'legs', space: 10, itemIds: [] },
-            { id: 'feet_l', name: 'Левая ступня', type: 'feet', space: 5, itemIds: [] },
+            { id: 'legs_l', name: 'Левая нога', type: 'legs', space: 12, itemIds: [] },
           ],
         },
       },
@@ -261,13 +283,12 @@ export class EntityFactory {
         socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
         socketLink: {
           links: {
-            base: { targetEntityId: torsoId, targetSocketId: 'r_hip', currentStrength: 50 },
+            base: createSocketLink(50, 50, 12, 12, torsoId, 'r_hip'),
           },
         },
         equip: {
           equipmentAreas: [
-            { id: 'legs_r', name: 'Правая нога', type: 'legs', space: 10, itemIds: [] },
-            { id: 'feet_r', name: 'Правая ступня', type: 'feet', space: 5, itemIds: [] },
+            { id: 'legs_r', name: 'Правая нога', type: 'legs', space: 12, itemIds: [] },
           ],
         },
       },

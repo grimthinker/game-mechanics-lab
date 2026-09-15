@@ -149,7 +149,7 @@ export function assembleZone(
   const body = new Circle({ x: posX, y: posY }, radius);
   body.isStatic = false;
   const category = CollisionCategory.TRIGGER_ZONE;
-  const mask = CollisionCategory.CREATURE;
+  const mask = CollisionCategory.CREATURE | CollisionCategory.ITEM;
   world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask, isTrigger: true });
   physics.registerBody(id, body);
 

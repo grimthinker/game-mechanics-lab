@@ -60,6 +60,17 @@ export function assembleItem(
     world.addComponent(id, 'ownership', config.ownership);
   }
 
+  // 4.6. Здоровье (Структурная прочность)
+  const maxHp = config.health?.maxHp ?? 50;
+  world.addComponent(id, 'health', {
+    current: config.health?.hp ?? maxHp,
+    max: createStat(maxHp),
+    isAlive: true,
+    destructible: config.health?.destructible ?? true,
+    hitFlashTimer: 0,
+    healFlashTimer: 0,
+  });
+
   const isPossessed = !!config.ownership;
 
   // 5. Специфические компоненты экипировки

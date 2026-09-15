@@ -89,41 +89,6 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
           </span>
         </div>
 
-        {/* Полоска здоровья */}
-        <div style={{ marginBottom: '8px' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              fontSize: '11px',
-              marginBottom: '4px',
-            }}
-          >
-            <span style={{ color: '#888' }}>Здоровье:</span>
-            <span style={{ fontWeight: 'bold', color: hpPercent > 25 ? '#2ecc71' : '#e74c3c' }}>
-              {currentHp} / {maxHp}
-            </span>
-          </div>
-          <div
-            style={{
-              width: '100%',
-              height: '8px',
-              backgroundColor: '#333',
-              borderRadius: '4px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                width: `${hpPercent}%`,
-                height: '100%',
-                backgroundColor: hpPercent > 25 ? '#2ecc71' : '#e74c3c',
-                transition: 'width 0.2s ease, background-color 0.2s ease',
-              }}
-            />
-          </div>
-        </div>
-
         {/* Оружие */}
         <div
           style={{

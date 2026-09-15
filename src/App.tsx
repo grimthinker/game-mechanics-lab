@@ -864,6 +864,7 @@ export const App: React.FC = () => {
         {/* Правый док (Живой Инспектор) */}
         {mode !== GameMode.GAME && (
           <Inspector
+            app={appRef.current}
             mode={mode}
             selectedEntityId={selectedEntityId}
             world={appRef.current?.world}

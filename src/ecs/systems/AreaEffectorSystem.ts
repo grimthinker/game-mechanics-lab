@@ -4,6 +4,7 @@ import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, ModifierType } from '../types';
 import { applyDamage, applyHeal } from '../utils/health';
 import { addModifier } from '../stats/StatEvaluator';
+import { applyZoneDamageToCreature } from '../utils/anatomyDamage';
 
 export class AreaEffectorSystem {
   private pulseTimer: number = 0;
@@ -31,7 +32,11 @@ export class AreaEffectorSystem {
         if (!targetId) return;
 
         const targetPhys = world.getComponent(targetId, 'physicsBody');
-        if (!targetPhys || (targetPhys.category & CollisionCategory.CREATURE) === 0) return;
+        if (
+          !targetPhys ||
+          (targetPhys.category & (CollisionCategory.CREATURE | CollisionCategory.ITEM)) === 0
+        )
+          return;
 
         // Иммунитет носителя ауры
         if (areaEffector.ignoreParent && attachment && attachment.parentId === targetId) {
@@ -87,7 +92,17 @@ export class AreaEffectorSystem {
 
         // 1. Урон
         if (areaEffector.effect === 'damage') {
-          applyDamage(world, targetId, deltaValue, isPulseTick);
+          const tag = world.getComponent(targetId, 'tag');
+          const hasAnatomy =
+            world.getComponent(targetId, 'assemblyRoot') ||
+            world.getComponent(targetId, 'socketDef') ||
+            tag?.archetype === 'creature';
+
+          if (hasAnatomy) {
+            applyZoneDamageToCreature(world, physics, targetId, deltaValue);
+          } else {
+            applyDamage(world, targetId, deltaValue, isPulseTick);
+          }
         }
         // 2. Лечение
         else if (areaEffector.effect === 'heal') {

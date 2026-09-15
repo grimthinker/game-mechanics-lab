@@ -6,11 +6,20 @@ import {
   calculateSystemWeightAndRadius,
   findActiveBrain,
 } from '../utils/anatomy';
+import { destroyPartRecursive } from '../utils/anatomyDamage';
 import { Circle } from 'detect-collisions';
 import { setBaseStat, createStat } from '../stats/StatEvaluator';
 
 export class AnatomySystem {
   public update(dt: number, world: World, physics: PhysicsSystem): void {
+    // 0. Удаление частей тела, у которых структурная прочность (СП) упала до 0
+    const destructibleParts = world.getEntitiesWith('socketDef', 'health');
+    for (const [partId, { health }] of destructibleParts) {
+      if (health.current <= 0) {
+        destroyPartRecursive(world, physics, partId);
+      }
+    }
+
     const bodyParts = world.getEntitiesWith('socketDef');
     const visitedGraphs = new Set<EntityId>();
 
@@ -168,7 +177,7 @@ export class AnatomySystem {
       }
     }
 
-    // 2. Находим центральную часть (максимум связей) для ориентации в пространстве
+    // 2. Находим центральную часть (максимум связей, при равенстве - наибольший размер size)
     let anchorPartId = graph[0];
     let maxLinks = -1;
     for (const id of graph) {
@@ -177,6 +186,12 @@ export class AnatomySystem {
       if (linksCount > maxLinks) {
         maxLinks = linksCount;
         anchorPartId = id;
+      } else if (linksCount === maxLinks && linksCount > -1) {
+        const currentSize = world.getComponent(id, 'physicsStats')?.size ?? 0;
+        const anchorSize = world.getComponent(anchorPartId, 'physicsStats')?.size ?? 0;
+        if (currentSize > anchorSize) {
+          anchorPartId = id;
+        }
       }
     }
 

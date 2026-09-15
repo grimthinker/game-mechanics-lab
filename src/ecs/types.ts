@@ -62,6 +62,8 @@ export interface SocketLink {
   targetEntityId: string;
   targetSocketId: string;
   currentStrength: number;
+  maxStrength: StatValue<number>;
+  socketSize: number;
 }
 
 export interface SocketLinkComponent {
@@ -246,9 +248,16 @@ export interface HealthComponent {
   current: number;
   max: StatValue<number>;
   isAlive: boolean;
+  destructible: boolean;
   hitFlashTimer: number;
   healFlashTimer?: number;
   healthBarTimer?: number;
+}
+
+export interface FunctionalHealthComponent {
+  current: number;
+  max: StatValue<number>;
+  isFunctional: boolean;
 }
 
 export type ItemType = 'weapon' | 'armor' | 'bag' | 'bodyPart';
@@ -324,9 +333,7 @@ export interface EquipmentComponent {
   equipmentAreas: EquipmentArea[];
 }
 
-export interface InteractionSlotsComponent {
-  slots: InteractionSlot[];
-}
+export type InteractionSlotsComponent = InteractionSlot;
 
 export type InteractionPhase = 'reach' | 'lift' | 'abort_reach' | 'abort_lift';
 
@@ -409,6 +416,7 @@ export interface EntityComponents {
   velocity?: VelocityComponent;
   input?: InputComponent;
   health?: HealthComponent;
+  functionalHealth?: FunctionalHealthComponent;
   physicsStats?: PhysicsStatsComponent;
   movementStats?: MovementStatsComponent;
   stealthStats?: StealthStatsComponent;
@@ -441,6 +449,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'areaEffector',
   'attachment',
   'health',
+  'functionalHealth',
   'transform',
   'physicsStats',
   'movementStats',
@@ -511,6 +520,12 @@ export type HitZoneConfig = {
 export interface HealthConfig {
   maxHp: number;
   hp?: number;
+  destructible?: boolean;
+}
+
+export interface FunctionalHealthConfig {
+  maxHp: number;
+  hp?: number;
 }
 
 export interface MovementConfig {
@@ -523,6 +538,8 @@ export interface MovementConfig {
   runTurnMultiplier?: number;
   crouchTurnMultiplier?: number;
   proneTurnMultiplier?: number;
+  walkTurnMultiplier?: number;
+  turnInPlaceTurnMultiplier?: number;
   strafeSpeedMultiplier?: number;
   backwardSpeedMultiplier?: number;
   strafeTurnMultiplier?: number;
@@ -547,6 +564,8 @@ export interface MovementStatsComponent {
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
   proneTurnMultiplier: number;
+  walkTurnMultiplier: number;
+  turnInPlaceTurnMultiplier: number;
   strafeSpeedMultiplier: number;
   backwardSpeedMultiplier: number;
   strafeTurnMultiplier: number;
@@ -650,6 +669,7 @@ export interface EntityConfig {
   gizmo?: GizmoComponent;
   physics?: PhysicsConfig;
   health?: HealthConfig;
+  functionalHealth?: FunctionalHealthConfig;
   movement?: MovementConfig;
   stealth?: StealthConfig;
   ai?: AIConfig;

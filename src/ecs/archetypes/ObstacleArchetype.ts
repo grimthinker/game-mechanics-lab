@@ -70,6 +70,7 @@ export function assembleObstacle(
     current: hp,
     max: createStat(maxHp),
     isAlive: hp > 0,
+    destructible,
     hitFlashTimer: 0,
     healFlashTimer: 0,
     healthBarTimer: 0,

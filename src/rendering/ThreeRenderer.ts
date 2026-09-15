@@ -230,8 +230,8 @@ export class ThreeRenderer implements IRenderer {
       this.uiCtx.globalAlpha = overlayAlpha;
       this.uiCtx.translate(screenX, screenY);
 
-      // Отрисовка полоски здоровья (только если есть компонент health)
-      if (health) {
+      // Отрисовка полоски здоровья (только для разрушаемых препятствий согласно п. 10 ТЗ)
+      if (health && isObstacle) {
         const hp = health.current;
         const maxHp = health.max.current;
         const barW = Math.max(30, radius * 1.5);
@@ -250,7 +250,7 @@ export class ThreeRenderer implements IRenderer {
       this.uiCtx.textAlign = 'center';
       this.uiCtx.textBaseline = 'bottom';
       const displayName = meta?.name ?? id;
-      this.uiCtx.fillText(displayName, 0, health ? -14 : -4);
+      this.uiCtx.fillText(displayName, 0, health && isObstacle ? -14 : -4);
 
       this.uiCtx.restore();
     }

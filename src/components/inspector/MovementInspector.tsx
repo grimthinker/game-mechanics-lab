@@ -11,6 +11,8 @@ export interface MovementInspectorValues {
   runTurnMultiplier: number;
   crouchTurnMultiplier: number;
   proneTurnMultiplier: number;
+  walkTurnMultiplier: number;
+  turnInPlaceTurnMultiplier: number;
   strafeSpeedMultiplier: number;
   backwardSpeedMultiplier: number;
   strafeTurnMultiplier: number;
@@ -132,6 +134,34 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
       />
     </label>
     <label>
+      Множитель поворота при шаге:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.walkTurnMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ walkTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
+      Множитель поворота на месте:
+      <input
+        disabled={isReadOnly}
+        type="number"
+        value={values.turnInPlaceTurnMultiplier}
+        min={0.1}
+        max={10}
+        step={0.1}
+        onChange={(e) =>
+          onChange({ turnInPlaceTurnMultiplier: Math.round(Number(e.target.value) * 100) / 100 })
+        }
+      />
+    </label>
+    <label>
       Множитель поворота в присяди:
       <input
         disabled={isReadOnly}
@@ -247,81 +277,37 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
       <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
         Время переходов (сек):
       </span>
-      <div
-        style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '6px' }}
-      >
-        <label style={{ fontSize: '11px' }}>
-          Стоя → Присед:
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.standToCrouchTime}
-            min={0.01}
-            max={5}
-            step={0.05}
-            onChange={(e) => onChange({ standToCrouchTime: Number(e.target.value) })}
-          />
-        </label>
-        <label style={{ fontSize: '11px' }}>
-          Присед → Стоя:
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.crouchToStandTime}
-            min={0.01}
-            max={5}
-            step={0.05}
-            onChange={(e) => onChange({ crouchToStandTime: Number(e.target.value) })}
-          />
-        </label>
-        <label style={{ fontSize: '11px' }}>
-          Стоя → Лежа:
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.standToProneTime}
-            min={0.01}
-            max={5}
-            step={0.05}
-            onChange={(e) => onChange({ standToProneTime: Number(e.target.value) })}
-          />
-        </label>
-        <label style={{ fontSize: '11px' }}>
-          Лежа → Стоя:
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.proneToStandTime}
-            min={0.01}
-            max={5}
-            step={0.05}
-            onChange={(e) => onChange({ proneToStandTime: Number(e.target.value) })}
-          />
-        </label>
-        <label style={{ fontSize: '11px' }}>
-          Присед → Лежа:
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.crouchToProneTime}
-            min={0.01}
-            max={5}
-            step={0.05}
-            onChange={(e) => onChange({ crouchToProneTime: Number(e.target.value) })}
-          />
-        </label>
-        <label style={{ fontSize: '11px' }}>
-          Лежа → Присед:
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.proneToCrouchTime}
-            min={0.01}
-            max={5}
-            step={0.05}
-            onChange={(e) => onChange({ proneToCrouchTime: Number(e.target.value) })}
-          />
-        </label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+        {[
+          { label: 'Стоя → Присед:', key: 'standToCrouchTime' },
+          { label: 'Присед → Стоя:', key: 'crouchToStandTime' },
+          { label: 'Стоя → Лежа:', key: 'standToProneTime' },
+          { label: 'Лежа → Стоя:', key: 'proneToStandTime' },
+          { label: 'Присед → Лежа:', key: 'crouchToProneTime' },
+          { label: 'Лежа → Присед:', key: 'proneToCrouchTime' },
+        ].map(({ label, key }) => (
+          <label
+            key={key}
+            style={{
+              fontSize: '11px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            <span>{label}</span>
+            <input
+              disabled={isReadOnly}
+              type="number"
+              value={(values as any)[key]}
+              min={0.01}
+              max={5}
+              step={0.05}
+              style={{ width: '70px', padding: '2px 4px' }}
+              onChange={(e) => onChange({ [key]: Number(e.target.value) })}
+            />
+          </label>
+        ))}
       </div>
     </div>
   </div>

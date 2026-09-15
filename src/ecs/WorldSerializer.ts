@@ -64,12 +64,12 @@ export class WorldSerializer {
 
         childEnt.components.ownership = { ownerId: parentId, status };
 
-        if (childEnt.components.interactionSlots?.slots) {
-          for (const slot of childEnt.components.interactionSlots.slots) {
-            if (slot.itemId) {
-              injectOwnershipRecursive(childId, slot.itemId, 'equipped');
-            }
-          }
+        if (childEnt.components.interactionSlots?.itemId) {
+          injectOwnershipRecursive(
+            childId,
+            childEnt.components.interactionSlots.itemId,
+            'equipped'
+          );
         }
 
         if (childEnt.components.equip?.equipmentAreas) {
@@ -96,10 +96,8 @@ export class WorldSerializer {
       for (const ent of data.entities) {
         if (!ent.components) continue;
 
-        if (ent.components.interactionSlots?.slots) {
-          for (const slot of ent.components.interactionSlots.slots) {
-            if (slot.itemId) injectOwnershipRecursive(ent.id, slot.itemId, 'equipped');
-          }
+        if (ent.components.interactionSlots?.itemId) {
+          injectOwnershipRecursive(ent.id, ent.components.interactionSlots.itemId, 'equipped');
         }
         if (ent.components.equip?.equipmentAreas) {
           for (const area of ent.components.equip.equipmentAreas) {

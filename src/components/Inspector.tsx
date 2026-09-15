@@ -2,15 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { World } from '../ecs/World';
 import { PhysicsSystem } from '../ecs/systems/PhysicsSystem';
 import { AISystem } from '../ecs/systems/AISystem';
+import { GameApp } from '../GameApp';
 import { GameMode, THEME_COLORS } from '../constants';
-import { setBaseStat } from '../ecs/stats/StatEvaluator';
-import { killEntity } from '../ecs/utils/health';
 import {
   HitZoneType,
   HitZoneConfig,
   StandardRadius,
-  COLLISION_MASK_ALL,
-  COLLISION_MASK_NONE,
   isValidStandardRadius,
   STANDARD_EQUIPMENT_AREA_TYPES,
   EQUIPMENT_AREA_TYPE_LABELS,
@@ -24,14 +21,19 @@ import {
   CommonItemFormFields,
 } from './modals/forms/FormFields';
 import { DEFAULT_ZONE_PARAMS, ZoneTypeParams } from '../Weapon';
-import { deg2Rad, rad2Deg, Degrees } from '../utils';
+import { rad2Deg, Degrees, deg2Rad } from '../utils';
 import { AIInspector } from './inspector/AIInspector';
 import { HealthInspector } from './inspector/HealthInspector';
 import { MetaInspector } from './inspector/MetaInspector';
 import { MovementInspector } from './inspector/MovementInspector';
 import { PhysicsInspector } from './inspector/PhysicsInspector';
 import { StealthInspector } from './inspector/StealthInspector';
-import { calculateTotalEntityWeight, getAnatomyParts } from '../ecs/utils/hierarchy';
+import {
+  calculateTotalEntityWeight,
+  getAnatomyParts,
+  getAggregatedInteractionSlots,
+  getAllEquippedDescendants,
+} from '../ecs/utils/hierarchy';
 
 interface Breadcrumb {
   id: string;
@@ -39,6 +41,7 @@ interface Breadcrumb {
 }
 
 export interface InspectorProps {
+  app?: GameApp | null;
   mode: GameMode;
   selectedEntityId: string | null;
   world: World | null | undefined;
@@ -49,31 +52,19 @@ export interface InspectorProps {
   handleDeleteEntity: () => void;
 }
 
-const summaryStyle: React.CSSProperties = {
-  padding: '10px 12px',
-  backgroundColor: '#2a2a2a',
-  color: '#ecf0f1',
-  fontWeight: 'bold',
-  cursor: 'pointer',
-  userSelect: 'none',
-  borderBottom: '1px solid #1a1a1a',
-  display: 'flex',
-  justifyContent: 'space-between',
-  fontSize: '13px',
-};
-
 const contentStyle: React.CSSProperties = {
   padding: '12px',
   backgroundColor: '#222',
-  borderBottom: '1px solid #111',
+  borderTop: '1px solid #1a1a1a',
 };
 
 export const Inspector: React.FC<InspectorProps> = ({
+  app,
   mode,
   selectedEntityId,
   world,
   physics: _physics,
-  aiSystem,
+  aiSystem: _aiSystem,
   onCommitHistory,
   onUpdateStats,
   handleDeleteEntity,
@@ -97,22 +88,105 @@ export const Inspector: React.FC<InspectorProps> = ({
 
   const pushPath = (id: string, label: string) => {
     setPath((prev) => {
-      // Если кликнули по уже открытой сущности — ничего не делаем
       if (prev.length > 0 && prev[prev.length - 1].id === id) {
         return prev;
       }
-      // Если сущность уже есть в цепочке навигации — возвращаемся к ней (срезаем путь)
       const existingIndex = prev.findIndex((crumb) => crumb.id === id);
       if (existingIndex !== -1) {
         return prev.slice(0, existingIndex + 1);
       }
-      // Иначе добавляем новый шаг в историю
       return [...prev, { id, label }];
     });
   };
 
   const popPath = (index: number) => {
     setPath((prev) => prev.slice(0, index + 1));
+  };
+
+  // --- Система сворачивания групп (Аккордеон) ---
+  const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
+    meta: true, // Открыто: Базовая информация
+    physics: true, // Открыто: Физика и коллизии
+    health: true, // Открыто: Здоровье / СП
+    functionalHealth: true, // Открыто: ФП
+    sockets: false, // Свернуто
+    movement: false, // Свернуто: Большое число параметров движения
+    stealth: false, // Свернуто: Большое число множителей стелса
+    ai: false, // Свернуто
+    effector: false, // Свернуто
+    weapon: false, // Свернуто
+    armor: false, // Свернуто
+    bag: false, // Свернуто
+    genericItem: false, // Свернуто
+    anatomy: false, // Свернуто
+    slots: false, // Свернуто
+    equip: false, // Свернуто
+    inventory: false, // Свернуто
+  });
+
+  const toggleSection = (key: string) => {
+    setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const renderSection = (key: string, title: React.ReactNode, content: React.ReactNode) => {
+    const isOpen = sectionsOpen[key] ?? true;
+    return (
+      <div
+        style={{
+          marginBottom: '8px',
+          borderRadius: '6px',
+          overflow: isOpen ? 'visible' : 'hidden',
+          border: '1px solid #333',
+          backgroundColor: '#222',
+        }}
+      >
+        <div
+          onClick={() => toggleSection(key)}
+          style={{
+            padding: '10px 12px',
+            backgroundColor: '#2a2a2a',
+            color: '#ecf0f1',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            userSelect: 'none',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '13px',
+            transition: 'background-color 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#333')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#2a2a2a')}
+        >
+          <span>{title}</span>
+          <span
+            style={{
+              fontSize: '11px',
+              color: '#3498db',
+              fontWeight: 'normal',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <span style={{ fontSize: '10px', color: '#aaa' }}>
+              {isOpen ? 'Свернуть' : 'Развернуть'}
+            </span>
+            <span
+              style={{
+                transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                transition: 'transform 0.2s',
+                display: 'inline-block',
+                fontSize: '10px',
+              }}
+            >
+              ▼
+            </span>
+          </span>
+        </div>
+        {isOpen && <div style={contentStyle}>{content}</div>}
+      </div>
+    );
   };
 
   // --- Система Debounce для Истории ---
@@ -132,6 +206,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   const [draftDestructible, setDraftDestructible] = useState(false);
   const [draftPhysics, setDraftPhysics] = useState<any>(null);
   const [draftHealth, setDraftHealth] = useState<any>(null);
+  const [draftFunctionalHealth, setDraftFunctionalHealth] = useState<any>(null);
   const [draftMovement, setDraftMovement] = useState<any>(null);
   const [draftStealth, setDraftStealth] = useState<any>(null);
   const [draftAI, setDraftAI] = useState<string | null>(null);
@@ -173,6 +248,13 @@ export const Inspector: React.FC<InspectorProps> = ({
       health ? { hp: Math.round(health.current), maxHp: Math.round(health.max.base) } : null
     );
 
+    const functionalHealth = world.getComponent(targetId, 'functionalHealth');
+    setDraftFunctionalHealth(
+      functionalHealth
+        ? { fp: Math.round(functionalHealth.current), maxFp: Math.round(functionalHealth.max.base) }
+        : null
+    );
+
     const moveStats = world.getComponent(targetId, 'movementStats');
     setDraftMovement(
       moveStats
@@ -183,9 +265,11 @@ export const Inspector: React.FC<InspectorProps> = ({
             crouchSpeedMultiplier: moveStats.crouchSpeedMultiplier,
             proneSpeedMultiplier: moveStats.proneSpeedMultiplier ?? 0.2,
             walkSpeedMultiplier: moveStats.walkSpeedMultiplier ?? 0.5,
-            runTurnMultiplier: moveStats.runTurnMultiplier,
+            runTurnMultiplier: moveStats.runTurnMultiplier ?? 0.7,
             crouchTurnMultiplier: moveStats.crouchTurnMultiplier,
             proneTurnMultiplier: moveStats.proneTurnMultiplier ?? 0.3,
+            walkTurnMultiplier: moveStats.walkTurnMultiplier ?? 1.1,
+            turnInPlaceTurnMultiplier: moveStats.turnInPlaceTurnMultiplier ?? 1.2,
             strafeSpeedMultiplier: moveStats.strafeSpeedMultiplier ?? 0.8,
             backwardSpeedMultiplier: moveStats.backwardSpeedMultiplier ?? 0.6,
             strafeTurnMultiplier: moveStats.strafeTurnMultiplier ?? 0.8,
@@ -294,25 +378,14 @@ export const Inspector: React.FC<InspectorProps> = ({
     }
   }, [targetId, world]);
 
-  // --- Автоматическая синхронизация Draft -> ECS ---
+  // --- Синхронизация Draft через методы GameApp ---
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly) return;
-    let changed = false;
-    const meta = world.getComponent(targetId, 'meta');
-    const item = world.getComponent(targetId, 'item');
-    if (meta && meta.name !== draftName) {
-      meta.name = draftName;
-      changed = true;
-    }
-    if (item && item.name !== draftName) {
-      item.name = draftName;
-      changed = true;
-    }
-    if (meta && meta.destructible !== draftDestructible) {
-      meta.destructible = draftDestructible;
-      changed = true;
-    }
+    if (!targetId || !world || isReadOnly || !app) return;
+    const changed = app.updateEntityMeta(targetId, {
+      name: draftName,
+      destructible: draftDestructible,
+    });
     if (changed) {
       requestCommit('Изменение имени');
       onUpdateStats();
@@ -320,27 +393,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftName, draftDestructible]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftPhysics) return;
-    let changed = false;
-    const physStats = world.getComponent(targetId, 'physicsStats');
-    const physBody = world.getComponent(targetId, 'physicsBody');
-    if (physStats) {
-      if (physStats.radius.base !== draftPhysics.radius) {
-        setBaseStat(physStats.radius, draftPhysics.radius);
-        if (physBody && 'r' in physBody.body) (physBody.body as any).r = draftPhysics.radius;
-        changed = true;
-      }
-      if (physStats.weight.base !== draftPhysics.weight) {
-        setBaseStat(physStats.weight, draftPhysics.weight);
-        changed = true;
-      }
-      if (physStats.isSolid !== draftPhysics.isSolid) {
-        physStats.isSolid = draftPhysics.isSolid;
-        if (physBody)
-          physBody.mask = draftPhysics.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-        changed = true;
-      }
-    }
+    if (!targetId || !world || isReadOnly || !draftPhysics || !app) return;
+    const changed = app.updateEntityPhysics(targetId, draftPhysics);
     if (changed) {
       requestCommit('Изменение физики');
       onUpdateStats();
@@ -348,21 +402,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftPhysics]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftHealth) return;
-    let changed = false;
-    const health = world.getComponent(targetId, 'health');
-    if (health) {
-      if (health.max.base !== draftHealth.maxHp) {
-        setBaseStat(health.max, Math.max(1, draftHealth.maxHp));
-        changed = true;
-      }
-      if (health.current !== draftHealth.hp) {
-        health.current = Math.min(health.max.current, Math.max(0, draftHealth.hp));
-        if (health.current <= 0) killEntity(world, targetId);
-        else health.isAlive = true;
-        changed = true;
-      }
-    }
+    if (!targetId || !world || isReadOnly || !draftHealth || !app) return;
+    const changed = app.updateEntityHealth(targetId, draftHealth);
     if (changed) {
       requestCommit('Изменение здоровья');
       onUpdateStats();
@@ -370,96 +411,17 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftHealth]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftMovement) return;
-    let changed = false;
-    const ms = world.getComponent(targetId, 'movementStats');
-    if (ms) {
-      const draftTurn = deg2Rad(draftMovement.maxTurnSpeed);
-      if (ms.maxSpeed.base !== draftMovement.maxSpeed) {
-        setBaseStat(ms.maxSpeed, draftMovement.maxSpeed);
-        changed = true;
-      }
-      if (ms.maxTurnSpeed.base !== draftTurn) {
-        setBaseStat(ms.maxTurnSpeed, draftTurn);
-        changed = true;
-      }
-      if (ms.runSpeedMultiplier !== draftMovement.runSpeedMultiplier) {
-        ms.runSpeedMultiplier = draftMovement.runSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.crouchSpeedMultiplier !== draftMovement.crouchSpeedMultiplier) {
-        ms.crouchSpeedMultiplier = draftMovement.crouchSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.proneSpeedMultiplier !== draftMovement.proneSpeedMultiplier) {
-        ms.proneSpeedMultiplier = draftMovement.proneSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.walkSpeedMultiplier !== draftMovement.walkSpeedMultiplier) {
-        ms.walkSpeedMultiplier = draftMovement.walkSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.runTurnMultiplier !== draftMovement.runTurnMultiplier) {
-        ms.runTurnMultiplier = draftMovement.runTurnMultiplier;
-        changed = true;
-      }
-      if (ms.crouchTurnMultiplier !== draftMovement.crouchTurnMultiplier) {
-        ms.crouchTurnMultiplier = draftMovement.crouchTurnMultiplier;
-        changed = true;
-      }
-      if (ms.proneTurnMultiplier !== draftMovement.proneTurnMultiplier) {
-        ms.proneTurnMultiplier = draftMovement.proneTurnMultiplier;
-        changed = true;
-      }
-      if (ms.standToCrouchTime && ms.standToCrouchTime.base !== draftMovement.standToCrouchTime) {
-        setBaseStat(ms.standToCrouchTime, draftMovement.standToCrouchTime);
-        changed = true;
-      }
-      if (ms.crouchToStandTime && ms.crouchToStandTime.base !== draftMovement.crouchToStandTime) {
-        setBaseStat(ms.crouchToStandTime, draftMovement.crouchToStandTime);
-        changed = true;
-      }
-      if (ms.standToProneTime && ms.standToProneTime.base !== draftMovement.standToProneTime) {
-        setBaseStat(ms.standToProneTime, draftMovement.standToProneTime);
-        changed = true;
-      }
-      if (ms.proneToStandTime && ms.proneToStandTime.base !== draftMovement.proneToStandTime) {
-        setBaseStat(ms.proneToStandTime, draftMovement.proneToStandTime);
-        changed = true;
-      }
-      if (ms.crouchToProneTime && ms.crouchToProneTime.base !== draftMovement.crouchToProneTime) {
-        setBaseStat(ms.crouchToProneTime, draftMovement.crouchToProneTime);
-        changed = true;
-      }
-      if (ms.proneToCrouchTime && ms.proneToCrouchTime.base !== draftMovement.proneToCrouchTime) {
-        setBaseStat(ms.proneToCrouchTime, draftMovement.proneToCrouchTime);
-        changed = true;
-      }
-      if (ms.strafeSpeedMultiplier !== draftMovement.strafeSpeedMultiplier) {
-        ms.strafeSpeedMultiplier = draftMovement.strafeSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.backwardSpeedMultiplier !== draftMovement.backwardSpeedMultiplier) {
-        ms.backwardSpeedMultiplier = draftMovement.backwardSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.strafeTurnMultiplier !== draftMovement.strafeTurnMultiplier) {
-        ms.strafeTurnMultiplier = draftMovement.strafeTurnMultiplier;
-        changed = true;
-      }
-      if (ms.backwardTurnMultiplier !== draftMovement.backwardTurnMultiplier) {
-        ms.backwardTurnMultiplier = draftMovement.backwardTurnMultiplier;
-        changed = true;
-      }
-      if (ms.pickupSpeedMultiplier !== draftMovement.pickupSpeedMultiplier) {
-        ms.pickupSpeedMultiplier = draftMovement.pickupSpeedMultiplier;
-        changed = true;
-      }
-      if (ms.pickupTurnMultiplier !== draftMovement.pickupTurnMultiplier) {
-        ms.pickupTurnMultiplier = draftMovement.pickupTurnMultiplier;
-        changed = true;
-      }
+    if (!targetId || !world || isReadOnly || !draftFunctionalHealth || !app) return;
+    const changed = app.updateEntityFunctionalHealth(targetId, draftFunctionalHealth);
+    if (changed) {
+      requestCommit('Изменение функциональной прочности');
+      onUpdateStats();
     }
+  }, [draftFunctionalHealth]);
+
+  useEffect(() => {
+    if (!targetId || !world || isReadOnly || !draftMovement || !app) return;
+    const changed = app.updateEntityMovementStats(targetId, draftMovement);
     if (changed) {
       requestCommit('Изменение параметров движения');
       onUpdateStats();
@@ -467,39 +429,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftMovement]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftStealth) return;
-    let changed = false;
-    const st = world.getComponent(targetId, 'stealthStats');
-    if (st) {
-      if (st.stealthPower.base !== draftStealth.stealthPower) {
-        setBaseStat(st.stealthPower, draftStealth.stealthPower);
-        changed = true;
-      }
-      if (st.crouchStealthMultiplier !== draftStealth.crouchStealthMultiplier) {
-        st.crouchStealthMultiplier = draftStealth.crouchStealthMultiplier;
-        changed = true;
-      }
-      if (st.proneStealthMultiplier !== draftStealth.proneStealthMultiplier) {
-        st.proneStealthMultiplier = draftStealth.proneStealthMultiplier;
-        changed = true;
-      }
-      if (st.runStealthMultiplier !== draftStealth.runStealthMultiplier) {
-        st.runStealthMultiplier = draftStealth.runStealthMultiplier;
-        changed = true;
-      }
-      if (st.walkStealthMultiplier !== draftStealth.walkStealthMultiplier) {
-        st.walkStealthMultiplier = draftStealth.walkStealthMultiplier;
-        changed = true;
-      }
-      if (st.turnInPlaceStealthMultiplier !== draftStealth.turnInPlaceStealthMultiplier) {
-        st.turnInPlaceStealthMultiplier = draftStealth.turnInPlaceStealthMultiplier;
-        changed = true;
-      }
-      if (st.immobileStealthMultiplier !== draftStealth.immobileStealthMultiplier) {
-        st.immobileStealthMultiplier = draftStealth.immobileStealthMultiplier;
-        changed = true;
-      }
-    }
+    if (!targetId || !world || isReadOnly || !draftStealth || !app) return;
+    const changed = app.updateEntityStealthStats(targetId, draftStealth);
     if (changed) {
       requestCommit('Изменение скрытности');
       onUpdateStats();
@@ -507,33 +438,17 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftStealth]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftAI || !aiSystem) return;
-    const aiStats = world.getComponent(targetId, 'aiStats');
-    if (aiStats && aiStats.behavior.current !== draftAI) {
-      aiStats.behavior.current = draftAI;
-      aiStats.behavior.base = draftAI;
-      aiSystem.initBotBrain(world, targetId, draftAI);
+    if (!targetId || !world || isReadOnly || !draftAI || !app) return;
+    const changed = app.updateEntityAIBehavior(targetId, draftAI);
+    if (changed) {
       requestCommit('Изменение поведения AI');
       onUpdateStats();
     }
   }, [draftAI]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftZone) return;
-    let changed = false;
-    const effector = world.getComponent(targetId, 'areaEffector');
-    const physStats = world.getComponent(targetId, 'physicsStats');
-    const physBody = world.getComponent(targetId, 'physicsBody');
-    if (effector) {
-      Object.assign(effector, draftZone);
-      if (physStats && physStats.radius.base !== draftZone.radius) {
-        setBaseStat(physStats.radius, draftZone.radius);
-      }
-      if (physBody && 'r' in physBody.body) {
-        (physBody.body as any).r = draftZone.radius;
-      }
-      changed = true;
-    }
+    if (!targetId || !world || isReadOnly || !draftZone || !app) return;
+    const changed = app.updateEntityAreaEffector(targetId, draftZone);
     if (changed) {
       requestCommit('Настройка зоны эффектора');
       onUpdateStats();
@@ -541,58 +456,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftZone]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftWeapon) return;
-    let changed = false;
-    const item = world.getComponent(targetId, 'item');
-    const wStats = world.getComponent(targetId, 'weaponStats');
-    const wZone = world.getComponent(targetId, 'weaponZone');
-
-    if (item && item.type === 'weapon') {
-      if (item.size !== draftWeapon.size) {
-        item.size = draftWeapon.size;
-        changed = true;
-      }
-      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftWeapon.equipTypes)) {
-        item.equipTypes = draftWeapon.equipTypes ? [...draftWeapon.equipTypes] : [];
-        changed = true;
-      }
-      if (item.equippable !== draftWeapon.equippable) {
-        item.equippable = draftWeapon.equippable;
-        changed = true;
-      }
-      if (item.equipTimeMultiplier !== draftWeapon.equipTimeMultiplier) {
-        item.equipTimeMultiplier = draftWeapon.equipTimeMultiplier;
-        changed = true;
-      }
-    }
-
-    if (wStats) {
-      if (wStats.baseDamage.base !== draftWeapon.baseDamage) {
-        setBaseStat(wStats.baseDamage, draftWeapon.baseDamage);
-        changed = true;
-      }
-      if (wStats.prepTime.base !== draftWeapon.prepTime) {
-        setBaseStat(wStats.prepTime, draftWeapon.prepTime);
-        changed = true;
-      }
-      if (wStats.recoveryTime.base !== draftWeapon.recoveryTime) {
-        setBaseStat(wStats.recoveryTime, draftWeapon.recoveryTime);
-        changed = true;
-      }
-    }
-
-    if (wZone) {
-      wZone.hitZoneType = draftWeapon.hitZoneType;
-      wZone.radius = draftWeapon.radius;
-      wZone.length = draftWeapon.length;
-      wZone.angle = deg2Rad(draftWeapon.angle);
-      wZone.rayCount = draftWeapon.rayCount;
-      wZone.pierceObstacles = draftWeapon.pierceObstacles;
-      wZone.pierceCreatures = draftWeapon.pierceCreatures;
-      wZone.pierceItems = draftWeapon.pierceItems;
-      changed = true;
-    }
-
+    if (!targetId || !world || isReadOnly || !draftWeapon || !app) return;
+    const changed = app.updateEntityWeapon(targetId, draftWeapon);
     if (changed) {
       requestCommit('Изменение параметров оружия');
       onUpdateStats();
@@ -600,60 +465,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftWeapon]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftArmor) return;
-    let changed = false;
-    const item = world.getComponent(targetId, 'item');
-    const aStats = world.getComponent(targetId, 'armorStats');
-    const meta = world.getComponent(targetId, 'meta');
-
-    if (item && item.type === 'armor') {
-      if (item.size !== draftArmor.size) {
-        item.size = draftArmor.size;
-        changed = true;
-      }
-      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftArmor.equipTypes)) {
-        item.equipTypes = draftArmor.equipTypes ? [...draftArmor.equipTypes] : [];
-        changed = true;
-      }
-      if (item.equippable !== draftArmor.equippable) {
-        item.equippable = draftArmor.equippable;
-        changed = true;
-      }
-      if (item.equipTimeMultiplier !== draftArmor.equipTimeMultiplier) {
-        item.equipTimeMultiplier = draftArmor.equipTimeMultiplier;
-        changed = true;
-      }
-    }
-
-    if (aStats) {
-      if (aStats.defense.base !== draftArmor.defense) {
-        setBaseStat(aStats.defense, draftArmor.defense);
-        changed = true;
-      }
-      if (aStats.flatReduction.base !== draftArmor.flatReduction) {
-        setBaseStat(aStats.flatReduction, draftArmor.flatReduction);
-        changed = true;
-      }
-    } else if (meta?.entityType === 'creature') {
-      let selfArmor = world.getComponent(targetId, 'armorStats');
-      if (!selfArmor) {
-        world.addComponent(targetId, 'armorStats', {
-          defense: { base: 0, current: 0 },
-          flatReduction: { base: 0, current: 0 },
-        });
-        selfArmor = world.getComponent(targetId, 'armorStats');
-      }
-      if (selfArmor) {
-        if (selfArmor.defense.base !== draftArmor.defense) {
-          setBaseStat(selfArmor.defense, draftArmor.defense);
-          changed = true;
-        }
-        if (selfArmor.flatReduction.base !== draftArmor.flatReduction) {
-          setBaseStat(selfArmor.flatReduction, draftArmor.flatReduction);
-          changed = true;
-        }
-      }
-    }
+    if (!targetId || !world || isReadOnly || !draftArmor || !app) return;
+    const changed = app.updateEntityArmor(targetId, draftArmor);
     if (changed) {
       requestCommit('Изменение параметров брони');
       onUpdateStats();
@@ -661,27 +474,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftArmor]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftGenericItem) return;
-    let changed = false;
-    const item = world.getComponent(targetId, 'item');
-    if (item && item.type === 'bodyPart') {
-      if (item.size !== draftGenericItem.size) {
-        item.size = draftGenericItem.size;
-        changed = true;
-      }
-      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftGenericItem.equipTypes)) {
-        item.equipTypes = [...draftGenericItem.equipTypes];
-        changed = true;
-      }
-      if (item.equippable !== draftGenericItem.equippable) {
-        item.equippable = draftGenericItem.equippable;
-        changed = true;
-      }
-      if (item.equipTimeMultiplier !== draftGenericItem.equipTimeMultiplier) {
-        item.equipTimeMultiplier = draftGenericItem.equipTimeMultiplier;
-        changed = true;
-      }
-    }
+    if (!targetId || !world || isReadOnly || !draftGenericItem || !app) return;
+    const changed = app.updateEntityGenericItem(targetId, draftGenericItem);
     if (changed) {
       requestCommit('Изменение параметров предмета');
       onUpdateStats();
@@ -689,40 +483,8 @@ export const Inspector: React.FC<InspectorProps> = ({
   }, [draftGenericItem]);
 
   useEffect(() => {
-    if (!targetId || !world || isReadOnly || !draftBag) return;
-    let changed = false;
-    const item = world.getComponent(targetId, 'item');
-    const inv = world.getComponent(targetId, 'inventory');
-
-    if (item) {
-      if (item.size !== draftBag.size) {
-        item.size = draftBag.size;
-        changed = true;
-      }
-      if (JSON.stringify(item.equipTypes) !== JSON.stringify(draftBag.equipTypes)) {
-        item.equipTypes = draftBag.equipTypes ? [...draftBag.equipTypes] : [];
-        changed = true;
-      }
-      if (item.equippable !== draftBag.equippable) {
-        item.equippable = draftBag.equippable;
-        changed = true;
-      }
-      if (item.equipTimeMultiplier !== draftBag.equipTimeMultiplier) {
-        item.equipTimeMultiplier = draftBag.equipTimeMultiplier;
-        changed = true;
-      }
-    }
-
-    if (inv && isBagEmpty) {
-      if (inv.size.width !== draftBag.width || inv.size.height !== draftBag.height) {
-        inv.size = { width: draftBag.width, height: draftBag.height };
-        inv.slots = Array.from({ length: draftBag.height }, () =>
-          Array.from({ length: draftBag.width }, () => ({ itemId: null, count: 0 }))
-        );
-        changed = true;
-      }
-    }
-
+    if (!targetId || !world || isReadOnly || !draftBag || !app) return;
+    const changed = app.updateEntityBag(targetId, draftBag, isBagEmpty);
     if (changed) {
       requestCommit('Изменение параметров инвентаря');
       onUpdateStats();
@@ -816,16 +578,17 @@ export const Inspector: React.FC<InspectorProps> = ({
         style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}
       >
         <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-          <details open>
-            <summary style={summaryStyle}>Имя и Трансформация</summary>
-            <div style={contentStyle}>
+          {renderSection(
+            'meta',
+            'Имя и Трансформация',
+            <>
               <MetaInspector
                 name={draftName}
                 onChange={setDraftName}
                 isReadOnly={isReadOnly}
                 stance={world.getComponent(targetId, 'meta')?.stance}
               />
-              {currentArchetype === 'obstacle' && (
+              {(currentArchetype === 'obstacle' || currentArchetype === 'item') && (
                 <label
                   style={{
                     display: 'flex',
@@ -841,130 +604,323 @@ export const Inspector: React.FC<InspectorProps> = ({
                     checked={draftDestructible}
                     onChange={(e) => setDraftDestructible(e.target.checked)}
                   />
-                  Разрушаемое препятствие
+                  Разрушаемый объект
                 </label>
               )}
-            </div>
-          </details>
-
-          {draftPhysics && (
-            <details open>
-              <summary style={summaryStyle}>Физика</summary>
-              <div style={contentStyle}>
-                <PhysicsInspector
-                  values={draftPhysics}
-                  onChange={(p: any) => setDraftPhysics((prev: any) => ({ ...prev, ...p }))}
-                  isReadOnly={isReadOnly}
-                  isStandardRadiusOnly={isStandardRadiusOnly}
-                  totalWeight={calculateTotalEntityWeight(world, targetId)}
-                />
-              </div>
-            </details>
+            </>
           )}
 
-          {draftHealth && (
-            <details open>
-              <summary style={summaryStyle}>Здоровье</summary>
-              <div style={contentStyle}>
+          {draftPhysics &&
+            renderSection(
+              'physics',
+              'Физика',
+              <PhysicsInspector
+                values={draftPhysics}
+                onChange={(p: any) => setDraftPhysics((prev: any) => ({ ...prev, ...p }))}
+                isReadOnly={isReadOnly}
+                isStandardRadiusOnly={isStandardRadiusOnly}
+                totalWeight={calculateTotalEntityWeight(world, targetId)}
+              />
+            )}
+
+          {draftHealth &&
+            currentArchetype !== 'creature' &&
+            !hasAssembly &&
+            renderSection(
+              'health',
+              'Структурная прочность (СП)',
+              <>
                 <HealthInspector
                   values={draftHealth}
                   onChange={(p: any) => setDraftHealth((prev: any) => ({ ...prev, ...p }))}
                   isReadOnly={isReadOnly}
                 />
-              </div>
-            </details>
-          )}
-
-          {draftMovement && (
-            <details open>
-              <summary style={summaryStyle}>Движение</summary>
-              <div style={contentStyle}>
-                <MovementInspector
-                  values={draftMovement}
-                  onChange={(p: any) => setDraftMovement((prev: any) => ({ ...prev, ...p }))}
-                  isReadOnly={isReadOnly}
-                />
-              </div>
-            </details>
-          )}
-
-          {draftStealth && (
-            <details open>
-              <summary style={summaryStyle}>Скрытность</summary>
-              <div style={contentStyle}>
-                <StealthInspector
-                  values={draftStealth}
-                  onChange={(p: any) => setDraftStealth((prev: any) => ({ ...prev, ...p }))}
-                  isReadOnly={isReadOnly}
-                />
-              </div>
-            </details>
-          )}
-
-          {draftAI && (
-            <details open>
-              <summary style={summaryStyle}>Поведение (ИИ)</summary>
-              <div style={contentStyle}>
-                <AIInspector behavior={draftAI} onChange={setDraftAI} isReadOnly={isReadOnly} />
-              </div>
-            </details>
-          )}
-
-          {draftZone && (
-            <details open>
-              <summary style={summaryStyle}>Свойства зоны (Area Effector)</summary>
-              <div style={contentStyle}>
-                <AreaEffectorInspector
-                  values={draftZone}
-                  onChange={(p: any) => setDraftZone((prev: any) => ({ ...prev, ...p }))}
-                  isReadOnly={isReadOnly}
-                />
-              </div>
-            </details>
-          )}
-
-          {draftWeapon && (
-            <details open>
-              <summary style={summaryStyle}>Оружие и зона атаки</summary>
-              <div style={contentStyle}>
-                <WeaponFormFields
-                  values={draftWeapon}
-                  onChange={(p: any) => setDraftWeapon((prev) => (prev ? { ...prev, ...p } : null))}
-                  onZoneTypeChange={(newType) => {
-                    zoneParamsMapRef.current[draftWeapon.hitZoneType] = {
-                      length: draftWeapon.length,
-                      radius: draftWeapon.radius,
-                      rayCount: draftWeapon.rayCount,
-                      angle: deg2Rad(draftWeapon.angle),
-                      pierceObstacles: draftWeapon.pierceObstacles,
-                      pierceCreatures: draftWeapon.pierceCreatures,
-                      pierceItems: draftWeapon.pierceItems,
-                    };
-                    const np = zoneParamsMapRef.current[newType] || DEFAULT_ZONE_PARAMS[newType];
-                    setDraftWeapon({
-                      ...draftWeapon,
-                      hitZoneType: newType,
-                      length: np.length,
-                      radius: np.radius,
-                      rayCount: np.rayCount,
-                      angle: Math.round(rad2Deg(np.angle)) as Degrees,
-                      pierceObstacles: np.pierceObstacles,
-                      pierceCreatures: np.pierceCreatures,
-                      pierceItems: np.pierceItems,
-                    });
+                <div
+                  style={{
+                    marginTop: '8px',
+                    height: '10px',
+                    backgroundColor: '#111',
+                    borderRadius: '5px',
+                    overflow: 'hidden',
+                    border: '1px solid #333',
                   }}
-                  isReadOnly={isReadOnly}
-                />
-              </div>
-            </details>
-          )}
+                >
+                  <div
+                    style={{
+                      width: `${Math.max(0, Math.min(100, (draftHealth.hp / (draftHealth.maxHp || 1)) * 100))}%`,
+                      height: '100%',
+                      backgroundColor: '#3498db',
+                      transition: 'width 0.2s',
+                    }}
+                  />
+                </div>
+              </>
+            )}
 
-          {draftArmor && (
-            <details open>
-              <summary style={summaryStyle}>
-                {currentArchetype === 'creature' ? 'Собственная броня' : 'Параметры брони'}
-              </summary>
-              <div style={contentStyle}>
+          {draftFunctionalHealth &&
+            renderSection(
+              'functionalHealth',
+              'Функциональная прочность (ФП)',
+              <>
+                {(() => {
+                  const fp = draftFunctionalHealth.fp;
+                  const maxFp = draftFunctionalHealth.maxFp;
+                  const minFp = -2 * maxFp;
+                  const totalRange = maxFp - minFp;
+                  const percent = Math.max(0, Math.min(100, ((fp - minFp) / totalRange) * 100));
+
+                  let color = '#2ecc71'; // Зеленый (>0)
+                  let statusText = 'Функционирует';
+                  if (fp <= 0 && fp > -maxFp) {
+                    color = '#f39c12'; // Оранжевый/Желтый
+                    statusText = 'Травмировано / Отключено';
+                  } else if (fp <= -maxFp) {
+                    color = '#e74c3c'; // Красный
+                    statusText = 'Критическая травма / Уничтожено';
+                  }
+
+                  return (
+                    <>
+                      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        Текущая ФП (от {minFp} до {maxFp}):
+                        <input
+                          disabled={isReadOnly}
+                          type="number"
+                          value={fp}
+                          min={minFp}
+                          max={maxFp}
+                          onChange={(e) =>
+                            setDraftFunctionalHealth((prev: any) => ({
+                              ...prev,
+                              fp: Number(e.target.value),
+                            }))
+                          }
+                        />
+                      </label>
+                      <label
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          marginTop: '6px',
+                        }}
+                      >
+                        Макс. ФП:
+                        <input
+                          disabled={isReadOnly}
+                          type="number"
+                          value={maxFp}
+                          min={1}
+                          max={10000}
+                          onChange={(e) =>
+                            setDraftFunctionalHealth((prev: any) => ({
+                              ...prev,
+                              maxFp: Number(e.target.value),
+                            }))
+                          }
+                        />
+                      </label>
+
+                      <div
+                        style={{
+                          marginTop: '10px',
+                          height: '12px',
+                          backgroundColor: '#111',
+                          borderRadius: '6px',
+                          overflow: 'hidden',
+                          border: '1px solid #333',
+                          position: 'relative',
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: `${(maxFp / totalRange) * 100}%`,
+                            top: 0,
+                            bottom: 0,
+                            width: '1px',
+                            backgroundColor: '#fff',
+                            zIndex: 2,
+                          }}
+                          title="0 (Порог отключения)"
+                        />
+                        <div
+                          style={{
+                            width: `${percent}%`,
+                            height: '100%',
+                            backgroundColor: color,
+                            transition: 'width 0.2s, background-color 0.2s',
+                          }}
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color,
+                          marginTop: '6px',
+                          fontWeight: 'bold',
+                          textAlign: 'center',
+                        }}
+                      >
+                        Статус: {statusText}
+                      </div>
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+          {world.getComponent(targetId, 'socketLink') &&
+            renderSection(
+              'sockets',
+              'Соединения сокетов',
+              <>
+                {Object.entries(world.getComponent(targetId, 'socketLink')!.links).map(
+                  ([socketId, link]) => {
+                    const targetMeta = world.getComponent(link.targetEntityId, 'meta');
+                    const maxStr = link.maxStrength?.base ?? 50;
+                    return (
+                      <div
+                        key={socketId}
+                        style={{
+                          marginBottom: '8px',
+                          padding: '8px',
+                          backgroundColor: '#181818',
+                          borderRadius: '4px',
+                          border: '1px solid #333',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            color: '#3498db',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          <span>Сокет: {socketId}</span>
+                          <span style={{ color: '#aaa' }}>
+                            → {targetMeta?.name || link.targetEntityId}
+                          </span>
+                        </div>
+                        <label
+                          style={{
+                            fontSize: '11px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          Прочность связи:
+                          <input
+                            disabled={isReadOnly}
+                            type="number"
+                            value={Math.round(link.currentStrength)}
+                            min={-maxStr}
+                            max={maxStr}
+                            style={{ width: '60px', padding: '2px' }}
+                            onChange={(e) => {
+                              if (app) {
+                                app.updateEntitySocketLinkStrength(
+                                  targetId,
+                                  socketId,
+                                  Number(e.target.value)
+                                );
+                                requestCommit('Изменение прочности связи');
+                                onUpdateStats();
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    );
+                  }
+                )}
+              </>
+            )}
+
+          {draftMovement &&
+            renderSection(
+              'movement',
+              'Движение',
+              <MovementInspector
+                values={draftMovement}
+                onChange={(p: any) => setDraftMovement((prev: any) => ({ ...prev, ...p }))}
+                isReadOnly={isReadOnly}
+              />
+            )}
+
+          {draftStealth &&
+            renderSection(
+              'stealth',
+              'Скрытность',
+              <StealthInspector
+                values={draftStealth}
+                onChange={(p: any) => setDraftStealth((prev: any) => ({ ...prev, ...p }))}
+                isReadOnly={isReadOnly}
+              />
+            )}
+
+          {draftAI &&
+            renderSection(
+              'ai',
+              'Поведение (ИИ)',
+              <AIInspector behavior={draftAI} onChange={setDraftAI} isReadOnly={isReadOnly} />
+            )}
+
+          {draftZone &&
+            renderSection(
+              'effector',
+              'Свойства зоны (Area Effector)',
+              <AreaEffectorInspector
+                values={draftZone}
+                onChange={(p: any) => setDraftZone((prev: any) => ({ ...prev, ...p }))}
+                isReadOnly={isReadOnly}
+              />
+            )}
+
+          {draftWeapon &&
+            renderSection(
+              'weapon',
+              'Оружие и зона атаки',
+              <WeaponFormFields
+                values={draftWeapon}
+                onChange={(p: any) => setDraftWeapon((prev) => (prev ? { ...prev, ...p } : null))}
+                onZoneTypeChange={(newType) => {
+                  zoneParamsMapRef.current[draftWeapon.hitZoneType] = {
+                    length: draftWeapon.length,
+                    radius: draftWeapon.radius,
+                    rayCount: draftWeapon.rayCount,
+                    angle: deg2Rad(draftWeapon.angle),
+                    pierceObstacles: draftWeapon.pierceObstacles,
+                    pierceCreatures: draftWeapon.pierceCreatures,
+                    pierceItems: draftWeapon.pierceItems,
+                  };
+                  const np = zoneParamsMapRef.current[newType] || DEFAULT_ZONE_PARAMS[newType];
+                  setDraftWeapon({
+                    ...draftWeapon,
+                    hitZoneType: newType,
+                    length: np.length,
+                    radius: np.radius,
+                    rayCount: np.rayCount,
+                    angle: Math.round(rad2Deg(np.angle)) as Degrees,
+                    pierceObstacles: np.pierceObstacles,
+                    pierceCreatures: np.pierceCreatures,
+                    pierceItems: np.pierceItems,
+                  });
+                }}
+                isReadOnly={isReadOnly}
+              />
+            )}
+
+          {draftArmor &&
+            renderSection(
+              'armor',
+              currentArchetype === 'creature' ? 'Собственная броня' : 'Параметры брони',
+              <>
                 {currentArchetype !== 'creature' && (
                   <ArmorFormFields
                     values={draftArmor}
@@ -1008,41 +964,37 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </label>
                   </div>
                 )}
-              </div>
-            </details>
-          )}
+              </>
+            )}
 
-          {draftBag && (
-            <details open>
-              <summary style={summaryStyle}>Сумка / Инвентарь</summary>
-              <div style={contentStyle}>
-                <BagFormFields
-                  values={draftBag}
-                  onChange={(p: any) => setDraftBag((prev: any) => ({ ...prev, ...p }))}
-                  isReadOnly={isReadOnly}
-                  isBagInventoryEmpty={isBagEmpty}
-                />
-              </div>
-            </details>
-          )}
+          {draftBag &&
+            renderSection(
+              'bag',
+              'Сумка / Инвентарь',
+              <BagFormFields
+                values={draftBag}
+                onChange={(p: any) => setDraftBag((prev: any) => ({ ...prev, ...p }))}
+                isReadOnly={isReadOnly}
+                isBagInventoryEmpty={isBagEmpty}
+              />
+            )}
 
-          {draftGenericItem && (
-            <details open>
-              <summary style={summaryStyle}>Параметры части тела (как предмета)</summary>
-              <div style={contentStyle}>
-                <CommonItemFormFields
-                  values={draftGenericItem}
-                  onChange={(p: any) => setDraftGenericItem((prev: any) => ({ ...prev, ...p }))}
-                  isReadOnly={isReadOnly}
-                />
-              </div>
-            </details>
-          )}
+          {draftGenericItem &&
+            renderSection(
+              'genericItem',
+              'Параметры части тела (как предмета)',
+              <CommonItemFormFields
+                values={draftGenericItem}
+                onChange={(p: any) => setDraftGenericItem((prev: any) => ({ ...prev, ...p }))}
+                isReadOnly={isReadOnly}
+              />
+            )}
 
-          {anatomyParts.length > 1 && (
-            <details open>
-              <summary style={summaryStyle}>Анатомия ({anatomyParts.length} частей)</summary>
-              <div style={contentStyle}>
+          {anatomyParts.length > 1 &&
+            renderSection(
+              'anatomy',
+              `Анатомия (${anatomyParts.length} частей)`,
+              <>
                 {anatomyParts.map((partId) => {
                   const meta = world.getComponent(partId, 'meta');
                   const brain = world.getComponent(partId, 'bodyBrain');
@@ -1073,104 +1025,245 @@ export const Inspector: React.FC<InspectorProps> = ({
                     </div>
                   );
                 })}
-              </div>
-            </details>
-          )}
+              </>
+            )}
 
-          {/* Ячейки взаимодействия (только для существ) */}
-          {interactionSlotsComp && interactionSlotsComp.slots.length > 0 && (
-            <details open>
-              <summary style={summaryStyle}>Ячейки взаимодействия (Руки)</summary>
-              <div style={contentStyle}>
-                {interactionSlotsComp.slots.map((slot) => {
-                  const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
-                  return (
-                    <div
-                      key={`slot_${slot.id}`}
-                      style={{
-                        marginBottom: '8px',
-                        padding: '10px',
-                        backgroundColor: '#181818',
-                        borderRadius: '4px',
-                        border: '1px solid #333',
-                      }}
-                    >
-                      <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#3498db' }}>
-                        {slot.id}
-                      </div>
-                      <label
-                        style={{
-                          fontSize: '11px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        Дальность:
-                        <input
-                          type="number"
-                          disabled={isReadOnly}
-                          value={slot.interactDist}
-                          style={{ width: '60px', padding: '2px' }}
-                          onChange={(e) => {
-                            slot.interactDist = Math.max(1, +e.target.value);
-                            requestCommit('Настройка ячейки');
-                            onUpdateStats();
+          {/* Ячейки взаимодействия (Руки) */}
+          {currentArchetype === 'creature'
+            ? renderSection(
+                'slots',
+                'Ячейки взаимодействия (Руки)',
+                <>
+                  {getAggregatedInteractionSlots(world, targetId).length > 0 ? (
+                    getAggregatedInteractionSlots(world, targetId).map((info) => {
+                      const slot = info.slot;
+                      const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
+                      const partMeta = world.getComponent(info.partId, 'meta');
+                      return (
+                        <div
+                          key={`slot_${info.partId}_${slot.id}`}
+                          style={{
+                            marginBottom: '8px',
+                            padding: '10px',
+                            backgroundColor: '#181818',
+                            borderRadius: '4px',
+                            border: '1px solid #333',
                           }}
-                        />
-                      </label>
-                      <label
-                        style={{
-                          fontSize: '11px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          marginTop: '4px',
-                        }}
-                      >
-                        Сила (кг):
-                        <input
-                          type="number"
-                          disabled={isReadOnly}
-                          value={slot.strength}
-                          style={{ width: '60px', padding: '2px' }}
-                          onChange={(e) => {
-                            slot.strength = Math.max(1, +e.target.value);
-                            requestCommit('Настройка ячейки');
-                            onUpdateStats();
-                          }}
-                        />
-                      </label>
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          paddingTop: '8px',
-                          borderTop: '1px solid #2a2a2a',
-                        }}
-                      >
-                        {slotItem ? (
-                          <button
-                            type="button"
-                            className="btn btn-sm"
-                            style={{ width: '100%', backgroundColor: '#2c3e50', color: '#ecf0f1' }}
-                            onClick={() => pushPath(slot.itemId!, slotItem.name)}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              marginBottom: '8px',
+                            }}
                           >
-                            Настроить: {slotItem.name}
-                          </button>
-                        ) : (
-                          <span style={{ color: '#777', fontSize: '12px' }}>Пусто</span>
-                        )}
-                      </div>
+                            <span style={{ fontWeight: 'bold', color: '#3498db' }}>{slot.id}</span>
+                            <span style={{ fontSize: '11px', color: '#888' }}>
+                              ({partMeta?.name || info.partId})
+                            </span>
+                          </div>
+                          <label
+                            style={{
+                              fontSize: '11px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                            }}
+                          >
+                            Дальность:
+                            <input
+                              type="number"
+                              disabled={isReadOnly}
+                              value={slot.interactDist}
+                              style={{ width: '60px', padding: '2px' }}
+                              onChange={(e) => {
+                                if (app) {
+                                  app.updateEntityInteractionSlot(info.partId, {
+                                    interactDist: Math.max(1, +e.target.value),
+                                  });
+                                  requestCommit('Настройка ячейки');
+                                  onUpdateStats();
+                                }
+                              }}
+                            />
+                          </label>
+                          <label
+                            style={{
+                              fontSize: '11px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              marginTop: '4px',
+                            }}
+                          >
+                            Сила (кг):
+                            <input
+                              type="number"
+                              disabled={isReadOnly}
+                              value={slot.strength}
+                              style={{ width: '60px', padding: '2px' }}
+                              onChange={(e) => {
+                                if (app) {
+                                  app.updateEntityInteractionSlot(info.partId, {
+                                    strength: Math.max(1, +e.target.value),
+                                  });
+                                  requestCommit('Настройка ячейки');
+                                  onUpdateStats();
+                                }
+                              }}
+                            />
+                          </label>
+                          <div
+                            style={{
+                              marginTop: '8px',
+                              paddingTop: '8px',
+                              borderTop: '1px solid #2a2a2a',
+                            }}
+                          >
+                            {slotItem ? (
+                              <button
+                                type="button"
+                                className="btn btn-sm"
+                                style={{
+                                  width: '100%',
+                                  backgroundColor: '#2c3e50',
+                                  color: '#ecf0f1',
+                                }}
+                                onClick={() => pushPath(slot.itemId!, slotItem.name)}
+                              >
+                                Настроить: {slotItem.name}
+                              </button>
+                            ) : (
+                              <span style={{ color: '#777', fontSize: '12px' }}>Пусто</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
+                      У существа нет частей тела с руками.
                     </div>
-                  );
-                })}
-              </div>
-            </details>
-          )}
+                  )}
+                </>
+              )
+            : interactionSlotsComp &&
+              renderSection(
+                'slots',
+                'Ячейка взаимодействия (Рука)',
+                <>
+                  {(() => {
+                    const slot = interactionSlotsComp;
+                    const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
+                    return (
+                      <div
+                        key={`slot_${slot.id}`}
+                        style={{
+                          marginBottom: '8px',
+                          padding: '10px',
+                          backgroundColor: '#181818',
+                          borderRadius: '4px',
+                          border: '1px solid #333',
+                        }}
+                      >
+                        <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#3498db' }}>
+                          {slot.id}
+                        </div>
+                        <label
+                          style={{
+                            fontSize: '11px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          Дальность:
+                          <input
+                            type="number"
+                            disabled={isReadOnly}
+                            value={slot.interactDist}
+                            style={{ width: '60px', padding: '2px' }}
+                            onChange={(e) => {
+                              slot.interactDist = Math.max(1, +e.target.value);
+                              requestCommit('Настройка ячейки');
+                              onUpdateStats();
+                            }}
+                          />
+                        </label>
+                        <label
+                          style={{
+                            fontSize: '11px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            marginTop: '4px',
+                          }}
+                        >
+                          Сила (кг):
+                          <input
+                            type="number"
+                            disabled={isReadOnly}
+                            value={slot.strength}
+                            style={{ width: '60px', padding: '2px' }}
+                            onChange={(e) => {
+                              slot.strength = Math.max(1, +e.target.value);
+                              requestCommit('Настройка ячейки');
+                              onUpdateStats();
+                            }}
+                          />
+                        </label>
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            paddingTop: '8px',
+                            borderTop: '1px solid #2a2a2a',
+                          }}
+                        >
+                          {slotItem ? (
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              style={{
+                                width: '100%',
+                                backgroundColor: '#2c3e50',
+                                color: '#ecf0f1',
+                              }}
+                              onClick={() => pushPath(slot.itemId!, slotItem.name)}
+                            >
+                              Настроить: {slotItem.name}
+                            </button>
+                          ) : (
+                            <span style={{ color: '#777', fontSize: '12px' }}>Пусто</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
 
           {/* Области экипировки (на существах ИЛИ предметах) */}
-          <details open>
-            <summary style={summaryStyle}>
-              <span>Области экипировки {equip ? `(${equip.equipmentAreas.length})` : '(0)'}</span>
-              {!isReadOnly && (
+          {renderSection(
+            'equip',
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                width: '100%',
+              }}
+            >
+              <span>
+                Области экипировки{' '}
+                {(() => {
+                  let count = equip?.equipmentAreas?.length ?? 0;
+                  const isCreatureOrAssembly = currentArchetype === 'creature' || hasAssembly;
+                  if (isCreatureOrAssembly && !equip) {
+                    const parts = getAnatomyParts(world, targetId);
+                    count = parts.reduce((acc, pId) => {
+                      return acc + (world.getComponent(pId, 'equip')?.equipmentAreas?.length ?? 0);
+                    }, 0);
+                  }
+                  return `(${count})`;
+                })()}
+              </span>
+              {!isReadOnly && currentArchetype !== 'creature' && (
                 <button
                   type="button"
                   className="btn btn-sm"
@@ -1182,307 +1275,390 @@ export const Inspector: React.FC<InspectorProps> = ({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    let targetEquip = world.getComponent(targetId, 'equip');
-                    if (!targetEquip) {
-                      targetEquip = {
-                        equipmentAreas: [],
-                      };
-                      world.addComponent(targetId, 'equip', targetEquip);
+                    if (app) {
+                      app.addEquipmentArea(targetId);
+                      requestCommit('Добавление области экипировки');
+                      onUpdateStats();
                     }
-                    const areaId = `slot_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-                    targetEquip.equipmentAreas.push({
-                      id: areaId,
-                      name: 'Новый слот',
-                      type: 'belt_slot',
-                      space: 10,
-                      itemIds: [],
-                    });
-                    requestCommit('Добавление области экипировки');
-                    onUpdateStats();
                   }}
                 >
                   + Слот
                 </button>
               )}
-            </summary>
-            <div style={contentStyle}>
-              {equip && equip.equipmentAreas.length > 0 ? (
-                equip.equipmentAreas.map((area, idx) => {
-                  let usedSpace = 0;
-                  for (const id of area.itemIds) {
-                    const item = world.getComponent(id, 'item');
-                    if (item) usedSpace += item.size;
+            </div>,
+            <>
+              {(() => {
+                const isCreatureOrAssembly = currentArchetype === 'creature' || hasAssembly;
+                let displayAreas: { area: any; containerId: string; containerName: string }[] = [];
+                if (equip && equip.equipmentAreas) {
+                  displayAreas = equip.equipmentAreas.map((area) => ({
+                    area,
+                    containerId: targetId,
+                    containerName: draftName,
+                  }));
+                } else if (isCreatureOrAssembly) {
+                  const parts = getAnatomyParts(world, targetId);
+                  for (const pId of parts) {
+                    const pMeta = world.getComponent(pId, 'meta');
+                    const pEquip = world.getComponent(pId, 'equip');
+                    if (pEquip && pEquip.equipmentAreas) {
+                      for (const area of pEquip.equipmentAreas) {
+                        displayAreas.push({
+                          area,
+                          containerId: pId,
+                          containerName: pMeta?.name || pId,
+                        });
+                      }
+                    }
                   }
-                  const isOverloaded = usedSpace > area.space;
+                }
 
-                  return (
-                    <div
-                      key={`area_${area.id || idx}`}
-                      style={{
-                        marginBottom: '8px',
-                        padding: '10px',
-                        backgroundColor: '#181818',
-                        borderRadius: '4px',
-                        border: '1px solid #333',
-                      }}
-                    >
+                return displayAreas.length > 0 ? (
+                  displayAreas.map(({ area, containerId, containerName }, idx) => {
+                    let usedSpace = 0;
+                    for (const id of area.itemIds) {
+                      const item = world.getComponent(id, 'item');
+                      if (item) usedSpace += item.size;
+                    }
+                    const isOverloaded = usedSpace > area.space;
+                    const isFromPart = containerId !== targetId;
+
+                    return (
                       <div
+                        key={`area_${area.id || idx}`}
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
                           marginBottom: '8px',
+                          padding: '10px',
+                          backgroundColor: '#181818',
+                          borderRadius: '4px',
+                          border: '1px solid #333',
                         }}
                       >
-                        <input
-                          disabled={isReadOnly}
-                          type="text"
-                          value={area.name}
+                        <div
                           style={{
-                            width: '45%',
-                            padding: '2px',
-                            fontSize: '12px',
-                            fontWeight: 'bold',
-                            color: '#2ecc71',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            borderBottom: '1px solid #444',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '6px',
                           }}
-                          onChange={(e) => {
-                            area.name = e.target.value;
-                            requestCommit('Имя области');
-                            onUpdateStats();
-                          }}
-                        />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span
-                            style={{ fontSize: '11px', color: isOverloaded ? '#e74c3c' : '#888' }}
-                          >
-                            {usedSpace} /{' '}
-                            <input
-                              disabled={isReadOnly}
-                              type="number"
-                              value={area.space}
-                              style={{
-                                width: '36px',
-                                padding: '0',
-                                background: 'transparent',
-                                color: 'inherit',
-                                border: 'none',
-                                borderBottom: '1px solid #444',
-                              }}
-                              onChange={(e) => {
-                                area.space = Math.max(1, +e.target.value);
-                                requestCommit('Объем области');
+                        >
+                          <input
+                            disabled={isReadOnly}
+                            type="text"
+                            value={area.name}
+                            style={{
+                              width: '45%',
+                              padding: '2px',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              color: '#2ecc71',
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              borderBottom: '1px solid #444',
+                            }}
+                            onChange={(e) => {
+                              if (app) {
+                                app.updateEquipmentArea(containerId, area.id, {
+                                  name: e.target.value,
+                                });
+                                requestCommit('Имя области');
                                 onUpdateStats();
-                              }}
-                            />
-                          </span>
-                          {!isReadOnly && (
+                              }
+                            }}
+                          />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span
+                              style={{ fontSize: '11px', color: isOverloaded ? '#e74c3c' : '#888' }}
+                            >
+                              {usedSpace} /{' '}
+                              <input
+                                disabled={isReadOnly}
+                                type="number"
+                                value={area.space}
+                                style={{
+                                  width: '36px',
+                                  padding: '0',
+                                  background: 'transparent',
+                                  color: 'inherit',
+                                  border: 'none',
+                                  borderBottom: '1px solid #444',
+                                }}
+                                onChange={(e) => {
+                                  if (app) {
+                                    app.updateEquipmentArea(containerId, area.id, {
+                                      space: Math.max(1, +e.target.value),
+                                    });
+                                    requestCommit('Объем области');
+                                    onUpdateStats();
+                                  }
+                                }}
+                              />
+                            </span>
+                            {!isReadOnly && !isFromPart && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (area.itemIds.length > 0) {
+                                    alert(
+                                      'Нельзя удалить область экипировки, пока в ней есть предметы!'
+                                    );
+                                    return;
+                                  }
+                                  if (app) {
+                                    app.removeEquipmentArea(containerId, area.id);
+                                    requestCommit('Удаление области экипировки');
+                                    onUpdateStats();
+                                  }
+                                }}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: '#e74c3c',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  padding: '0 2px',
+                                }}
+                                title="Удалить слот"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {isFromPart && (
+                          <div
+                            style={{
+                              fontSize: '10px',
+                              color: '#3498db',
+                              marginBottom: '6px',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <span>Часть тела: {containerName}</span>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (area.itemIds.length > 0) {
-                                  alert(
-                                    'Нельзя удалить область экипировки, пока в ней есть предметы!'
-                                  );
-                                  return;
-                                }
-                                equip.equipmentAreas.splice(idx, 1);
-                                requestCommit('Удаление области экипировки');
-                                onUpdateStats();
-                              }}
+                              className="btn btn-sm"
                               style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#e74c3c',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                padding: '0 2px',
+                                padding: '1px 5px',
+                                fontSize: '9px',
+                                backgroundColor: '#2c3e50',
+                                color: '#fff',
                               }}
-                              title="Удалить слот"
+                              onClick={() => pushPath(containerId, containerName)}
                             >
-                              ✕
+                              Перейти →
                             </button>
+                          </div>
+                        )}
+
+                        <label
+                          style={{
+                            fontSize: '11px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          Тип слота:
+                          <input
+                            disabled={isReadOnly}
+                            type="text"
+                            value={area.type}
+                            list="area_types_list"
+                            style={{ width: '65%', padding: '2px 4px', fontSize: '11px' }}
+                            onChange={(e) => {
+                              if (app) {
+                                app.updateEquipmentArea(containerId, area.id, {
+                                  type: e.target.value,
+                                });
+                                requestCommit('Тип области');
+                                onUpdateStats();
+                              }
+                            }}
+                          />
+                          <datalist id="area_types_list">
+                            {STANDARD_EQUIPMENT_AREA_TYPES.map((t) => (
+                              <option key={t} value={t}>
+                                {EQUIPMENT_AREA_TYPE_LABELS[t] || t}
+                              </option>
+                            ))}
+                          </datalist>
+                        </label>
+
+                        <div
+                          style={{
+                            marginTop: '8px',
+                            paddingTop: '8px',
+                            borderTop: '1px solid #2a2a2a',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                          }}
+                        >
+                          {area.itemIds.length > 0 ? (
+                            area.itemIds.map((itemId: string) => {
+                              const it = world.getComponent(itemId, 'item');
+                              const itWeight = calculateTotalEntityWeight(world, itemId);
+                              return (
+                                <button
+                                  key={itemId}
+                                  type="button"
+                                  className="btn btn-sm"
+                                  style={{
+                                    width: '100%',
+                                    backgroundColor: '#1e3d29',
+                                    color: '#ecf0f1',
+                                    textAlign: 'left',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                  }}
+                                  onClick={() => pushPath(itemId, it?.name || 'Предмет')}
+                                >
+                                  <span>{it ? it.name : itemId}</span>
+                                  <span style={{ color: '#888' }}>
+                                    V:{it?.size ?? 0} | {itWeight}кг
+                                  </span>
+                                </button>
+                              );
+                            })
+                          ) : (
+                            <span style={{ color: '#777', fontSize: '11px' }}>Слот свободен</span>
                           )}
                         </div>
                       </div>
-
-                      <label
-                        style={{
-                          fontSize: '11px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          gap: '6px',
-                        }}
-                      >
-                        Тип слота:
-                        <input
-                          disabled={isReadOnly}
-                          type="text"
-                          value={area.type}
-                          list="area_types_list"
-                          style={{ width: '65%', padding: '2px 4px', fontSize: '11px' }}
-                          onChange={(e) => {
-                            area.type = e.target.value;
-                            requestCommit('Тип области');
-                            onUpdateStats();
-                          }}
-                        />
-                        <datalist id="area_types_list">
-                          {STANDARD_EQUIPMENT_AREA_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {EQUIPMENT_AREA_TYPE_LABELS[t] || t}
-                            </option>
-                          ))}
-                        </datalist>
-                      </label>
-
-                      <div
-                        style={{
-                          marginTop: '8px',
-                          paddingTop: '8px',
-                          borderTop: '1px solid #2a2a2a',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                        }}
-                      >
-                        {area.itemIds.length > 0 ? (
-                          area.itemIds.map((itemId) => {
-                            const it = world.getComponent(itemId, 'item');
-                            const itWeight = calculateTotalEntityWeight(world, itemId);
-                            return (
-                              <button
-                                key={itemId}
-                                type="button"
-                                className="btn btn-sm"
-                                style={{
-                                  width: '100%',
-                                  backgroundColor: '#1e3d29',
-                                  color: '#ecf0f1',
-                                  textAlign: 'left',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                }}
-                                onClick={() => pushPath(itemId, it?.name || 'Предмет')}
-                              >
-                                <span>{it ? it.name : itemId}</span>
-                                <span style={{ color: '#888' }}>
-                                  V:{it?.size ?? 0} | {itWeight}кг
-                                </span>
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <span style={{ color: '#777', fontSize: '11px' }}>Слот свободен</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
-                  Нет областей экипировки. Нажмите "+ Слот", чтобы добавить.
-                </div>
-              )}
-            </div>
-          </details>
+                    );
+                  })
+                ) : (
+                  <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
+                    {isCreatureOrAssembly
+                      ? 'У данного существа пока нет частей тела со слотами экипировки.'
+                      : 'Нет областей экипировки. Нажмите "+ Слот", чтобы добавить.'}
+                  </div>
+                );
+              })()}
+            </>
+          )}
 
           {/* Инвентарь (Сетка хранения) */}
-          <details open>
-            <summary style={summaryStyle}>
-              <span>Сетка инвентаря</span>
-              {currentArchetype === 'item' && !isReadOnly && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{
-                    backgroundColor: inv ? '#c0392b' : '#27ae60',
-                    color: '#fff',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (inv) {
-                      if (isBagEmpty) {
-                        world.removeComponent(targetId, 'inventory');
-                        requestCommit('Удаление инвентаря');
-                        onUpdateStats();
+          {(() => {
+            let activeInv = inv;
+            let bagName = '';
+            if (!activeInv && currentArchetype === 'creature') {
+              const equipped = getAllEquippedDescendants(world, targetId);
+              for (const eqId of equipped) {
+                const eqInv = world.getComponent(eqId, 'inventory');
+                if (eqInv) {
+                  activeInv = eqInv;
+                  bagName = world.getComponent(eqId, 'item')?.name || 'Сумка';
+                  break;
+                }
+              }
+            }
+
+            return renderSection(
+              'inventory',
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  width: '100%',
+                }}
+              >
+                <span>Сетка инвентаря {bagName ? `(${bagName})` : ''}</span>
+                {currentArchetype === 'item' && !isReadOnly && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{
+                      backgroundColor: inv ? '#c0392b' : '#27ae60',
+                      color: '#fff',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (inv) {
+                        if (isBagEmpty) {
+                          if (app) {
+                            app.setEntityInventoryGrid(targetId, false);
+                            requestCommit('Удаление инвентаря');
+                            onUpdateStats();
+                          }
+                        } else {
+                          alert('Нельзя удалить инвентарь, пока в нем есть предметы!');
+                        }
                       } else {
-                        alert('Нельзя удалить инвентарь, пока в нем есть предметы!');
+                        if (app) {
+                          app.setEntityInventoryGrid(targetId, true);
+                          requestCommit('Добавление инвентаря');
+                          onUpdateStats();
+                        }
                       }
-                    } else {
-                      world.addComponent(targetId, 'inventory', {
-                        size: { width: 4, height: 2 },
-                        slots: Array.from({ length: 2 }, () =>
-                          Array.from({ length: 4 }, () => ({ itemId: null, count: 0 }))
-                        ),
-                      });
-                      requestCommit('Добавление инвентаря');
-                      onUpdateStats();
-                    }
-                  }}
-                >
-                  {inv ? 'Удалить сетку' : '+ Добавить сетку'}
-                </button>
-              )}
-            </summary>
-            <div style={contentStyle}>
-              {inv ? (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${inv.size.width}, 36px)`,
-                    gap: '4px',
-                    justifyContent: 'center',
-                    backgroundColor: '#111',
-                    padding: '8px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  {inv.slots.map((row, rIdx) =>
-                    row.map((cell, cIdx) => {
-                      const it = cell.itemId ? world.getComponent(cell.itemId, 'item') : null;
-                      return (
-                        <div
-                          key={`${rIdx}_${cIdx}`}
-                          onClick={() => {
-                            if (cell.itemId) pushPath(cell.itemId, it?.name || 'Предмет');
-                          }}
-                          title={it ? `${it.name} (${it.type})` : 'Пустая ячейка'}
-                          style={{
-                            width: '36px',
-                            height: '36px',
-                            backgroundColor: it ? '#2980b9' : '#222',
-                            border: '1px solid #444',
-                            borderRadius: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: cell.itemId ? 'pointer' : 'default',
-                            fontSize: '10px',
-                            color: '#fff',
-                            textAlign: 'center',
-                            padding: '2px',
-                            overflow: 'hidden',
-                          }}
-                        >
-                          {it ? it.name.substring(0, 4) : ''}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              ) : (
-                <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
-                  Инвентарь отсутствует.
-                </div>
-              )}
-            </div>
-          </details>
+                    }}
+                  >
+                    {inv ? 'Удалить сетку' : '+ Добавить сетку'}
+                  </button>
+                )}
+              </div>,
+              <>
+                {activeInv ? (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: `repeat(${activeInv.size.width}, 36px)`,
+                      gap: '4px',
+                      justifyContent: 'center',
+                      backgroundColor: '#111',
+                      padding: '8px',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    {activeInv.slots.map((row, rIdx) =>
+                      row.map((cell, cIdx) => {
+                        const it = cell.itemId ? world.getComponent(cell.itemId, 'item') : null;
+                        return (
+                          <div
+                            key={`${rIdx}_${cIdx}`}
+                            onClick={() => {
+                              if (cell.itemId) pushPath(cell.itemId, it?.name || 'Предмет');
+                            }}
+                            title={it ? `${it.name} (${it.type})` : 'Пустая ячейка'}
+                            style={{
+                              width: '36px',
+                              height: '36px',
+                              backgroundColor: it ? '#2980b9' : '#222',
+                              border: '1px solid #444',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: cell.itemId ? 'pointer' : 'default',
+                              fontSize: '10px',
+                              color: '#fff',
+                              textAlign: 'center',
+                              padding: '2px',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {it ? it.name.substring(0, 4) : ''}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
+                    Инвентарь отсутствует. Наденьте сумку на туловище.
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </form>
 
         {/* Кнопка удаления для корневой сущности инспектора */}
