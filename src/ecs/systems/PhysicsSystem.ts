@@ -107,6 +107,29 @@ export class PhysicsSystem {
     return hitIds;
   }
 
+  /**
+   * Пространственный запрос тел внутри произвольного полигона за O(log N).
+   */
+  public queryEntitiesInPolygon(points: Point[]): EntityId[] {
+    const poly = new Polygon({ x: 0, y: 0 }, points);
+    this.system.insert(poly);
+
+    const hitIds: EntityId[] = [];
+    const seen = new Set<EntityId>();
+
+    this.system.checkOne(poly, (response) => {
+      const other = response.b === poly ? response.a : response.b;
+      const id = this.bodyToEntityMap.get(other);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        hitIds.push(id);
+      }
+    });
+
+    this.system.remove(poly);
+    return hitIds;
+  }
+
   public registerBody(entityId: EntityId, body: Body): void {
     this.bodyToEntityMap.set(body, entityId);
     this.system.insert(body);
@@ -324,6 +347,72 @@ export class PhysicsSystem {
       const id1 = this.bodyToEntityMap.get(c1);
       const id2 = this.bodyToEntityMap.get(c2);
       if (!id1 || !id2) return;
+
+      // --- Слияние стакующихся предметов на земле ---
+      const tag1 = world.getComponent(id1, 'tag');
+      const tag2 = world.getComponent(id2, 'tag');
+      if (tag1?.archetype === 'item' && tag2?.archetype === 'item') {
+        const item1 = world.getComponent(id1, 'item');
+        const item2 = world.getComponent(id2, 'item');
+
+        if (
+          item1 &&
+          item2 &&
+          item1.name === item2.name &&
+          item1.maxStack > 1 &&
+          item2.maxStack > 1 &&
+          !world.getComponent(id1, 'ownership') &&
+          !world.getComponent(id2, 'ownership')
+        ) {
+          const isTargeted =
+            world
+              .getEntitiesWith('interactionAction')
+              .some(
+                ([_, { interactionAction }]) =>
+                  interactionAction.targetId === id1 || interactionAction.targetId === id2
+              ) ||
+            world
+              .getEntitiesWith('pickupIntent')
+              .some(
+                ([_, { pickupIntent }]) =>
+                  pickupIntent.targetItemId === id1 || pickupIntent.targetItemId === id2
+              );
+
+          if (!isTargeted) {
+            let receiver = item1;
+            let giver = item2;
+            let giverId = id2;
+            let giverBody = c2 as Body;
+
+            const count1 = item1.count ?? 1;
+            const count2 = item2.count ?? 1;
+            item1.count = count1;
+            item2.count = count2;
+
+            if (receiver.count! >= receiver.maxStack) {
+              receiver = item2;
+              giver = item1;
+              giverId = id1;
+              giverBody = c1 as Body;
+            }
+
+            const space = receiver.maxStack - (receiver.count ?? 1);
+            const giverCount = giver.count ?? 1;
+            if (space > 0 && giverCount > 0 && receiver !== giver) {
+              const transfer = Math.min(space, giverCount);
+              receiver.count = (receiver.count ?? 1) + transfer;
+              giver.count = giverCount - transfer;
+
+              if (giver.count <= 0) {
+                this.unregisterBody(giverBody);
+                world.removeEntity(giverId);
+                return;
+              }
+            }
+          }
+        }
+      }
+      // --- Конец слияния ---
 
       const p1 = world.getComponent(id1, 'physicsBody');
       const p2 = world.getComponent(id2, 'physicsBody');

@@ -106,13 +106,24 @@ export class Camera {
     const newScale = Math.min(this.maxScale, Math.max(this.minScale, this.scale * factor));
     const rect = canvas.getBoundingClientRect();
     const screen = { x: clientX - rect.left, y: clientY - rect.top };
-    const world = {
-      x: (screen.x - this.offsetX) / this.scale,
-      y: (screen.y - this.offsetY) / this.scale,
-    };
+
+    // 1. Узнаем точные мировые координаты точки под курсором ДО изменения масштаба
+    const worldPoint = this.getCanvasPoint(clientX, clientY, canvas);
+
+    // 2. Применяем новый масштаб
     this.scale = newScale;
-    this.offsetX = screen.x - world.x * newScale;
-    this.offsetY = screen.y - world.y * newScale;
+
+    // 3. Вычисляем новые offsetX/offsetY так, чтобы точка осталась ровно под курсором с учетом yaw
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const dx = screen.x - cx;
+    const dy = screen.y - cy;
+
+    const unRotX = dx * Math.cos(-this.yaw) - dy * Math.sin(-this.yaw);
+    const unRotY = dx * Math.sin(-this.yaw) + dy * Math.cos(-this.yaw);
+
+    this.offsetX = unRotX + cx - worldPoint.x * this.scale;
+    this.offsetY = unRotY + cy - worldPoint.y * this.scale;
   }
 
   public getCanvasPoint(clientX: number, clientY: number, canvas: HTMLCanvasElement): Point {

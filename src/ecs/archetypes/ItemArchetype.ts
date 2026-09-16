@@ -5,6 +5,7 @@ import { AISystem } from '../systems/AISystem';
 import {
   EntityId,
   EntityConfig,
+  ItemData,
   CollisionCategory,
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
@@ -23,14 +24,15 @@ export function assembleItem(
   config: EntityConfig,
   position?: Point
 ): void {
-  const itemData = config.item ?? {
-    name: 'Предмет',
-    type: 'weapon',
-    maxStack: 1,
-    size: 10,
-    equipTypes: [],
-    equippable: false,
-    equipTimeMultiplier: 1.0,
+  const itemData: ItemData = {
+    name: config.item?.name ?? 'Предмет',
+    type: config.item?.type ?? 'weapon',
+    maxStack: config.item?.maxStack ?? 1,
+    count: config.item?.count ?? 1,
+    size: config.item?.size ?? 10,
+    equipTypes: config.item?.equipTypes ?? [],
+    equippable: config.item?.equippable ?? false,
+    equipTimeMultiplier: config.item?.equipTimeMultiplier ?? 1.0,
   };
   const radius = config.physics?.radius ?? 16;
   const weight = config.physics?.weight ?? 1;

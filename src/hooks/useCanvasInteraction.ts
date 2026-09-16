@@ -141,7 +141,8 @@ export const useCanvasInteraction = ({
       // 3. Клик по пустому месту — начинаем рамку выделения
       clickedEntityIdRef.current = null;
       isMarqueeActiveRef.current = true;
-      app.startMarquee(point);
+      const rect = containerRef.current!.getBoundingClientRect();
+      app.startMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     }
   };
 
@@ -181,7 +182,8 @@ export const useCanvasInteraction = ({
 
     // Обновление рамки выделения
     if (isMarqueeActiveRef.current && (e.buttons & 1) === 1) {
-      app.updateMarquee(point);
+      const rect = containerRef.current!.getBoundingClientRect();
+      app.updateMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       e.currentTarget.style.cursor = 'crosshair';
       return;
     }

@@ -279,6 +279,7 @@ export class AnatomySystem {
         name: 'Часть тела',
         type: 'bodyPart',
         maxStack: 1,
+        count: 1,
         size: maxSize,
         equipTypes: [],
         equippable: false,

@@ -307,17 +307,20 @@ export interface FunctionalHealthComponent {
   isFunctional: boolean;
 }
 
-export type ItemType = 'weapon' | 'armor' | 'bag' | 'bodyPart';
+export type ItemType = 'weapon' | 'armor' | 'bag' | 'bodyPart' | 'resource' | 'consumable' | 'ammo';
 
 export interface ItemData {
   name: string;
   type: ItemType;
   maxStack: number;
+  count: number;
   size: number;
   equipTypes: string[];
   equippable: boolean;
   equipTimeMultiplier: number;
 }
+
+export type ItemConfig = Omit<ItemData, 'count'> & { count?: number };
 
 export interface InventorySlot {
   itemId: EntityId | null;
@@ -769,7 +772,7 @@ export interface EntityConfig {
   movement?: MovementConfig;
   stealth?: StealthConfig;
   ai?: AIConfig;
-  item?: ItemData;
+  item?: ItemConfig;
   inventory?: InventorySetup;
   equip?: EquipmentComponent;
   interactionSlots?: InteractionSlotsComponent;

@@ -1904,17 +1904,26 @@ export const Inspector: React.FC<InspectorProps> = ({
                               border: '1px solid #444',
                               borderRadius: '4px',
                               display: 'flex',
+                              flexDirection: 'column',
                               alignItems: 'center',
                               justifyContent: 'center',
                               cursor: cell.itemId ? 'pointer' : 'default',
-                              fontSize: '10px',
+                              fontSize: '9px',
                               color: '#fff',
                               textAlign: 'center',
                               padding: '2px',
                               overflow: 'hidden',
+                              position: 'relative',
                             }}
                           >
-                            {it ? it.name.substring(0, 4) : ''}
+                            <span>{it ? it.name.substring(0, 4) : ''}</span>
+                            {it && it.count > 1 && (
+                              <span
+                                style={{ fontSize: '8px', color: '#f1c40f', fontWeight: 'bold' }}
+                              >
+                                x{it.count}
+                              </span>
+                            )}
                           </div>
                         );
                       })

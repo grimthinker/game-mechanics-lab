@@ -329,6 +329,7 @@ export class EntityFactory {
           name: 'Сумка',
           type: 'bag',
           maxStack: 1,
+          count: 1,
           size: 10,
           equipTypes: ['torso'],
           equippable: true,

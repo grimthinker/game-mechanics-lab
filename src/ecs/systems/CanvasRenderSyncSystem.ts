@@ -93,6 +93,7 @@ export class CanvasRenderSyncSystem {
 
       // 2.5 Синхронизация предметов (включая оторванные связки частей тел)
       if (archetype === 'item') {
+        const item = world.getComponent(id, 'item');
         const physStats = world.getComponent(id, 'physicsStats');
         if (physStats && renderable.isVisible) {
           const radius = physStats.radius.current;
@@ -106,6 +107,28 @@ export class CanvasRenderSyncSystem {
             if (tag?.subType === 'bodyPart') {
               rectPrim.fill = '#e67e22';
             }
+          }
+
+          // Отображение количества предметов в стаке на земле
+          if (item && item.count > 1) {
+            if (renderable.primitives.length === 1) {
+              renderable.primitives.push({
+                kind: 'text',
+                text: `${item.count}`,
+                font: 'bold 10px sans-serif',
+                fill: '#ffffff',
+                ignoreRotation: true,
+                align: 'center',
+                baseline: 'middle',
+              });
+            } else if (renderable.primitives[1]?.kind === 'text') {
+              renderable.primitives[1].text = `${item.count}`;
+            }
+          } else if (
+            renderable.primitives.length > 1 &&
+            renderable.primitives[1]?.kind === 'text'
+          ) {
+            renderable.primitives.splice(1, 1);
           }
         }
       }

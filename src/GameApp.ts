@@ -683,6 +683,7 @@ export class GameApp {
           name: 'Аура разрушения',
           type: 'weapon',
           maxStack: 1,
+          count: 1,
           size: 10,
           equipTypes: [],
           equippable: false,
@@ -714,6 +715,7 @@ export class GameApp {
           name: 'Шрапнельный дробовик',
           type: 'weapon',
           maxStack: 1,
+          count: 1,
           size: 10,
           equipTypes: [],
           equippable: false,
@@ -747,6 +749,7 @@ export class GameApp {
           name: 'Копьё пронзания',
           type: 'weapon',
           maxStack: 1,
+          count: 1,
           size: 10,
           equipTypes: [],
           equippable: false,
@@ -778,6 +781,7 @@ export class GameApp {
           name: 'Тяжёлый нагрудник',
           type: 'armor',
           maxStack: 1,
+          count: 1,
           size: 20,
           equipTypes: ['torso'],
           equippable: true,
@@ -800,6 +804,7 @@ export class GameApp {
           name: 'Стальной шлем',
           type: 'armor',
           maxStack: 1,
+          count: 1,
           size: 10,
           equipTypes: ['head'],
           equippable: true,
@@ -812,6 +817,81 @@ export class GameApp {
         },
       },
       { x: itemsX, y: spawnPos.y + 100 }
+    );
+
+    // 6. Тестовые стакующиеся предметы: Золотые монеты (maxStack: 50)
+    // Расположены вплотную, при включении симуляции они соприкоснутся и сольются в стак из 35 шт.
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'resource' },
+        item: {
+          name: 'Золотые монеты',
+          type: 'resource',
+          maxStack: 50,
+          count: 15,
+          size: 2,
+          equipTypes: [],
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 12, weight: 0.05, isSolid: true },
+      },
+      { x: itemsX + 50, y: spawnPos.y - 60 }
+    );
+
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'resource' },
+        item: {
+          name: 'Золотые монеты',
+          type: 'resource',
+          maxStack: 50,
+          count: 20,
+          size: 2,
+          equipTypes: [],
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 12, weight: 0.05, isSolid: true },
+      },
+      { x: itemsX + 50, y: spawnPos.y - 42 }
+    );
+
+    // 7. Тестовые стакующиеся предметы: Патроны 9mm (maxStack: 30)
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'ammo' },
+        item: {
+          name: 'Патроны 9mm',
+          type: 'ammo',
+          maxStack: 30,
+          count: 12,
+          size: 2,
+          equipTypes: [],
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 12, weight: 0.02, isSolid: true },
+      },
+      { x: itemsX + 50, y: spawnPos.y + 20 }
+    );
+
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'ammo' },
+        item: {
+          name: 'Патроны 9mm',
+          type: 'ammo',
+          maxStack: 30,
+          count: 15,
+          size: 2,
+          equipTypes: [],
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 12, weight: 0.02, isSolid: true },
+      },
+      { x: itemsX + 50, y: spawnPos.y + 38 }
     );
   }
 
@@ -1053,18 +1133,28 @@ export class GameApp {
     const current = this.marqueeBox.current;
     this.marqueeBox = null;
 
-    const minX = Math.min(start.x, current.x);
-    const maxX = Math.max(start.x, current.x);
-    const minY = Math.min(start.y, current.y);
-    const maxY = Math.max(start.y, current.y);
-
-    // Если клик без растягивания (< порога) — клик по пустому месту сбрасывает выбор
-    if (Math.hypot(maxX - minX, maxY - minY) < EDITOR_CONFIG.marqueeThresholdPx) {
+    // Если клик без растягивания (меньше порога в экранных пикселях) — сбрасываем выбор
+    if (Math.hypot(current.x - start.x, current.y - start.y) < EDITOR_CONFIG.marqueeThresholdPx) {
       this.selectEntity(null, true);
       return [];
     }
 
-    const rawIds = this.physics.queryEntitiesInBox(minX, minY, maxX, maxY);
+    const canvasRect = this.canvas.getBoundingClientRect();
+
+    // Получаем 4 угла экранной рамки
+    const startX = start.x + canvasRect.left;
+    const startY = start.y + canvasRect.top;
+    const currentX = current.x + canvasRect.left;
+    const currentY = current.y + canvasRect.top;
+
+    // Переводим их в мировые координаты (получаем полигон с учетом вращения/зума)
+    const p1 = this.getCanvasPoint(startX, startY);
+    const p2 = this.getCanvasPoint(currentX, startY);
+    const p3 = this.getCanvasPoint(currentX, currentY);
+    const p4 = this.getCanvasPoint(startX, currentY);
+
+    // Запрашиваем сущности внутри этого ориентированного полигона
+    const rawIds = this.physics.queryEntitiesInPolygon([p1, p2, p3, p4]);
     const filteredIds: string[] = [];
 
     for (const id of rawIds) {
@@ -1118,9 +1208,16 @@ export class GameApp {
       hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
     }
 
-    if (hits.length === 0) return null;
-    hits.sort((a, b) => b.zIndex - a.zIndex);
-    return hits[0].id;
+    if (hits.length > 0) {
+      hits.sort((a, b) => b.zIndex - a.zIndex);
+      return hits[0].id;
+    }
+
+    if (isEditor) {
+      return this.pickNearestEntity(worldPoint);
+    }
+
+    return null;
   }
 
   public setMouseScreenPos(clientX: number | null, clientY: number | null): void {

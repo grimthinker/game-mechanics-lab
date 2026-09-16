@@ -78,13 +78,18 @@ export class CanvasRenderer implements IRenderer {
       selectedIds,
       hoveredId,
       gameMode,
-      marqueeBox,
+      null, // Рамка передается отдельно, рендерится ниже вне матрицы трансформаций
       showUIOverlays,
       gizmo,
       showAIDebug
     );
 
     this.ctx.restore();
+
+    // Отрисовка рамки выделения в экранных координатах (вне матрицы вращения мира)
+    if (marqueeBox) {
+      this.renderScreenMarqueeBox(marqueeBox);
+    }
   }
 
   private renderGrid(camera: Camera): void {
@@ -164,11 +169,6 @@ export class CanvasRenderer implements IRenderer {
 
     // Отрисовка эффектов взаимодействия
     this.renderPickupInteractions(world, camera);
-
-    // Отрисовка рамки выделения (Marquee Selection Box)
-    if (marqueeBox) {
-      this.renderMarqueeBox(camera, marqueeBox);
-    }
 
     // Отрисовка Healthbars и ID-текстов
     if (showUIOverlays) {
@@ -308,7 +308,7 @@ export class CanvasRenderer implements IRenderer {
     this.ctx.restore();
   }
 
-  private renderMarqueeBox(camera: Camera, box: { start: Point; current: Point }): void {
+  private renderScreenMarqueeBox(box: { start: Point; current: Point }): void {
     const minX = Math.min(box.start.x, box.current.x);
     const minY = Math.min(box.start.y, box.current.y);
     const width = Math.abs(box.current.x - box.start.x);
@@ -317,8 +317,8 @@ export class CanvasRenderer implements IRenderer {
     this.ctx.save();
     this.ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
     this.ctx.strokeStyle = 'rgba(52, 152, 219, 0.85)';
-    this.ctx.lineWidth = 1.5 / camera.scale;
-    this.ctx.setLineDash([5 / camera.scale, 3 / camera.scale]);
+    this.ctx.lineWidth = 1.5;
+    this.ctx.setLineDash([5, 3]);
     this.ctx.fillRect(minX, minY, width, height);
     this.ctx.strokeRect(minX, minY, width, height);
     this.ctx.restore();
@@ -750,11 +750,11 @@ export class CanvasRenderer implements IRenderer {
       this.ctx.shadowBlur = VISUAL_CONFIG.itemTooltip.shadowBlur;
       this.ctx.shadowOffsetX = 1;
       this.ctx.shadowOffsetY = 1;
-      this.ctx.fillText(
-        hoverComp.item.name,
-        0,
-        -radius - VISUAL_CONFIG.itemTooltip.offsetY / camera.scale
-      );
+      const displayName =
+        hoverComp.item.count > 1
+          ? `${hoverComp.item.name} (${hoverComp.item.count})`
+          : hoverComp.item.name;
+      this.ctx.fillText(displayName, 0, -radius - VISUAL_CONFIG.itemTooltip.offsetY / camera.scale);
       this.ctx.restore();
     }
   }

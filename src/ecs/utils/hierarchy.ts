@@ -251,7 +251,9 @@ export function calculateTotalEntityWeight(
   visited.add(entityId);
 
   const physStats: PhysicsStatsComponent | undefined = world.getComponent(entityId, 'physicsStats');
-  let total = physStats?.weight.current ?? 1;
+  const item = world.getComponent(entityId, 'item');
+  const countMultiplier = item?.count && item.count > 0 ? item.count : 1;
+  let total = (physStats?.weight.current ?? 1) * countMultiplier;
 
   const slot = world.getComponent(entityId, 'interactionSlots');
   if (slot && slot.itemId) {
