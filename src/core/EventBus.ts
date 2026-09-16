@@ -9,6 +9,7 @@ export interface EventMap {
   'bt:updated': {
     btData: BTNodeDTO | null;
     btBlackboard: Record<string, any> | null;
+    btSchema: Record<string, any> | null;
   };
   'game:playerDied': void;
 }

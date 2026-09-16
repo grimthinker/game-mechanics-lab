@@ -98,6 +98,11 @@ export const en = {
     noBt: 'Selected entity has no behavior tree',
     blackboardTitle: '🧠 Agent Memory (Blackboard)',
     blackboardEmpty: 'Memory is empty',
+    blackboardKey: 'Key',
+    blackboardVal: 'Value',
+    blackboardPick: 'Pick on map (crosshair)',
+    blackboardPickingPrompt: 'Click an entity on map for key "{key}"',
+    blackboardNone: '[None / null]',
   },
   palette: {
     subtitle: 'Select a preset and click on the map to place:',

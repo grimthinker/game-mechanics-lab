@@ -201,10 +201,28 @@ export class BTServicePathUpdater extends BTService {
   }
 }
 
+import { NodeBBSchema } from './schema';
+
 export class BTServiceSyncStats extends BTService {
   public static readonly nodeName = 'Синхронизация параметров';
   public static readonly description =
     'Регулярно переносит актуальные боевые и поведенческие характеристики из ECS-компонентов в blackboard существа';
+  public static readonly bbSchema: NodeBBSchema = {
+    writes: {
+      health: { type: 'number', isSystem: true, description: 'Текущее здоровье' },
+      maxHealth: { type: 'number', isSystem: true, description: 'Макс. здоровье' },
+      pos: { type: 'point', isSystem: true, description: 'Координаты' },
+      detectDist: { type: 'number', description: 'Радиус обнаружения' },
+      loseTargetDist: { type: 'number', description: 'Дистанция потери цели' },
+      followStopDist: { type: 'number', description: 'Остановка до цели' },
+      followUpDist: { type: 'number', description: 'Старт преследования' },
+      visionFovAngle: { type: 'number', description: 'Угол обзора' },
+      visionClarity: { type: 'number', description: 'Четкость зрения' },
+      visionMaxDist: { type: 'number', description: 'Дальность зрения' },
+      hearingSensitivity: { type: 'number', description: 'Слух' },
+      hearingMaxDist: { type: 'number', description: 'Дальность слуха' },
+    },
+  };
 
   public static readonly defaultParams = {
     ...BTService.defaultParams,

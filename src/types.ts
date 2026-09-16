@@ -5,5 +5,10 @@ export interface Point {
   y: number;
 }
 
+export interface BlackboardPickingState {
+  entityId: string;
+  key: string;
+}
+
 export type PlacementMode =
   { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; behavior: string; name: string };

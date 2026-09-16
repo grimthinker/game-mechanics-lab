@@ -15,6 +15,7 @@ interface GlobalShortcutsProps {
   onSetGizmoTool?: (tool: GizmoTool) => void;
   onCancelGizmo?: () => boolean;
   onClosePieMenu?: () => boolean;
+  onCancelPicker?: () => boolean;
 }
 
 export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
@@ -47,10 +48,15 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         onSetGizmoTool,
         onCancelGizmo,
         onClosePieMenu,
+        onCancelPicker,
       } = propsRef.current;
 
-      // Закрытие радиального меню, отмена манипулятора или выход из игры по Escape
+      // Закрытие радиального меню, отмена манипулятора, пикера или выход из игры по Escape
       if (e.key === 'Escape' || e.code === 'Escape') {
+        if (mode === GameMode.EDITOR && onCancelPicker && onCancelPicker()) {
+          e.preventDefault();
+          return;
+        }
         if (mode === GameMode.EDITOR && onClosePieMenu && onClosePieMenu()) {
           e.preventDefault();
           return;

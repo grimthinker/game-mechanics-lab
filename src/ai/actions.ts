@@ -4,9 +4,18 @@ import { vec2_distance_to, Radians } from '../utils';
 import { LOGIC_CONFIG } from './config';
 import { NodeStatus, BTAction, PathKeys, BTSimpleAction } from './core';
 
+import { NodeBBSchema } from './schema';
+
 export class BTConditionValidTarget extends BTSimpleAction {
   public static readonly nodeName = 'Проверка валидности цели';
   public static readonly description = 'Проверяет, что цель валидна';
+  public static readonly bbSchema: NodeBBSchema = {
+    reads: { targetId: { type: 'entityId', description: 'Идентификатор цели' } },
+    writes: {
+      targetId: { type: 'entityId', description: 'Сброс цели при потере' },
+      isEngaged: { type: 'boolean', description: 'Сброс состояния боя' },
+    },
+  };
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
@@ -60,6 +69,12 @@ export class BTActionPursue extends BTAction {
   private readonly stopDistSq: number = LOGIC_CONFIG.followStopDist ** 2;
   public static readonly nodeName = 'Преследовать цель';
   public static readonly description = 'Преследовать цель, если она есть и есть путь currentPath';
+  public static readonly bbSchema: NodeBBSchema = {
+    reads: {
+      targetId: { type: 'entityId' },
+      currentPath: { type: 'path' },
+    },
+  };
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;

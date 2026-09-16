@@ -14,7 +14,7 @@ import { HotkeysModal } from './components/HotkeysModal';
 import { GameHUD } from './components/GameHUD';
 import { CanvasHUD } from './components/CanvasHUD';
 import { MultiSelectionDrawer } from './components/MultiSelectionDrawer';
-import { PlacementMode } from './types';
+import { PlacementMode, BlackboardPickingState } from './types';
 import { GameMode } from './config/gameConfig';
 import { GizmoTool } from './gizmos/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
@@ -31,6 +31,7 @@ export const App: React.FC = () => {
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
+  const [isEngineReady, setIsEngineReady] = useState<boolean>(false);
   const [snapshot, setSnapshot] = useState<any>(null);
   const snapshotRef = useRef<any>(null);
   snapshotRef.current = snapshot;
@@ -86,10 +87,12 @@ export const App: React.FC = () => {
   });
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
+  const [bbPicking, setBbPicking] = useState<BlackboardPickingState | null>(null);
   const [globalTimeScale, setGlobalTimeScale] = useState<number>(1.0);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
+  const [btSchema, setBtSchema] = useState<Record<string, any> | null>(null);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
 
   // Синхронизация реального размера Canvas с Flex-контейнером
@@ -126,10 +129,14 @@ export const App: React.FC = () => {
       }
     );
 
-    const unsubBT = EventBus.on('bt:updated', ({ btData: data, btBlackboard: bb }) => {
-      setBtData(data);
-      setBtBlackboard(bb);
-    });
+    const unsubBT = EventBus.on(
+      'bt:updated',
+      ({ btData: data, btBlackboard: bb, btSchema: schema }) => {
+        setBtData(data);
+        setBtBlackboard(bb);
+        setBtSchema(schema);
+      }
+    );
 
     const unsubPlayerDied = EventBus.on('game:playerDied', () => {
       applyGameMode(GameMode.SIMULATION);
@@ -174,6 +181,8 @@ export const App: React.FC = () => {
     typeFilters,
     onOpenPieMenu: setPieMenuState,
     onClosePieMenu: closePieMenu,
+    bbPicking,
+    setBbPicking,
   });
 
   const handleResetCamera = useCallback(() => {
@@ -237,6 +246,7 @@ export const App: React.FC = () => {
 
     app.selection.emitSelectionChanged();
     app.updateBTData(true);
+    setIsEngineReady(true);
 
     return () => {
       app.destroy();
@@ -409,6 +419,22 @@ export const App: React.FC = () => {
     app.updateBTData(true);
   }, []);
 
+  const handleStartBBPicking = useCallback(
+    (key: string) => {
+      if (!selectedEntityId) return;
+      setBbPicking({ entityId: selectedEntityId, key });
+    },
+    [selectedEntityId]
+  );
+
+  const handleCancelPicker = useCallback(() => {
+    if (bbPicking) {
+      setBbPicking(null);
+      return true;
+    }
+    return false;
+  }, [bbPicking]);
+
   useGlobalShortcuts({
     mode,
     isPaused,
@@ -421,6 +447,7 @@ export const App: React.FC = () => {
     onSetGizmoTool: applyGizmoTool,
     onCancelGizmo: handleCancelGizmo,
     onClosePieMenu: handleClosePieMenuViaShortcut,
+    onCancelPicker: handleCancelPicker,
   });
 
   return (
@@ -504,6 +531,7 @@ export const App: React.FC = () => {
         {/* Левый док (Иерархия, Палитра, BT) */}
         {mode !== GameMode.GAME && (
           <LeftDock
+            app={appRef.current}
             world={appRef.current?.world}
             selectedEntityId={selectedEntityId}
             onSelectEntity={(id) => {
@@ -516,8 +544,11 @@ export const App: React.FC = () => {
             }
             btData={btData}
             btBlackboard={btBlackboard}
+            btSchema={btSchema}
             activeTab={leftDockTab}
             onTabChange={setLeftDockTab}
+            onStartPicking={handleStartBBPicking}
+            pickingKey={bbPicking?.key ?? null}
           />
         )}
 
@@ -602,6 +633,42 @@ export const App: React.FC = () => {
                 className="btn btn-sm"
                 style={{ backgroundColor: '#c0392b' }}
                 onClick={() => setPlacementMode(null)}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          )}
+
+          {/* Плашка режима выбора сущности для Blackboard */}
+          {bbPicking && (
+            <div
+              onMouseDown={(e) => e.stopPropagation()}
+              onMouseMove={(e) => e.stopPropagation()}
+              onMouseUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                top: 20,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(142, 68, 173, 0.95)',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                display: 'flex',
+                gap: '15px',
+                alignItems: 'center',
+                zIndex: 50,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                color: '#fff',
+                fontSize: '12px',
+              }}
+            >
+              <span>🎯 {t('dock.blackboardPickingPrompt', { key: bbPicking.key })}</span>
+              <button
+                className="btn btn-sm"
+                style={{ backgroundColor: '#c0392b', color: '#fff' }}
+                onClick={() => setBbPicking(null)}
               >
                 {t('common.cancel')}
               </button>

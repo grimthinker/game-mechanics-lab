@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { GameApp } from '../GameApp';
 import { GameMode } from '../config/gameConfig';
-import { PlacementMode, Point } from '../types';
+import { PlacementMode, Point, BlackboardPickingState } from '../types';
 import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 
@@ -23,6 +23,8 @@ interface UseCanvasInteractionProps {
   typeFilters: Record<string, boolean>;
   onOpenPieMenu?: (menuState: PieMenuState) => void;
   onClosePieMenu?: () => void;
+  bbPicking?: BlackboardPickingState | null;
+  setBbPicking?: Dispatch<SetStateAction<BlackboardPickingState | null>>;
 }
 
 export const useCanvasInteraction = ({
@@ -35,6 +37,8 @@ export const useCanvasInteraction = ({
   typeFilters,
   onOpenPieMenu,
   onClosePieMenu,
+  bbPicking,
+  setBbPicking,
 }: UseCanvasInteractionProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -46,7 +50,7 @@ export const useCanvasInteraction = ({
     const container = containerRef.current;
     if (!container) return;
 
-    container.style.cursor = placementMode ? 'pointer' : 'default';
+    container.style.cursor = placementMode || bbPicking ? 'crosshair' : 'default';
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -107,6 +111,18 @@ export const useCanvasInteraction = ({
             }
           }
         }
+        return;
+      }
+
+      // Интерактивный выбор сущности для Blackboard (Object Picker)
+      if (bbPicking && setBbPicking && mode === GameMode.EDITOR) {
+        const pickedId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
+        if (pickedId) {
+          app.updateEntityBlackboard(bbPicking.entityId, bbPicking.key, pickedId);
+        }
+        setBbPicking(null);
+        syncPlayerControls();
+        updateStats();
         return;
       }
 
@@ -220,7 +236,9 @@ export const useCanvasInteraction = ({
       isHoveringEntity = nearestId !== null;
     }
 
-    if (placementMode || isHoveringEntity) {
+    if (placementMode || bbPicking) {
+      e.currentTarget.style.cursor = 'crosshair';
+    } else if (isHoveringEntity) {
       e.currentTarget.style.cursor = 'pointer';
     } else {
       e.currentTarget.style.cursor = 'default';
@@ -300,6 +318,11 @@ export const useCanvasInteraction = ({
     e.preventDefault();
     const app = appRef.current;
     if (!app || mode !== GameMode.EDITOR || !containerRef.current) return;
+
+    if (bbPicking && setBbPicking) {
+      setBbPicking(null);
+      return;
+    }
 
     if (placementMode) {
       setPlacementMode(null);

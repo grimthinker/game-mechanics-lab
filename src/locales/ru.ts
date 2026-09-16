@@ -99,6 +99,11 @@ export const ru = {
     noBt: 'У выбранного объекта нет дерева поведения',
     blackboardTitle: '🧠 Память бота (Blackboard)',
     blackboardEmpty: 'Память пуста',
+    blackboardKey: 'Ключ',
+    blackboardVal: 'Значение',
+    blackboardPick: 'Выбрать на карте (прицел)',
+    blackboardPickingPrompt: 'Кликните по сущности на карте для ключа "{key}"',
+    blackboardNone: '[Нет / null]',
   },
   palette: {
     subtitle: 'Выберите шаблон и кликните на поле карты для размещения:',

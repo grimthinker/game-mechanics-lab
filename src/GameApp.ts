@@ -31,6 +31,7 @@ import { serializeBTNode } from './ai/serializer';
 import { findActiveBrain } from './ecs/utils/anatomy';
 import { EDITOR_CONFIG } from './config/editorConfig';
 import { deg2Rad, Radians } from './utils';
+import { compileTreeBlackboardSchema } from './ai/schema';
 
 // Контроллеры редактора
 import { SelectionController } from './editor/SelectionController';
@@ -891,7 +892,7 @@ export class GameApp {
     if (!targetId) {
       if (this.lastBTTargetId !== null) {
         this.lastBTTargetId = null;
-        EventBus.emit('bt:updated', { btData: null, btBlackboard: null });
+        EventBus.emit('bt:updated', { btData: null, btBlackboard: null, btSchema: null });
       }
       return;
     }
@@ -905,10 +906,44 @@ export class GameApp {
       }
     }
 
+    let schema = null;
+    if (brain && brain.root_node) {
+      schema = compileTreeBlackboardSchema(brain.root_node);
+    }
+
     EventBus.emit('bt:updated', {
       btData: !brain || !brain.root_node ? null : serializeBTNode(brain.root_node),
       btBlackboard: !brain ? null : { ...brain.blackboard.getData() },
+      btSchema: schema,
     });
+  }
+
+  public updateEntityBlackboard(entityId: string, key: string, value: any): void {
+    let brain = this.world.getComponent(entityId, 'brain') as BTLogicComponent | undefined;
+    if (!brain) {
+      const activeBrainId = findActiveBrain(this.world, entityId);
+      if (activeBrainId) {
+        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
+      }
+    }
+    if (brain) {
+      brain.blackboard.set(key, value);
+      this.updateBTData(true);
+    }
+  }
+
+  public removeEntityBlackboardKey(entityId: string, key: string): void {
+    let brain = this.world.getComponent(entityId, 'brain') as BTLogicComponent | undefined;
+    if (!brain) {
+      const activeBrainId = findActiveBrain(this.world, entityId);
+      if (activeBrainId) {
+        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
+      }
+    }
+    if (brain) {
+      brain.blackboard.remove(key);
+      this.updateBTData(true);
+    }
   }
 
   private updateSystems(dt: number): void {

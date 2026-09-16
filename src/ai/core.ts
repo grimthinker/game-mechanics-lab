@@ -41,12 +41,15 @@ export interface EntityUtils {
 
 export type AttackStatus = 'idle' | 'attacking' | 'cooldown';
 
+import { NodeBBSchema } from './schema';
+
 export abstract class BTNode {
   public readonly id: string = Math.random().toString(36).substring(2, 9);
   public static readonly nodeName: string;
   public static readonly description: string;
   public static readonly category: NodeCategory;
   public static readonly defaultParams?: Record<string, any>;
+  public static readonly bbSchema?: NodeBBSchema;
 
   public get name(): string {
     return (this.constructor as typeof BTNode).nodeName;
@@ -195,25 +198,25 @@ export type AIEvent = {
 };
 
 export class Blackboard {
-  private data: Partial<BBData> = {};
+  private data: Record<string, any> = {};
 
-  public getData(): Partial<BBData> {
+  public getData(): Record<string, any> {
     return this.data;
   }
 
-  public set<K extends keyof BBData>(key: K, value: BBData[K]): void {
+  public set(key: string, value: any): void {
     this.data[key] = value;
   }
 
-  public get<K extends keyof BBData>(key: K): BBData[K] | undefined {
+  public get(key: string): any {
     return this.data[key];
   }
 
-  public has<K extends keyof BBData>(key: K): boolean {
+  public has(key: string): boolean {
     return this.data[key] !== undefined;
   }
 
-  public remove<K extends keyof BBData>(key: K): void {
+  public remove(key: string): void {
     delete this.data[key];
   }
 }
