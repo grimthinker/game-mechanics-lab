@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { World } from '../../ecs/World';
 import { GameApp } from '../../GameApp';
 import { t } from '../../locales';
@@ -21,8 +21,10 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({
   const health = world.getComponent(targetId, 'health');
   const [hp, setHp] = useState(health ? Math.round(health.current) : 100);
   const [maxHp, setMaxHp] = useState(health ? Math.round(health.max.base) : 100);
+  const isFocusedRef = useRef(false);
 
   useEffect(() => {
+    if (isFocusedRef.current) return;
     const comp = world.getComponent(targetId, 'health');
     if (comp) {
       setHp(Math.round(comp.current));
@@ -57,6 +59,12 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({
           value={hp}
           min={0}
           max={maxHp}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+          }}
           onChange={(e) => handleUpdate({ hp: Number(e.target.value) })}
         />
       </label>
@@ -68,6 +76,12 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({
           value={maxHp}
           min={1}
           max={10000}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+          }}
           onChange={(e) => handleUpdate({ maxHp: Number(e.target.value) })}
         />
       </label>

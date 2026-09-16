@@ -63,6 +63,7 @@ export const SocketsInspector: React.FC<SocketsInspectorProps> = ({
               <input
                 disabled={isReadOnly}
                 type="number"
+                key={`socket_str_${targetId}_${socketId}`}
                 defaultValue={Math.round(link.currentStrength)}
                 min={-maxStr}
                 max={maxStr}

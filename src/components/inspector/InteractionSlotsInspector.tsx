@@ -68,6 +68,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                   <input
                     type="number"
                     disabled={isReadOnly}
+                    key={`slot_dist_${info.partId}_${slot.id}`}
                     defaultValue={slot.interactDist}
                     style={{ width: '60px', padding: '2px' }}
                     onChange={(e) => {
@@ -92,6 +93,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                   <input
                     type="number"
                     disabled={isReadOnly}
+                    key={`slot_str_${info.partId}_${slot.id}`}
                     defaultValue={slot.strength}
                     style={{ width: '60px', padding: '2px' }}
                     onChange={(e) => {
@@ -167,6 +169,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           <input
             type="number"
             disabled={isReadOnly}
+            key={`single_slot_dist_${targetId}_${slot.id}`}
             defaultValue={slot.interactDist}
             style={{ width: '60px', padding: '2px' }}
             onChange={(e) => {
@@ -191,6 +194,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           <input
             type="number"
             disabled={isReadOnly}
+            key={`single_slot_str_${targetId}_${slot.id}`}
             defaultValue={slot.strength}
             style={{ width: '60px', padding: '2px' }}
             onChange={(e) => {

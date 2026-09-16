@@ -162,6 +162,24 @@ export class Camera {
     this.pitch = CAMERA_CONFIG.defaultPitch;
   }
 
+  public resetZoomAndRotation(canvas: HTMLCanvasElement): void {
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+
+    // 1. Вычисляем мировые координаты точки, которая сейчас находится в центре экрана
+    const worldX = (cx - this.offsetX) / this.scale;
+    const worldY = (cy - this.offsetY) / this.scale;
+
+    // 2. Сбрасываем масштаб, угол и наклон к значениям по умолчанию
+    this.scale = CAMERA_CONFIG.defaultZoom;
+    this.yaw = 0;
+    this.pitch = CAMERA_CONFIG.defaultPitch;
+
+    // 3. Корректируем смещение так, чтобы центр экрана остался на тех же мировых координатах
+    this.offsetX = cx - worldX * this.scale;
+    this.offsetY = cy - worldY * this.scale;
+  }
+
   public serialize(): CameraState {
     return {
       scale: this.scale,

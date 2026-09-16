@@ -43,7 +43,7 @@ export const App: React.FC = () => {
 
   const applyGizmoTool = useCallback((tool: GizmoTool) => {
     setGizmoTool(tool);
-    if (appRef.current) appRef.current.gizmoTool = tool;
+    if (appRef.current) appRef.current.gizmo.setTool(tool);
   }, []);
 
   const closePieMenu = useCallback(() => {
@@ -55,13 +55,11 @@ export const App: React.FC = () => {
   const applyShowUIOverlays = useCallback((val: boolean) => {
     setShowUIOverlays(val);
     if (appRef.current) appRef.current.showUIOverlays = val;
-    updateStatsRef.current();
   }, []);
 
   const applyShowAIDebug = useCallback((val: boolean) => {
     setShowAIDebug(val);
     if (appRef.current) appRef.current.showAIDebug = val;
-    updateStatsRef.current();
   }, []);
 
   const applyGameMode = useCallback((m: GameMode) => {
@@ -107,7 +105,6 @@ export const App: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Инициализация клавиатурного контроля ДО его использования в эффектах подписок
   const { syncPlayerControls } = useKeyboardControls({
     isModalOpen: isPaused,
     isEditModalOpen: false,
@@ -119,8 +116,13 @@ export const App: React.FC = () => {
     const unsubSelection = EventBus.on(
       'selection:changed',
       ({ selectedEntityId: sId, selectedEntityIds: sIds }) => {
-        setSelectedEntityId(sId);
-        setSelectedEntityIds(sIds);
+        setSelectedEntityId((prev) => (prev !== sId ? sId : prev));
+        setSelectedEntityIds((prev) => {
+          if (prev.length === sIds.length && prev.every((id, idx) => id === sIds[idx])) {
+            return prev;
+          }
+          return sIds;
+        });
       }
     );
 
@@ -150,12 +152,9 @@ export const App: React.FC = () => {
   const updateStats = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
-    app.emitSelectionChanged();
+    app.selection.emitSelectionChanged();
     app.updateBTData(true);
   }, []);
-
-  const updateStatsRef = useRef(updateStats);
-  updateStatsRef.current = updateStats;
 
   const {
     containerRef,
@@ -182,7 +181,7 @@ export const App: React.FC = () => {
     const app = appRef.current;
     const canvas = app?.canvas;
     if (!app || !canvas) return;
-    app.camera.reset(canvas);
+    app.camera.resetZoomAndRotation(canvas);
     updateStats();
     saveWorldToStorage(app, snapshotRef.current);
   }, [closePieMenu, updateStats]);
@@ -218,9 +217,6 @@ export const App: React.FC = () => {
     app.globalTimeScale = globalTimeScale;
 
     app.start();
-    app.onHistoryChange = () => {
-      saveWorldToStorage(app, snapshotRef.current);
-    };
 
     // Восстановление мира из автосохранения либо создание дефолтного мира
     const autoSave = loadWorldFromStorage();
@@ -238,7 +234,9 @@ export const App: React.FC = () => {
       app.initDefaultWorld(spawnPos);
       saveWorldToStorage(app);
     }
-    updateStatsRef.current();
+
+    app.selection.emitSelectionChanged();
+    app.updateBTData(true);
 
     return () => {
       app.destroy();
@@ -297,11 +295,9 @@ export const App: React.FC = () => {
     applyGameMode(GameMode.EDITOR);
     app.isPaused = true;
     setIsPaused(true);
-    app.selectEntity(null);
-    app.hoverEntity(null);
-    updateStats();
+    app.selection.clear();
     saveWorldToStorage(app);
-  }, [snapshot, updateStats, applyGameMode]);
+  }, [snapshot, applyGameMode]);
 
   const goToSimulation = useCallback(() => {
     const app = appRef.current;
@@ -316,11 +312,9 @@ export const App: React.FC = () => {
     applyGameMode(GameMode.SIMULATION);
     app.isPaused = false;
     setIsPaused(false);
-    app.selectEntity(null);
-    app.hoverEntity(null);
-    updateStats();
+    app.selection.clear();
     saveWorldToStorage(app, currentSnapshot);
-  }, [updateStats, applyGameMode, snapshot]);
+  }, [applyGameMode, snapshot]);
 
   const goToGame = useCallback(() => {
     const app = appRef.current;
@@ -335,9 +329,8 @@ export const App: React.FC = () => {
     applyGameMode(GameMode.GAME);
     app.isPaused = false;
     setIsPaused(false);
-    updateStats();
     saveWorldToStorage(app, currentSnapshot);
-  }, [updateStats, applyGameMode, applyGlobalTimeScale, snapshot]);
+  }, [applyGameMode, applyGlobalTimeScale, snapshot]);
 
   const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
@@ -393,8 +386,8 @@ export const App: React.FC = () => {
 
   const handleCancelGizmo = useCallback(() => {
     const app = appRef.current;
-    if (app && app.isGizmoDragging()) {
-      app.cancelGizmoDrag(true);
+    if (app && app.gizmo.isDragging()) {
+      app.gizmo.cancelDrag(true);
       updateStats();
       return true;
     }
@@ -408,6 +401,13 @@ export const App: React.FC = () => {
     }
     return false;
   }, [pieMenuState]);
+
+  const handleCommitHistory = useCallback((desc: string) => {
+    const app = appRef.current;
+    if (!app) return;
+    app.commitHistory(desc);
+    app.updateBTData(true);
+  }, []);
 
   useGlobalShortcuts({
     mode,
@@ -464,7 +464,7 @@ export const App: React.FC = () => {
                   setSnapshot(null);
                   snapshotRef.current = null;
                   app.deserializeWorld(data);
-                  app.history.clear();
+                  app.commandHistory.clear();
                   saveWorldToStorage(app);
                   syncPlayerControls();
                   updateStats();
@@ -479,8 +479,8 @@ export const App: React.FC = () => {
           togglePause={togglePause}
           globalTimeScale={globalTimeScale}
           setGlobalTimeScale={applyGlobalTimeScale}
-          canUndo={appRef.current?.history.canUndo() ?? false}
-          canRedo={appRef.current?.history.canRedo() ?? false}
+          canUndo={appRef.current?.commandHistory.canUndo() ?? false}
+          canRedo={appRef.current?.commandHistory.canRedo() ?? false}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onOpenHotkeys={() => setIsHotkeysOpen(true)}
@@ -507,8 +507,7 @@ export const App: React.FC = () => {
             world={appRef.current?.world}
             selectedEntityId={selectedEntityId}
             onSelectEntity={(id) => {
-              appRef.current?.selectEntity(id, true);
-              updateStats();
+              appRef.current?.selection.selectEntity(id, true);
             }}
             onFocusEntity={handleFocusEntity}
             onSelectSpawnPreset={handleSelectSpawnPreset}
@@ -563,16 +562,13 @@ export const App: React.FC = () => {
                 setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
               }
               onSelectEntity={(id) => {
-                appRef.current?.selectEntity(id, false);
-                updateStats();
+                appRef.current?.selection.selectEntity(id, false);
               }}
               onDeselectEntity={(id) => {
-                appRef.current?.deselectEntity(id);
-                updateStats();
+                appRef.current?.selection.deselectEntity(id);
               }}
               onClearSelection={() => {
-                appRef.current?.selectEntity(null, true);
-                updateStats();
+                appRef.current?.selection.clear();
               }}
               onDeleteSelected={handleDeleteEntity}
             />
@@ -666,9 +662,11 @@ export const App: React.FC = () => {
                         color: '#9b59b6',
                         onSelect: () => {
                           if (pieMenuState.targetEntityId) {
-                            appRef.current?.selectEntity(pieMenuState.targetEntityId, true);
+                            appRef.current?.selection.selectEntity(
+                              pieMenuState.targetEntityId,
+                              true
+                            );
                             setLeftDockTab('bt');
-                            updateStats();
                           }
                         },
                       },
@@ -695,18 +693,19 @@ export const App: React.FC = () => {
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory(t('history.spawnPlayer'));
-                          const id = app.entityFactory.spawnModularHumanoid(
-                            app.world,
-                            app.physics,
-                            app.aiSystem,
-                            pieMenuState.worldPos,
-                            'PlayerTree',
-                            t('palette.player')
-                          );
-                          app.selectEntity(id, true);
+                          app.executeTransaction(t('history.spawnPlayer'), () => {
+                            const id = app.entityFactory.spawnModularHumanoid(
+                              app.world,
+                              app.physics,
+                              app.aiSystem,
+                              pieMenuState.worldPos,
+                              'PlayerTree',
+                              t('palette.player')
+                            );
+                            app.selection.selectEntity(id, true);
+                            return id;
+                          });
                           syncPlayerControls();
-                          updateStats();
                         },
                       },
                       {
@@ -716,18 +715,19 @@ export const App: React.FC = () => {
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory(t('history.spawnAttacker'));
-                          const id = app.entityFactory.spawnModularHumanoid(
-                            app.world,
-                            app.physics,
-                            app.aiSystem,
-                            pieMenuState.worldPos,
-                            'AttackerTree',
-                            t('palette.attacker')
-                          );
-                          app.selectEntity(id, true);
+                          app.executeTransaction(t('history.spawnAttacker'), () => {
+                            const id = app.entityFactory.spawnModularHumanoid(
+                              app.world,
+                              app.physics,
+                              app.aiSystem,
+                              pieMenuState.worldPos,
+                              'AttackerTree',
+                              t('palette.attacker')
+                            );
+                            app.selection.selectEntity(id, true);
+                            return id;
+                          });
                           syncPlayerControls();
-                          updateStats();
                         },
                       },
                       {
@@ -737,27 +737,28 @@ export const App: React.FC = () => {
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory(t('history.spawnWall'));
-                          const id = app.spawnEntity(
-                            {
-                              tag: { archetype: 'obstacle' },
-                              meta: {
-                                name: t('palette.wall'),
-                                entityType: 'obstacle',
-                                destructible: false,
+                          app.executeTransaction(t('history.spawnWall'), () => {
+                            const id = app.spawnEntity(
+                              {
+                                tag: { archetype: 'obstacle' },
+                                meta: {
+                                  name: t('palette.wall'),
+                                  entityType: 'obstacle',
+                                  destructible: false,
+                                },
+                                physics: {
+                                  radius: 54,
+                                  weight: 1000,
+                                  isSolid: true,
+                                  points: createRectanglePoints(100, 40),
+                                },
                               },
-                              physics: {
-                                radius: 54,
-                                weight: 1000,
-                                isSolid: true,
-                                points: createRectanglePoints(100, 40),
-                              },
-                            },
-                            pieMenuState.worldPos
-                          );
-                          app.selectEntity(id, true);
+                              pieMenuState.worldPos
+                            );
+                            app.selection.selectEntity(id, true);
+                            return id;
+                          });
                           syncPlayerControls();
-                          updateStats();
                         },
                       },
                       {
@@ -767,28 +768,29 @@ export const App: React.FC = () => {
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory(t('history.spawnCrate'));
-                          const id = app.spawnEntity(
-                            {
-                              tag: { archetype: 'obstacle' },
-                              meta: {
-                                name: t('palette.crate'),
-                                entityType: 'obstacle',
-                                destructible: true,
+                          app.executeTransaction(t('history.spawnCrate'), () => {
+                            const id = app.spawnEntity(
+                              {
+                                tag: { archetype: 'obstacle' },
+                                meta: {
+                                  name: t('palette.crate'),
+                                  entityType: 'obstacle',
+                                  destructible: true,
+                                },
+                                health: { hp: 100, maxHp: 100 },
+                                physics: {
+                                  radius: 42,
+                                  weight: 50,
+                                  isSolid: true,
+                                  points: createRectanglePoints(60, 60),
+                                },
                               },
-                              health: { hp: 100, maxHp: 100 },
-                              physics: {
-                                radius: 42,
-                                weight: 50,
-                                isSolid: true,
-                                points: createRectanglePoints(60, 60),
-                              },
-                            },
-                            pieMenuState.worldPos
-                          );
-                          app.selectEntity(id, true);
+                              pieMenuState.worldPos
+                            );
+                            app.selection.selectEntity(id, true);
+                            return id;
+                          });
                           syncPlayerControls();
-                          updateStats();
                         },
                       },
                       {
@@ -798,14 +800,15 @@ export const App: React.FC = () => {
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory(t('history.spawnFireZone'));
-                          const id = app.spawnEntity(
-                            createZoneConfig('damage', 70, 15, t('palette.zoneFire')),
-                            pieMenuState.worldPos
-                          );
-                          app.selectEntity(id, true);
+                          app.executeTransaction(t('history.spawnFireZone'), () => {
+                            const id = app.spawnEntity(
+                              createZoneConfig('damage', 70, 15, t('palette.zoneFire')),
+                              pieMenuState.worldPos
+                            );
+                            app.selection.selectEntity(id, true);
+                            return id;
+                          });
                           syncPlayerControls();
-                          updateStats();
                         },
                       },
                       {
@@ -815,28 +818,29 @@ export const App: React.FC = () => {
                         onSelect: () => {
                           const app = appRef.current;
                           if (!app) return;
-                          app.commitHistory(t('history.spawnSpear'));
-                          const id = app.spawnEntity(
-                            {
-                              tag: { archetype: 'item', subType: 'weapon' },
-                              item: {
-                                name: t('palette.spear'),
-                                type: 'weapon',
-                                maxStack: 1,
-                                size: 10,
-                                equipTypes: [],
-                                equippable: false,
-                                equipTimeMultiplier: 1.0,
+                          app.executeTransaction(t('history.spawnSpear'), () => {
+                            const id = app.spawnEntity(
+                              {
+                                tag: { archetype: 'item', subType: 'weapon' },
+                                item: {
+                                  name: t('palette.spear'),
+                                  type: 'weapon',
+                                  maxStack: 1,
+                                  size: 10,
+                                  equipTypes: [],
+                                  equippable: false,
+                                  equipTimeMultiplier: 1.0,
+                                },
+                                physics: { radius: 16, weight: 1, isSolid: true },
+                                weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
+                                weaponZone: { hitZoneType: 'forward_line', length: 150 },
                               },
-                              physics: { radius: 16, weight: 1, isSolid: true },
-                              weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
-                              weaponZone: { hitZoneType: 'forward_line', length: 150 },
-                            },
-                            pieMenuState.worldPos
-                          );
-                          app.selectEntity(id, true);
+                              pieMenuState.worldPos
+                            );
+                            app.selection.selectEntity(id, true);
+                            return id;
+                          });
                           syncPlayerControls();
-                          updateStats();
                         },
                       },
                     ]
@@ -852,13 +856,7 @@ export const App: React.FC = () => {
             mode={mode}
             selectedEntityId={selectedEntityId}
             world={appRef.current?.world}
-            physics={appRef.current?.physics}
-            aiSystem={appRef.current?.aiSystem}
-            onCommitHistory={(desc) => {
-              appRef.current?.commitHistory(desc);
-              updateStats();
-            }}
-            onUpdateStats={updateStats}
+            onCommitHistory={handleCommitHistory}
             handleDeleteEntity={handleDeleteEntity}
           />
         )}

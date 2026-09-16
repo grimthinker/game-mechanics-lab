@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { PieMenuItem } from './types';
 import { Point } from '../../types';
 
@@ -52,148 +53,168 @@ export const PieMenu: React.FC<PieMenuProps> = ({ position, title, items, onClos
     };
   };
 
-  return (
+  return createPortal(
     <div
-      onMouseDown={(e) => e.stopPropagation()}
-      onMouseMove={(e) => e.stopPropagation()}
-      onMouseUp={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9998,
+        pointerEvents: 'auto',
+        backgroundColor: 'transparent',
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-      }}
-      style={{
-        position: 'absolute',
-        left: position.x,
-        top: position.y,
-        transform: 'translate(-50%, -50%)',
-        zIndex: 1000,
-        width: outerRadius * 2 + 40,
-        height: outerRadius * 2 + 40,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        userSelect: 'none',
-        pointerEvents: 'auto',
+        onClose();
       }}
     >
-      {/* Заголовок меню */}
-      {title && (
-        <div
-          style={{
-            position: 'absolute',
-            top: -12,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(15, 15, 15, 0.95)',
-            border: '1px solid #444',
-            borderRadius: '12px',
-            padding: '3px 10px',
-            color: '#3498db',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
-            pointerEvents: 'none',
-          }}
-        >
-          {title}
-        </div>
-      )}
-
-      <svg
-        width={outerRadius * 2 + 20}
-        height={outerRadius * 2 + 20}
-        viewBox={`${-outerRadius - 10} ${-outerRadius - 10} ${(outerRadius + 10) * 2} ${(outerRadius + 10) * 2}`}
-        style={{ overflow: 'visible', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.7))' }}
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseMove={(e) => e.stopPropagation()}
+        onMouseUp={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        style={{
+          position: 'fixed',
+          left: position.x,
+          top: position.y,
+          transform: 'translate(-50%, -50%)',
+          zIndex: 9999,
+          width: outerRadius * 2 + 40,
+          height: outerRadius * 2 + 40,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          userSelect: 'none',
+          pointerEvents: 'auto',
+        }}
       >
-        {/* Секторы радиального меню */}
-        {items.map((item, idx) => {
-          const isHovered = hoveredIndex === idx;
-          const pos = getItemCenterPos(idx);
-          const baseFill = item.danger ? 'rgba(192, 57, 43, 0.85)' : 'rgba(28, 28, 28, 0.92)';
-          const hoverFill = item.danger ? '#e74c3c' : item.color || '#2980b9';
-
-          return (
-            <g
-              key={item.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                item.onSelect();
-                onClose();
-              }}
-              onMouseEnter={() => setHoveredIndex(idx)}
-              onMouseLeave={() => setHoveredIndex(null)}
-              style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
-            >
-              <path
-                d={getSectorPath(idx)}
-                fill={isHovered ? hoverFill : baseFill}
-                stroke="rgba(255, 255, 255, 0.15)"
-                strokeWidth={isHovered ? 2 : 1}
-                style={{
-                  transition: 'fill 0.12s ease, stroke 0.12s ease',
-                }}
-              />
-              <text
-                x={pos.x}
-                y={pos.y - 7}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="18px"
-                pointerEvents="none"
-              >
-                {item.icon}
-              </text>
-              <text
-                x={pos.x}
-                y={pos.y + 11}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fontSize="10px"
-                fontWeight={isHovered ? 'bold' : 'normal'}
-                fill="#ffffff"
-                pointerEvents="none"
-              >
-                {item.label}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* Центральный круг отмены */}
-        <g
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          style={{ cursor: 'pointer' }}
-        >
-          <circle
-            cx={0}
-            cy={0}
-            r={centerRadius}
-            fill="#151515"
-            stroke="rgba(255, 255, 255, 0.2)"
-            strokeWidth={1.5}
-            style={{ transition: 'fill 0.15s' }}
-            onMouseEnter={(e) => (e.currentTarget.style.fill = '#2c3e50')}
-            onMouseLeave={(e) => (e.currentTarget.style.fill = '#151515')}
-          />
-          <text
-            x={0}
-            y={0}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="#888888"
-            fontSize="14px"
-            fontWeight="bold"
-            pointerEvents="none"
+        {/* Заголовок меню */}
+        {title && (
+          <div
+            style={{
+              position: 'absolute',
+              top: -12,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(15, 15, 15, 0.95)',
+              border: '1px solid #444',
+              borderRadius: '12px',
+              padding: '3px 10px',
+              color: '#3498db',
+              fontSize: '11px',
+              fontWeight: 'bold',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
+              pointerEvents: 'none',
+            }}
           >
-            ✕
-          </text>
-        </g>
-      </svg>
-    </div>
+            {title}
+          </div>
+        )}
+
+        <svg
+          width={outerRadius * 2 + 20}
+          height={outerRadius * 2 + 20}
+          viewBox={`${-outerRadius - 10} ${-outerRadius - 10} ${(outerRadius + 10) * 2} ${(outerRadius + 10) * 2}`}
+          style={{ overflow: 'visible', filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.7))' }}
+        >
+          {/* Секторы радиального меню */}
+          {items.map((item, idx) => {
+            const isHovered = hoveredIndex === idx;
+            const pos = getItemCenterPos(idx);
+            const baseFill = item.danger ? 'rgba(192, 57, 43, 0.85)' : 'rgba(28, 28, 28, 0.92)';
+            const hoverFill = item.danger ? '#e74c3c' : item.color || '#2980b9';
+
+            return (
+              <g
+                key={item.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  item.onSelect();
+                  onClose();
+                }}
+                onMouseEnter={() => setHoveredIndex(idx)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                style={{ cursor: 'pointer', transition: 'all 0.15s ease' }}
+              >
+                <path
+                  d={getSectorPath(idx)}
+                  fill={isHovered ? hoverFill : baseFill}
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth={isHovered ? 2 : 1}
+                  style={{
+                    transition: 'fill 0.12s ease, stroke 0.12s ease',
+                  }}
+                />
+                <text
+                  x={pos.x}
+                  y={pos.y - 7}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="18px"
+                  pointerEvents="none"
+                >
+                  {item.icon}
+                </text>
+                <text
+                  x={pos.x}
+                  y={pos.y + 11}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="10px"
+                  fontWeight={isHovered ? 'bold' : 'normal'}
+                  fill="#ffffff"
+                  pointerEvents="none"
+                >
+                  {item.label}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Центральный круг отмены */}
+          <g
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            style={{ cursor: 'pointer' }}
+          >
+            <circle
+              cx={0}
+              cy={0}
+              r={centerRadius}
+              fill="#151515"
+              stroke="rgba(255, 255, 255, 0.2)"
+              strokeWidth={1.5}
+              style={{ transition: 'fill 0.15s' }}
+              onMouseEnter={(e) => (e.currentTarget.style.fill = '#2c3e50')}
+              onMouseLeave={(e) => (e.currentTarget.style.fill = '#151515')}
+            />
+            <text
+              x={0}
+              y={0}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="#888888"
+              fontSize="14px"
+              fontWeight="bold"
+              pointerEvents="none"
+            >
+              ✕
+            </text>
+          </g>
+        </svg>
+      </div>
+    </div>,
+    document.body
   );
 };

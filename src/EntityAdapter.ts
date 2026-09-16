@@ -1,24 +1,19 @@
 import { World } from './ecs/World';
 import {
-  CreatureStance,
-  CreatureMovementMode,
-  CreatureDirectionMode,
-  CreatureActionMode,
   EntityId,
   IMovable,
-  InventoryComponent,
   EntityController,
   StandardRadius,
   ItemData,
   OwnershipComponent,
-  ArmorStatsComponent,
-  WeaponStatsComponent,
-  HitZoneConfig,
-  EntityComponents,
   EquipmentComponent,
   InteractionSlotsComponent,
   InteractionPhase,
   InteractionActionComponent,
+  CreatureMovementMode,
+  CreatureDirectionMode,
+  CreatureActionMode,
+  InventoryComponent,
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
@@ -27,77 +22,84 @@ import { Radians } from './utils';
 import { calculateTotalEntityWeight, getAggregatedInteractionSlots } from './ecs/utils/hierarchy';
 import { findActiveBrain } from './ecs/utils/anatomy';
 
+// Под-адаптеры по доменам
+import { MovementAdapter } from './ecs/adapters/MovementAdapter';
+import { CombatAdapter } from './ecs/adapters/CombatAdapter';
+import { InventoryAdapter } from './ecs/adapters/InventoryAdapter';
+
 export class EntityAdapter implements IMovable, EntityController {
   public dt: number = 0;
   public utils!: EntityUtils;
 
+  private movementAdapter: MovementAdapter;
+  private combatAdapter: CombatAdapter;
+  private inventoryAdapter: InventoryAdapter;
+
   constructor(
     public readonly id: EntityId,
     private world: World
-  ) {}
+  ) {
+    this.movementAdapter = new MovementAdapter(id, world);
+    this.combatAdapter = new CombatAdapter(id, world);
+    this.inventoryAdapter = new InventoryAdapter(id, world);
+  }
 
-  // --- Вспомогательные приватные методы (DOD Proxy Helpers) ---
-  private getComponent<K extends keyof EntityComponents>(key: K): EntityComponents[K] | undefined {
+  private getComponent<K extends keyof import('./ecs/types').EntityComponents>(key: K) {
     return this.world.getComponent(this.id, key);
   }
 
-  private getInputIfActive() {
-    const health = this.getComponent('health');
-    if (!health?.isAlive) return undefined;
-    return this.getComponent('input');
-  }
-
-  // --- Геттеры состояния (Read-Only View) ---
+  // --- Делегируемые геттеры и свойства (Фасад) ---
   public get itemData(): ItemData | undefined {
     return this.getComponent('item');
   }
   public get inventory(): InventoryComponent | undefined {
-    return this.getComponent('inventory');
+    return this.inventoryAdapter.inventory;
   }
-  public get weaponStats(): WeaponStatsComponent | undefined {
-    return this.getComponent('weaponStats');
+  public get weaponStats() {
+    return this.combatAdapter.weaponStats;
   }
-  public get weaponZone(): HitZoneConfig | undefined {
-    return this.getComponent('weaponZone');
+  public get weaponZone() {
+    return this.combatAdapter.weaponZone;
   }
-  public get armorStats(): ArmorStatsComponent | undefined {
-    return this.getComponent('armorStats');
+  public get armorStats() {
+    return this.combatAdapter.armorStats;
   }
   public get ownership(): OwnershipComponent | undefined {
     return this.getComponent('ownership');
   }
+
   public get behavior(): string {
     return this.getComponent('aiStats')?.behavior.current ?? 'IdleTree';
   }
-  public get stance(): import('./ecs/types').CreatureStance {
-    return this.getComponent('meta')?.stance ?? 'standing';
+  public get stance() {
+    return this.movementAdapter.stance;
   }
-  public get desiredStance(): import('./ecs/types').BaseCreatureStance {
-    return this.getComponent('input')?.desiredStance ?? 'standing';
+  public get desiredStance() {
+    return this.movementAdapter.desiredStance;
   }
   public get movementMode(): CreatureMovementMode {
-    return this.getComponent('meta')?.movementMode ?? 'immobile';
+    return this.movementAdapter.movementMode;
   }
   public get directionMode(): CreatureDirectionMode {
-    return this.getComponent('meta')?.directionMode ?? 'immobile';
+    return this.movementAdapter.directionMode;
   }
   public get actionMode(): CreatureActionMode {
-    return this.getComponent('meta')?.actionMode ?? 'idle';
+    return this.movementAdapter.actionMode;
   }
+
   public get targetLookAngle(): Radians | undefined {
     return this.getComponent('input')?.targetLookAngle;
   }
   public get pos(): Point {
-    const transform = this.getComponent('transform');
-    return transform ? { x: transform.x, y: transform.y } : { x: 0, y: 0 };
+    return this.movementAdapter.pos;
   }
   public get angle(): Radians {
-    const transform = this.getComponent('transform');
-    return (transform ? transform.angle : 0) as Radians;
+    return this.movementAdapter.angle;
   }
   public get radius(): StandardRadius {
-    return (this.getComponent('physicsStats')?.radius.current as StandardRadius) ?? 16;
+    return this.movementAdapter.radius as StandardRadius;
   }
+
   public get baseRadius(): StandardRadius {
     return (this.getComponent('physicsStats')?.radius.base as StandardRadius) ?? this.radius;
   }
@@ -113,21 +115,24 @@ export class EntityAdapter implements IMovable, EntityController {
   public get isSolid(): boolean {
     return this.getComponent('physicsStats')?.isSolid ?? true;
   }
-  public get hp(): number {
-    return this.getComponent('health')?.current ?? 0;
+
+  public get hp() {
+    return this.combatAdapter.hp;
   }
-  public get maxHp(): number {
-    return this.getComponent('health')?.max.current ?? 0;
+  public get maxHp() {
+    return this.combatAdapter.maxHp;
   }
-  public get isAlive(): boolean {
-    return this.getComponent('health')?.isAlive ?? false;
+  public get isAlive() {
+    return this.combatAdapter.isAlive;
   }
-  public get maxSpeed(): number {
-    return this.getComponent('movementStats')?.maxSpeed.current ?? 0;
+
+  public get maxSpeed() {
+    return this.movementAdapter.maxSpeed;
   }
-  public get maxTurnSpeed(): Radians {
-    return (this.getComponent('movementStats')?.maxTurnSpeed.current ?? 0) as Radians;
+  public get maxTurnSpeed() {
+    return this.movementAdapter.maxTurnSpeed;
   }
+
   public get currentSpeed(): number {
     return this.getComponent('velocity')?.currentSpeed ?? 0;
   }
@@ -182,21 +187,23 @@ export class EntityAdapter implements IMovable, EntityController {
   public get isStanding(): boolean {
     return this.stance === 'standing';
   }
+
   public get equip(): EquipmentComponent | undefined {
-    return this.getComponent('equip');
+    return this.inventoryAdapter.equip;
   }
   public get interactionSlots(): InteractionSlotsComponent | undefined {
-    return this.getComponent('interactionSlots');
+    return this.inventoryAdapter.interactionSlots;
   }
   public get interactionAction(): InteractionActionComponent | undefined {
-    return this.getComponent('interactionAction');
+    return this.inventoryAdapter.interactionAction;
   }
-  public get isInteracting(): boolean {
-    return this.interactionAction !== undefined;
+  public get isInteracting() {
+    return this.inventoryAdapter.isInteracting;
   }
-  public get interactionPhase(): InteractionPhase | null {
-    return this.interactionAction?.phase ?? null;
+  public get interactionPhase() {
+    return this.inventoryAdapter.interactionPhase;
   }
+
   public get perception(): import('./ecs/types').PerceptionComponent | undefined {
     return this.getComponent('perception');
   }
@@ -210,18 +217,8 @@ export class EntityAdapter implements IMovable, EntityController {
     }
     return b;
   }
-  public get attackStatus(): AttackStatus {
-    const activeAttacks = this.getComponent('activeAttacks');
-    const currentAttack = activeAttacks?.attacks[0];
-    if (!currentAttack) return 'idle';
-
-    if (currentAttack.phase === 'prep' || currentAttack.phase === 'cast') {
-      return 'attacking';
-    }
-    if (currentAttack.phase === 'recovery') {
-      return 'cooldown';
-    }
-    return 'idle';
+  public get attackStatus() {
+    return this.combatAdapter.attackStatus;
   }
   public get timeScaleMultiplier(): number {
     return this.getComponent('timeScale')?.multiplier.current ?? 1.0;
@@ -246,17 +243,14 @@ export class EntityAdapter implements IMovable, EntityController {
     };
   }
 
-  // --- Команды управления (Agent Controller API) ---
+  // --- Делегируемые команды управления ---
   public setDesiredMoveVector(vec: Point | null): void {
-    const input = this.getInputIfActive();
-    if (input) {
-      input.desiredMoveVector = vec ? { x: vec.x, y: vec.y } : null;
-    }
+    this.movementAdapter.setDesiredMoveVector(vec);
   }
 
   public setMovementInput(forward: -1 | 0 | 1, strafe: -1 | 0 | 1): void {
-    const input = this.getInputIfActive();
-    if (input) {
+    const input = this.getComponent('input');
+    if (input && this.isAlive) {
       input.moveForward = forward;
       input.moveStrafe = strafe;
       input.isMovingForward = forward === 1;
@@ -264,155 +258,86 @@ export class EntityAdapter implements IMovable, EntityController {
   }
 
   public setTargetLookAngle(angle?: Radians): void {
-    const input = this.getInputIfActive();
-    if (input) {
+    const input = this.getComponent('input');
+    if (input && this.isAlive) {
       input.targetLookAngle = angle;
     }
   }
 
   public startMovingForward(): void {
-    const input = this.getInputIfActive();
-    if (input) {
-      input.isMovingForward = true;
-      input.moveForward = 1;
-      const angle = this.angle;
-      input.desiredMoveVector = { x: Math.cos(angle), y: Math.sin(angle) };
-    }
+    this.movementAdapter.startMovingForward();
   }
   public stopMovingForward(): void {
-    const input = this.getComponent('input');
-    if (input) {
-      input.isMovingForward = false;
-      if (input.moveForward === 1) {
-        input.moveForward = 0;
-      }
-      input.desiredMoveVector = null;
-    }
+    this.movementAdapter.stopMovingForward();
   }
   public startTurning(direction: -1 | 1, ratio = 1): void {
-    const input = this.getInputIfActive();
-    if (input) {
-      input.turnDirection = direction;
-      input.turnRatio = Math.max(0, Math.min(1, ratio));
-    }
+    this.movementAdapter.startTurning(direction, ratio);
   }
   public stopTurning(): void {
-    const input = this.getComponent('input');
-    if (input) {
-      input.turnDirection = 0;
-      input.turnRatio = 0;
-    }
+    this.movementAdapter.stopTurning();
   }
   public startRunning(): void {
-    const input = this.getInputIfActive();
-    if (input) {
-      input.isRunning = true;
-    }
+    this.movementAdapter.startRunning();
   }
   public stopRunning(): void {
-    const input = this.getComponent('input');
-    if (input) input.isRunning = false;
+    this.movementAdapter.stopRunning();
   }
   public setDesiredStance(stance: import('./ecs/types').BaseCreatureStance): void {
-    const input = this.getInputIfActive();
-    if (input) {
-      input.desiredStance = stance;
-      input.isCrouching = stance === 'crouching';
-    }
+    this.movementAdapter.setDesiredStance(stance);
   }
   public startCrouching(): void {
     this.setDesiredStance('crouching');
   }
   public stopCrouching(): void {
-    if (this.desiredStance === 'crouching') {
-      this.setDesiredStance('standing');
-    }
+    if (this.desiredStance === 'crouching') this.setDesiredStance('standing');
   }
   public startProne(): void {
     this.setDesiredStance('prone');
   }
   public stopProne(): void {
-    if (this.desiredStance === 'prone') {
-      this.setDesiredStance('standing');
-    }
+    if (this.desiredStance === 'prone') this.setDesiredStance('standing');
   }
   public startWalking(): void {
-    const input = this.getInputIfActive();
-    if (input) input.isSlowWalking = true;
+    const input = this.getComponent('input');
+    if (input && this.isAlive) input.isSlowWalking = true;
   }
   public stopWalking(): void {
     const input = this.getComponent('input');
     if (input) input.isSlowWalking = false;
   }
   public toggleWalking(): void {
-    const input = this.getInputIfActive();
-    if (input) input.isSlowWalking = !input.isSlowWalking;
+    const input = this.getComponent('input');
+    if (input && this.isAlive) input.isSlowWalking = !input.isSlowWalking;
   }
 
   public stop(): boolean {
-    const input = this.getComponent('input');
-    if (input) {
-      input.desiredMoveVector = null;
-      input.moveForward = 0;
-      input.moveStrafe = 0;
-      input.isMovingForward = false;
-      input.turnDirection = 0;
-      input.turnRatio = 0;
-      input.wantsAttack = false;
-      input.attackSlotIndex = undefined;
-      input.targetLookAngle = undefined;
-    }
-    return true;
+    return this.movementAdapter.stop();
   }
   public attack(targetId?: string, slotIndex?: number): boolean {
-    const input = this.getInputIfActive();
-    if (input) {
-      input.wantsAttack = true;
-      input.attackSlotIndex = slotIndex;
-    }
-    return true;
+    return this.combatAdapter.attack(targetId, slotIndex);
   }
   public cancelAttack(slotIndex?: number): void {
-    const activeAttacks = this.getComponent('activeAttacks');
-    if (!activeAttacks) return;
-    if (slotIndex !== undefined) {
-      activeAttacks.attacks = activeAttacks.attacks.filter((a) => a.slotIndex !== slotIndex);
-    } else {
-      activeAttacks.attacks = [];
-    }
+    this.combatAdapter.cancelAttack(slotIndex);
   }
   public pickup(targetItemId: EntityId): boolean {
-    const health = this.getComponent('health');
-    if (!health || !health.isAlive) return false;
-
-    if (this.getComponent('interactionAction')) return false;
-    if (this.getComponent('pickupIntent')) return false;
-
-    const targetOwnership = this.world.getComponent(targetItemId, 'ownership');
-    const targetItem = this.world.getComponent(targetItemId, 'item');
-    if (!targetItem || targetOwnership) return false;
-
-    this.world.addComponent(this.id, 'pickupIntent', { targetItemId });
-    return true;
+    return this.inventoryAdapter.pickup(targetItemId);
   }
   public cancelInteraction(): void {
-    const action = this.getComponent('interactionAction');
-    if (action) {
-      action.wantsCancel = true;
-    }
+    this.inventoryAdapter.cancelInteraction();
   }
+
   public isSlotBusy(slotIndex: number): boolean {
-    const activeAttacks = this.getComponent('activeAttacks');
-    return activeAttacks?.attacks.some((a) => a.slotIndex === slotIndex) ?? false;
+    return this.combatAdapter.isSlotBusy(slotIndex);
   }
+
   public isWeaponBusy(weaponId: EntityId): boolean {
     const activeAttacks = this.getComponent('activeAttacks');
     return activeAttacks?.attacks.some((a) => a.weaponId === weaponId) ?? false;
   }
+
   public getFreeWeaponSlots(): { slotIndex: number; weaponId: EntityId }[] {
     const aggSlots = getAggregatedInteractionSlots(this.world, this.id);
     const activeAttacks = this.getComponent('activeAttacks');
-
     const busyGlobalIndices = new Set(activeAttacks?.attacks.map((a: any) => a.slotIndex));
     const freeSlots: { slotIndex: number; weaponId: EntityId }[] = [];
 
@@ -427,6 +352,7 @@ export class EntityAdapter implements IMovable, EntityController {
 
     return freeSlots;
   }
+
   public getPos(): Point {
     return this.pos;
   }

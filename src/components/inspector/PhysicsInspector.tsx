@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { World } from '../../ecs/World';
 import { GameApp } from '../../GameApp';
 import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
@@ -27,8 +27,10 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   const [radius, setRadius] = useState(physStats ? physStats.radius.base : 16);
   const [weight, setWeight] = useState(physStats ? physStats.weight.base : 1);
   const [isSolid, setIsSolid] = useState(physStats ? physStats.isSolid : true);
+  const isFocusedRef = useRef(false);
 
   useEffect(() => {
+    if (isFocusedRef.current) return;
     const comp = world.getComponent(targetId, 'physicsStats');
     if (comp) {
       setRadius(comp.radius.base);
@@ -101,6 +103,12 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
             min={1}
             max={1000}
             step={1}
+            onFocus={() => {
+              isFocusedRef.current = true;
+            }}
+            onBlur={() => {
+              isFocusedRef.current = false;
+            }}
             onChange={(e) => handleUpdate({ radius: Math.max(1, Number(e.target.value)) })}
           />
         )}
@@ -115,6 +123,12 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           min={0.1}
           max={1000}
           step={0.5}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+          }}
           onChange={(e) => handleUpdate({ weight: Math.round(Number(e.target.value) * 10) / 10 })}
         />
       </label>

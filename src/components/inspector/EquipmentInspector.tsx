@@ -93,6 +93,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
               <input
                 disabled={isReadOnly}
                 type="text"
+                key={`area_name_${containerId}_${area.id || idx}`}
                 defaultValue={area.name}
                 style={{
                   width: '45%',
@@ -117,6 +118,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                   <input
                     disabled={isReadOnly}
                     type="number"
+                    key={`area_space_${containerId}_${area.id || idx}`}
                     defaultValue={area.space}
                     style={{
                       width: '36px',
@@ -206,6 +208,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
               <input
                 disabled={isReadOnly}
                 type="text"
+                key={`area_type_${containerId}_${area.id || idx}`}
                 defaultValue={area.type}
                 list="area_types_list"
                 style={{ width: '65%', padding: '2px 4px', fontSize: '11px' }}

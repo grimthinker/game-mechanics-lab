@@ -17,42 +17,45 @@ import { ThreeRenderer } from './rendering/ThreeRenderer';
 import { ThreeSyncSystem } from './ecs/systems/ThreeSyncSystem';
 import { IRenderer } from './rendering/IRenderer';
 import { Point } from './types';
-import { EntityAdapter } from './EntityAdapter';
 import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode } from './config/gameConfig';
 import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
-import { deg2Rad, Radians } from './utils';
-import { HistoryManager, HistoryRecord } from './history/HistoryManager';
-import { GizmoTool, GizmoHandle, GizmoDragState, GizmoInitialEntityData } from './gizmos/types';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
+import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
+import { Circle } from 'detect-collisions';
 import { EventBus } from './core/EventBus';
 import { BTLogicComponent } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
 import { findActiveBrain } from './ecs/utils/anatomy';
-import {
-  SERIALIZABLE_COMPONENT_KEYS,
-  COLLISION_MASK_ALL,
-  COLLISION_MASK_NONE,
-  EquipmentArea,
-} from './ecs/types';
-import { Circle } from 'detect-collisions';
-import { setBaseStat } from './ecs/stats/StatEvaluator';
-import { killEntity } from './ecs/utils/health';
+import { EDITOR_CONFIG } from './config/editorConfig';
+import { deg2Rad, Radians } from './utils';
+
+// Контроллеры редактора
+import { SelectionController } from './editor/SelectionController';
+import { GizmoController } from './editor/GizmoController';
+import { EditorMutationsAPI } from './editor/EditorMutationsAPI';
+
+// Новая система истории (Паттерн Команда)
+import { CommandHistory } from './history/CommandHistory';
+import { TransactionBuilder } from './history/TransactionBuilder';
+import { EntitySnapshotCommand } from './history/commands/EntitySnapshotCommand';
 
 export { EntityAdapter } from './EntityAdapter';
 
-import { EDITOR_CONFIG } from './config/editorConfig';
-import { VISUAL_CONFIG } from './config/visualConfig';
-
 export class GameApp {
   private container: HTMLDivElement;
-  private renderer: IRenderer;
+  public renderer: IRenderer;
   public world: World;
-  public history: HistoryManager = new HistoryManager(EDITOR_CONFIG.historyMaxDepth);
+
+  public commandHistory: CommandHistory = new CommandHistory(EDITOR_CONFIG.historyMaxDepth);
+  public get history(): CommandHistory {
+    return this.commandHistory;
+  }
   private isHistoryAction: boolean = false;
   private mouseScreenPos: Point | null = null;
+
   public physics: PhysicsSystem;
   private movementSystem: MovementSystem;
   private stealthSystem: StealthSystem;
@@ -65,98 +68,29 @@ export class GameApp {
   public interactionSystem: InteractionSystem;
   private areaEffectorSystem: AreaEffectorSystem;
   private modifierSystem: ModifierSystem;
-  private attachmentSystem: AttachmentSystem;
+  public attachmentSystem: AttachmentSystem;
   public camera: Camera;
+
   public activeRendererMode: '2d' | '3d' = '2d';
   public showUIOverlays: boolean = true;
   public showAIDebug: boolean = false;
   public globalTimeScale: number = 1.0;
   public entityFactory: EntityFactory;
-  private serializer: WorldSerializer;
+  public serializer: WorldSerializer;
 
-  public selectedEntityId: string | null = null;
-  public selectedEntityIds: Set<string> = new Set();
-  public hoveredEntityId: string | null = null;
-  private _cachedSelectedEntity: EntityAdapter | null = null;
-
-  // Рамка выделения
-  public marqueeBox: { start: Point; current: Point } | null = null;
-
-  // Интерактивные манипуляторы (Gizmos)
-  public gizmoTool: GizmoTool = 'translate';
-  public hoveredGizmoHandle: GizmoHandle | null = null;
-  public activeGizmoHandle: GizmoHandle | null = null;
-  public gizmoDragState: GizmoDragState | null = null;
-  private gizmoStartSnapshot: HistoryRecord | null = null;
-  private pendingGizmoDragPoint: { point: Point; shiftKey: boolean } | null = null;
-
-  public get selectedEntity(): EntityAdapter | null {
-    if (!this.selectedEntityId) return null;
-    if (!this.world.getEntity(this.selectedEntityId)) {
-      this.selectedEntityId = null;
-      this._cachedSelectedEntity = null;
-      return null;
-    }
-    if (!this._cachedSelectedEntity || this._cachedSelectedEntity.id !== this.selectedEntityId) {
-      this._cachedSelectedEntity = new EntityAdapter(this.selectedEntityId, this.world);
-    }
-    return this._cachedSelectedEntity;
-  }
-
-  public get hoveredEntity(): EntityAdapter | null {
-    if (!this.hoveredEntityId) return null;
-    if (!this.world.getEntity(this.hoveredEntityId)) {
-      this.hoveredEntityId = null;
-      return null;
-    }
-    return new EntityAdapter(this.hoveredEntityId, this.world);
-  }
+  // Контроллеры редактора
+  public selection: SelectionController;
+  public gizmo: GizmoController;
+  public mutations: EditorMutationsAPI;
 
   public onFrame: (() => void) | null = null;
-  public onHistoryChange: (() => void) | null = null;
 
   private lastTime: number = 0;
   private isRunning: boolean = false;
   public isPaused: boolean = false;
-  private timeAccumulator: number = 0;
+
   private lastBTUpdate: number = 0;
   private lastBTTargetId: string | null = null;
-
-  public emitSelectionChanged(): void {
-    EventBus.emit('selection:changed', {
-      selectedEntityId: this.selectedEntityId,
-      selectedEntityIds: Array.from(this.selectedEntityIds),
-    });
-  }
-
-  public updateBTData(force: boolean = false): void {
-    const targetId = this.selectedEntityId;
-    const now = performance.now();
-    if (!force && !this.isPaused && now - this.lastBTUpdate < 100) return;
-    this.lastBTUpdate = now;
-
-    if (!targetId) {
-      if (this.lastBTTargetId !== null) {
-        this.lastBTTargetId = null;
-        EventBus.emit('bt:updated', { btData: null, btBlackboard: null });
-      }
-      return;
-    }
-
-    this.lastBTTargetId = targetId;
-    let brain = this.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
-    if (!brain) {
-      const activeBrainId = findActiveBrain(this.world, targetId);
-      if (activeBrainId) {
-        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
-      }
-    }
-
-    EventBus.emit('bt:updated', {
-      btData: !brain || !brain.root_node ? null : serializeBTNode(brain.root_node),
-      btBlackboard: !brain ? null : { ...brain.blackboard.getData() },
-    });
-  }
 
   public gameMode: GameMode = GameMode.EDITOR;
 
@@ -182,8 +116,20 @@ export class GameApp {
     this.entityFactory = new EntityFactory();
     this.serializer = new WorldSerializer(this);
 
+    // Инициализация контроллеров
+    this.selection = new SelectionController(this);
+    this.gizmo = new GizmoController(this);
+    this.mutations = new EditorMutationsAPI(this.world, this.physics, this.aiSystem);
+
     this.resizeCanvas();
     window.addEventListener('resize', this.handleResize);
+
+    // Подписываемся на смену выделения для фиксации состояния ДО редактирования в Инспекторе
+    EventBus.on('selection:changed', () => {
+      if (this.gameMode === GameMode.EDITOR) {
+        this.captureBaseState();
+      }
+    });
   }
 
   public get canvas(): HTMLCanvasElement {
@@ -228,6 +174,28 @@ export class GameApp {
       position,
       forcedId
     );
+  }
+
+  /**
+   * Возвращает развернутый массив ID, включая части тела и содержимое инвентаря.
+   */
+  public gatherHierarchyIds(rootIds: string[]): string[] {
+    const resultSet = new Set<string>();
+    for (const id of rootIds) {
+      if (resultSet.has(id)) continue;
+
+      resultSet.add(id);
+      const parts = getAnatomyParts(this.world, id);
+
+      for (const partId of parts) {
+        resultSet.add(partId);
+        const items = getAllContainedItems(this.world, partId);
+        for (const itemId of items) {
+          resultSet.add(itemId);
+        }
+      }
+    }
+    return Array.from(resultSet);
   }
 
   private cloneHierarchy(rootId: string, offset: Point): string {
@@ -348,9 +316,10 @@ export class GameApp {
     const validIds = ids.filter((id) => this.world.getEntity(id));
     if (validIds.length === 0) return [];
 
-    this.commitHistory('Клонирование объектов');
+    // При клонировании "до" пустое: оригинальные объекты не меняются
+    const tx = new TransactionBuilder(this, 'Клонирование объектов');
+    tx.captureBefore([]);
 
-    // Исключаем дочерние части тела, если их корень уже выбран в списке на клонирование
     const rootIdsToClone = validIds.filter((id) => {
       const tag = this.world.getComponent(id, 'tag');
       if (tag?.archetype === 'bodyPart') {
@@ -371,7 +340,6 @@ export class GameApp {
       const tag = comp.tag;
       const isModular = tag?.archetype === 'creature' || !!comp.assemblyRoot;
 
-      // Модульные существа и сборки клонируем полным анатомическим графом
       if (isModular) {
         const newRootId = this.cloneHierarchy(id, offset);
         newIds.push(newRootId);
@@ -522,9 +490,12 @@ export class GameApp {
     }
 
     if (newIds.length > 0) {
-      this.selectedEntityIds = new Set(newIds);
-      this.selectEntity(newIds[0], false);
+      this.selection.selectEntities(newIds);
     }
+
+    tx.includeAdded(newIds);
+    tx.commit();
+    this.captureBaseState();
 
     return newIds;
   }
@@ -543,30 +514,31 @@ export class GameApp {
 
   public deleteSelectedEntities(): void {
     const ids = Array.from(
-      this.selectedEntityIds.size > 0
-        ? this.selectedEntityIds
-        : this.selectedEntityId
-          ? [this.selectedEntityId]
+      this.selection.selectedEntityIds.size > 0
+        ? this.selection.selectedEntityIds
+        : this.selection.selectedEntityId
+          ? [this.selection.selectedEntityId]
           : []
     );
 
     if (ids.length === 0) return;
 
-    this.commitHistory('Удаление объектов');
+    const tx = new TransactionBuilder(this, 'Удаление объектов');
+    tx.captureBefore(ids);
 
     for (const id of ids) {
       this.deleteEntityRecursive(id);
-      if (this.hoveredEntityId === id) this.hoveredEntityId = null;
+      if (this.selection.hoveredEntityId === id) this.selection.hoverEntity(null);
     }
 
-    this.selectedEntityIds.clear();
-    this.selectEntity(null, true);
+    this.selection.clear();
+    tx.commit();
+    this.captureBaseState();
   }
 
   private deleteEntityRecursive(id: string): void {
     if (!this.world.getEntity(id)) return;
 
-    // Каскадное удаление анатомических частей тела при удалении существа или связки частей
     const tag = this.world.getComponent(id, 'tag');
     const isAssembly = this.world.getComponent(id, 'assemblyRoot');
     if (tag?.archetype === 'creature' || isAssembly) {
@@ -578,7 +550,6 @@ export class GameApp {
       }
     }
 
-    // Каскадное удаление привязанных дочерних сущностей (ауры, зоны и т.д.)
     const attachedEntities = this.world.getEntitiesWith('attachment');
     for (const [childId, { attachment }] of attachedEntities) {
       if (attachment.parentId === id) {
@@ -621,14 +592,13 @@ export class GameApp {
       this.world.removeEntity(id);
     }
     this.aiSystem.clear();
-    this.selectEntity(null);
-    this.hoverEntity(null);
+    this.selection.clear();
     EventBus.emit('world:updated');
   }
 
   public initDefaultWorld(center?: Point): void {
     this.clearWorld();
-    this.history.clear();
+    this.commandHistory.clear();
     const spawnPos: Point = center ?? {
       x: this.canvas.width / 2,
       y: this.canvas.height / 2,
@@ -646,20 +616,12 @@ export class GameApp {
     this.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 180, y: spawnPos.y });
     this.spawnEntity(
       createZoneConfig('repel', 70, 200, 'Зона отталкивания', false, false, false, true, 7000, 0),
-      {
-        x: spawnPos.x - 180,
-        y: spawnPos.y - 180,
-      }
+      { x: spawnPos.x - 180, y: spawnPos.y - 180 }
     );
     this.spawnEntity(
       createZoneConfig('attract', 70, 200, 'Зона притягивания', false, false, false, true, 7000, 0),
-      {
-        x: spawnPos.x + 180,
-        y: spawnPos.y - 180,
-      }
+      { x: spawnPos.x + 180, y: spawnPos.y - 180 }
     );
-
-    // Зона замедления времени (скорость 0.4x)
     this.spawnEntity(
       createZoneConfig(
         'time_dilation',
@@ -671,13 +633,8 @@ export class GameApp {
         false,
         false
       ),
-      {
-        x: spawnPos.x - 180,
-        y: spawnPos.y + 180,
-      }
+      { x: spawnPos.x - 180, y: spawnPos.y + 180 }
     );
-
-    // Зона ускорения времени (скорость 1.8x)
     this.spawnEntity(
       createZoneConfig(
         'time_dilation',
@@ -689,13 +646,9 @@ export class GameApp {
         false,
         false
       ),
-      {
-        x: spawnPos.x + 180,
-        y: spawnPos.y + 180,
-      }
+      { x: spawnPos.x + 180, y: spawnPos.y + 180 }
     );
 
-    // Начальное разрушаемое препятствие по умолчанию
     this.spawnEntity(
       {
         tag: { archetype: 'obstacle' },
@@ -716,10 +669,8 @@ export class GameApp {
       { x: spawnPos.x, y: spawnPos.y + 160 }
     );
 
-    // Начальный спавн предметов в вертикальный ряд
     const itemsX = spawnPos.x + 80;
 
-    // 1. Оружие с атакой в радиусе (Аура)
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
@@ -734,12 +685,7 @@ export class GameApp {
           equipTimeMultiplier: 1.0,
         },
         physics: { radius: 16, weight: 1, isSolid: true },
-        weaponStats: {
-          baseDamage: 30,
-          prepTime: 0.3,
-          castTime: 0,
-          recoveryTime: 0.4,
-        },
+        weaponStats: { baseDamage: 30, prepTime: 0.3, castTime: 0, recoveryTime: 0.4 },
         weaponZone: {
           hitZoneType: 'radius',
           radius: 50,
@@ -751,7 +697,6 @@ export class GameApp {
       { x: itemsX, y: spawnPos.y - 100 }
     );
 
-    // 2. Оружие с атакой шрапнелью
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
@@ -766,12 +711,7 @@ export class GameApp {
           equipTimeMultiplier: 1.0,
         },
         physics: { radius: 16, weight: 1, isSolid: true },
-        weaponStats: {
-          baseDamage: 15,
-          prepTime: 0.4,
-          castTime: 0,
-          recoveryTime: 0.5,
-        },
+        weaponStats: { baseDamage: 15, prepTime: 0.4, castTime: 0, recoveryTime: 0.5 },
         weaponZone: {
           hitZoneType: 'shrapnel',
           length: 120,
@@ -785,7 +725,6 @@ export class GameApp {
       { x: itemsX, y: spawnPos.y - 50 }
     );
 
-    // 3. Оружие с атакой на линии
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
@@ -800,12 +739,7 @@ export class GameApp {
           equipTimeMultiplier: 1.0,
         },
         physics: { radius: 16, weight: 1, isSolid: true },
-        weaponStats: {
-          baseDamage: 25,
-          prepTime: 0.2,
-          castTime: 0,
-          recoveryTime: 0.3,
-        },
+        weaponStats: { baseDamage: 25, prepTime: 0.2, castTime: 0, recoveryTime: 0.3 },
         weaponZone: {
           hitZoneType: 'forward_line',
           length: 150,
@@ -817,7 +751,6 @@ export class GameApp {
       { x: itemsX, y: spawnPos.y }
     );
 
-    // 4. Броня для туловища, вес 20
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'armor' },
@@ -832,15 +765,11 @@ export class GameApp {
           equipTimeMultiplier: 1.0,
         },
         physics: { radius: 16, weight: 20, isSolid: true },
-        armorStats: {
-          defense: 25,
-          flatReduction: 5,
-        },
+        armorStats: { defense: 25, flatReduction: 5 },
       },
       { x: itemsX, y: spawnPos.y + 50 }
     );
 
-    // 5. Броня для головы, вес 10
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'armor' },
@@ -855,87 +784,9 @@ export class GameApp {
           equipTimeMultiplier: 1.0,
         },
         physics: { radius: 16, weight: 10, isSolid: true },
-        armorStats: {
-          defense: 15,
-          flatReduction: 2,
-        },
+        armorStats: { defense: 15, flatReduction: 2 },
       },
       { x: itemsX, y: spawnPos.y + 100 }
-    );
-
-    // 6. Тестовые стакующиеся предметы: Золотые монеты (maxStack: 50)
-    // Расположены вплотную, при включении симуляции они соприкоснутся и сольются в стак из 35 шт.
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'resource' },
-        item: {
-          name: 'Золотые монеты',
-          type: 'resource',
-          maxStack: 50,
-          count: 15,
-          size: 2,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 12, weight: 0.05, isSolid: true },
-      },
-      { x: itemsX + 50, y: spawnPos.y - 60 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'resource' },
-        item: {
-          name: 'Золотые монеты',
-          type: 'resource',
-          maxStack: 50,
-          count: 20,
-          size: 2,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 12, weight: 0.05, isSolid: true },
-      },
-      { x: itemsX + 50, y: spawnPos.y - 42 }
-    );
-
-    // 7. Тестовые стакующиеся предметы: Патроны 9mm (maxStack: 30)
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'ammo' },
-        item: {
-          name: 'Патроны 9mm',
-          type: 'ammo',
-          maxStack: 30,
-          count: 12,
-          size: 2,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 12, weight: 0.02, isSolid: true },
-      },
-      { x: itemsX + 50, y: spawnPos.y + 20 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'ammo' },
-        item: {
-          name: 'Патроны 9mm',
-          type: 'ammo',
-          maxStack: 30,
-          count: 15,
-          size: 2,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 12, weight: 0.02, isSolid: true },
-      },
-      { x: itemsX + 50, y: spawnPos.y + 38 }
     );
   }
 
@@ -947,79 +798,73 @@ export class GameApp {
     this.serializer.deserializeWorld(data);
   }
 
-  public captureHistoryRecord(description: string = 'Действие'): HistoryRecord {
-    return {
-      description,
-      worldSnapshot: this.serializeWorld(),
-      selectedEntityIds: Array.from(this.selectedEntityIds),
-      selectedEntityId: this.selectedEntityId,
+  private baseStateForCommit: any[] = [];
+  private baseSelectionForCommit = { id: null as string | null, ids: [] as string[] };
+
+  public captureBaseState(): void {
+    const ids = Array.from(this.selection.selectedEntityIds);
+    this.baseStateForCommit = this.serializer.serializeEntities(this.gatherHierarchyIds(ids));
+    this.baseSelectionForCommit = {
+      id: this.selection.selectedEntityId,
+      ids: [...ids],
     };
   }
 
+  /**
+   * Синхронно выполняет действие и сразу упаковывает его в транзакцию Команды.
+   */
+  public executeTransaction<T>(description: string, action: () => T): T {
+    const tx = new TransactionBuilder(this, description);
+    tx.captureBefore(Array.from(this.selection.selectedEntityIds));
+    const result = action();
+    tx.includeAdded(Array.from(this.selection.selectedEntityIds));
+    tx.commit();
+    this.captureBaseState();
+    return result;
+  }
+
+  /**
+   * Синхронно фиксирует изменения, сделанные через поля Инспектора.
+   */
   public commitHistory(description: string = 'Изменение'): void {
-    if (this.gameMode !== GameMode.EDITOR || this.isHistoryAction) return;
-    this.history.pushState(this.captureHistoryRecord(description));
-    if (this.onHistoryChange) {
-      this.onHistoryChange();
-    }
+    if (this.gameMode !== GameMode.EDITOR) return;
+
+    const currentIds = Array.from(this.selection.selectedEntityIds);
+    const currentExpanded = this.gatherHierarchyIds(currentIds);
+
+    const allAffected = new Set<string>();
+    this.baseStateForCommit.forEach((e) => allAffected.add(e.id));
+    currentExpanded.forEach((id) => allAffected.add(id));
+
+    const affectedArr = Array.from(allAffected);
+    const afterEntities = this.serializer.serializeEntities(affectedArr);
+
+    const command = new EntitySnapshotCommand(
+      description,
+      this,
+      affectedArr,
+      this.baseStateForCommit,
+      afterEntities,
+      this.baseSelectionForCommit,
+      { id: this.selection.selectedEntityId, ids: currentIds }
+    );
+
+    this.commandHistory.push(command);
+    this.captureBaseState();
   }
 
   public undo(): boolean {
-    if (this.gameMode !== GameMode.EDITOR || !this.history.canUndo()) return false;
-
-    this.isHistoryAction = true;
-    try {
-      const current = this.captureHistoryRecord('Текущее состояние');
-      const target = this.history.undo(current);
-      if (target) {
-        this.restoreHistoryRecord(target);
-        if (this.onHistoryChange) {
-          this.onHistoryChange();
-        }
-        return true;
-      }
-    } finally {
-      this.isHistoryAction = false;
-    }
-    return false;
+    if (this.gameMode !== GameMode.EDITOR || !this.commandHistory.canUndo()) return false;
+    this.commandHistory.undo();
+    this.captureBaseState();
+    return true;
   }
 
   public redo(): boolean {
-    if (this.gameMode !== GameMode.EDITOR || !this.history.canRedo()) return false;
-
-    this.isHistoryAction = true;
-    try {
-      const current = this.captureHistoryRecord('Текущее состояние');
-      const target = this.history.redo(current);
-      if (target) {
-        this.restoreHistoryRecord(target);
-        if (this.onHistoryChange) {
-          this.onHistoryChange();
-        }
-        return true;
-      }
-    } finally {
-      this.isHistoryAction = false;
-    }
-    return false;
-  }
-
-  private restoreHistoryRecord(record: HistoryRecord): void {
-    this.deserializeWorld(record.worldSnapshot);
-    this.selectedEntityIds.clear();
-    for (const id of record.selectedEntityIds) {
-      if (this.world.getEntity(id)) {
-        this.selectedEntityIds.add(id);
-      }
-    }
-    const targetId =
-      record.selectedEntityId && this.world.getEntity(record.selectedEntityId)
-        ? record.selectedEntityId
-        : (this.selectedEntityIds.values().next().value ?? null);
-    this.selectEntity(targetId, false);
-    this.hoverEntity(null);
-    this.emitSelectionChanged();
-    EventBus.emit('world:updated');
+    if (this.gameMode !== GameMode.EDITOR || !this.commandHistory.canRedo()) return false;
+    this.commandHistory.redo();
+    this.captureBaseState();
+    return true;
   }
 
   public start(): void {
@@ -1037,14 +882,41 @@ export class GameApp {
     }
   }
 
+  public updateBTData(force: boolean = false): void {
+    const targetId = this.selection.selectedEntityId;
+    const now = performance.now();
+    if (!force && !this.isPaused && now - this.lastBTUpdate < 100) return;
+    this.lastBTUpdate = now;
+
+    if (!targetId) {
+      if (this.lastBTTargetId !== null) {
+        this.lastBTTargetId = null;
+        EventBus.emit('bt:updated', { btData: null, btBlackboard: null });
+      }
+      return;
+    }
+
+    this.lastBTTargetId = targetId;
+    let brain = this.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
+    if (!brain) {
+      const activeBrainId = findActiveBrain(this.world, targetId);
+      if (activeBrainId) {
+        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
+      }
+    }
+
+    EventBus.emit('bt:updated', {
+      btData: !brain || !brain.root_node ? null : serializeBTNode(brain.root_node),
+      btBlackboard: !brain ? null : { ...brain.blackboard.getData() },
+    });
+  }
+
   private updateSystems(dt: number): void {
     if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
       const worldPoint = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
       this.updatePlayerAim(worldPoint);
     }
 
-    // AnatomySystem работает перед модификаторами и физикой,
-    // чтобы актуализировать графы и базовые статы (вес/радиус)
     this.anatomySystem.update(dt, this.world, this.physics);
     this.modifierSystem.update(dt, this.world);
     this.aiSystem.update(dt, this.world);
@@ -1066,11 +938,7 @@ export class GameApp {
 
     if (!this.isPaused) {
       const simulatedDt = realDt * this.globalTimeScale;
-      const MAX_SUBSTEP = 1 / 60; // Максимально допустимый шаг физики/логики
-
-      // Настоящий Temporal Sub-stepping:
-      // При слоу-мо (< 1.0) делаем ровно 1 шаг за кадр рендера с малым dt (плавные 60 FPS без рывков).
-      // При ускорении (> 1.0) или лагах дробим вызов на безопасные субстепы <= 1/60 сек.
+      const MAX_SUBSTEP = 1 / 60;
       const steps = Math.min(10, Math.max(1, Math.ceil(simulatedDt / MAX_SUBSTEP)));
       const stepDt = simulatedDt / steps;
 
@@ -1095,35 +963,43 @@ export class GameApp {
     if (this.activeRendererMode === '2d') {
       this.canvasRenderSyncSystem.update(realDt, this.world, this.gameMode);
     } else if (this.activeRendererMode === '3d' && this.threeSyncSystem) {
-      this.threeSyncSystem.update(realDt, this.world, this.gameMode, this.selectedEntityIds);
+      this.threeSyncSystem.update(
+        realDt,
+        this.world,
+        this.gameMode,
+        this.selection.selectedEntityIds
+      );
     }
 
-    // Применяем накопленный ввод манипулятора строго 1 раз за кадр рендера (RAF Throttling)
-    this.applyPendingGizmoDrag();
+    this.gizmo.applyPendingDrag();
 
     let gizmoRenderData: import('./gizmos/types').GizmoRenderData | null = null;
-    if (this.gameMode === GameMode.EDITOR && this.selectedEntityId && this.gizmoTool !== 'select') {
-      const transform = this.world.getComponent(this.selectedEntityId, 'transform');
+    if (
+      this.gameMode === GameMode.EDITOR &&
+      this.selection.selectedEntityId &&
+      this.gizmo.tool !== 'select'
+    ) {
+      const transform = this.world.getComponent(this.selection.selectedEntityId, 'transform');
       if (transform) {
         let dragDelta: Point | undefined = undefined;
         let dragDeltaAngle: number | undefined = undefined;
 
-        if (this.gizmoDragState) {
+        if (this.gizmo.dragState) {
           dragDelta = {
-            x: transform.x - this.gizmoDragState.anchorPos.x,
-            y: transform.y - this.gizmoDragState.anchorPos.y,
+            x: transform.x - this.gizmo.dragState.anchorPos.x,
+            y: transform.y - this.gizmo.dragState.anchorPos.y,
           };
-          dragDeltaAngle = this.gizmoDragState.appliedDeltaAngle;
+          dragDeltaAngle = this.gizmo.dragState.appliedDeltaAngle;
         }
 
         gizmoRenderData = {
-          tool: this.gizmoTool,
+          tool: this.gizmo.tool,
           position: { x: transform.x, y: transform.y },
           angle: transform.angle,
-          initialAngle: this.gizmoDragState?.initialAnchorAngle,
-          hoveredHandle: this.hoveredGizmoHandle,
-          activeHandle: this.activeGizmoHandle,
-          isDragging: this.isGizmoDragging(),
+          initialAngle: this.gizmo.dragState?.initialAnchorAngle,
+          hoveredHandle: this.gizmo.hoveredHandle,
+          activeHandle: this.gizmo.activeHandle,
+          isDragging: this.gizmo.isDragging(),
           dragDelta,
           dragDeltaAngle,
         };
@@ -1136,10 +1012,10 @@ export class GameApp {
       physics: this.physics,
       gameMode: this.gameMode,
       editorData: {
-        selectedId: this.selectedEntityId,
-        selectedIds: this.selectedEntityIds,
-        hoveredId: this.hoveredEntityId,
-        marqueeBox: this.marqueeBox,
+        selectedId: this.selection.selectedEntityId,
+        selectedIds: this.selection.selectedEntityIds,
+        hoveredId: this.selection.hoveredEntityId,
+        marqueeBox: this.selection.marqueeBox,
         gizmo: gizmoRenderData,
         showAIDebug: this.showAIDebug,
       },
@@ -1148,151 +1024,6 @@ export class GameApp {
     if (this.onFrame) this.onFrame();
 
     requestAnimationFrame((t) => this.loop(t));
-  }
-
-  public selectEntity(id: string | null, clearGroup: boolean = false): void {
-    let changed = false;
-
-    if (clearGroup) {
-      if (this.selectedEntityIds.size !== (id ? 1 : 0) || (id && !this.selectedEntityIds.has(id))) {
-        changed = true;
-      }
-      this.selectedEntityIds.clear();
-      if (id) this.selectedEntityIds.add(id);
-    } else if (id && !this.selectedEntityIds.has(id)) {
-      this.selectedEntityIds.add(id);
-      changed = true;
-    }
-
-    if (this.selectedEntityId !== id) {
-      this.selectedEntityId = id;
-      this._cachedSelectedEntity = id ? new EntityAdapter(id, this.world) : null;
-      changed = true;
-    }
-
-    if (changed) {
-      this.emitSelectionChanged();
-      this.updateBTData(true);
-    }
-  }
-
-  public selectEntities(ids: string[]): void {
-    this.selectedEntityIds = new Set(ids);
-    this.selectEntity(ids.length > 0 ? ids[0] : null, false);
-    this.emitSelectionChanged();
-  }
-
-  public deselectEntity(id: string): void {
-    this.selectedEntityIds.delete(id);
-    if (this.selectedEntityId === id) {
-      const next = this.selectedEntityIds.values().next().value ?? null;
-      this.selectEntity(next, false);
-    } else {
-      this.emitSelectionChanged();
-    }
-  }
-
-  public startMarquee(startPoint: Point): void {
-    this.marqueeBox = { start: startPoint, current: startPoint };
-  }
-
-  public updateMarquee(currentPoint: Point): void {
-    if (this.marqueeBox) {
-      this.marqueeBox.current = currentPoint;
-    }
-  }
-
-  public endMarquee(typeFilters: Record<string, boolean>): string[] {
-    if (!this.marqueeBox) return [];
-    const start = this.marqueeBox.start;
-    const current = this.marqueeBox.current;
-    this.marqueeBox = null;
-
-    // Если клик без растягивания (меньше порога в экранных пикселях) — сбрасываем выбор
-    if (Math.hypot(current.x - start.x, current.y - start.y) < EDITOR_CONFIG.marqueeThresholdPx) {
-      this.selectEntity(null, true);
-      return [];
-    }
-
-    const canvasRect = this.canvas.getBoundingClientRect();
-
-    // Получаем 4 угла экранной рамки
-    const startX = start.x + canvasRect.left;
-    const startY = start.y + canvasRect.top;
-    const currentX = current.x + canvasRect.left;
-    const currentY = current.y + canvasRect.top;
-
-    // Переводим их в мировые координаты (получаем полигон с учетом вращения/зума)
-    const p1 = this.getCanvasPoint(startX, startY);
-    const p2 = this.getCanvasPoint(currentX, startY);
-    const p3 = this.getCanvasPoint(currentX, currentY);
-    const p4 = this.getCanvasPoint(startX, currentY);
-
-    // Запрашиваем сущности внутри этого ориентированного полигона
-    const rawIds = this.physics.queryEntitiesInPolygon([p1, p2, p3, p4]);
-    const filteredIds: string[] = [];
-
-    for (const id of rawIds) {
-      const renderable = this.world.getComponent(id, 'renderable');
-      if (renderable && !renderable.isVisible) continue;
-
-      const tag = this.world.getComponent(id, 'tag');
-      const meta = this.world.getComponent(id, 'meta');
-      const archetype = tag?.archetype ?? meta?.entityType ?? 'creature';
-
-      if (typeFilters && typeFilters[archetype] === false) {
-        continue;
-      }
-
-      filteredIds.push(id);
-    }
-
-    this.selectedEntityIds = new Set(filteredIds);
-    this.selectEntity(filteredIds.length > 0 ? filteredIds[0] : null, false);
-    return filteredIds;
-  }
-
-  public hoverEntity(id: string | null): void {
-    if (this.hoveredEntityId === id) return;
-    this.hoveredEntityId = id;
-  }
-
-  public pickEntityAt(worldPoint: Point, clientX?: number, clientY?: number): string | null {
-    if (
-      this.activeRendererMode === '3d' &&
-      clientX !== undefined &&
-      clientY !== undefined &&
-      this.renderer.pickEntity
-    ) {
-      const hit3dId = this.renderer.pickEntity(clientX, clientY);
-      if (hit3dId) return hit3dId;
-    }
-
-    const isEditor = this.gameMode === GameMode.EDITOR;
-    const hitIds = this.physics.queryPointAt(worldPoint);
-    const hits: { id: string; zIndex: number }[] = [];
-
-    for (const entityId of hitIds) {
-      const renderable = this.world.getComponent(entityId, 'renderable');
-      if (renderable && !renderable.isVisible) continue;
-
-      const physicsBody = this.world.getComponent(entityId, 'physicsBody');
-      const physStats = this.world.getComponent(entityId, 'physicsStats');
-      if (!isEditor && !physicsBody && !physStats) continue;
-
-      hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
-    }
-
-    if (hits.length > 0) {
-      hits.sort((a, b) => b.zIndex - a.zIndex);
-      return hits[0].id;
-    }
-
-    if (isEditor) {
-      return this.pickNearestEntity(worldPoint);
-    }
-
-    return null;
   }
 
   public setMouseScreenPos(clientX: number | null, clientY: number | null): void {
@@ -1324,44 +1055,6 @@ export class GameApp {
     }
   }
 
-  public pickNearestEntity(
-    worldPoint: Point,
-    maxDistanceRatio: number = VISUAL_CONFIG.creatureHoverScreenRatio
-  ): string | null {
-    const isEditor = this.gameMode === GameMode.EDITOR;
-    const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
-    const maxWorldDist = maxScreenDistancePx / this.camera.scale;
-
-    const candidates = this.physics.queryEntitiesInRadius(worldPoint, maxWorldDist);
-
-    let nearestId: string | null = null;
-    let minDistance = Infinity;
-    let bestZIndex = -Infinity;
-
-    for (const { id: entityId, overlap } of candidates) {
-      const renderable = this.world.getComponent(entityId, 'renderable');
-      if (renderable && !renderable.isVisible) continue;
-
-      const physicsBody = this.world.getComponent(entityId, 'physicsBody');
-      const physStats = this.world.getComponent(entityId, 'physicsStats');
-      if (!isEditor && !physicsBody && !physStats) continue;
-
-      const distToBoundary = Math.max(0, maxWorldDist - overlap);
-      const zIndex = renderable?.zIndex ?? 0;
-
-      if (distToBoundary < minDistance - 0.001) {
-        minDistance = distToBoundary;
-        nearestId = entityId;
-        bestZIndex = zIndex;
-      } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
-        nearestId = entityId;
-        bestZIndex = zIndex;
-      }
-    }
-
-    return nearestId;
-  }
-
   public startPan(clientX: number, clientY: number): void {
     this.camera.startPan(clientX, clientY);
   }
@@ -1378,735 +1071,86 @@ export class GameApp {
     return this.renderer.screenToWorld(clientX, clientY, this.camera);
   }
 
-  // --- Управление манипуляторами (Gizmo Controller) ---
-
-  public setPendingGizmoDrag(point: Point, shiftKey: boolean): void {
-    this.pendingGizmoDragPoint = { point, shiftKey };
-  }
-
-  private applyPendingGizmoDrag(): void {
-    if (!this.pendingGizmoDragPoint || !this.gizmoDragState) return;
-    const { point, shiftKey } = this.pendingGizmoDragPoint;
-    this.pendingGizmoDragPoint = null;
-    this.updateGizmoDrag(point, shiftKey);
-  }
-
-  public hitTestGizmo(worldPoint: Point): import('./gizmos/types').GizmoHandle | null {
-    if (!this.selectedEntityId || this.gizmoTool === 'select') return null;
-    const transform = this.world.getComponent(this.selectedEntityId, 'transform');
-    if (!transform) return null;
-
-    const invScale = 1 / this.camera.scale;
-    const gx = transform.x;
-    const gy = transform.y;
-    const mx = worldPoint.x;
-    const my = worldPoint.y;
-
-    if (this.gizmoTool === 'translate') {
-      const centerSize = 14 * invScale;
-      if (Math.abs(mx - gx) <= centerSize / 2 && Math.abs(my - gy) <= centerSize / 2) {
-        return 'center';
-      }
-
-      const axisLen = 65 * invScale;
-      const hitTolerance = 9 * invScale;
-
-      if (
-        mx >= gx + centerSize / 2 &&
-        mx <= gx + axisLen + 15 * invScale &&
-        Math.abs(my - gy) <= hitTolerance
-      ) {
-        return 'x';
-      }
-
-      if (
-        my >= gy + centerSize / 2 &&
-        my <= gy + axisLen + 15 * invScale &&
-        Math.abs(mx - gx) <= hitTolerance
-      ) {
-        return 'y';
-      }
-    } else if (this.gizmoTool === 'rotate') {
-      const ringRadius = 55 * invScale;
-      const ringThickness = 10 * invScale;
-      const dist = Math.hypot(mx - gx, my - gy);
-      if (Math.abs(dist - ringRadius) <= ringThickness) {
-        return 'rotate';
-      }
-    }
-
-    return null;
-  }
-
-  public startGizmoDrag(handle: GizmoHandle, worldPoint: Point): boolean {
-    if (!this.selectedEntityId) return false;
-    const anchorTransform = this.world.getComponent(this.selectedEntityId, 'transform');
-    if (!anchorTransform) return false;
-
-    // Фиксируем снимок мира ДО начала трансформации для корректной работы Undo (Ctrl+Z)
-    this.gizmoStartSnapshot = this.captureHistoryRecord('Трансформация манипулятором');
-
-    const initialEntities = new Map<string, GizmoInitialEntityData>();
-    const idsToDrag = this.selectedEntityIds.has(this.selectedEntityId)
-      ? Array.from(this.selectedEntityIds)
-      : [this.selectedEntityId];
-
-    for (const entId of idsToDrag) {
-      const t = this.world.getComponent(entId, 'transform');
-      if (t) {
-        initialEntities.set(entId, {
-          pos: { x: t.x, y: t.y },
-          angle: t.angle,
-        });
-      }
-    }
-
-    const anchorPos = { x: anchorTransform.x, y: anchorTransform.y };
-    const startAngle = Math.atan2(worldPoint.y - anchorPos.y, worldPoint.x - anchorPos.x);
-
-    this.activeGizmoHandle = handle;
-    this.gizmoDragState = {
-      tool: this.gizmoTool,
-      handle,
-      startPoint: { x: worldPoint.x, y: worldPoint.y },
-      currentPoint: { x: worldPoint.x, y: worldPoint.y },
-      anchorPos,
-      startAngle,
-      currentAngle: startAngle,
-      initialAnchorAngle: anchorTransform.angle,
-      appliedDeltaAngle: 0,
-      initialEntities,
-    };
-
-    return true;
-  }
-
-  public updateGizmoDrag(worldPoint: Point, shiftKey: boolean = false): void {
-    if (!this.gizmoDragState) return;
-
-    this.gizmoDragState.currentPoint = { x: worldPoint.x, y: worldPoint.y };
-
-    if (this.gizmoDragState.tool === 'translate') {
-      let rawDx = worldPoint.x - this.gizmoDragState.startPoint.x;
-      let rawDy = worldPoint.y - this.gizmoDragState.startPoint.y;
-
-      if (this.gizmoDragState.handle === 'x') {
-        rawDy = 0;
-      } else if (this.gizmoDragState.handle === 'y') {
-        rawDx = 0;
-      }
-
-      if (shiftKey) {
-        const snapGrid = EDITOR_CONFIG.gridSnapSize;
-        rawDx = Math.round(rawDx / snapGrid) * snapGrid;
-        rawDy = Math.round(rawDy / snapGrid) * snapGrid;
-      }
-
-      for (const [entId, initData] of this.gizmoDragState.initialEntities.entries()) {
-        const t = this.world.getComponent(entId, 'transform');
-        const phys = this.world.getComponent(entId, 'physicsBody');
-        const newX = initData.pos.x + rawDx;
-        const newY = initData.pos.y + rawDy;
-
-        if (t) {
-          t.x = newX;
-          t.y = newY;
-        }
-        if (phys && phys.body) {
-          phys.body.setPosition(newX, newY);
-          this.physics.system.updateBody(phys.body);
-        }
-      }
-      this.attachmentSystem.update(this.world, this.physics);
-    } else if (this.gizmoDragState.tool === 'rotate') {
-      const anchor = this.gizmoDragState.anchorPos;
-      const currentAngle = Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x);
-      this.gizmoDragState.currentAngle = currentAngle;
-
-      // Нормализация разницы углов для предотвращения скачка при переходе через шов ±180°
-      let deltaAngle = currentAngle - this.gizmoDragState.startAngle;
-      deltaAngle = Math.atan2(Math.sin(deltaAngle), Math.cos(deltaAngle));
-
-      if (shiftKey) {
-        const snapStep = EDITOR_CONFIG.angleSnapStep;
-        deltaAngle = Math.round(deltaAngle / snapStep) * snapStep;
-      }
-
-      this.gizmoDragState.appliedDeltaAngle = deltaAngle;
-
-      for (const [entId, initData] of this.gizmoDragState.initialEntities.entries()) {
-        const t = this.world.getComponent(entId, 'transform');
-        const phys = this.world.getComponent(entId, 'physicsBody');
-
-        let newAngle = (initData.angle + deltaAngle) % (Math.PI * 2);
-        if (newAngle > Math.PI) newAngle -= Math.PI * 2;
-        if (newAngle < -Math.PI) newAngle += Math.PI * 2;
-
-        let newX = initData.pos.x;
-        let newY = initData.pos.y;
-
-        if (this.gizmoDragState.initialEntities.size > 1) {
-          const relX = initData.pos.x - anchor.x;
-          const relY = initData.pos.y - anchor.y;
-          newX = anchor.x + relX * Math.cos(deltaAngle) - relY * Math.sin(deltaAngle);
-          newY = anchor.y + relX * Math.sin(deltaAngle) + relY * Math.cos(deltaAngle);
-        }
-
-        if (t) {
-          t.x = newX;
-          t.y = newY;
-          t.angle = newAngle as Radians;
-        }
-        if (phys && phys.body) {
-          phys.body.setPosition(newX, newY);
-          if (typeof phys.body.setAngle === 'function') {
-            phys.body.setAngle(newAngle);
-          }
-          this.physics.system.updateBody(phys.body);
-        }
-      }
-      this.attachmentSystem.update(this.world, this.physics);
-    }
-  }
-
-  public endGizmoDrag(): void {
-    if (!this.gizmoDragState) return;
-
-    // Применяем последний необработанный кадр ввода перед фиксацией в истории
-    this.applyPendingGizmoDrag();
-
-    if (this.gizmoDragState.tool === 'translate') {
-      const dx = this.gizmoDragState.currentPoint.x - this.gizmoDragState.startPoint.x;
-      const dy = this.gizmoDragState.currentPoint.y - this.gizmoDragState.startPoint.y;
-      if (Math.hypot(dx, dy) > 0.5 && this.gizmoStartSnapshot) {
-        this.gizmoStartSnapshot.description = 'Смещение манипулятором';
-        this.history.pushState(this.gizmoStartSnapshot);
-      }
-    } else if (this.gizmoDragState.tool === 'rotate') {
-      let rawDelta = this.gizmoDragState.currentAngle - this.gizmoDragState.startAngle;
-      const deltaAngle = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta));
-      if (Math.abs(deltaAngle) > 0.01 && this.gizmoStartSnapshot) {
-        this.gizmoStartSnapshot.description = 'Вращение манипулятором';
-        this.history.pushState(this.gizmoStartSnapshot);
-      }
-    }
-
-    this.cancelGizmoDrag(false);
-  }
-
-  public cancelGizmoDrag(revert: boolean = false): void {
-    this.pendingGizmoDragPoint = null;
-    if (revert && this.gizmoDragState) {
-      for (const [entId, initData] of this.gizmoDragState.initialEntities.entries()) {
-        const t = this.world.getComponent(entId, 'transform');
-        const phys = this.world.getComponent(entId, 'physicsBody');
-        if (t) {
-          t.x = initData.pos.x;
-          t.y = initData.pos.y;
-          t.angle = initData.angle;
-        }
-        if (phys && phys.body) {
-          phys.body.setPosition(initData.pos.x, initData.pos.y);
-          if (typeof phys.body.setAngle === 'function') {
-            phys.body.setAngle(initData.angle);
-          }
-          this.physics.system.updateBody(phys.body);
-        }
-      }
-      this.attachmentSystem.update(this.world, this.physics);
-    }
-    this.activeGizmoHandle = null;
-    this.gizmoDragState = null;
-    this.gizmoStartSnapshot = null;
-  }
-
-  public isGizmoDragging(): boolean {
-    return this.gizmoDragState !== null;
-  }
-
-  // --- Методы мутации данных сущностей для редактора (Editor API) ---
+  // --- Методы-фасады (delegates) для обратной совместимости с Инспектором ---
 
   public updateEntityMeta(id: string, patch: { name?: string; destructible?: boolean }): boolean {
-    const meta = this.world.getComponent(id, 'meta');
-    const item = this.world.getComponent(id, 'item');
-    let changed = false;
-
-    if (meta && patch.name !== undefined && meta.name !== patch.name) {
-      meta.name = patch.name;
-      changed = true;
-    }
-    if (item && patch.name !== undefined && item.name !== patch.name) {
-      item.name = patch.name;
-      changed = true;
-    }
-    if (meta && patch.destructible !== undefined && meta.destructible !== patch.destructible) {
-      meta.destructible = patch.destructible;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityMeta(id, patch);
   }
 
   public updateEntityPhysics(
     id: string,
     patch: { radius?: number; weight?: number; isSolid?: boolean }
   ): boolean {
-    const physStats = this.world.getComponent(id, 'physicsStats');
-    const physBody = this.world.getComponent(id, 'physicsBody');
-    if (!physStats) return false;
-    let changed = false;
-
-    if (patch.radius !== undefined && physStats.radius.base !== patch.radius) {
-      setBaseStat(physStats.radius, patch.radius);
-      if (physBody && 'r' in physBody.body) {
-        (physBody.body as Circle).r = patch.radius;
-      }
-      changed = true;
-    }
-    if (patch.weight !== undefined && physStats.weight.base !== patch.weight) {
-      setBaseStat(physStats.weight, patch.weight);
-      changed = true;
-    }
-    if (patch.isSolid !== undefined && physStats.isSolid !== patch.isSolid) {
-      physStats.isSolid = patch.isSolid;
-      if (physBody) {
-        physBody.mask = patch.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-      }
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityPhysics(id, patch);
   }
 
   public updateEntityHealth(id: string, patch: { hp?: number; maxHp?: number }): boolean {
-    const health = this.world.getComponent(id, 'health');
-    if (!health) return false;
-    let changed = false;
-
-    if (patch.maxHp !== undefined && health.max.base !== patch.maxHp) {
-      setBaseStat(health.max, Math.max(1, patch.maxHp));
-      changed = true;
-    }
-    if (patch.hp !== undefined && health.current !== patch.hp) {
-      health.current = Math.min(health.max.current, Math.max(0, patch.hp));
-      if (health.current <= 0) {
-        killEntity(this.world, id);
-      } else {
-        health.isAlive = true;
-      }
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityHealth(id, patch);
   }
 
   public updateEntityFunctionalHealth(id: string, patch: { fp?: number; maxFp?: number }): boolean {
-    const fp = this.world.getComponent(id, 'functionalHealth');
-    if (!fp) return false;
-    let changed = false;
-
-    if (patch.maxFp !== undefined && fp.max.base !== patch.maxFp) {
-      setBaseStat(fp.max, Math.max(1, patch.maxFp));
-      changed = true;
-    }
-    if (patch.fp !== undefined && fp.current !== patch.fp) {
-      fp.current = Math.min(fp.max.current, Math.max(-2 * fp.max.current, patch.fp));
-      fp.isFunctional = fp.current >= 0;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityFunctionalHealth(id, patch);
   }
 
   public updateEntitySocketLinkStrength(id: string, socketId: string, strength: number): boolean {
-    const socketLink = this.world.getComponent(id, 'socketLink');
-    const link = socketLink?.links[socketId];
-    if (!link) return false;
-    link.currentStrength = strength;
-
-    const targetLink = this.world.getComponent(link.targetEntityId, 'socketLink')?.links[
-      link.targetSocketId
-    ];
-    if (targetLink) {
-      targetLink.currentStrength = strength;
-    }
-    return true;
+    return this.mutations.updateEntitySocketLinkStrength(id, socketId, strength);
   }
 
   public updateEntityMovementStats(id: string, patch: any): boolean {
-    const ms = this.world.getComponent(id, 'movementStats');
-    if (!ms) return false;
-    let changed = false;
-
-    if (patch.maxSpeed !== undefined && ms.maxSpeed.base !== patch.maxSpeed) {
-      setBaseStat(ms.maxSpeed, patch.maxSpeed);
-      changed = true;
-    }
-    if (patch.maxTurnSpeed !== undefined) {
-      const draftTurn = deg2Rad(patch.maxTurnSpeed);
-      if (ms.maxTurnSpeed.base !== draftTurn) {
-        setBaseStat(ms.maxTurnSpeed, draftTurn);
-        changed = true;
-      }
-    }
-    const multipliers = [
-      'runSpeedMultiplier',
-      'crouchSpeedMultiplier',
-      'proneSpeedMultiplier',
-      'walkSpeedMultiplier',
-      'runTurnMultiplier',
-      'crouchTurnMultiplier',
-      'proneTurnMultiplier',
-      'walkTurnMultiplier',
-      'turnInPlaceTurnMultiplier',
-      'strafeSpeedMultiplier',
-      'backwardSpeedMultiplier',
-      'strafeTurnMultiplier',
-      'backwardTurnMultiplier',
-      'pickupSpeedMultiplier',
-      'pickupTurnMultiplier',
-    ] as const;
-
-    for (const m of multipliers) {
-      if (patch[m] !== undefined && (ms as any)[m] !== patch[m]) {
-        (ms as any)[m] = patch[m];
-        changed = true;
-      }
-    }
-
-    const transitionTimes = [
-      'standToCrouchTime',
-      'crouchToStandTime',
-      'standToProneTime',
-      'proneToStandTime',
-      'crouchToProneTime',
-      'proneToCrouchTime',
-    ] as const;
-
-    for (const t of transitionTimes) {
-      if (patch[t] !== undefined && (ms as any)[t]?.base !== patch[t]) {
-        setBaseStat((ms as any)[t], patch[t]);
-        changed = true;
-      }
-    }
-    return changed;
+    return this.mutations.updateEntityMovementStats(id, patch);
   }
 
   public updateEntityStealthStats(id: string, patch: any): boolean {
-    const st = this.world.getComponent(id, 'stealthStats');
-    if (!st) return false;
-    let changed = false;
-
-    if (patch.stealthPower !== undefined && st.stealthPower.base !== patch.stealthPower) {
-      setBaseStat(st.stealthPower, patch.stealthPower);
-      changed = true;
-    }
-    const multipliers = [
-      'crouchStealthMultiplier',
-      'proneStealthMultiplier',
-      'runStealthMultiplier',
-      'walkStealthMultiplier',
-      'turnInPlaceStealthMultiplier',
-      'immobileStealthMultiplier',
-    ] as const;
-
-    for (const m of multipliers) {
-      if (patch[m] !== undefined && (st as any)[m] !== patch[m]) {
-        (st as any)[m] = patch[m];
-        changed = true;
-      }
-    }
-    return changed;
+    return this.mutations.updateEntityStealthStats(id, patch);
   }
 
   public updateEntityAIBehavior(id: string, behavior: string): boolean {
-    const aiStats = this.world.getComponent(id, 'aiStats');
-    if (!aiStats || aiStats.behavior.current === behavior) return false;
-    aiStats.behavior.current = behavior;
-    aiStats.behavior.base = behavior;
-    this.aiSystem.initBotBrain(this.world, id, behavior);
-    return true;
+    return this.mutations.updateEntityAIBehavior(id, behavior);
   }
 
   public updateEntityAreaEffector(id: string, patch: any): boolean {
-    const effector = this.world.getComponent(id, 'areaEffector');
-    const physStats = this.world.getComponent(id, 'physicsStats');
-    const physBody = this.world.getComponent(id, 'physicsBody');
-    if (!effector) return false;
-
-    Object.assign(effector, patch);
-    if (patch.radius !== undefined) {
-      if (physStats && physStats.radius.base !== patch.radius) {
-        setBaseStat(physStats.radius, patch.radius);
-      }
-      if (physBody && 'r' in physBody.body) {
-        (physBody.body as Circle).r = patch.radius;
-      }
-    }
-    return true;
+    return this.mutations.updateEntityAreaEffector(id, patch);
   }
 
   public updateEntityWeapon(id: string, patch: any): boolean {
-    const item = this.world.getComponent(id, 'item');
-    const wStats = this.world.getComponent(id, 'weaponStats');
-    const wZone = this.world.getComponent(id, 'weaponZone');
-    let changed = false;
-
-    if (item && item.type === 'weapon') {
-      if (patch.size !== undefined && item.size !== patch.size) {
-        item.size = patch.size;
-        changed = true;
-      }
-      if (
-        patch.equipTypes !== undefined &&
-        JSON.stringify(item.equipTypes) !== JSON.stringify(patch.equipTypes)
-      ) {
-        item.equipTypes = [...patch.equipTypes];
-        changed = true;
-      }
-      if (patch.equippable !== undefined && item.equippable !== patch.equippable) {
-        item.equippable = patch.equippable;
-        changed = true;
-      }
-      if (
-        patch.equipTimeMultiplier !== undefined &&
-        item.equipTimeMultiplier !== patch.equipTimeMultiplier
-      ) {
-        item.equipTimeMultiplier = patch.equipTimeMultiplier;
-        changed = true;
-      }
-    }
-
-    if (wStats) {
-      if (patch.baseDamage !== undefined && wStats.baseDamage.base !== patch.baseDamage) {
-        setBaseStat(wStats.baseDamage, patch.baseDamage);
-        changed = true;
-      }
-      if (patch.prepTime !== undefined && wStats.prepTime.base !== patch.prepTime) {
-        setBaseStat(wStats.prepTime, patch.prepTime);
-        changed = true;
-      }
-      if (patch.recoveryTime !== undefined && wStats.recoveryTime.base !== patch.recoveryTime) {
-        setBaseStat(wStats.recoveryTime, patch.recoveryTime);
-        changed = true;
-      }
-    }
-
-    if (wZone) {
-      if (patch.hitZoneType !== undefined) wZone.hitZoneType = patch.hitZoneType;
-      if (patch.radius !== undefined) wZone.radius = patch.radius;
-      if (patch.length !== undefined) wZone.length = patch.length;
-      if (patch.angle !== undefined) wZone.angle = deg2Rad(patch.angle);
-      if (patch.rayCount !== undefined) wZone.rayCount = patch.rayCount;
-      if (patch.pierceObstacles !== undefined) wZone.pierceObstacles = patch.pierceObstacles;
-      if (patch.pierceCreatures !== undefined) wZone.pierceCreatures = patch.pierceCreatures;
-      if (patch.pierceItems !== undefined) wZone.pierceItems = patch.pierceItems;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityWeapon(id, patch);
   }
 
   public updateEntityArmor(id: string, patch: any): boolean {
-    const item = this.world.getComponent(id, 'item');
-    const aStats = this.world.getComponent(id, 'armorStats');
-    const meta = this.world.getComponent(id, 'meta');
-    let changed = false;
-
-    if (item && item.type === 'armor') {
-      if (patch.size !== undefined && item.size !== patch.size) {
-        item.size = patch.size;
-        changed = true;
-      }
-      if (
-        patch.equipTypes !== undefined &&
-        JSON.stringify(item.equipTypes) !== JSON.stringify(patch.equipTypes)
-      ) {
-        item.equipTypes = [...patch.equipTypes];
-        changed = true;
-      }
-      if (patch.equippable !== undefined && item.equippable !== patch.equippable) {
-        item.equippable = patch.equippable;
-        changed = true;
-      }
-      if (
-        patch.equipTimeMultiplier !== undefined &&
-        item.equipTimeMultiplier !== patch.equipTimeMultiplier
-      ) {
-        item.equipTimeMultiplier = patch.equipTimeMultiplier;
-        changed = true;
-      }
-    }
-
-    if (aStats) {
-      if (patch.defense !== undefined && aStats.defense.base !== patch.defense) {
-        setBaseStat(aStats.defense, patch.defense);
-        changed = true;
-      }
-      if (patch.flatReduction !== undefined && aStats.flatReduction.base !== patch.flatReduction) {
-        setBaseStat(aStats.flatReduction, patch.flatReduction);
-        changed = true;
-      }
-    } else if (meta?.entityType === 'creature') {
-      let selfArmor = this.world.getComponent(id, 'armorStats');
-      if (!selfArmor) {
-        this.world.addComponent(id, 'armorStats', {
-          defense: { base: 0, current: 0 },
-          flatReduction: { base: 0, current: 0 },
-        });
-        selfArmor = this.world.getComponent(id, 'armorStats');
-      }
-      if (selfArmor) {
-        if (patch.defense !== undefined && selfArmor.defense.base !== patch.defense) {
-          setBaseStat(selfArmor.defense, patch.defense);
-          changed = true;
-        }
-        if (
-          patch.flatReduction !== undefined &&
-          selfArmor.flatReduction.base !== patch.flatReduction
-        ) {
-          setBaseStat(selfArmor.flatReduction, patch.flatReduction);
-          changed = true;
-        }
-      }
-    }
-    return changed;
+    return this.mutations.updateEntityArmor(id, patch);
   }
 
   public updateEntityGenericItem(id: string, patch: any): boolean {
-    const item = this.world.getComponent(id, 'item');
-    if (!item) return false;
-    let changed = false;
-
-    if (patch.size !== undefined && item.size !== patch.size) {
-      item.size = patch.size;
-      changed = true;
-    }
-    if (
-      patch.equipTypes !== undefined &&
-      JSON.stringify(item.equipTypes) !== JSON.stringify(patch.equipTypes)
-    ) {
-      item.equipTypes = [...patch.equipTypes];
-      changed = true;
-    }
-    if (patch.equippable !== undefined && item.equippable !== patch.equippable) {
-      item.equippable = patch.equippable;
-      changed = true;
-    }
-    if (
-      patch.equipTimeMultiplier !== undefined &&
-      item.equipTimeMultiplier !== patch.equipTimeMultiplier
-    ) {
-      item.equipTimeMultiplier = patch.equipTimeMultiplier;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityGenericItem(id, patch);
   }
 
   public updateEntityHeart(id: string, patch: { requiresBrain?: boolean }): boolean {
-    const heart = this.world.getComponent(id, 'heart');
-    if (!heart) return false;
-    let changed = false;
-    if (patch.requiresBrain !== undefined && heart.requiresBrain !== patch.requiresBrain) {
-      heart.requiresBrain = patch.requiresBrain;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityHeart(id, patch);
   }
 
   public updateEntityVision(
     id: string,
     patch: { fovAngle?: number; clarity?: number; maxDistance?: number }
   ): boolean {
-    const vision = this.world.getComponent(id, 'vision');
-    if (!vision) return false;
-    let changed = false;
-    if (patch.fovAngle !== undefined && vision.fovAngle.base !== patch.fovAngle) {
-      setBaseStat(vision.fovAngle, patch.fovAngle);
-      changed = true;
-    }
-    if (patch.clarity !== undefined && vision.clarity.base !== patch.clarity) {
-      setBaseStat(vision.clarity, patch.clarity);
-      changed = true;
-    }
-    if (patch.maxDistance !== undefined && vision.maxDistance.base !== patch.maxDistance) {
-      setBaseStat(vision.maxDistance, patch.maxDistance);
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityVision(id, patch);
   }
 
   public updateEntityHearing(
     id: string,
     patch: { sensitivity?: number; maxDistance?: number }
   ): boolean {
-    const hearing = this.world.getComponent(id, 'hearing');
-    if (!hearing) return false;
-    let changed = false;
-    if (patch.sensitivity !== undefined && hearing.sensitivity.base !== patch.sensitivity) {
-      setBaseStat(hearing.sensitivity, patch.sensitivity);
-      changed = true;
-    }
-    if (patch.maxDistance !== undefined && hearing.maxDistance.base !== patch.maxDistance) {
-      setBaseStat(hearing.maxDistance, patch.maxDistance);
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityHearing(id, patch);
   }
 
   public updateEntityBag(id: string, patch: any, isBagEmpty: boolean): boolean {
-    const item = this.world.getComponent(id, 'item');
-    const inv = this.world.getComponent(id, 'inventory');
-    let changed = false;
-
-    if (item) {
-      if (patch.size !== undefined && item.size !== patch.size) {
-        item.size = patch.size;
-        changed = true;
-      }
-      if (
-        patch.equipTypes !== undefined &&
-        JSON.stringify(item.equipTypes) !== JSON.stringify(patch.equipTypes)
-      ) {
-        item.equipTypes = [...patch.equipTypes];
-        changed = true;
-      }
-      if (patch.equippable !== undefined && item.equippable !== patch.equippable) {
-        item.equippable = patch.equippable;
-        changed = true;
-      }
-      if (
-        patch.equipTimeMultiplier !== undefined &&
-        item.equipTimeMultiplier !== patch.equipTimeMultiplier
-      ) {
-        item.equipTimeMultiplier = patch.equipTimeMultiplier;
-        changed = true;
-      }
-    }
-
-    if (inv && isBagEmpty && patch.width && patch.height) {
-      if (inv.size.width !== patch.width || inv.size.height !== patch.height) {
-        inv.size = { width: patch.width, height: patch.height };
-        inv.slots = Array.from({ length: patch.height }, () =>
-          Array.from({ length: patch.width }, () => ({ itemId: null, count: 0 }))
-        );
-        changed = true;
-      }
-    }
-    return changed;
+    return this.mutations.updateEntityBag(id, patch, isBagEmpty);
   }
 
   public updateEntityInteractionSlot(
     partOrCreatureId: string,
     patch: { interactDist?: number; strength?: number }
   ): boolean {
-    const slot = this.world.getComponent(partOrCreatureId, 'interactionSlots');
-    if (!slot) return false;
-    let changed = false;
-    if (patch.interactDist !== undefined && slot.interactDist !== patch.interactDist) {
-      slot.interactDist = patch.interactDist;
-      changed = true;
-    }
-    if (patch.strength !== undefined && slot.strength !== patch.strength) {
-      slot.strength = patch.strength;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEntityInteractionSlot(partOrCreatureId, patch);
   }
 
   public updateEquipmentArea(
@@ -2114,23 +1158,7 @@ export class GameApp {
     areaId: string,
     patch: { name?: string; space?: number; type?: string }
   ): boolean {
-    const equip = this.world.getComponent(containerId, 'equip');
-    const area = equip?.equipmentAreas.find((a) => a.id === areaId);
-    if (!area) return false;
-    let changed = false;
-    if (patch.name !== undefined && area.name !== patch.name) {
-      area.name = patch.name;
-      changed = true;
-    }
-    if (patch.space !== undefined && area.space !== patch.space) {
-      area.space = patch.space;
-      changed = true;
-    }
-    if (patch.type !== undefined && area.type !== patch.type) {
-      area.type = patch.type;
-      changed = true;
-    }
-    return changed;
+    return this.mutations.updateEquipmentArea(containerId, areaId, patch);
   }
 
   public addEquipmentArea(
@@ -2139,52 +1167,14 @@ export class GameApp {
     defaultName: string = 'Новый слот',
     space?: number
   ): string {
-    let targetEquip = this.world.getComponent(containerId, 'equip');
-    if (!targetEquip) {
-      targetEquip = { equipmentAreas: [] };
-      this.world.addComponent(containerId, 'equip', targetEquip);
-    }
-    const partSize = space ?? this.world.getComponent(containerId, 'physicsStats')?.size ?? 10;
-    const areaId = `slot_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-    targetEquip.equipmentAreas.push({
-      id: areaId,
-      name: defaultName,
-      type: defaultType,
-      space: partSize,
-      itemIds: [],
-    });
-    return areaId;
+    return this.mutations.addEquipmentArea(containerId, defaultType, defaultName, space);
   }
 
   public removeEquipmentArea(containerId: string, areaId: string): boolean {
-    const equip = this.world.getComponent(containerId, 'equip');
-    if (!equip) return false;
-    const idx = equip.equipmentAreas.findIndex((a) => a.id === areaId);
-    if (idx === -1) return false;
-    if (equip.equipmentAreas[idx].itemIds.length > 0) {
-      return false;
-    }
-    equip.equipmentAreas.splice(idx, 1);
-    return true;
+    return this.mutations.removeEquipmentArea(containerId, areaId);
   }
 
   public setEntityInventoryGrid(id: string, enable: boolean): boolean {
-    if (enable) {
-      if (this.world.getComponent(id, 'inventory')) return false;
-      this.world.addComponent(id, 'inventory', {
-        size: { width: 4, height: 2 },
-        slots: Array.from({ length: 2 }, () =>
-          Array.from({ length: 4 }, () => ({ itemId: null, count: 0 }))
-        ),
-      });
-      return true;
-    } else {
-      const inv = this.world.getComponent(id, 'inventory');
-      if (!inv) return false;
-      const isEmpty = inv.slots.every((row) => row.every((cell) => !cell.itemId));
-      if (!isEmpty) return false;
-      this.world.removeComponent(id, 'inventory');
-      return true;
-    }
+    return this.mutations.setEntityInventoryGrid(id, enable);
   }
 }

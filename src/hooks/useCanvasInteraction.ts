@@ -8,11 +8,10 @@ import {
   MouseEvent as ReactMouseEvent,
 } from 'react';
 import { GameApp } from '../GameApp';
+import { GameMode } from '../config/gameConfig';
 import { PlacementMode, Point } from '../types';
-
 import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
-import { GameMode } from '../config/gameConfig';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -88,7 +87,7 @@ export const useCanvasInteraction = ({
 
       // В режиме игры: подбор предмета через Ctrl+ЛКМ
       if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
-        const targetEntityId = app.pickNearestEntity(point);
+        const targetEntityId = app.selection.pickNearestEntity(point);
         if (targetEntityId) {
           const itemComp = app.world.getComponent(targetEntityId, 'item');
           const tagComp = app.world.getComponent(targetEntityId, 'tag');
@@ -114,24 +113,28 @@ export const useCanvasInteraction = ({
       if (placementMode) return;
 
       // 1. Проверка клика по интерактивному манипулятору (Gizmo)
-      if (mode === GameMode.EDITOR && app.selectedEntityId && app.gizmoTool !== 'select') {
-        const gizmoHandle = app.hitTestGizmo(point);
+      if (
+        mode === GameMode.EDITOR &&
+        app.selection.selectedEntityId &&
+        app.gizmo.tool !== 'select'
+      ) {
+        const gizmoHandle = app.gizmo.hitTest(point);
         if (gizmoHandle) {
           clickedEntityIdRef.current = null;
-          app.startGizmoDrag(gizmoHandle, point);
+          app.gizmo.startDrag(gizmoHandle, point);
           e.currentTarget.style.cursor = gizmoHandle === 'rotate' ? 'crosshair' : 'grabbing';
           return;
         }
       }
 
       // 2. Клик по сущности на поле — выбор с поддержкой Shift (мультиселект / инверсия)
-      const entityId = app.pickEntityAt(point, e.clientX, e.clientY);
+      const entityId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
       if (entityId) {
         clickedEntityIdRef.current = entityId;
-        if (e.shiftKey && app.selectedEntityIds.has(entityId)) {
-          app.deselectEntity(entityId);
+        if (e.shiftKey && app.selection.selectedEntityIds.has(entityId)) {
+          app.selection.deselectEntity(entityId);
         } else {
-          app.selectEntity(entityId, !e.shiftKey);
+          app.selection.selectEntity(entityId, !e.shiftKey);
         }
         syncPlayerControls();
         updateStats();
@@ -142,7 +145,7 @@ export const useCanvasInteraction = ({
       clickedEntityIdRef.current = null;
       isMarqueeActiveRef.current = true;
       const rect = containerRef.current!.getBoundingClientRect();
-      app.startMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      app.selection.startMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     }
   };
 
@@ -150,14 +153,12 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app) return;
 
-    // Вращение
     if (app.camera.isRotating) {
       app.camera.rotate(e.clientX, e.clientY);
       e.currentTarget.style.cursor = 'move';
       return;
     }
 
-    // Панорамирование камеры зажатым СКМ
     if ((e.buttons & 4) === 4) {
       app.pan(e.clientX, e.clientY);
       e.currentTarget.style.cursor = 'grabbing';
@@ -173,17 +174,17 @@ export const useCanvasInteraction = ({
     const point = app.getCanvasPoint(e.clientX, e.clientY);
     setCursorWorldPos({ x: Math.round(point.x), y: Math.round(point.y) });
 
-    // Обновление перетаскивания манипулятора (запись намерения без нагрузки на BVH)
-    if (app.isGizmoDragging() && mode === GameMode.EDITOR) {
-      app.setPendingGizmoDrag(point, e.shiftKey);
-      e.currentTarget.style.cursor = app.activeGizmoHandle === 'rotate' ? 'crosshair' : 'grabbing';
+    // Обновление перетаскивания манипулятора
+    if (app.gizmo.isDragging() && mode === GameMode.EDITOR) {
+      app.gizmo.setPendingDrag(point, e.shiftKey);
+      e.currentTarget.style.cursor = app.gizmo.activeHandle === 'rotate' ? 'crosshair' : 'grabbing';
       return;
     }
 
     // Обновление рамки выделения
     if (isMarqueeActiveRef.current && (e.buttons & 1) === 1) {
       const rect = containerRef.current!.getBoundingClientRect();
-      app.updateMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      app.selection.updateMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
       e.currentTarget.style.cursor = 'crosshair';
       return;
     }
@@ -191,14 +192,14 @@ export const useCanvasInteraction = ({
     // Проверка наведения на манипулятор (Gizmo Hover)
     if (
       mode === GameMode.EDITOR &&
-      app.selectedEntityId &&
+      app.selection.selectedEntityId &&
       !placementMode &&
-      app.gizmoTool !== 'select'
+      app.gizmo.tool !== 'select'
     ) {
-      const gizmoHit = app.hitTestGizmo(point);
-      app.hoveredGizmoHandle = gizmoHit;
+      const gizmoHit = app.gizmo.hitTest(point);
+      app.gizmo.hoveredHandle = gizmoHit;
       if (gizmoHit) {
-        app.hoverEntity(null);
+        app.selection.hoverEntity(null);
         if (gizmoHit === 'x') e.currentTarget.style.cursor = 'ew-resize';
         else if (gizmoHit === 'y') e.currentTarget.style.cursor = 'ns-resize';
         else if (gizmoHit === 'center') e.currentTarget.style.cursor = 'move';
@@ -206,16 +207,16 @@ export const useCanvasInteraction = ({
         return;
       }
     } else {
-      app.hoveredGizmoHandle = null;
+      app.gizmo.hoveredHandle = null;
     }
 
     // Подсветка при наведении
     let isHoveringEntity = false;
     if (placementMode) {
-      app.hoverEntity(null);
+      app.selection.hoverEntity(null);
     } else {
-      const nearestId = app.pickNearestEntity(point);
-      app.hoverEntity(nearestId);
+      const nearestId = app.selection.pickNearestEntity(point);
+      app.selection.hoverEntity(nearestId);
       isHoveringEntity = nearestId !== null;
     }
 
@@ -247,8 +248,8 @@ export const useCanvasInteraction = ({
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
     // Завершение взаимодействия с манипулятором
-    if (app.isGizmoDragging() && mode === GameMode.EDITOR) {
-      app.endGizmoDrag();
+    if (app.gizmo.isDragging() && mode === GameMode.EDITOR) {
+      app.gizmo.endDrag();
       updateStats();
       syncPlayerControls();
       e.currentTarget.style.cursor = 'default';
@@ -258,7 +259,7 @@ export const useCanvasInteraction = ({
     // Завершение рамки выделения
     if (isMarqueeActiveRef.current) {
       isMarqueeActiveRef.current = false;
-      app.endMarquee(typeFilters);
+      app.selection.endMarquee(typeFilters);
       updateStats();
       e.currentTarget.style.cursor = 'default';
       return;
@@ -267,20 +268,24 @@ export const useCanvasInteraction = ({
     // Спавн сущности
     if (placementMode && mode === GameMode.EDITOR) {
       if (placementMode.kind === 'entity') {
-        app.commitHistory('Спавн объекта');
-        const spawnedId = app.spawnEntity(placementMode.config, point);
-        app.selectEntity(spawnedId, true);
+        app.executeTransaction('Спавн объекта', () => {
+          const spawnedId = app.spawnEntity(placementMode.config, point);
+          app.selection.selectEntity(spawnedId, true);
+          return spawnedId;
+        });
       } else if (placementMode.kind === 'modular') {
-        app.commitHistory('Спавн составного существа');
-        const spawnedId = app.entityFactory.spawnModularHumanoid(
-          app.world,
-          app.physics,
-          app.aiSystem,
-          point,
-          placementMode.behavior,
-          placementMode.name
-        );
-        app.selectEntity(spawnedId, true);
+        app.executeTransaction('Спавн составного существа', () => {
+          const spawnedId = app.entityFactory.spawnModularHumanoid(
+            app.world,
+            app.physics,
+            app.aiSystem,
+            point,
+            placementMode.behavior,
+            placementMode.name
+          );
+          app.selection.selectEntity(spawnedId, true);
+          return spawnedId;
+        });
       }
       setPlacementMode(null);
       syncPlayerControls();
@@ -288,7 +293,6 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Сброс флага клика по сущности (клик в пустое место детерминированно обрабатывает endMarquee)
     clickedEntityIdRef.current = null;
   };
 
@@ -297,7 +301,6 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app || mode !== GameMode.EDITOR || !containerRef.current) return;
 
-    // Правый клик в режиме размещения шаблона отменяет размещение
     if (placementMode) {
       setPlacementMode(null);
       if (onClosePieMenu) onClosePieMenu();
@@ -306,29 +309,30 @@ export const useCanvasInteraction = ({
 
     if (!onOpenPieMenu) return;
 
-    if (app.isGizmoDragging()) {
-      app.cancelGizmoDrag(true);
+    if (app.gizmo.isDragging()) {
+      app.gizmo.cancelDrag(true);
     }
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
-    const rect = containerRef.current.getBoundingClientRect();
 
-    // Ограничиваем экранные координаты, чтобы радиальное меню не обрезалось границами экрана
     const margin = EDITOR_CONFIG.pieMenuMargin;
-    const maxX = Math.max(margin, rect.width - margin);
-    const maxY = Math.max(margin, rect.height - margin);
+    const minX = Math.min(margin, window.innerWidth / 2);
+    const maxX = Math.max(minX, window.innerWidth - margin);
+    const minY = Math.min(margin, window.innerHeight / 2);
+    const maxY = Math.max(minY, window.innerHeight - margin);
+
     const screenPos = {
-      x: Math.min(maxX, Math.max(margin, e.clientX - rect.left)),
-      y: Math.min(maxY, Math.max(margin, e.clientY - rect.top)),
+      x: Math.min(maxX, Math.max(minX, e.clientX)),
+      y: Math.min(maxY, Math.max(minY, e.clientY)),
     };
 
-    const entityId = app.pickEntityAt(point, e.clientX, e.clientY);
+    const entityId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
 
     if (entityId) {
-      if (app.selectedEntityIds.has(entityId)) {
-        app.selectEntity(entityId, false);
+      if (app.selection.selectedEntityIds.has(entityId)) {
+        app.selection.selectEntity(entityId, false);
       } else {
-        app.selectEntity(entityId, true);
+        app.selection.selectEntity(entityId, true);
       }
       syncPlayerControls();
       updateStats();
@@ -337,7 +341,7 @@ export const useCanvasInteraction = ({
         screenPos,
         worldPos: point,
         targetEntityId: entityId,
-        targetEntityIds: Array.from(app.selectedEntityIds),
+        targetEntityIds: Array.from(app.selection.selectedEntityIds),
       });
     } else {
       onOpenPieMenu({
@@ -353,19 +357,19 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (app) {
       app.setMouseScreenPos(null, null);
-      if (app.isGizmoDragging()) {
-        app.cancelGizmoDrag(true);
+      if (app.gizmo.isDragging()) {
+        app.gizmo.cancelDrag(true);
       }
-      app.hoveredGizmoHandle = null;
+      app.gizmo.hoveredHandle = null;
       if (isMarqueeActiveRef.current) {
-        app.marqueeBox = null;
+        app.selection.marqueeBox = null;
         isMarqueeActiveRef.current = false;
       }
       if (app.camera.isRotating) {
         app.camera.endRotate();
       }
       app.endPan();
-      app.hoverEntity(null);
+      app.selection.hoverEntity(null);
     }
     clickedEntityIdRef.current = null;
     setCursorWorldPos(null);

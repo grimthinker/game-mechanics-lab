@@ -3,6 +3,7 @@ import { World } from '../ecs/World';
 import { PhysicsSystem } from '../ecs/systems/PhysicsSystem';
 import { AISystem } from '../ecs/systems/AISystem';
 import { GameApp } from '../GameApp';
+import { GameMode, THEME_COLORS } from '../config/gameConfig';
 import {
   MetaInspector,
   PhysicsInspector,
@@ -27,7 +28,6 @@ import {
 import { getAnatomyParts } from '../ecs/utils/hierarchy';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { t } from '../locales';
-import { GameMode, THEME_COLORS } from '../config/gameConfig';
 
 interface Breadcrumb {
   id: string;
@@ -62,14 +62,24 @@ export const Inspector: React.FC<InspectorProps> = ({
 }) => {
   const isReadOnly = mode !== GameMode.EDITOR;
 
-  // Хлебные крошки для навигации по вложенным объектам
   const [path, setPath] = useState<Breadcrumb[]>([]);
 
   useEffect(() => {
     if (selectedEntityId && world) {
       const meta = world.getComponent(selectedEntityId, 'meta');
       const item = world.getComponent(selectedEntityId, 'item');
-      setPath([{ id: selectedEntityId, label: meta?.name || item?.name || selectedEntityId }]);
+      const rootLabel = meta?.name || item?.name || selectedEntityId;
+      setPath((prev) => {
+        if (prev.length > 0 && prev[0].id === selectedEntityId) {
+          if (prev[0].label !== rootLabel) {
+            const next = [...prev];
+            next[0] = { ...next[0], label: rootLabel };
+            return next;
+          }
+          return prev;
+        }
+        return [{ id: selectedEntityId, label: rootLabel }];
+      });
     } else {
       setPath([]);
     }
@@ -90,7 +100,6 @@ export const Inspector: React.FC<InspectorProps> = ({
     setPath((prev) => prev.slice(0, index + 1));
   };
 
-  // Состояние свернутых/развернутых секций аккордеона
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
     meta: true,
     physics: true,
@@ -178,7 +187,6 @@ export const Inspector: React.FC<InspectorProps> = ({
     );
   };
 
-  // Debounce для фиксации снимка в истории отмены (Undo)
   const commitTimerRef = useRef<any>(null);
   const requestCommit = useCallback(
     (desc: string) => {
@@ -226,7 +234,7 @@ export const Inspector: React.FC<InspectorProps> = ({
   const commonProps = {
     targetId,
     world,
-    app,
+    app: app, // Передаем настоящий GameApp (он перехватит вызовы через свои методы-фасады)
     isReadOnly,
     onCommit: requestCommit,
   };
@@ -247,7 +255,6 @@ export const Inspector: React.FC<InspectorProps> = ({
         flexDirection: 'column',
       }}
     >
-      {/* Хлебные крошки */}
       <div
         style={{
           padding: '10px 12px',
@@ -282,21 +289,17 @@ export const Inspector: React.FC<InspectorProps> = ({
       <div
         style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}
       >
-        <form className="modal-form" onSubmit={(e) => e.preventDefault()}>
-          {/* Мета и Базовые данные */}
+        <form className="modal-form" key={targetId} onSubmit={(e) => e.preventDefault()}>
           {renderSection('meta', t('inspector.meta'), <MetaInspector {...commonProps} />)}
 
-          {/* Физика */}
           {world.getComponent(targetId, 'physicsStats') &&
             renderSection('physics', t('inspector.physics'), <PhysicsInspector {...commonProps} />)}
 
-          {/* Структурное здоровье (HP) */}
           {world.getComponent(targetId, 'health') &&
             currentArchetype !== 'creature' &&
             !hasAssembly &&
             renderSection('health', t('inspector.health'), <HealthInspector {...commonProps} />)}
 
-          {/* Функциональная прочность (ФП) */}
           {world.getComponent(targetId, 'functionalHealth') &&
             renderSection(
               'functionalHealth',
@@ -304,19 +307,15 @@ export const Inspector: React.FC<InspectorProps> = ({
               <FunctionalHealthInspector {...commonProps} />
             )}
 
-          {/* Сердце */}
           {world.getComponent(targetId, 'heart') &&
             renderSection('heart', t('inspector.heart'), <HeartInspector {...commonProps} />)}
 
-          {/* Зрение и Слух */}
           {(world.getComponent(targetId, 'vision') || world.getComponent(targetId, 'hearing')) &&
             renderSection('senses', t('inspector.senses'), <SensesInspector {...commonProps} />)}
 
-          {/* Сокеты */}
           {world.getComponent(targetId, 'socketLink') &&
             renderSection('sockets', t('inspector.sockets'), <SocketsInspector {...commonProps} />)}
 
-          {/* Параметры движения */}
           {world.getComponent(targetId, 'movementStats') &&
             renderSection(
               'movement',
@@ -324,15 +323,12 @@ export const Inspector: React.FC<InspectorProps> = ({
               <MovementInspector {...commonProps} />
             )}
 
-          {/* Скрытность */}
           {world.getComponent(targetId, 'stealthStats') &&
             renderSection('stealth', t('inspector.stealth'), <StealthInspector {...commonProps} />)}
 
-          {/* Поведение ИИ */}
           {world.getComponent(targetId, 'aiStats') &&
             renderSection('ai', t('inspector.ai'), <AIInspector {...commonProps} />)}
 
-          {/* Зона-эффектор */}
           {world.getComponent(targetId, 'areaEffector') &&
             renderSection(
               'effector',
@@ -340,12 +336,10 @@ export const Inspector: React.FC<InspectorProps> = ({
               <AreaEffectorInspector {...commonProps} />
             )}
 
-          {/* Оружие */}
           {world.getComponent(targetId, 'weaponStats') &&
             world.getComponent(targetId, 'weaponZone') &&
             renderSection('weapon', t('inspector.weapon'), <WeaponInspector {...commonProps} />)}
 
-          {/* Броня */}
           {(world.getComponent(targetId, 'armorStats') || currentArchetype === 'creature') &&
             renderSection(
               'armor',
@@ -353,12 +347,10 @@ export const Inspector: React.FC<InspectorProps> = ({
               <ArmorInspector {...commonProps} />
             )}
 
-          {/* Сумка / Инвентарь предмета */}
           {world.getComponent(targetId, 'inventory') &&
             world.getComponent(targetId, 'item')?.type === 'bag' &&
             renderSection('bag', t('inspector.bag'), <BagInspector {...commonProps} />)}
 
-          {/* Часть тела как предмет */}
           {world.getComponent(targetId, 'item')?.type === 'bodyPart' &&
             renderSection(
               'genericItem',
@@ -366,7 +358,6 @@ export const Inspector: React.FC<InspectorProps> = ({
               <GenericItemInspector {...commonProps} />
             )}
 
-          {/* Анатомия */}
           {anatomyParts.length > 1 &&
             renderSection(
               'anatomy',
@@ -379,7 +370,6 @@ export const Inspector: React.FC<InspectorProps> = ({
               />
             )}
 
-          {/* Слоты взаимодействия (Руки) */}
           {(currentArchetype === 'creature' || world.getComponent(targetId, 'interactionSlots')) &&
             renderSection(
               'slots',
@@ -387,7 +377,6 @@ export const Inspector: React.FC<InspectorProps> = ({
               <InteractionSlotsInspector {...commonProps} onNavigate={pushPath} />
             )}
 
-          {/* Области экипировки */}
           {renderSection(
             'equip',
             <div
@@ -412,7 +401,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                   onClick={(e) => {
                     e.stopPropagation();
                     if (app) {
-                      app.addEquipmentArea(targetId);
+                      app.mutations.addEquipmentArea(targetId);
                       requestCommit(t('history.equipAdd'));
                     }
                   }}
@@ -424,7 +413,6 @@ export const Inspector: React.FC<InspectorProps> = ({
             <EquipmentInspector {...commonProps} onNavigate={pushPath} />
           )}
 
-          {/* Инвентарь (Сетки хранения) */}
           {renderSection(
             'inventory',
             <div
@@ -451,7 +439,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     if (inv) {
                       if (isBagEmpty) {
                         if (app) {
-                          app.setEntityInventoryGrid(targetId, false);
+                          app.mutations.setEntityInventoryGrid(targetId, false);
                           requestCommit(t('history.gridRemove'));
                         }
                       } else {
@@ -459,7 +447,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                       }
                     } else {
                       if (app) {
-                        app.setEntityInventoryGrid(targetId, true);
+                        app.mutations.setEntityInventoryGrid(targetId, true);
                         requestCommit(t('history.gridAdd'));
                       }
                     }
@@ -473,7 +461,6 @@ export const Inspector: React.FC<InspectorProps> = ({
           )}
         </form>
 
-        {/* Кнопка удаления корневой выбранной сущности */}
         {path.length === 1 && !isReadOnly && (
           <div style={{ marginTop: '16px' }}>
             <button

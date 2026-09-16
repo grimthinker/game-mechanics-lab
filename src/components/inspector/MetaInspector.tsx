@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { World } from '../../ecs/World';
 import { GameApp } from '../../GameApp';
 import { CreatureStance } from '../../ecs/types';
@@ -25,8 +25,10 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
 
   const [name, setName] = useState(meta?.name ?? item?.name ?? targetId);
   const [destructible, setDestructible] = useState(meta?.destructible ?? false);
+  const isFocusedRef = useRef(false);
 
   useEffect(() => {
+    if (isFocusedRef.current) return;
     const m = world.getComponent(targetId, 'meta');
     const it = world.getComponent(targetId, 'item');
     setName(m?.name ?? it?.name ?? targetId);
@@ -67,6 +69,12 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
           disabled={isReadOnly}
           type="text"
           value={name}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+          }}
           onChange={(e) => handleNameChange(e.target.value)}
         />
       </label>
