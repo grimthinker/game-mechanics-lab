@@ -328,3 +328,165 @@ export function findEquipmentAreaInHierarchy(
 
   return null;
 }
+
+export interface DiscoveredInventory {
+  containerId: EntityId;
+  containerName: string;
+  inventory: InventoryComponent;
+  path: { id: EntityId; name: string }[];
+  distance: number;
+}
+
+/**
+ * Ищет все инвентари, привязанные к сущности (включая части тела, экипированные сумки, разгрузки и вложенные контейнеры).
+ * Возвращает список инвентарей, отсортированный по возрастанию длины пути (начиная от самого короткого).
+ */
+export function findAllInventoriesInHierarchy(
+  world: World,
+  rootEntityId: EntityId
+): DiscoveredInventory[] {
+  const results: DiscoveredInventory[] = [];
+  const visited = new Set<EntityId>();
+
+  const getName = (id: EntityId): string => {
+    const meta = world.getComponent(id, 'meta');
+    const item = world.getComponent(id, 'item');
+    return meta?.name || item?.name || id;
+  };
+
+  // 1. Проверяем саму корневую сущность (дистанция 0)
+  visited.add(rootEntityId);
+  const rootInv = world.getComponent(rootEntityId, 'inventory');
+  if (rootInv) {
+    results.push({
+      containerId: rootEntityId,
+      containerName: getName(rootEntityId),
+      inventory: rootInv,
+      path: [],
+      distance: 0,
+    });
+  }
+
+  interface QueueItem {
+    id: EntityId;
+    path: { id: EntityId; name: string }[];
+  }
+
+  const queue: QueueItem[] = [];
+
+  // 2. Первичные дочерние узлы:
+  // А) Части тела существа
+  const parts = getAnatomyParts(world, rootEntityId);
+  for (const partId of parts) {
+    if (partId !== rootEntityId && !visited.has(partId)) {
+      visited.add(partId);
+      queue.push({
+        id: partId,
+        path: [{ id: partId, name: getName(partId) }],
+      });
+    }
+  }
+
+  // Б) Экипировка на rootEntityId
+  const rootEquip = world.getComponent(rootEntityId, 'equip');
+  if (rootEquip?.equipmentAreas) {
+    for (const area of rootEquip.equipmentAreas) {
+      for (const itemId of area.itemIds) {
+        if (!visited.has(itemId)) {
+          visited.add(itemId);
+          queue.push({
+            id: itemId,
+            path: [{ id: itemId, name: getName(itemId) }],
+          });
+        }
+      }
+    }
+  }
+
+  // В) Слоты взаимодействия (руки) на rootEntityId
+  const rootSlots = world.getComponent(rootEntityId, 'interactionSlots');
+  if (rootSlots?.itemId && !visited.has(rootSlots.itemId)) {
+    visited.add(rootSlots.itemId);
+    queue.push({
+      id: rootSlots.itemId,
+      path: [{ id: rootSlots.itemId, name: getName(rootSlots.itemId) }],
+    });
+  }
+
+  // Г) Предметы внутри собственного инвентаря
+  if (rootInv?.slots) {
+    for (const row of rootInv.slots) {
+      for (const cell of row) {
+        if (cell.itemId && !visited.has(cell.itemId)) {
+          visited.add(cell.itemId);
+          queue.push({
+            id: cell.itemId,
+            path: [{ id: cell.itemId, name: getName(cell.itemId) }],
+          });
+        }
+      }
+    }
+  }
+
+  // 3. Поиск в ширину (BFS)
+  while (queue.length > 0) {
+    const { id, path } = queue.shift()!;
+
+    const inv = world.getComponent(id, 'inventory');
+    if (inv) {
+      results.push({
+        containerId: id,
+        containerName: getName(id),
+        inventory: inv,
+        path,
+        distance: path.length,
+      });
+    }
+
+    // Расширение через области экипировки
+    const eq = world.getComponent(id, 'equip');
+    if (eq?.equipmentAreas) {
+      for (const area of eq.equipmentAreas) {
+        for (const subItemId of area.itemIds) {
+          if (!visited.has(subItemId)) {
+            visited.add(subItemId);
+            queue.push({
+              id: subItemId,
+              path: [...path, { id: subItemId, name: getName(subItemId) }],
+            });
+          }
+        }
+      }
+    }
+
+    // Расширение через руки
+    const slots = world.getComponent(id, 'interactionSlots');
+    if (slots?.itemId && !visited.has(slots.itemId)) {
+      visited.add(slots.itemId);
+      queue.push({
+        id: slots.itemId,
+        path: [...path, { id: slots.itemId, name: getName(slots.itemId) }],
+      });
+    }
+
+    // Расширение через ячейки инвентаря
+    if (inv?.slots) {
+      for (const row of inv.slots) {
+        for (const cell of row) {
+          if (cell.itemId && !visited.has(cell.itemId)) {
+            visited.add(cell.itemId);
+            queue.push({
+              id: cell.itemId,
+              path: [...path, { id: cell.itemId, name: getName(cell.itemId) }],
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Гарантированная сортировка от самого короткого пути к самому длинному
+  results.sort((a, b) => a.distance - b.distance);
+
+  return results;
+}
