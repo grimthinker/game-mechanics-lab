@@ -27,6 +27,10 @@ import { deg2Rad, Radians } from './utils';
 import { HistoryManager, HistoryRecord } from './history/HistoryManager';
 import { GizmoTool, GizmoHandle, GizmoDragState, GizmoInitialEntityData } from './gizmos/types';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
+import { EventBus } from './core/EventBus';
+import { BTLogicComponent } from './ai/core';
+import { serializeBTNode } from './ai/serializer';
+import { findActiveBrain } from './ecs/utils/anatomy';
 import {
   SERIALIZABLE_COMPONENT_KEYS,
   COLLISION_MASK_ALL,
@@ -114,6 +118,44 @@ export class GameApp {
   private isRunning: boolean = false;
   public isPaused: boolean = false;
   private timeAccumulator: number = 0;
+  private lastBTUpdate: number = 0;
+  private lastBTTargetId: string | null = null;
+
+  public emitSelectionChanged(): void {
+    EventBus.emit('selection:changed', {
+      selectedEntityId: this.selectedEntityId,
+      selectedEntityIds: Array.from(this.selectedEntityIds),
+    });
+  }
+
+  public updateBTData(force: boolean = false): void {
+    const targetId = this.selectedEntityId;
+    const now = performance.now();
+    if (!force && !this.isPaused && now - this.lastBTUpdate < 100) return;
+    this.lastBTUpdate = now;
+
+    if (!targetId) {
+      if (this.lastBTTargetId !== null) {
+        this.lastBTTargetId = null;
+        EventBus.emit('bt:updated', { btData: null, btBlackboard: null });
+      }
+      return;
+    }
+
+    this.lastBTTargetId = targetId;
+    let brain = this.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
+    if (!brain) {
+      const activeBrainId = findActiveBrain(this.world, targetId);
+      if (activeBrainId) {
+        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
+      }
+    }
+
+    EventBus.emit('bt:updated', {
+      btData: !brain || !brain.root_node ? null : serializeBTNode(brain.root_node),
+      btBlackboard: !brain ? null : { ...brain.blackboard.getData() },
+    });
+  }
 
   public gameMode: GameMode = GameMode.EDITOR;
 
@@ -580,6 +622,7 @@ export class GameApp {
     this.aiSystem.clear();
     this.selectEntity(null);
     this.hoverEntity(null);
+    EventBus.emit('world:updated');
   }
 
   public initDefaultWorld(center?: Point): void {
@@ -974,6 +1017,8 @@ export class GameApp {
         : (this.selectedEntityIds.values().next().value ?? null);
     this.selectEntity(targetId, false);
     this.hoverEntity(null);
+    this.emitSelectionChanged();
+    EventBus.emit('world:updated');
   }
 
   public start(): void {
@@ -1031,7 +1076,20 @@ export class GameApp {
       for (let i = 0; i < steps; i++) {
         this.updateSystems(stepDt);
       }
+
+      if (this.gameMode === GameMode.GAME) {
+        const isAnyPlayerAlive = this.world
+          .getAllEntities()
+          .some(
+            ([_, comp]) => comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
+          );
+        if (!isAnyPlayerAlive) {
+          EventBus.emit('game:playerDied');
+        }
+      }
     }
+
+    this.updateBTData(false);
 
     if (this.activeRendererMode === '2d') {
       this.canvasRenderSyncSystem.update(realDt, this.world, this.gameMode);
@@ -1092,21 +1150,35 @@ export class GameApp {
   }
 
   public selectEntity(id: string | null, clearGroup: boolean = false): void {
+    let changed = false;
+
     if (clearGroup) {
+      if (this.selectedEntityIds.size !== (id ? 1 : 0) || (id && !this.selectedEntityIds.has(id))) {
+        changed = true;
+      }
       this.selectedEntityIds.clear();
       if (id) this.selectedEntityIds.add(id);
     } else if (id && !this.selectedEntityIds.has(id)) {
       this.selectedEntityIds.add(id);
+      changed = true;
     }
 
-    if (this.selectedEntityId === id) return;
-    this.selectedEntityId = id;
-    this._cachedSelectedEntity = id ? new EntityAdapter(id, this.world) : null;
+    if (this.selectedEntityId !== id) {
+      this.selectedEntityId = id;
+      this._cachedSelectedEntity = id ? new EntityAdapter(id, this.world) : null;
+      changed = true;
+    }
+
+    if (changed) {
+      this.emitSelectionChanged();
+      this.updateBTData(true);
+    }
   }
 
   public selectEntities(ids: string[]): void {
     this.selectedEntityIds = new Set(ids);
     this.selectEntity(ids.length > 0 ? ids[0] : null, false);
+    this.emitSelectionChanged();
   }
 
   public deselectEntity(id: string): void {
@@ -1114,6 +1186,8 @@ export class GameApp {
     if (this.selectedEntityId === id) {
       const next = this.selectedEntityIds.values().next().value ?? null;
       this.selectEntity(next, false);
+    } else {
+      this.emitSelectionChanged();
     }
   }
 

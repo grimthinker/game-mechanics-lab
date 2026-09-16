@@ -3,8 +3,7 @@ import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
 import { EntityConfig } from './ecs/types';
-import { BTLogicComponent, BTNodeDTO } from './ai/core';
-import { serializeBTNode } from './ai/serializer';
+import { BTNodeDTO } from './ai/core';
 import { LeftDock, DockTab } from './components/LeftDock/LeftDock';
 import { PieMenu } from './components/PieMenu/PieMenu';
 import { PieMenuState } from './components/PieMenu/types';
@@ -22,9 +21,9 @@ import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './editor.css';
 import { createZoneConfig } from './ecs/archetypes';
 import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
-import { findActiveBrain } from './ecs/utils/anatomy';
 import { EDITOR_CONFIG } from './config/editorConfig';
 import { t } from './locales';
+import { EventBus } from './core/EventBus';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -87,7 +86,6 @@ export const App: React.FC = () => {
     zone: true,
     marker: true,
   });
-  const [, setFrameTick] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
   const [globalTimeScale, setGlobalTimeScale] = useState<number>(1.0);
@@ -95,10 +93,6 @@ export const App: React.FC = () => {
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
-
-  const lastBTUpdateRef = useRef<number>(0);
-  const lastUIUpdateRef = useRef<number>(0);
-  const lastSelectedEntityIdRef = useRef<string | null>(null);
 
   // Синхронизация реального размера Canvas с Flex-контейнером
   useEffect(() => {
@@ -113,70 +107,55 @@ export const App: React.FC = () => {
     return () => observer.disconnect();
   }, []);
 
-  const updateStats = useCallback(() => {
-    const app = appRef.current;
-    if (!app) return;
-
-    const currentMode = modeRef.current;
-
-    if (currentMode === GameMode.GAME) {
-      const isAnyPlayerAlive = app.world
-        .getAllEntities()
-        .some(
-          ([_, comp]) => comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
-        );
-      if (!isAnyPlayerAlive) {
-        applyGameMode(GameMode.SIMULATION);
-        app.isPaused = true;
-        setIsPaused(true);
-      }
-    }
-
-    const targetId = app.selectedEntity?.id ?? null;
-    const isEntityChanged = targetId !== lastSelectedEntityIdRef.current;
-
-    if (isEntityChanged) {
-      lastSelectedEntityIdRef.current = targetId;
-      setSelectedEntityId(targetId);
-    }
-    setSelectedEntityIds(Array.from(app.selectedEntityIds));
-
-    const now = performance.now();
-    const shouldUpdateUI = isEntityChanged || app.isPaused || now - lastUIUpdateRef.current >= 100;
-
-    if (shouldUpdateUI) {
-      lastUIUpdateRef.current = now;
-      setFrameTick((t) => (t + 1) % 1000);
-    }
-
-    if (targetId) {
-      let brain = app.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
-      if (!brain) {
-        const activeBrainId = findActiveBrain(app.world, targetId);
-        if (activeBrainId) {
-          brain = app.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
-        }
-      }
-
-      if (isEntityChanged || app.isPaused || now - lastBTUpdateRef.current >= 100) {
-        lastBTUpdateRef.current = now;
-        setBtData(!brain || !brain.root_node ? null : serializeBTNode(brain.root_node));
-        setBtBlackboard(!brain ? null : { ...brain.blackboard.getData() });
-      }
-    } else {
-      setBtData(null);
-      setBtBlackboard(null);
-    }
-  }, [applyGameMode]);
-
-  const updateStatsRef = useRef(updateStats);
-  updateStatsRef.current = updateStats;
-
+  // Инициализация клавиатурного контроля ДО его использования в эффектах подписок
   const { syncPlayerControls } = useKeyboardControls({
     isModalOpen: isPaused,
     isEditModalOpen: false,
     mode,
   });
+
+  // Подписка на события движка через EventBus
+  useEffect(() => {
+    const unsubSelection = EventBus.on(
+      'selection:changed',
+      ({ selectedEntityId: sId, selectedEntityIds: sIds }) => {
+        setSelectedEntityId(sId);
+        setSelectedEntityIds(sIds);
+      }
+    );
+
+    const unsubBT = EventBus.on('bt:updated', ({ btData: data, btBlackboard: bb }) => {
+      setBtData(data);
+      setBtBlackboard(bb);
+    });
+
+    const unsubPlayerDied = EventBus.on('game:playerDied', () => {
+      applyGameMode(GameMode.SIMULATION);
+      if (appRef.current) appRef.current.isPaused = true;
+      setIsPaused(true);
+    });
+
+    const unsubWorld = EventBus.on('world:updated', () => {
+      syncPlayerControls();
+    });
+
+    return () => {
+      unsubSelection();
+      unsubBT();
+      unsubPlayerDied();
+      unsubWorld();
+    };
+  }, [applyGameMode, syncPlayerControls]);
+
+  const updateStats = useCallback(() => {
+    const app = appRef.current;
+    if (!app) return;
+    app.emitSelectionChanged();
+    app.updateBTData(true);
+  }, []);
+
+  const updateStatsRef = useRef(updateStats);
+  updateStatsRef.current = updateStats;
 
   const {
     containerRef,
@@ -239,7 +218,6 @@ export const App: React.FC = () => {
     app.globalTimeScale = globalTimeScale;
 
     app.start();
-    app.onFrame = () => updateStatsRef.current();
     app.onHistoryChange = () => {
       saveWorldToStorage(app, snapshotRef.current);
     };
