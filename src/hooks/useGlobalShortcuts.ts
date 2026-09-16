@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { GameMode } from '../constants';
 
 import { GizmoTool } from '../gizmos/types';
+import { GameMode } from '../config/gameConfig';
 
 interface GlobalShortcutsProps {
   mode: GameMode;

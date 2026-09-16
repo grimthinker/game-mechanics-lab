@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react';
-import { GameMode } from '../constants';
 import { GlobalInput } from '../input/GlobalInput';
+import { GameMode } from '../config/gameConfig';
 
 interface UseKeyboardControlsProps {
   isModalOpen: boolean;

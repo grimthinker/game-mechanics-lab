@@ -1,5 +1,5 @@
+import { GameMode } from '../../config/gameConfig';
 import { World } from '../World';
-import { GameMode } from '../../constants';
 import { RENDER_Z_INDEX, RenderCirclePrimitive, RenderPolygonPrimitive } from '../types';
 
 export class CanvasRenderSyncSystem {

@@ -8,11 +8,11 @@ import {
   MouseEvent as ReactMouseEvent,
 } from 'react';
 import { GameApp } from '../GameApp';
-import { GameMode } from '../constants';
 import { PlacementMode, Point } from '../types';
 
 import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
+import { GameMode } from '../config/gameConfig';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;

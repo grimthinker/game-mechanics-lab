@@ -15,7 +15,7 @@ import { GameHUD } from './components/GameHUD';
 import { CanvasHUD } from './components/CanvasHUD';
 import { MultiSelectionDrawer } from './components/MultiSelectionDrawer';
 import { PlacementMode } from './types';
-import { GameMode } from './constants';
+import { GameMode } from './config/gameConfig';
 import { GizmoTool } from './gizmos/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import './editor.css';

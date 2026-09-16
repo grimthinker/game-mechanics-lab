@@ -1,4 +1,5 @@
 export const VISUAL_CONFIG = {
+  creatureHoverScreenRatio: 0.02,
   // Параметры фоновой сетки
   grid: {
     size: 64,

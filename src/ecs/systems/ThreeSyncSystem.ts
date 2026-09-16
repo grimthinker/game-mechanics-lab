@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { World } from '../World';
-import { GameMode } from '../../constants';
 import { EntityId } from '../types';
+import { GameMode } from '../../config/gameConfig';
 
 export class ThreeSyncSystem {
   private scene: THREE.Scene;

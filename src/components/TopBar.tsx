@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { GameMode, THEME_COLORS } from '../constants';
 import { t, useLocale, setLocale } from '../locales';
+import { GameMode } from '../config/gameConfig';
 
 export interface TopBarProps {
   mode: GameMode;

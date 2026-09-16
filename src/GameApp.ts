@@ -19,7 +19,7 @@ import { IRenderer } from './rendering/IRenderer';
 import { Point } from './types';
 import { EntityAdapter } from './EntityAdapter';
 import { EntityFactory } from './ecs/EntityFactory';
-import { GameMode, CREATURE_HOVER_SCREEN_RATIO } from './constants';
+import { GameMode } from './config/gameConfig';
 import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
@@ -44,6 +44,7 @@ import { killEntity } from './ecs/utils/health';
 export { EntityAdapter } from './EntityAdapter';
 
 import { EDITOR_CONFIG } from './config/editorConfig';
+import { VISUAL_CONFIG } from './config/visualConfig';
 
 export class GameApp {
   private container: HTMLDivElement;
@@ -1325,7 +1326,7 @@ export class GameApp {
 
   public pickNearestEntity(
     worldPoint: Point,
-    maxDistanceRatio: number = CREATURE_HOVER_SCREEN_RATIO
+    maxDistanceRatio: number = VISUAL_CONFIG.creatureHoverScreenRatio
   ): string | null {
     const isEditor = this.gameMode === GameMode.EDITOR;
     const maxScreenDistancePx = this.canvas.width * maxDistanceRatio;
