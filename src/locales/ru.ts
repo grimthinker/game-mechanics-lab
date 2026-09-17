@@ -91,6 +91,12 @@ export const ru = {
     badgeInv: 'ИНВ',
     badgeZone: 'ЗОНА',
     badgePart: 'ЧАСТЬ',
+    showEmptySlots: 'Пустые слоты',
+    expandAll: 'Развернуть всё',
+    collapseAll: 'Свернуть всё',
+    virtualSlot: 'Слот: {name}',
+    virtualArea: 'Экип: {name}',
+    inventoryGrid: 'Сетка инвентаря',
   },
   dock: {
     hierarchy: 'Иерархия',

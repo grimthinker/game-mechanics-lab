@@ -243,25 +243,47 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                   const it = world.getComponent(itemId, 'item');
                   const itWeight = calculateTotalEntityWeight(world, itemId);
                   return (
-                    <button
-                      key={itemId}
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        width: '100%',
-                        backgroundColor: '#1e3d29',
-                        color: '#ecf0f1',
-                        textAlign: 'left',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                      }}
-                      onClick={() => onNavigate(itemId, it?.name || itemId)}
-                    >
-                      <span>{it ? it.name : itemId}</span>
-                      <span style={{ color: '#888' }}>
-                        V:{it?.size ?? 0} | {itWeight}kg
-                      </span>
-                    </button>
+                    <div key={itemId} style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#1e3d29',
+                          color: '#ecf0f1',
+                          textAlign: 'left',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                        }}
+                        onClick={() => onNavigate(itemId, it?.name || itemId)}
+                      >
+                        <span>{it ? it.name : itemId}</span>
+                        <span style={{ color: '#888' }}>
+                          V:{it?.size ?? 0} | {itWeight}kg
+                        </span>
+                      </button>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{
+                            backgroundColor: '#c0392b',
+                            color: '#fff',
+                            padding: '0 8px',
+                          }}
+                          title="Удалить предмет из мира"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (app) {
+                              app.deleteItemFromEquipmentArea(containerId, area.id, itemId);
+                              onCommit(t('history.deleteObjects'));
+                            }
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   );
                 })
               ) : (

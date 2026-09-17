@@ -28,6 +28,7 @@ import {
 import { getAnatomyParts } from '../ecs/utils/hierarchy';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { t } from '../locales';
+import { EventBus } from '../core/EventBus';
 
 interface Breadcrumb {
   id: string;
@@ -63,6 +64,20 @@ export const Inspector: React.FC<InspectorProps> = ({
   const isReadOnly = mode !== GameMode.EDITOR;
 
   const [path, setPath] = useState<Breadcrumb[]>([]);
+
+  useEffect(() => {
+    const unsub = EventBus.on('inspector:navigate', (data) => {
+      setPath(data.path);
+      if (data.targetSection) {
+        setSectionsOpen((prev) => ({ ...prev, [data.targetSection!]: true }));
+        setTimeout(() => {
+          const el = document.getElementById(`inspector-sec-${data.targetSection}`);
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     if (selectedEntityId && world) {
@@ -130,6 +145,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     const isOpen = sectionsOpen[key] ?? true;
     return (
       <div
+        id={`inspector-sec-${key}`}
         style={{
           marginBottom: '8px',
           borderRadius: '6px',

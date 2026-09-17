@@ -537,7 +537,34 @@ export class GameApp {
     this.captureBaseState();
   }
 
-  private deleteEntityRecursive(id: string): void {
+  public deleteItemFromInteractionSlot(partId: string): boolean {
+    const slot = this.world.getComponent(partId, 'interactionSlots');
+    if (slot && slot.itemId) {
+      const itemId = slot.itemId;
+      slot.itemId = null;
+      this.deleteEntityRecursive(itemId);
+      this.attachmentSystem.update(this.world, this.physics);
+      return true;
+    }
+    return false;
+  }
+
+  public deleteItemFromEquipmentArea(containerId: string, areaId: string, itemId: string): boolean {
+    const equip = this.world.getComponent(containerId, 'equip');
+    if (!equip) return false;
+    const area = equip.equipmentAreas.find((a) => a.id === areaId);
+    if (!area) return false;
+    const idx = area.itemIds.indexOf(itemId);
+    if (idx !== -1) {
+      area.itemIds.splice(idx, 1);
+      this.deleteEntityRecursive(itemId);
+      this.attachmentSystem.update(this.world, this.physics);
+      return true;
+    }
+    return false;
+  }
+
+  public deleteEntityRecursive(id: string): void {
     if (!this.world.getEntity(id)) return;
 
     const tag = this.world.getComponent(id, 'tag');

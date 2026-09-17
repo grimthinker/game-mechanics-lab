@@ -164,18 +164,41 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                   }}
                 >
                   {slotItem ? (
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      style={{
-                        width: '100%',
-                        backgroundColor: '#2c3e50',
-                        color: '#ecf0f1',
-                      }}
-                      onClick={() => onNavigate(slot.itemId!, slotItem.name)}
-                    >
-                      Настроить: {slotItem.name}
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#2c3e50',
+                          color: '#ecf0f1',
+                        }}
+                        onClick={() => onNavigate(slot.itemId!, slotItem.name)}
+                      >
+                        Настроить: {slotItem.name}
+                      </button>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{
+                            backgroundColor: '#c0392b',
+                            color: '#fff',
+                            padding: '0 8px',
+                          }}
+                          title="Удалить предмет из мира"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (app) {
+                              app.deleteItemFromInteractionSlot(info.partId);
+                              onCommit(t('history.deleteObjects'));
+                            }
+                          }}
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <span style={{ color: '#777', fontSize: '12px' }}>{t('common.empty')}</span>
                   )}
@@ -328,18 +351,41 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
         }}
       >
         {slotItem ? (
-          <button
-            type="button"
-            className="btn btn-sm"
-            style={{
-              width: '100%',
-              backgroundColor: '#2c3e50',
-              color: '#ecf0f1',
-            }}
-            onClick={() => onNavigate(slot.itemId!, slotItem.name)}
-          >
-            Настроить: {slotItem.name}
-          </button>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              style={{
+                flex: 1,
+                backgroundColor: '#2c3e50',
+                color: '#ecf0f1',
+              }}
+              onClick={() => onNavigate(slot.itemId!, slotItem.name)}
+            >
+              Настроить: {slotItem.name}
+            </button>
+            {!isReadOnly && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  backgroundColor: '#c0392b',
+                  color: '#fff',
+                  padding: '0 8px',
+                }}
+                title="Удалить предмет из мира"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (app) {
+                    app.deleteItemFromInteractionSlot(targetId);
+                    onCommit(t('history.deleteObjects'));
+                  }
+                }}
+              >
+                🗑️
+              </button>
+            )}
+          </div>
         ) : (
           <span style={{ color: '#777', fontSize: '12px' }}>{t('common.empty')}</span>
         )}

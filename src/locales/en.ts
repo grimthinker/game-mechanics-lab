@@ -90,6 +90,12 @@ export const en = {
     badgeInv: 'INV',
     badgeZone: 'ZONE',
     badgePart: 'PART',
+    showEmptySlots: 'Empty slots',
+    expandAll: 'Expand All',
+    collapseAll: 'Collapse All',
+    virtualSlot: 'Slot: {name}',
+    virtualArea: 'Equip: {name}',
+    inventoryGrid: 'Inventory Grid',
   },
   dock: {
     hierarchy: 'Hierarchy',

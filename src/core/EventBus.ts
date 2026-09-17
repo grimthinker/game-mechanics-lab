@@ -12,6 +12,11 @@ export interface EventMap {
     btSchema: Record<string, any> | null;
   };
   'game:playerDied': void;
+  'inspector:navigate': {
+    rootEntityId: string;
+    path: Array<{ id: string; label: string }>;
+    targetSection?: string;
+  };
 }
 
 type EventCallback<T> = (data: T) => void;
