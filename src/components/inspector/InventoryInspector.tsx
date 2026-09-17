@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { World } from '../../ecs/World';
 import { findAllInventoriesInHierarchy } from '../../ecs/utils/hierarchy';
+import { useDragDrop } from '../../dnd/DragDropContext';
+import { findItemLocation } from '../../ecs/utils/itemValidation';
 import { t } from '../../locales';
 
 export interface InventoryInspectorProps {
@@ -14,6 +16,55 @@ export const InventoryInspector: React.FC<InventoryInspectorProps> = ({
   world,
   onNavigate,
 }) => {
+  const { isDragging, startDrag, setHoverTarget, hoverTarget, isValidTarget, isSwap } =
+    useDragDrop();
+  const dragCandidateRef = useRef<{ x: number; y: number } | null>(null);
+  const wasDraggingRef = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    dragCandidateRef.current = { x: e.clientX, y: e.clientY };
+    wasDraggingRef.current = false;
+  };
+
+  const handlePointerMove = (e: React.PointerEvent, itemId: string) => {
+    if (dragCandidateRef.current && !isDragging) {
+      const dx = e.clientX - dragCandidateRef.current.x;
+      const dy = e.clientY - dragCandidateRef.current.y;
+      if (Math.hypot(dx, dy) > 5) {
+        const comp = world.getEntity(itemId);
+        if (comp && comp.item) {
+          const source = findItemLocation(world, itemId);
+          if (source) {
+            let icon = '📦';
+            if (comp.item.type === 'weapon') icon = '⚔️';
+            else if (comp.item.type === 'armor') icon = '🛡️';
+            else if (comp.item.type === 'bag') icon = '🎒';
+            else if (comp.item.type === 'bodyPart') icon = '🥩';
+
+            startDrag(
+              {
+                id: itemId,
+                name: comp.meta?.name ?? comp.item.name,
+                icon,
+                size: comp.item.size,
+                weight: comp.physicsStats?.weight.current ?? 1,
+              },
+              source,
+              e.clientX,
+              e.clientY
+            );
+          }
+        }
+        dragCandidateRef.current = null;
+        wasDraggingRef.current = true;
+      }
+    }
+  };
+
+  const handlePointerUp = () => {
+    dragCandidateRef.current = null;
+  };
+
   const discoveredInventories = findAllInventoriesInHierarchy(world, targetId);
 
   if (discoveredInventories.length === 0) {
@@ -110,10 +161,52 @@ export const InventoryInspector: React.FC<InventoryInspectorProps> = ({
             {entry.inventory.slots.map((row, rIdx) =>
               row.map((cell, cIdx) => {
                 const it = cell.itemId ? world.getComponent(cell.itemId, 'item') : null;
+
+                const isHoveredTarget =
+                  isDragging &&
+                  hoverTarget?.type === 'inventory' &&
+                  hoverTarget.containerId === entry.containerId &&
+                  hoverTarget.row === rIdx &&
+                  hoverTarget.col === cIdx;
+
+                let bgColor = it ? '#2980b9' : '#222';
+                let borderColor = '#444';
+                if (isHoveredTarget) {
+                  if (isValidTarget && isSwap) {
+                    bgColor = '#154360';
+                    borderColor = '#3498db';
+                  } else if (isValidTarget) {
+                    bgColor = '#1e8449';
+                    borderColor = '#2ecc71';
+                  } else {
+                    bgColor = '#641e16';
+                    borderColor = '#e74c3c';
+                  }
+                }
+
                 return (
                   <div
                     key={`${rIdx}_${cIdx}`}
-                    onClick={() => {
+                    onPointerEnter={() => {
+                      if (isDragging)
+                        setHoverTarget({
+                          type: 'inventory',
+                          containerId: entry.containerId,
+                          row: rIdx,
+                          col: cIdx,
+                        });
+                    }}
+                    onPointerLeave={() => {
+                      if (isDragging && isHoveredTarget) setHoverTarget(null);
+                    }}
+                    onPointerDown={it ? handlePointerDown : undefined}
+                    onPointerMove={it ? (e) => handlePointerMove(e, cell.itemId!) : undefined}
+                    onPointerUp={it ? handlePointerUp : undefined}
+                    onClick={(e) => {
+                      if (wasDraggingRef.current) {
+                        wasDraggingRef.current = false;
+                        return;
+                      }
                       if (cell.itemId) onNavigate(cell.itemId, it?.name || 'Предмет');
                     }}
                     title={
@@ -124,20 +217,28 @@ export const InventoryInspector: React.FC<InventoryInspectorProps> = ({
                     style={{
                       width: '36px',
                       height: '36px',
-                      backgroundColor: it ? '#2980b9' : '#222',
-                      border: '1px solid #444',
+                      backgroundColor: bgColor,
+                      border: `1px solid ${borderColor}`,
                       borderRadius: '4px',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      cursor: cell.itemId ? 'pointer' : 'default',
+                      cursor: cell.itemId
+                        ? isDragging
+                          ? 'grabbing'
+                          : 'grab'
+                        : isDragging
+                          ? 'crosshair'
+                          : 'default',
                       fontSize: '9px',
                       color: '#fff',
                       textAlign: 'center',
                       padding: '2px',
                       overflow: 'hidden',
                       position: 'relative',
+                      userSelect: 'none',
+                      transition: 'background-color 0.1s, border-color 0.1s',
                     }}
                   >
                     <span>{it ? it.name.substring(0, 4) : ''}</span>

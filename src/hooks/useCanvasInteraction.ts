@@ -12,6 +12,7 @@ import { GameMode } from '../config/gameConfig';
 import { PlacementMode, Point, BlackboardPickingState } from '../types';
 import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
+import { useDragDrop } from '../dnd/DragDropContext';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -45,6 +46,9 @@ export const useCanvasInteraction = ({
   const clickedEntityIdRef = useRef<string | null>(null);
   const isMarqueeActiveRef = useRef<boolean>(false);
   const [cursorWorldPos, setCursorWorldPos] = useState<Point | null>(null);
+
+  const { isDragging, startDrag, setHoverTarget } = useDragDrop();
+  const dragCandidateRef = useRef<{ id: string; startX: number; startY: number } | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -146,6 +150,12 @@ export const useCanvasInteraction = ({
       // 2. Клик по сущности на поле — выбор с поддержкой Shift (мультиселект / инверсия)
       const entityId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
       if (entityId) {
+        const comp = app.world.getEntity(entityId);
+        if (comp?.item && !comp.ownership && mode === GameMode.EDITOR) {
+          dragCandidateRef.current = { id: entityId, startX: e.clientX, startY: e.clientY };
+          return; // Откладываем выделение до отпускания или сдвига мыши
+        }
+
         clickedEntityIdRef.current = entityId;
         if (e.shiftKey && app.selection.selectedEntityIds.has(entityId)) {
           app.selection.deselectEntity(entityId);
@@ -189,6 +199,42 @@ export const useCanvasInteraction = ({
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
     setCursorWorldPos({ x: Math.round(point.x), y: Math.round(point.y) });
+
+    if (isDragging) {
+      setHoverTarget({ type: 'ground' });
+      return;
+    }
+
+    if (dragCandidateRef.current) {
+      const dx = e.clientX - dragCandidateRef.current.startX;
+      const dy = e.clientY - dragCandidateRef.current.startY;
+      if (Math.hypot(dx, dy) > 5) {
+        const id = dragCandidateRef.current.id;
+        const comp = app.world.getEntity(id);
+        if (comp && comp.item) {
+          let icon = '📦';
+          if (comp.item.type === 'weapon') icon = '⚔️';
+          else if (comp.item.type === 'armor') icon = '🛡️';
+          else if (comp.item.type === 'bag') icon = '🎒';
+          else if (comp.item.type === 'bodyPart') icon = '🥩';
+
+          startDrag(
+            {
+              id,
+              name: comp.meta?.name ?? comp.item.name,
+              icon,
+              size: comp.item.size,
+              weight: comp.physicsStats?.weight.current ?? 1,
+            },
+            { type: 'ground' },
+            e.clientX,
+            e.clientY
+          );
+        }
+        dragCandidateRef.current = null;
+      }
+      return;
+    }
 
     // Обновление перетаскивания манипулятора
     if (app.gizmo.isDragging() && mode === GameMode.EDITOR) {
@@ -263,6 +309,21 @@ export const useCanvasInteraction = ({
 
     if (e.button !== 0) return;
 
+    if (dragCandidateRef.current) {
+      const id = dragCandidateRef.current.id;
+      dragCandidateRef.current = null;
+
+      clickedEntityIdRef.current = id;
+      if (e.shiftKey && app.selection.selectedEntityIds.has(id)) {
+        app.selection.deselectEntity(id);
+      } else {
+        app.selection.selectEntity(id, !e.shiftKey);
+      }
+      syncPlayerControls();
+      updateStats();
+      return;
+    }
+
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
     // Завершение взаимодействия с манипулятором
@@ -316,6 +377,7 @@ export const useCanvasInteraction = ({
 
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
+    dragCandidateRef.current = null;
     const app = appRef.current;
     if (!app || mode !== GameMode.EDITOR || !containerRef.current) return;
 
@@ -377,6 +439,11 @@ export const useCanvasInteraction = ({
   };
 
   const handleMouseLeave = () => {
+    if (isDragging) {
+      setHoverTarget(null);
+    }
+    dragCandidateRef.current = null;
+
     const app = appRef.current;
     if (app) {
       app.setMouseScreenPos(null, null);

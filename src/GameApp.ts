@@ -42,6 +42,7 @@ import { EditorMutationsAPI } from './editor/EditorMutationsAPI';
 import { CommandHistory } from './history/CommandHistory';
 import { TransactionBuilder } from './history/TransactionBuilder';
 import { EntitySnapshotCommand } from './history/commands/EntitySnapshotCommand';
+import { ItemTransferService } from './editor/ItemTransferService';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -83,6 +84,7 @@ export class GameApp {
   public selection: SelectionController;
   public gizmo: GizmoController;
   public mutations: EditorMutationsAPI;
+  public itemTransfer: ItemTransferService;
 
   public onFrame: (() => void) | null = null;
 
@@ -121,6 +123,7 @@ export class GameApp {
     this.selection = new SelectionController(this);
     this.gizmo = new GizmoController(this);
     this.mutations = new EditorMutationsAPI(this.world, this.physics, this.aiSystem);
+    this.itemTransfer = new ItemTransferService(this);
 
     this.resizeCanvas();
     window.addEventListener('resize', this.handleResize);
@@ -1041,8 +1044,9 @@ export class GameApp {
       this.selection.selectedEntityId &&
       this.gizmo.tool !== 'select'
     ) {
+      const isOwned = !!this.world.getComponent(this.selection.selectedEntityId, 'ownership');
       const transform = this.world.getComponent(this.selection.selectedEntityId, 'transform');
-      if (transform) {
+      if (transform && !isOwned) {
         let dragDelta: Point | undefined = undefined;
         let dragDeltaAngle: number | undefined = undefined;
 

@@ -13,6 +13,8 @@ import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
 import { GameHUD } from './components/GameHUD';
 import { CanvasHUD } from './components/CanvasHUD';
+import { useDragDrop } from './dnd/DragDropContext';
+import { DragGhostOverlay } from './dnd/DragGhostOverlay';
 import { MultiSelectionDrawer } from './components/MultiSelectionDrawer';
 import { PlacementMode, BlackboardPickingState } from './types';
 import { GameMode } from './config/gameConfig';
@@ -94,6 +96,8 @@ export const App: React.FC = () => {
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
   const [btSchema, setBtSchema] = useState<Record<string, any> | null>(null);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
+
+  const { setApp } = useDragDrop();
 
   // Синхронизация реального размера Canvas с Flex-контейнером
   useEffect(() => {
@@ -219,6 +223,7 @@ export const App: React.FC = () => {
     if (!containerRef.current) return;
     const app = new GameApp(containerRef.current);
     appRef.current = app;
+    setApp(app);
 
     app.gameMode = modeRef.current;
     app.isPaused = true;
@@ -249,11 +254,12 @@ export const App: React.FC = () => {
     setIsEngineReady(true);
 
     return () => {
+      setApp(null);
       app.destroy();
       appRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setApp]);
 
   // Автосохранение при закрытии/скрытии вкладки браузера
   useEffect(() => {
@@ -590,7 +596,10 @@ export const App: React.FC = () => {
               world={appRef.current?.world}
               typeFilters={typeFilters}
               onToggleFilter={(type) =>
-                setTypeFilters((prev) => ({ ...prev, [type]: prev[type] === false ? true : false }))
+                setTypeFilters((prev) => ({
+                  ...prev,
+                  [type]: prev[type] === false ? true : false,
+                }))
               }
               onSelectEntity={(id) => {
                 appRef.current?.selection.selectEntity(id, false);
@@ -930,6 +939,7 @@ export const App: React.FC = () => {
       </div>
 
       <HotkeysModal isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
+      <DragGhostOverlay />
     </div>
   );
 };

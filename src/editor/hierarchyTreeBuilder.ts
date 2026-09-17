@@ -1,6 +1,7 @@
 import { World } from '../ecs/World';
 import { getAnatomyParts } from '../ecs/utils/hierarchy';
 import { getPartStatus, PartStatus } from '../ecs/utils/anatomyStatus';
+import { TransferTarget } from '../ecs/utils/itemValidation';
 import { t } from '../locales';
 
 export type HierarchyNodeType =
@@ -29,6 +30,7 @@ export interface HierarchyTreeNode {
   inspectorPath?: { id: string; label: string }[];
   targetSection?: string;
   hp?: string;
+  transferTarget?: TransferTarget;
 }
 
 export function buildHierarchyTree(
@@ -99,6 +101,7 @@ export function buildHierarchyTree(
           inspectorRootId,
           inspectorPath: myPath,
           targetSection: 'inventory',
+          transferTarget: { type: 'inventory', containerId: itemId },
         };
         children.push(invNode);
         if (invMatched || checkMatch(invName, '')) {
@@ -120,7 +123,6 @@ export function buildHierarchyTree(
             if (res.isMatched) areaMatched = true;
           }
         });
-
         if (areaChildren.length > 0 || showEmptySlots) {
           const areaNameBase = t('hierarchy.virtualArea', { name: area.name });
           const areaName =
@@ -136,6 +138,7 @@ export function buildHierarchyTree(
             inspectorRootId,
             inspectorPath: myPath,
             targetSection: 'equip',
+            transferTarget: { type: 'area', containerId: itemId, areaId: area.id },
           };
           children.push(areaNode);
           if (areaMatched || checkMatch(areaNameBase, '')) {
@@ -210,6 +213,7 @@ export function buildHierarchyTree(
           inspectorRootId,
           inspectorPath: myPath,
           targetSection: 'slots',
+          transferTarget: { type: 'slot', partId },
         };
         children.push(sNode);
         if (slotMatched || checkMatch(slotNameBase, '')) {
@@ -247,6 +251,7 @@ export function buildHierarchyTree(
             inspectorRootId,
             inspectorPath: myPath,
             targetSection: 'equip',
+            transferTarget: { type: 'area', containerId: partId, areaId: area.id },
           };
           children.push(areaNode);
           if (areaMatched || checkMatch(areaNameBase, '')) {
@@ -334,6 +339,7 @@ export function buildHierarchyTree(
         children,
         inspectorRootId: creatureId,
         inspectorPath: myPath,
+        transferTarget: { type: 'ground', parentEntityId: creatureId },
       },
       isMatched: totalMatched,
     };

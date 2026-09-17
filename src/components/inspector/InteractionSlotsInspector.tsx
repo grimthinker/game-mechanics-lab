@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { World } from '../../ecs/World';
 import { GameApp } from '../../GameApp';
 import { getAggregatedInteractionSlots } from '../../ecs/utils/hierarchy';
+import { useDragDrop } from '../../dnd/DragDropContext';
+import { findItemLocation } from '../../ecs/utils/itemValidation';
 import { t } from '../../locales';
 
 export interface InteractionSlotsInspectorProps {
@@ -21,6 +23,56 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
   onCommit,
   onNavigate,
 }) => {
+  const { isDragging, startDrag, setHoverTarget, hoverTarget, isValidTarget, isSwap } =
+    useDragDrop();
+  const dragCandidateRef = useRef<{ x: number; y: number } | null>(null);
+  const wasDraggingRef = useRef(false);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (isReadOnly) return;
+    dragCandidateRef.current = { x: e.clientX, y: e.clientY };
+    wasDraggingRef.current = false;
+  };
+
+  const handlePointerMove = (e: React.PointerEvent, itemId: string) => {
+    if (dragCandidateRef.current && !isDragging) {
+      const dx = e.clientX - dragCandidateRef.current.x;
+      const dy = e.clientY - dragCandidateRef.current.y;
+      if (Math.hypot(dx, dy) > 5) {
+        const comp = world.getEntity(itemId);
+        if (comp && comp.item) {
+          const source = findItemLocation(world, itemId);
+          if (source) {
+            let icon = '📦';
+            if (comp.item.type === 'weapon') icon = '⚔️';
+            else if (comp.item.type === 'armor') icon = '🛡️';
+            else if (comp.item.type === 'bag') icon = '🎒';
+            else if (comp.item.type === 'bodyPart') icon = '🥩';
+
+            startDrag(
+              {
+                id: itemId,
+                name: comp.meta?.name ?? comp.item.name,
+                icon,
+                size: comp.item.size,
+                weight: comp.physicsStats?.weight.current ?? 1,
+              },
+              source,
+              e.clientX,
+              e.clientY
+            );
+          }
+        }
+        dragCandidateRef.current = null;
+        wasDraggingRef.current = true;
+      }
+    }
+  };
+
+  const handlePointerUp = () => {
+    dragCandidateRef.current = null;
+  };
+
   const currentArchetype = world.getComponent(targetId, 'tag')?.archetype;
   const interactionSlotsComp = world.getComponent(targetId, 'interactionSlots');
 
@@ -34,15 +86,40 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
             const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
             const partMeta = world.getComponent(info.partId, 'meta');
 
+            const isHoveredTarget =
+              isDragging && hoverTarget?.type === 'slot' && hoverTarget.partId === info.partId;
+            let bgColor = '#181818';
+            let borderColor = '#333';
+            if (isHoveredTarget) {
+              if (isValidTarget && isSwap) {
+                bgColor = '#154360';
+                borderColor = '#3498db';
+              } else if (isValidTarget) {
+                bgColor = '#1e8449';
+                borderColor = '#2ecc71';
+              } else {
+                bgColor = '#641e16';
+                borderColor = '#e74c3c';
+              }
+            }
+
             return (
               <div
                 key={`slot_${info.partId}_${slot.id}`}
+                onPointerEnter={() => {
+                  if (isDragging && !isReadOnly)
+                    setHoverTarget({ type: 'slot', partId: info.partId });
+                }}
+                onPointerLeave={() => {
+                  if (isDragging && isHoveredTarget) setHoverTarget(null);
+                }}
                 style={{
                   marginBottom: '8px',
                   padding: '10px',
-                  backgroundColor: '#181818',
+                  backgroundColor: bgColor,
                   borderRadius: '4px',
-                  border: '1px solid #333',
+                  border: `1px solid ${borderColor}`,
+                  transition: 'background-color 0.1s, border-color 0.1s',
                 }}
               >
                 <div
@@ -168,12 +245,23 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                       <button
                         type="button"
                         className="btn btn-sm"
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={(e) => handlePointerMove(e, slot.itemId!)}
+                        onPointerUp={handlePointerUp}
                         style={{
                           flex: 1,
                           backgroundColor: '#2c3e50',
                           color: '#ecf0f1',
+                          cursor: isDragging ? 'grabbing' : 'grab',
                         }}
-                        onClick={() => onNavigate(slot.itemId!, slotItem.name)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (wasDraggingRef.current) {
+                            wasDraggingRef.current = false;
+                            return;
+                          }
+                          onNavigate(slot.itemId!, slotItem.name);
+                        }}
                       >
                         Настроить: {slotItem.name}
                       </button>
@@ -226,15 +314,39 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
   const slot = interactionSlotsComp;
   const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
 
+  const isHoveredTarget =
+    isDragging && hoverTarget?.type === 'slot' && hoverTarget.partId === targetId;
+  let bgColor = '#181818';
+  let borderColor = '#333';
+  if (isHoveredTarget) {
+    if (isValidTarget && isSwap) {
+      bgColor = '#154360';
+      borderColor = '#3498db';
+    } else if (isValidTarget) {
+      bgColor = '#1e8449';
+      borderColor = '#2ecc71';
+    } else {
+      bgColor = '#641e16';
+      borderColor = '#e74c3c';
+    }
+  }
+
   return (
     <div
       key={`slot_${slot.id}`}
+      onPointerEnter={() => {
+        if (isDragging && !isReadOnly) setHoverTarget({ type: 'slot', partId: targetId });
+      }}
+      onPointerLeave={() => {
+        if (isDragging && isHoveredTarget) setHoverTarget(null);
+      }}
       style={{
         marginBottom: '8px',
         padding: '10px',
-        backgroundColor: '#181818',
+        backgroundColor: bgColor,
         borderRadius: '4px',
-        border: '1px solid #333',
+        border: `1px solid ${borderColor}`,
+        transition: 'background-color 0.1s, border-color 0.1s',
       }}
     >
       <div
@@ -355,12 +467,23 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
             <button
               type="button"
               className="btn btn-sm"
+              onPointerDown={handlePointerDown}
+              onPointerMove={(e) => handlePointerMove(e, slot.itemId!)}
+              onPointerUp={handlePointerUp}
               style={{
                 flex: 1,
                 backgroundColor: '#2c3e50',
                 color: '#ecf0f1',
+                cursor: isDragging ? 'grabbing' : 'grab',
               }}
-              onClick={() => onNavigate(slot.itemId!, slotItem.name)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (wasDraggingRef.current) {
+                  wasDraggingRef.current = false;
+                  return;
+                }
+                onNavigate(slot.itemId!, slotItem.name);
+              }}
             >
               Настроить: {slotItem.name}
             </button>

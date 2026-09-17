@@ -1,9 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { World } from '../../ecs/World';
 import { t } from '../../locales';
 import { buildHierarchyTree, HierarchyTreeNode } from '../../editor/hierarchyTreeBuilder';
 import { EventBus } from '../../core/EventBus';
 import { PartStatus } from '../../ecs/utils/anatomyStatus';
+import { useDragDrop } from '../../dnd/DragDropContext';
+import { findItemLocation } from '../../ecs/utils/itemValidation';
+import { getRootOwner } from '../../ecs/utils/hierarchy';
 
 interface SceneHierarchyProps {
   world: World | null | undefined;
@@ -14,6 +17,7 @@ interface SceneHierarchyProps {
 
 const HierarchyNodeItem: React.FC<{
   node: HierarchyTreeNode;
+  world: World | null | undefined;
   depth: number;
   expanded: Set<string>;
   searchMatchedIds: Set<string>;
@@ -22,8 +26,10 @@ const HierarchyNodeItem: React.FC<{
   onToggle: (id: string, recursive: boolean, node: HierarchyTreeNode) => void;
   onSelect: (node: HierarchyTreeNode) => void;
   onDoubleClick: (node: HierarchyTreeNode) => void;
+  onAutoExpand: (id: string) => void;
 }> = ({
   node,
+  world,
   depth,
   expanded,
   searchMatchedIds,
@@ -32,12 +38,24 @@ const HierarchyNodeItem: React.FC<{
   onToggle,
   onSelect,
   onDoubleClick,
+  onAutoExpand,
 }) => {
   const isExpanded = expanded.has(node.id) || (searchActive && searchMatchedIds.has(node.id));
   const hasChildren = node.children.length > 0;
 
+  const { isDragging, startDrag, setHoverTarget, hoverTarget, isValidTarget, isSwap } =
+    useDragDrop();
+
+  const dragCandidateRef = useRef<{ x: number; y: number } | null>(null);
+  const wasDraggingRef = useRef(false);
+
   // Узел считается активным, если его внутренний id совпадает с тем, куда навигируется Инспектор
   const isActive = activeId === node.id || (activeId === node.entityId && !node.isVirtual);
+  const isHoveredTarget =
+    isDragging &&
+    hoverTarget &&
+    node.transferTarget &&
+    JSON.stringify(hoverTarget) === JSON.stringify(node.transferTarget);
 
   const getTextColor = () => {
     if (isActive) return '#fff';
@@ -47,11 +65,94 @@ const HierarchyNodeItem: React.FC<{
     return '#ccc';
   };
 
+  let bgColor = isActive ? '#1b4332' : 'transparent';
+  let borderColor = isActive ? '1px solid #2ecc71' : '1px solid transparent';
+
+  if (isHoveredTarget) {
+    if (isValidTarget && isSwap) {
+      bgColor = '#154360';
+      borderColor = '1px solid #3498db';
+    } else if (isValidTarget) {
+      bgColor = '#1e8449';
+      borderColor = '1px solid #2ecc71';
+    } else {
+      bgColor = '#641e16';
+      borderColor = '1px solid #e74c3c';
+    }
+  }
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (node.type === 'item') {
+      dragCandidateRef.current = { x: e.clientX, y: e.clientY };
+      wasDraggingRef.current = false;
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (dragCandidateRef.current && !isDragging) {
+      const dx = e.clientX - dragCandidateRef.current.x;
+      const dy = e.clientY - dragCandidateRef.current.y;
+      if (Math.hypot(dx, dy) > 5) {
+        if (world && node.entityId) {
+          const comp = world.getEntity(node.entityId);
+          if (comp && comp.item) {
+            const source = findItemLocation(world, node.entityId);
+            if (source) {
+              startDrag(
+                {
+                  id: node.entityId,
+                  name: node.name,
+                  icon: node.icon,
+                  size: comp.item.size,
+                  weight: comp.physicsStats?.weight.current ?? 1,
+                },
+                source,
+                e.clientX,
+                e.clientY
+              );
+            }
+          }
+        }
+        dragCandidateRef.current = null;
+        wasDraggingRef.current = true;
+      }
+    }
+  };
+
+  const handlePointerUp = () => {
+    // Если бросили предмет в валидный узел — автоматически раскрываем его
+    if (isDragging && isHoveredTarget && isValidTarget) {
+      onAutoExpand(node.id);
+    }
+    dragCandidateRef.current = null;
+  };
+
+  const handlePointerEnter = () => {
+    if (isDragging && node.transferTarget) {
+      setHoverTarget(node.transferTarget);
+    }
+  };
+
+  const handlePointerLeave = () => {
+    if (isDragging && isHoveredTarget) {
+      setHoverTarget(null);
+    }
+  };
+
   return (
     <div>
       <div
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}
         onClick={(e) => {
           e.stopPropagation();
+          if (wasDraggingRef.current) {
+            wasDraggingRef.current = false;
+            return;
+          }
           if (e.ctrlKey && hasChildren) {
             onToggle(node.id, e.altKey, node);
           } else {
@@ -67,12 +168,12 @@ const HierarchyNodeItem: React.FC<{
           alignItems: 'center',
           padding: `4px 8px 4px ${4 + depth * 14}px`,
           cursor: 'pointer',
-          backgroundColor: isActive ? '#1b4332' : 'transparent',
-          border: isActive ? '1px solid #2ecc71' : '1px solid transparent',
+          backgroundColor: bgColor,
+          border: borderColor,
           borderRadius: '4px',
           margin: '1px 4px',
           userSelect: 'none',
-          transition: 'background-color 0.1s',
+          transition: 'background-color 0.1s, border-color 0.1s',
         }}
         title={`ID: ${node.entityId || node.id}`}
       >
@@ -145,6 +246,7 @@ const HierarchyNodeItem: React.FC<{
             <HierarchyNodeItem
               key={child.id}
               node={child}
+              world={world}
               depth={depth + 1}
               expanded={expanded}
               searchMatchedIds={searchMatchedIds}
@@ -153,6 +255,7 @@ const HierarchyNodeItem: React.FC<{
               onToggle={onToggle}
               onSelect={onSelect}
               onDoubleClick={onDoubleClick}
+              onAutoExpand={onAutoExpand}
             />
           ))}
         </div>
@@ -205,9 +308,27 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
     );
   }, [expandedNodes]);
 
+  // Локальная ревизия мира: перерисовывает дерево при изменениях в ECS
+  const [worldRevision, setWorldRevision] = useState(0);
+
+  useEffect(() => {
+    const unsub = EventBus.on('world:updated', () => {
+      setWorldRevision((prev) => prev + 1);
+    });
+    return unsub;
+  }, []);
+
   const { tree, matchedIds } = useMemo(() => {
     return buildHierarchyTree(world, search, showEmptySlots);
-  }, [world, search, showEmptySlots]);
+  }, [world, search, showEmptySlots, worldRevision]);
+
+  const handleAutoExpand = (id: string) => {
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
 
   const toggleExpand = (id: string, recursive: boolean, node: HierarchyTreeNode) => {
     setExpandedNodes((prev) => {
@@ -271,6 +392,8 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
     const focusId = node.entityId || node.inspectorRootId;
     if (focusId) onFocusEntity(focusId);
   };
+
+  const { isDragging, dragItem, setHoverTarget } = useDragDrop();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -365,7 +488,24 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+      <div
+        style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}
+        onPointerOver={(e) => {
+          if (isDragging && e.target === e.currentTarget && dragItem && world) {
+            const source = findItemLocation(world, dragItem.id);
+            let rootId = null;
+            if (source?.type === 'slot') rootId = getRootOwner(world, source.partId);
+            else if (source?.type === 'area' || source?.type === 'inventory')
+              rootId = getRootOwner(world, source.containerId);
+
+            if (rootId) {
+              setHoverTarget({ type: 'ground', parentEntityId: rootId });
+            } else {
+              setHoverTarget({ type: 'ground' });
+            }
+          }
+        }}
+      >
         {tree.length === 0 ? (
           <div
             style={{
@@ -383,6 +523,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
             <HierarchyNodeItem
               key={node.id}
               node={node}
+              world={world}
               depth={0}
               expanded={expandedNodes}
               searchMatchedIds={matchedIds}
@@ -391,6 +532,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
               onToggle={toggleExpand}
               onSelect={handleSelect}
               onDoubleClick={handleDoubleClick}
+              onAutoExpand={handleAutoExpand}
             />
           ))
         )}

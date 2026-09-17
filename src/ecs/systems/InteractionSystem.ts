@@ -6,13 +6,16 @@ import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
 import { Radians } from '../../utils';
 import {
   calculateTotalEntityWeight,
-  isDescendantOf,
-  isItemEquippableToArea,
   getAggregatedInteractionSlots,
   AggregatedSlot,
 } from '../utils/hierarchy';
 import { findActiveBrain } from '../utils/anatomy';
 import { getPartStatus, PartStatus } from '../utils/anatomyStatus';
+import {
+  canItemBePickedUp,
+  canItemBeEquippedToArea,
+  canItemBeHeldInSlot,
+} from '../utils/itemValidation';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -22,12 +25,8 @@ export class InteractionSystem {
     if (world.getComponent(entityId, 'interactionAction')) return false;
     if (world.getComponent(entityId, 'pickupIntent')) return false;
 
-    const targetOwnership = world.getComponent(targetItemId, 'ownership');
-    const targetItem = world.getComponent(targetItemId, 'item');
-    if (!targetItem || targetOwnership) return false;
-
-    // Защита от поднятия в инвентарь или слоты предметов, которые обладают "мозгом"
-    if (findActiveBrain(world, targetItemId)) return false;
+    const pickupCheck = canItemBePickedUp(world, targetItemId);
+    if (!pickupCheck.valid) return false;
 
     world.addComponent(entityId, 'pickupIntent', { targetItemId });
     return true;
@@ -53,16 +52,15 @@ export class InteractionSystem {
     if (!slotInfo || slotInfo.isBroken || !slotInfo.slot.itemId) return false;
 
     const targetContainerId = containerId ?? entityId;
-    const containerEquip = world.getComponent(targetContainerId, 'equip');
-    const area = containerEquip?.equipmentAreas.find((a) => a.id === areaId);
-    if (!area) return false;
+    const equipCheck = canItemBeEquippedToArea(
+      world,
+      slotInfo.slot.itemId,
+      targetContainerId,
+      areaId
+    );
+    if (!equipCheck.valid) return false;
 
     const item = world.getComponent(slotInfo.slot.itemId, 'item');
-    if (!item || !isItemEquippableToArea(item, area.type)) return false;
-    if (isDescendantOf(world, targetContainerId, slotInfo.slot.itemId)) return false;
-
-    // Защита от помещения "живых" существ в экипировку
-    if (findActiveBrain(world, slotInfo.slot.itemId)) return false;
 
     world.addComponent(entityId, 'interactionAction', {
       type: 'equip',
@@ -70,8 +68,8 @@ export class InteractionSystem {
       partId: slotInfo.partId,
       areaId,
       containerId: targetContainerId,
-      timer: GAMEPLAY_CONFIG.pickupReachDuration * (item.equipTimeMultiplier || 1.0),
-      totalDuration: GAMEPLAY_CONFIG.pickupReachDuration * (item.equipTimeMultiplier || 1.0),
+      timer: GAMEPLAY_CONFIG.pickupReachDuration * (item?.equipTimeMultiplier || 1.0),
+      totalDuration: GAMEPLAY_CONFIG.pickupReachDuration * (item?.equipTimeMultiplier || 1.0),
     });
 
     return true;
@@ -98,8 +96,13 @@ export class InteractionSystem {
     const area = containerEquip?.equipmentAreas.find((a) => a.id === areaId);
     if (!area || !area.itemIds.includes(targetItemId)) return false;
 
-    const totalWeight = calculateTotalEntityWeight(world, targetItemId);
-    if (totalWeight > slotInfo.slot.strength * 2) return false;
+    const slotCheck = canItemBeHeldInSlot(
+      world,
+      targetItemId,
+      slotInfo.slot.strength,
+      slotInfo.partId
+    );
+    if (!slotCheck.valid) return false;
 
     const item = world.getComponent(targetItemId, 'item');
 
@@ -370,8 +373,13 @@ export class InteractionSystem {
               isOutOfReach = true;
             }
 
-            const totalWeight = calculateTotalEntityWeight(world, targetId);
-            if (isOutOfReach || totalWeight > slot.strength * 2) {
+            const holdCheck = canItemBeHeldInSlot(
+              world,
+              targetId,
+              slot.strength,
+              interactionAction.partId
+            );
+            if (isOutOfReach || !holdCheck.valid) {
               const currentRatio = Math.min(
                 1,
                 Math.max(0, 1 - interactionAction.timer / (interactionAction.totalDuration || 1))
@@ -414,6 +422,7 @@ export class InteractionSystem {
               renderable.isVisible = false;
             }
 
+            const totalWeight = calculateTotalEntityWeight(world, targetId);
             const minTime = Math.max(
               GAMEPLAY_CONFIG.pickupReachDuration,
               GAMEPLAY_CONFIG.minInteractionTime
@@ -461,27 +470,22 @@ export class InteractionSystem {
             (a) => a.id === interactionAction.areaId
           );
 
-          if (slot && slot.itemId && area && containerEquip) {
+          if (slot && slot.itemId) {
             const itemId = slot.itemId;
-            const item = world.getComponent(itemId, 'item');
+            const equipCheck = canItemBeEquippedToArea(
+              world,
+              itemId,
+              containerId,
+              interactionAction.areaId
+            );
 
-            if (item && isItemEquippableToArea(item, area.type)) {
-              if (!isDescendantOf(world, containerId, itemId)) {
-                let currentSize = 0;
-                for (const aItemId of area.itemIds) {
-                  const aItem = world.getComponent(aItemId, 'item');
-                  if (aItem) currentSize += aItem.size;
-                }
-
-                if (currentSize + item.size <= area.space) {
-                  area.itemIds.push(itemId);
-                  slot.itemId = null;
-                  world.addComponent(itemId, 'ownership', {
-                    ownerId: containerId,
-                    status: 'equipped',
-                  });
-                }
-              }
+            if (equipCheck.valid && area) {
+              area.itemIds.push(itemId);
+              slot.itemId = null;
+              world.addComponent(itemId, 'ownership', {
+                ownerId: containerId,
+                status: 'equipped',
+              });
             }
           }
         } else if (
@@ -500,9 +504,14 @@ export class InteractionSystem {
           if (slot && slot.itemId === null && area) {
             const itemIdx = area.itemIds.indexOf(interactionAction.targetId);
             if (itemIdx !== -1) {
-              const totalWeight = calculateTotalEntityWeight(world, interactionAction.targetId);
+              const holdCheck = canItemBeHeldInSlot(
+                world,
+                interactionAction.targetId,
+                slot.strength,
+                interactionAction.partId
+              );
 
-              if (totalWeight <= slot.strength * 2) {
+              if (holdCheck.valid) {
                 area.itemIds.splice(itemIdx, 1);
                 slot.itemId = interactionAction.targetId;
                 world.addComponent(interactionAction.targetId, 'ownership', {
@@ -593,11 +602,8 @@ export class InteractionSystem {
           }
 
           if (blocksDrop) {
-            // Совместимость: rayResult.point или сам объект в разных версиях detect-collisions
             const hitPoint = (rayResult as any).point || rayResult;
             const hitDist = Math.hypot(hitPoint.x - startPoint.x, hitPoint.y - startPoint.y);
-
-            // Укорачиваем дистанцию, чтобы предмет не врезался краем (минус радиус предмета и 1px зазора)
             const safeDist = Math.max(0, hitDist - itemRadius - 1);
 
             endPoint = {
@@ -612,7 +618,6 @@ export class InteractionSystem {
           }
         }
       } finally {
-        // Гарантированно возвращаем все отключенные тела обратно в физический движок
         for (const b of disabledBodies) {
           physics.system.insert(b);
         }
