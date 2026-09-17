@@ -1183,9 +1183,22 @@ export class GameApp {
 
   public updateEntityInteractionSlot(
     partOrCreatureId: string,
-    patch: { interactDist?: number; strength?: number }
+    patch: { name?: string; interactDist?: number; strength?: number }
   ): boolean {
     return this.mutations.updateEntityInteractionSlot(partOrCreatureId, patch);
+  }
+
+  public addEntityInteractionSlot(
+    partId: string,
+    defaultName: string = 'Новая рука',
+    interactDist: number = 25,
+    strength: number = 15
+  ): boolean {
+    return this.mutations.addEntityInteractionSlot(partId, defaultName, interactDist, strength);
+  }
+
+  public removeEntityInteractionSlot(partId: string): boolean {
+    return this.mutations.removeEntityInteractionSlot(partId);
   }
 
   public updateEquipmentArea(
@@ -1198,8 +1211,8 @@ export class GameApp {
 
   public addEquipmentArea(
     containerId: string,
-    defaultType: string = 'belt_slot',
-    defaultName: string = 'Новый слот',
+    defaultType: string = 'new_equip_type',
+    defaultName: string = 'Новая область',
     space?: number
   ): string {
     return this.mutations.addEquipmentArea(containerId, defaultType, defaultName, space);

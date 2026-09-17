@@ -138,7 +138,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                     }}
                   />
                 </span>
-                {!isReadOnly && !isFromPart && (
+                {!isReadOnly && (
                   <button
                     type="button"
                     onClick={() => {
@@ -159,7 +159,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                       fontSize: '12px',
                       padding: '0 2px',
                     }}
-                    title="Удалить слот"
+                    title="Удалить область"
                   >
                     ✕
                   </button>
@@ -204,7 +204,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                 gap: '6px',
               }}
             >
-              Тип слота:
+              Тип области:
               <input
                 disabled={isReadOnly}
                 type="text"
@@ -265,7 +265,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                   );
                 })
               ) : (
-                <span style={{ color: '#777', fontSize: '11px' }}>{t('inspector.slotFree')}</span>
+                <span style={{ color: '#777', fontSize: '11px' }}>{t('inspector.areaFree')}</span>
               )}
             </div>
           </div>

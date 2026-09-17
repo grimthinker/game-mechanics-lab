@@ -41,6 +41,7 @@ export interface InventorySetup {
 
 export interface InteractionSlot {
   id: string;
+  name: string;
   interactDist: number;
   strength: number;
   itemId: EntityId | null;

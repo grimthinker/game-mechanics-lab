@@ -49,13 +49,63 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',
+                    alignItems: 'center',
                     marginBottom: '8px',
                   }}
                 >
-                  <span style={{ fontWeight: 'bold', color: '#3498db' }}>{slot.id}</span>
-                  <span style={{ fontSize: '11px', color: '#888' }}>
-                    ({partMeta?.name || info.partId})
-                  </span>
+                  <input
+                    disabled={isReadOnly}
+                    type="text"
+                    key={`slot_name_${info.partId}_${slot.id}`}
+                    defaultValue={slot.name || slot.id}
+                    style={{
+                      width: '45%',
+                      padding: '2px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: '#2ecc71',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      borderBottom: '1px solid #444',
+                    }}
+                    onChange={(e) => {
+                      if (app) {
+                        app.updateEntityInteractionSlot(info.partId, { name: e.target.value });
+                        onCommit(t('history.slotConfigure'));
+                      }
+                    }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#888' }}>
+                      ({partMeta?.name || info.partId})
+                    </span>
+                    {!isReadOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (slot.itemId !== null) {
+                            alert(t('inspector.slotRemoveWarn'));
+                            return;
+                          }
+                          if (app) {
+                            app.mutations.removeEntityInteractionSlot(info.partId);
+                            onCommit(t('history.slotRemove'));
+                          }
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#e74c3c',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          padding: '0 2px',
+                        }}
+                        title={t('common.delete')}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <label
                   style={{
@@ -142,98 +192,158 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
     );
   }
 
-  if (interactionSlotsComp) {
-    const slot = interactionSlotsComp;
-    const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
-
+  if (!interactionSlotsComp) {
     return (
-      <div
-        key={`slot_${slot.id}`}
-        style={{
-          marginBottom: '8px',
-          padding: '10px',
-          backgroundColor: '#181818',
-          borderRadius: '4px',
-          border: '1px solid #333',
-        }}
-      >
-        <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#3498db' }}>{slot.id}</div>
-        <label
-          style={{
-            fontSize: '11px',
-            display: 'flex',
-            justifyContent: 'space-between',
-          }}
-        >
-          Дальность:
-          <input
-            type="number"
-            disabled={isReadOnly}
-            key={`single_slot_dist_${targetId}_${slot.id}`}
-            defaultValue={slot.interactDist}
-            style={{ width: '60px', padding: '2px' }}
-            onChange={(e) => {
-              if (app) {
-                app.updateEntityInteractionSlot(targetId, {
-                  interactDist: Math.max(1, +e.target.value),
-                });
-                onCommit(t('history.slotConfigure'));
-              }
-            }}
-          />
-        </label>
-        <label
-          style={{
-            fontSize: '11px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginTop: '4px',
-          }}
-        >
-          Сила (кг):
-          <input
-            type="number"
-            disabled={isReadOnly}
-            key={`single_slot_str_${targetId}_${slot.id}`}
-            defaultValue={slot.strength}
-            style={{ width: '60px', padding: '2px' }}
-            onChange={(e) => {
-              if (app) {
-                app.updateEntityInteractionSlot(targetId, {
-                  strength: Math.max(1, +e.target.value),
-                });
-                onCommit(t('history.slotConfigure'));
-              }
-            }}
-          />
-        </label>
-        <div
-          style={{
-            marginTop: '8px',
-            paddingTop: '8px',
-            borderTop: '1px solid #2a2a2a',
-          }}
-        >
-          {slotItem ? (
-            <button
-              type="button"
-              className="btn btn-sm"
-              style={{
-                width: '100%',
-                backgroundColor: '#2c3e50',
-                color: '#ecf0f1',
-              }}
-              onClick={() => onNavigate(slot.itemId!, slotItem.name)}
-            >
-              Настроить: {slotItem.name}
-            </button>
-          ) : (
-            <span style={{ color: '#777', fontSize: '12px' }}>{t('common.empty')}</span>
-          )}
-        </div>
+      <div style={{ color: '#777', fontSize: '11px', fontStyle: 'italic' }}>
+        {t('inspector.noInteractionSlot')}
       </div>
     );
   }
 
-  return null;
+  const slot = interactionSlotsComp;
+  const slotItem = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
+
+  return (
+    <div
+      key={`slot_${slot.id}`}
+      style={{
+        marginBottom: '8px',
+        padding: '10px',
+        backgroundColor: '#181818',
+        borderRadius: '4px',
+        border: '1px solid #333',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '8px',
+        }}
+      >
+        <input
+          disabled={isReadOnly}
+          type="text"
+          key={`single_slot_name_${targetId}_${slot.id}`}
+          defaultValue={slot.name || slot.id}
+          style={{
+            width: '50%',
+            padding: '2px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            color: '#2ecc71',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderBottom: '1px solid #444',
+          }}
+          onChange={(e) => {
+            if (app) {
+              app.updateEntityInteractionSlot(targetId, { name: e.target.value });
+              onCommit(t('history.slotConfigure'));
+            }
+          }}
+        />
+        {!isReadOnly && (
+          <button
+            type="button"
+            onClick={() => {
+              if (slot.itemId !== null) {
+                alert(t('inspector.slotRemoveWarn'));
+                return;
+              }
+              if (app) {
+                app.mutations.removeEntityInteractionSlot(targetId);
+                onCommit(t('history.slotRemove'));
+              }
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#e74c3c',
+              cursor: 'pointer',
+              fontSize: '12px',
+              padding: '0 2px',
+            }}
+            title={t('common.delete')}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      <label
+        style={{
+          fontSize: '11px',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}
+      >
+        Дальность:
+        <input
+          type="number"
+          disabled={isReadOnly}
+          key={`single_slot_dist_${targetId}_${slot.id}`}
+          defaultValue={slot.interactDist}
+          style={{ width: '60px', padding: '2px' }}
+          onChange={(e) => {
+            if (app) {
+              app.updateEntityInteractionSlot(targetId, {
+                interactDist: Math.max(1, +e.target.value),
+              });
+              onCommit(t('history.slotConfigure'));
+            }
+          }}
+        />
+      </label>
+      <label
+        style={{
+          fontSize: '11px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: '4px',
+        }}
+      >
+        Сила (кг):
+        <input
+          type="number"
+          disabled={isReadOnly}
+          key={`single_slot_str_${targetId}_${slot.id}`}
+          defaultValue={slot.strength}
+          style={{ width: '60px', padding: '2px' }}
+          onChange={(e) => {
+            if (app) {
+              app.updateEntityInteractionSlot(targetId, {
+                strength: Math.max(1, +e.target.value),
+              });
+              onCommit(t('history.slotConfigure'));
+            }
+          }}
+        />
+      </label>
+      <div
+        style={{
+          marginTop: '8px',
+          paddingTop: '8px',
+          borderTop: '1px solid #2a2a2a',
+        }}
+      >
+        {slotItem ? (
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              width: '100%',
+              backgroundColor: '#2c3e50',
+              color: '#ecf0f1',
+            }}
+            onClick={() => onNavigate(slot.itemId!, slotItem.name)}
+          >
+            Настроить: {slotItem.name}
+          </button>
+        ) : (
+          <span style={{ color: '#777', fontSize: '12px' }}>{t('common.empty')}</span>
+        )}
+      </div>
+    </div>
+  );
 };

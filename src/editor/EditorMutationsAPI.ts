@@ -481,11 +481,15 @@ export class EditorMutationsAPI {
 
   public updateEntityInteractionSlot(
     partOrCreatureId: string,
-    patch: { interactDist?: number; strength?: number }
+    patch: { name?: string; interactDist?: number; strength?: number }
   ): boolean {
     const slot = this.world.getComponent(partOrCreatureId, 'interactionSlots');
     if (!slot) return false;
     let changed = false;
+    if (patch.name !== undefined && slot.name !== patch.name) {
+      slot.name = patch.name;
+      changed = true;
+    }
     if (patch.interactDist !== undefined && slot.interactDist !== patch.interactDist) {
       slot.interactDist = patch.interactDist;
       changed = true;
@@ -523,8 +527,8 @@ export class EditorMutationsAPI {
 
   public addEquipmentArea(
     containerId: string,
-    defaultType: string = 'belt_slot',
-    defaultName: string = 'Новый слот',
+    defaultType: string = 'new_equip_type',
+    defaultName: string = 'Новая область',
     space?: number
   ): string {
     let targetEquip = this.world.getComponent(containerId, 'equip');
@@ -572,5 +576,33 @@ export class EditorMutationsAPI {
       this.world.removeComponent(id, 'inventory');
       return true;
     }
+  }
+
+  public addEntityInteractionSlot(
+    partId: string,
+    defaultName: string = 'Новая рука',
+    interactDist: number = 25,
+    strength: number = 15
+  ): boolean {
+    if (this.world.getComponent(partId, 'interactionSlots')) return false;
+
+    const slotId = `slot_${Date.now().toString(36).substring(2, 6)}`;
+    this.world.addComponent(partId, 'interactionSlots', {
+      id: slotId,
+      name: defaultName,
+      interactDist,
+      strength,
+      itemId: null,
+    });
+    return true;
+  }
+
+  public removeEntityInteractionSlot(partId: string): boolean {
+    const slot = this.world.getComponent(partId, 'interactionSlots');
+    if (!slot) return false;
+    if (slot.itemId !== null) return false;
+
+    this.world.removeComponent(partId, 'interactionSlots');
+    return true;
   }
 }

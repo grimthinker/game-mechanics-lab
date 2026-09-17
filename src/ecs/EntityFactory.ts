@@ -217,6 +217,7 @@ export class EntityFactory {
         },
         interactionSlots: {
           id: 'hand_left',
+          name: 'Левая рука',
           interactDist: 25,
           strength: 15,
           itemId: null,
@@ -249,6 +250,7 @@ export class EntityFactory {
         },
         interactionSlots: {
           id: 'hand_right',
+          name: 'Правая рука',
           interactDist: 25,
           strength: 15,
           itemId: null,

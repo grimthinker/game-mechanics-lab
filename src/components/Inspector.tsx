@@ -370,10 +370,48 @@ export const Inspector: React.FC<InspectorProps> = ({
               />
             )}
 
-          {(currentArchetype === 'creature' || world.getComponent(targetId, 'interactionSlots')) &&
+          {(currentArchetype === 'creature' ||
+            currentArchetype === 'bodyPart' ||
+            world.getComponent(targetId, 'interactionSlots')) &&
             renderSection(
               'slots',
-              currentArchetype === 'creature' ? t('inspector.slots') : t('inspector.singleSlot'),
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span>
+                  {currentArchetype === 'creature'
+                    ? t('inspector.slots')
+                    : t('inspector.singleSlot')}
+                </span>
+                {!isReadOnly &&
+                  currentArchetype !== 'creature' &&
+                  !world.getComponent(targetId, 'interactionSlots') && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{
+                        backgroundColor: '#27ae60',
+                        color: '#fff',
+                        padding: '2px 6px',
+                        fontSize: '10px',
+                        marginLeft: '8px',
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (app) {
+                          app.mutations.addEntityInteractionSlot(targetId);
+                          requestCommit(t('history.slotAdd'));
+                        }
+                      }}
+                    >
+                      {t('inspector.addSlot')}
+                    </button>
+                  )}
+              </div>,
               <InteractionSlotsInspector {...commonProps} onNavigate={pushPath} />
             )}
 
@@ -382,9 +420,8 @@ export const Inspector: React.FC<InspectorProps> = ({
             <div
               style={{
                 display: 'flex',
-                justifyContent: 'space-between',
                 alignItems: 'center',
-                width: '100%',
+                gap: '8px',
               }}
             >
               <span>{t('inspector.equip')}</span>
@@ -397,6 +434,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     color: '#fff',
                     padding: '2px 6px',
                     fontSize: '10px',
+                    marginLeft: '8px',
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -406,7 +444,7 @@ export const Inspector: React.FC<InspectorProps> = ({
                     }
                   }}
                 >
-                  {t('inspector.addSlot')}
+                  {t('inspector.addArea')}
                 </button>
               )}
             </div>,
