@@ -82,8 +82,9 @@ export class AnatomySystem {
       if (isViable) {
         const anchorId = brainId ?? heartId!;
 
-        // Приоритет 1: Подграф, содержащий оригинальный rootPartId, является прямым наследником
         let matchedRootId: string | null = null;
+
+        // Приоритет 1: Подграф, содержащий оригинальный rootPartId из assemblyRoot
         for (const [rootId, comp] of existingCreatureRoots) {
           if (!claimedCreatureRootIds.has(rootId) && graph.includes(comp.assemblyRoot.rootPartId)) {
             matchedRootId = rootId;
@@ -91,7 +92,21 @@ export class AnatomySystem {
           }
         }
 
-        // Приоритет 2: Если исходный якорь погиб, корень наследует подграф, имеющий пересечение по частям
+        // Приоритет 2: Части тела подграфа прямо ссылаются на корень через bodyBrain.rootEntityId
+        if (!matchedRootId) {
+          for (const partId of graph) {
+            const brain = world.getComponent(partId, 'bodyBrain');
+            if (brain && brain.rootEntityId && !claimedCreatureRootIds.has(brain.rootEntityId)) {
+              const rootTag = world.getComponent(brain.rootEntityId, 'tag');
+              if (rootTag?.archetype === 'creature') {
+                matchedRootId = brain.rootEntityId;
+                break;
+              }
+            }
+          }
+        }
+
+        // Приоритет 3: Если исходный якорь погиб, корень наследует подграф, имеющий пересечение по частям
         if (!matchedRootId) {
           for (const [rootId, comp] of existingCreatureRoots) {
             if (
@@ -212,16 +227,54 @@ export class AnatomySystem {
         x: anchorTransform.x,
         y: anchorTransform.y,
       });
+
+      world.addComponent(rootId, 'renderable', {
+        zIndex: 40,
+        isVisible: true,
+        syncWithTransform: true,
+        primitives: [
+          {
+            kind: 'circle',
+            radius: plan.maxRadius,
+            fill: '#34495e',
+            stroke: plan.inheritedBehavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
+            strokeWidth: 2,
+          },
+          {
+            kind: 'polygon',
+            points: [
+              { x: plan.maxRadius, y: 0 },
+              { x: 0, y: -plan.maxRadius },
+              { x: 0, y: plan.maxRadius },
+            ],
+            fill: '#7f8c8d',
+            stroke: '#95a5a6',
+            strokeWidth: 1.5,
+          },
+        ],
+      });
     }
 
-    // Регистрируем актуальную анатомическую сборку
-    world.addComponent(rootId, 'assemblyRoot', { rootPartId: plan.anchorId, partIds: plan.graph });
-    world.removeComponent(rootId, 'item');
+    // Регистрируем/обновляем актуальную анатомическую сборку
+    const assembly = world.getComponent(rootId, 'assemblyRoot');
+    if (!assembly) {
+      world.addComponent(rootId, 'assemblyRoot', {
+        rootPartId: plan.anchorId,
+        partIds: plan.graph,
+      });
+    } else {
+      assembly.rootPartId = plan.anchorId;
+      assembly.partIds = plan.graph;
+    }
+
+    if (world.getComponent(rootId, 'item')) {
+      world.removeComponent(rootId, 'item');
+    }
 
     // Привязываем все мозги подграфа к новому/актуальному корню
     for (const partId of plan.graph) {
       const brainComp = world.getComponent(partId, 'bodyBrain');
-      if (brainComp) {
+      if (brainComp && brainComp.rootEntityId !== rootId) {
         brainComp.rootEntityId = rootId;
       }
     }
@@ -238,11 +291,19 @@ export class AnatomySystem {
         hearingMaxDistance: sensory.hearing.maxDistance,
       });
     } else {
-      perception.visionFovAngle = sensory.vision.fovAngle;
-      perception.visionClarity = sensory.vision.clarity;
-      perception.visionMaxDistance = sensory.vision.maxDistance;
-      perception.hearingSensitivity = sensory.hearing.sensitivity;
-      perception.hearingMaxDistance = sensory.hearing.maxDistance;
+      if (
+        perception.visionFovAngle !== sensory.vision.fovAngle ||
+        perception.visionClarity !== sensory.vision.clarity ||
+        perception.visionMaxDistance !== sensory.vision.maxDistance ||
+        perception.hearingSensitivity !== sensory.hearing.sensitivity ||
+        perception.hearingMaxDistance !== sensory.hearing.maxDistance
+      ) {
+        perception.visionFovAngle = sensory.vision.fovAngle;
+        perception.visionClarity = sensory.vision.clarity;
+        perception.visionMaxDistance = sensory.vision.maxDistance;
+        perception.hearingSensitivity = sensory.hearing.sensitivity;
+        perception.hearingMaxDistance = sensory.hearing.maxDistance;
+      }
     }
 
     // Агрегация локомоции и сознания
@@ -250,7 +311,7 @@ export class AnatomySystem {
     let consciousnessComp = world.getComponent(rootId, 'consciousness');
     if (!consciousnessComp) {
       world.addComponent(rootId, 'consciousness', { state: currentConsciousness });
-    } else {
+    } else if (consciousnessComp.state !== currentConsciousness) {
       consciousnessComp.state = currentConsciousness;
     }
 
@@ -272,8 +333,12 @@ export class AnatomySystem {
       });
       rootPhysStats = world.getComponent(rootId, 'physicsStats')!;
     } else {
-      setBaseStat(rootPhysStats.radius, plan.maxRadius);
-      setBaseStat(rootPhysStats.weight, plan.totalWeight);
+      if (rootPhysStats.radius.base !== plan.maxRadius) {
+        setBaseStat(rootPhysStats.radius, plan.maxRadius);
+      }
+      if (rootPhysStats.weight.base !== plan.totalWeight) {
+        setBaseStat(rootPhysStats.weight, plan.totalWeight);
+      }
     }
 
     let rootPhysBody = world.getComponent(rootId, 'physicsBody');
@@ -293,13 +358,15 @@ export class AnatomySystem {
       });
       physics.registerBody(rootId, body);
     } else if (rootPhysBody.body instanceof Circle) {
-      rootPhysBody.body.r = Math.max(1, plan.maxRadius);
+      if (rootPhysBody.body.r !== Math.max(1, plan.maxRadius)) {
+        rootPhysBody.body.r = Math.max(1, plan.maxRadius);
+      }
       rootPhysBody.category = CollisionCategory.CREATURE;
     }
 
     if (!currentLocomotion.canStand) {
       const input = world.getComponent(rootId, 'input');
-      if (input) {
+      if (input && input.desiredStance !== 'prone') {
         input.desiredStance = 'prone';
       }
     }
@@ -317,7 +384,9 @@ export class AnatomySystem {
         physics.unregisterBody(physBody.body);
         world.removeComponent(partId, 'physicsBody');
       }
-      world.removeComponent(partId, 'item');
+      if (world.getComponent(partId, 'item')) {
+        world.removeComponent(partId, 'item');
+      }
     }
   }
 

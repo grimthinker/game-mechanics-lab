@@ -179,6 +179,18 @@ export class EntityFactory {
       }
     }
 
+    // 4.5. Регистрация анатомической сборки на корневом существе
+    const anchorPartKey =
+      blueprint.parts.find((p) => p.config.bodyBrain || p.config.heart)?.key ||
+      blueprint.parts[0].key;
+    const rootPartId = partKeyToId.get(anchorPartKey)!;
+    const allPartIds = Array.from(partKeyToId.values());
+
+    world.addComponent(rootId, 'assemblyRoot', {
+      rootPartId,
+      partIds: allPartIds,
+    });
+
     // 5. Создание и привязка стартовых предметов (например, сумки)
     if (blueprint.defaultItems) {
       for (const itemDef of blueprint.defaultItems) {
