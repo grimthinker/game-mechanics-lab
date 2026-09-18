@@ -1,4 +1,4 @@
-import { HitZoneType, HitZoneConfig, WeaponCombatConfig, StandardRadius } from './ecs/types';
+import { HitZoneType, HitZoneConfig, WeaponCombatConfig } from './ecs/types';
 import { deg2Rad, Radians } from './utils';
 import { t } from './locales';
 
@@ -69,7 +69,7 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
 export interface WeaponPreset {
   name: string;
   weight: number;
-  radius: StandardRadius;
+  radius: number;
   isSolid: boolean;
   combat: WeaponCombatConfig;
   zone: HitZoneConfig;

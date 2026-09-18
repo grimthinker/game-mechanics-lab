@@ -1,4 +1,5 @@
 import { EntityConfig } from './ecs/types';
+import { BodyStructureType } from './ecs/templates';
 
 export interface Point {
   x: number;
@@ -10,5 +11,11 @@ export interface BlackboardPickingState {
   key: string;
 }
 
+export interface ModularPlacementOptions {
+  structureType: BodyStructureType;
+  behavior: string;
+  name: string;
+}
+
 export type PlacementMode =
-  { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; behavior: string; name: string };
+  { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; options: ModularPlacementOptions };

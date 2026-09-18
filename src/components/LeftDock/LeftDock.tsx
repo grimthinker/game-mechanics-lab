@@ -8,9 +8,10 @@ import { SpawnPalette } from './SpawnPalette';
 import { BTGraph } from '../BTGraph';
 import { useResizable } from '../../hooks/useResizable';
 import { t } from '../../locales';
+import { BodyStructureType } from '../../ecs/templates';
+import { BBKeyType } from '../../ai/schema';
 
 export type DockTab = 'hierarchy' | 'palette' | 'bt';
-import { BBKeyType } from '../../ai/schema';
 
 export interface LeftDockProps {
   app?: GameApp | null;
@@ -19,7 +20,8 @@ export interface LeftDockProps {
   onSelectEntity: (id: string) => void;
   onFocusEntity: (id: string) => void;
   onSelectSpawnPreset: (config: EntityConfig) => void;
-  onSelectModular: (behavior: string, name: string) => void;
+  onSelectModular: (behavior: string, name: string, structureType?: BodyStructureType) => void;
+  onOpenWizard: () => void;
   btData: BTNodeDTO | null;
   btBlackboard: Record<string, any> | null;
   btSchema?: Record<string, any> | null;
@@ -437,6 +439,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   onFocusEntity,
   onSelectSpawnPreset,
   onSelectModular,
+  onOpenWizard,
   btData,
   btBlackboard,
   btSchema,
@@ -570,7 +573,11 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         )}
 
         {activeTab === 'palette' && (
-          <SpawnPalette onSelectPreset={onSelectSpawnPreset} onSelectModular={onSelectModular} />
+          <SpawnPalette
+            onSelectPreset={onSelectSpawnPreset}
+            onSelectModular={onSelectModular}
+            onOpenWizard={onOpenWizard}
+          />
         )}
 
         {activeTab === 'bt' && (

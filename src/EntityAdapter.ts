@@ -3,7 +3,6 @@ import {
   EntityId,
   IMovable,
   EntityController,
-  StandardRadius,
   ItemData,
   OwnershipComponent,
   EquipmentComponent,
@@ -96,12 +95,12 @@ export class EntityAdapter implements IMovable, EntityController {
   public get angle(): Radians {
     return this.movementAdapter.angle;
   }
-  public get radius(): StandardRadius {
-    return this.movementAdapter.radius as StandardRadius;
+  public get radius(): number {
+    return this.movementAdapter.radius;
   }
 
-  public get baseRadius(): StandardRadius {
-    return (this.getComponent('physicsStats')?.radius.base as StandardRadius) ?? this.radius;
+  public get baseRadius(): number {
+    return this.getComponent('physicsStats')?.radius.base ?? this.radius;
   }
   public get weight(): number {
     return this.getComponent('physicsStats')?.weight.current ?? 1;

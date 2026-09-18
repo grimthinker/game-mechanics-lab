@@ -1,12 +1,14 @@
 import React from 'react';
 import { EntityConfig } from '../../ecs/types';
+import { BodyStructureType } from '../../ecs/templates';
 import { createZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
 import { t } from '../../locales';
 
 interface SpawnPaletteProps {
   onSelectPreset: (config: EntityConfig) => void;
-  onSelectModular: (behavior: string, name: string) => void;
+  onSelectModular: (behavior: string, name: string, structureType?: BodyStructureType) => void;
+  onOpenWizard: () => void;
 }
 
 interface PaletteItem {
@@ -22,8 +24,11 @@ interface PaletteCategory {
   title: string;
   items: PaletteItem[];
 }
-
-export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSelectModular }) => {
+export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
+  onSelectPreset,
+  onSelectModular,
+  onOpenWizard,
+}) => {
   const categories: PaletteCategory[] = [
     {
       title: t('palette.categoryCreatures'),
@@ -33,21 +38,35 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
           name: t('palette.player'),
           description: t('palette.playerDesc'),
           icon: '🎮',
-          onClick: () => onSelectModular('PlayerTree', t('palette.player')),
+          onClick: () => onSelectModular('PlayerTree', t('palette.player'), 'humanoid'),
         },
         {
           id: 'creature_attacker',
           name: t('palette.attacker'),
           description: t('palette.attackerDesc'),
           icon: '⚔️',
-          onClick: () => onSelectModular('AttackerTree', t('palette.attacker')),
+          onClick: () => onSelectModular('AttackerTree', t('palette.attacker'), 'humanoid'),
+        },
+        {
+          id: 'creature_quadruped',
+          name: t('palette.quadrupedBot'),
+          description: t('palette.quadrupedDesc'),
+          icon: '🐕',
+          onClick: () => onSelectModular('AttackerTree', t('palette.quadrupedBot'), 'quadruped'),
+        },
+        {
+          id: 'creature_arachnid',
+          name: t('palette.arachnidBot'),
+          description: t('palette.arachnidDesc'),
+          icon: '🕷️',
+          onClick: () => onSelectModular('AttackerTree', t('palette.arachnidBot'), 'arachnid'),
         },
         {
           id: 'creature_idle',
           name: t('palette.idleBot'),
           description: t('palette.idleBotDesc'),
           icon: '👤',
-          onClick: () => onSelectModular('IdleTree', t('palette.idleBot')),
+          onClick: () => onSelectModular('IdleTree', t('palette.idleBot'), 'humanoid'),
         },
       ],
     },
@@ -413,68 +432,108 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({ onSelectPreset, onSe
   ];
 
   return (
-    <div style={{ height: '100%', overflowY: 'auto', padding: '10px' }}>
-      <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px' }}>
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '10px',
+        boxSizing: 'border-box',
+        overflow: 'hidden',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onOpenWizard}
+        style={{
+          width: '100%',
+          backgroundColor: '#27ae60',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '6px',
+          padding: '10px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          marginBottom: '12px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          transition: 'background-color 0.15s',
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#2ecc71')}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#27ae60')}
+      >
+        <span>✨</span>
+        <span>{t('palette.openWizard')}</span>
+      </button>
+
+      <div style={{ fontSize: '11px', color: '#888', marginBottom: '12px', flexShrink: 0 }}>
         {t('palette.subtitle')}
       </div>
 
-      {categories.map((category) => (
-        <div key={category.title} style={{ marginBottom: '16px' }}>
-          <div
-            style={{
-              fontSize: '11px',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              color: '#bdc3c7',
-              marginBottom: '6px',
-              paddingBottom: '4px',
-              borderBottom: '1px solid #2a2a2a',
-            }}
-          >
-            {category.title}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {category.items.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => {
-                  if (item.onClick) item.onClick();
-                  else if (item.createConfig) onSelectPreset(item.createConfig());
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  backgroundColor: '#1e1e1e',
-                  border: '1px solid #333',
-                  borderRadius: '6px',
-                  padding: '8px 10px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s, border-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#252525';
-                  e.currentTarget.style.borderColor = '#3498db';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#1e1e1e';
-                  e.currentTarget.style.borderColor = '#333';
-                }}
-              >
-                <span style={{ fontSize: '20px' }}>{item.icon}</span>
-                <div style={{ overflow: 'hidden' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#ecf0f1' }}>
-                    {item.name}
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
-                    {item.description}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '2px' }}>
+        {categories.map((category) => (
+          <div key={category.title} style={{ marginBottom: '16px' }}>
+            <div
+              style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                color: '#bdc3c7',
+                marginBottom: '6px',
+                paddingBottom: '4px',
+                borderBottom: '1px solid #2a2a2a',
+              }}
+            >
+              {category.title}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {category.items.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    if (item.onClick) item.onClick();
+                    else if (item.createConfig) onSelectPreset(item.createConfig());
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    backgroundColor: '#1e1e1e',
+                    border: '1px solid #333',
+                    borderRadius: '6px',
+                    padding: '8px 10px',
+                    cursor: 'pointer',
+                    transition: 'background-color 0.15s, border-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#252525';
+                    e.currentTarget.style.borderColor = '#3498db';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#1e1e1e';
+                    e.currentTarget.style.borderColor = '#333';
+                  }}
+                >
+                  <span style={{ fontSize: '20px' }}>{item.icon}</span>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#ecf0f1' }}>
+                      {item.name}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
+                      {item.description}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 };

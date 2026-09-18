@@ -13,6 +13,7 @@ import { PlacementMode, Point, BlackboardPickingState } from '../types';
 import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { useDragDrop } from '../dnd/DragDropContext';
+import { CREATURE_BLUEPRINTS } from '../ecs/templates';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -354,13 +355,15 @@ export const useCanvasInteraction = ({
         });
       } else if (placementMode.kind === 'modular') {
         app.executeTransaction('Спавн составного существа', () => {
-          const spawnedId = app.entityFactory.spawnModularHumanoid(
+          const blueprint = CREATURE_BLUEPRINTS[placementMode.options.structureType];
+          const spawnedId = app.entityFactory.spawnModularCreature(
             app.world,
             app.physics,
             app.aiSystem,
             point,
-            placementMode.behavior,
-            placementMode.name
+            blueprint,
+            placementMode.options.behavior,
+            placementMode.options.name
           );
           app.selection.selectEntity(spawnedId, true);
           return spawnedId;

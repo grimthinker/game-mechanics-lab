@@ -11,7 +11,10 @@ import { createRectanglePoints } from './utils';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
+import { CreatureWizardModal } from './components/modals/CreatureWizardModal';
 import { GameHUD } from './components/GameHUD';
+import { BodyStructureType } from './ecs/templates';
+import { ModularPlacementOptions } from './types';
 import { CanvasHUD } from './components/CanvasHUD';
 import { useDragDrop } from './dnd/DragDropContext';
 import { DragGhostOverlay } from './dnd/DragGhostOverlay';
@@ -96,6 +99,7 @@ export const App: React.FC = () => {
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
   const [btSchema, setBtSchema] = useState<Record<string, any> | null>(null);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
+  const [isCreatureWizardOpen, setIsCreatureWizardOpen] = useState(false);
 
   const { setApp } = useDragDrop();
 
@@ -379,8 +383,11 @@ export const App: React.FC = () => {
     const name = type === 'player' ? t('palette.player') : t('palette.attacker');
     setPlacementMode({
       kind: 'modular',
-      behavior,
-      name,
+      options: {
+        structureType: 'humanoid',
+        behavior,
+        name,
+      },
     });
   }, []);
 
@@ -545,9 +552,13 @@ export const App: React.FC = () => {
             }}
             onFocusEntity={handleFocusEntity}
             onSelectSpawnPreset={handleSelectSpawnPreset}
-            onSelectModular={(behavior, name) =>
-              setPlacementMode({ kind: 'modular', behavior, name })
+            onSelectModular={(behavior, name, structureType: BodyStructureType = 'humanoid') =>
+              setPlacementMode({
+                kind: 'modular',
+                options: { structureType, behavior, name },
+              })
             }
+            onOpenWizard={() => setIsCreatureWizardOpen(true)}
             btData={btData}
             btBlackboard={btBlackboard}
             btSchema={btSchema}
@@ -937,8 +948,18 @@ export const App: React.FC = () => {
           />
         )}
       </div>
-
       <HotkeysModal isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
+      <CreatureWizardModal
+        isOpen={isCreatureWizardOpen}
+        onClose={() => setIsCreatureWizardOpen(false)}
+        onConfirm={(options: ModularPlacementOptions) => {
+          setIsCreatureWizardOpen(false);
+          setPlacementMode({
+            kind: 'modular',
+            options,
+          });
+        }}
+      />
       <DragGhostOverlay />
     </div>
   );

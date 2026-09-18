@@ -1,19 +1,26 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
-import { EntityId, CollisionCategory, COLLISION_MASK_ALL, RENDER_Z_INDEX } from '../types';
+import {
+  EntityId,
+  CollisionCategory,
+  COLLISION_MASK_ALL,
+  RENDER_Z_INDEX,
+  EntityConfig,
+} from '../types';
 import {
   traverseAnatomyGraph,
   calculateSystemWeightAndRadius,
   findActiveBrain,
 } from '../utils/anatomy';
 import { destroyPartRecursive } from '../utils/anatomyDamage';
+import { ARCHETYPE_ASSEMBLERS } from '../archetypes';
 import { Circle } from 'detect-collisions';
 import { setBaseStat, createStat } from '../stats/StatEvaluator';
 import { evaluateConsciousness, getLocomotionState, getSensoryStats } from '../utils/anatomyStatus';
 import { ConsciousnessState } from '../types';
 
 export class AnatomySystem {
-  public update(dt: number, world: World, physics: PhysicsSystem): void {
+  public update(_dt: number, world: World, physics: PhysicsSystem): void {
     // 0. Удаление частей тела, у которых структурная прочность (СП) упала до 0
     const destructibleParts = world.getEntitiesWith('socketDef', 'health');
     for (const [partId, { health }] of destructibleParts) {
@@ -22,95 +29,204 @@ export class AnatomySystem {
       }
     }
 
+    // 1. Поиск всех изолированных подграфов соединенных частей тела
     const bodyParts = world.getEntitiesWith('socketDef');
-    const visitedGraphs = new Set<EntityId>();
+    const visitedParts = new Set<EntityId>();
+    const subgraphs: EntityId[][] = [];
 
     for (const [partId] of bodyParts) {
-      if (visitedGraphs.has(partId)) continue;
-
-      // 1. Получаем весь связанный граф частей тела
+      if (visitedParts.has(partId)) continue;
       const graph = traverseAnatomyGraph(world, partId);
-      graph.forEach((id) => visitedGraphs.add(id));
+      for (const id of graph) visitedParts.add(id);
+      subgraphs.push(graph);
+    }
 
-      // 2. Ищем активные органы и проверяем жизнеспособность
-      const brainId = findActiveBrain(world, partId);
+    // 2. Сбор существующих корней существ для разрешения преемственности
+    const existingCreatureRoots = world.getEntitiesWith('assemblyRoot').filter(([id]) => {
+      const tag = world.getComponent(id, 'tag');
+      return tag?.archetype === 'creature';
+    });
+
+    const claimedCreatureRootIds = new Set<string>();
+
+    interface ViableCreaturePlan {
+      graph: EntityId[];
+      anchorId: EntityId;
+      totalWeight: number;
+      maxRadius: number;
+      targetRootId: string;
+      isNewRoot: boolean;
+      inheritedBehavior?: string;
+      inheritedName?: string;
+    }
+
+    interface NonViableItemPlan {
+      graph: EntityId[];
+      totalWeight: number;
+      maxRadius: number;
+      calculatedSize: number;
+    }
+
+    const viablePlans: ViableCreaturePlan[] = [];
+    const itemPlans: NonViableItemPlan[] = [];
+
+    // 3. Арбитраж подграфов: сопоставление с существующими корнями
+    for (const graph of subgraphs) {
+      const brainId = findActiveBrain(world, graph[0]);
       const heartId = graph.find((id) => world.getComponent(id, 'heart') !== undefined);
-      const { totalWeight, maxRadius } = calculateSystemWeightAndRadius(world, partId);
+      const consciousness = evaluateConsciousness(world, graph[0]);
+      const isViable = heartId !== undefined && consciousness !== ConsciousnessState.DEAD;
 
-      // 3. Вычисляем суммарный габарит связки как корень из суммы квадратов размеров всех частей
-      let sumSqSize = 0;
-      for (const id of graph) {
-        const pStats = world.getComponent(id, 'physicsStats');
-        const partSize = pStats?.size ?? 10;
-        sumSqSize += partSize * partSize;
-      }
-      const calculatedSize = Math.max(1, Math.round(Math.sqrt(sumSqSize)));
+      const { totalWeight, maxRadius } = calculateSystemWeightAndRadius(world, graph[0]);
 
-      // 4. Проверяем жизнеспособность: существо ОБЯЗАНО иметь сердце и не быть мертвым
-      const consciousness = evaluateConsciousness(world, partId);
-      const isViableCreature = heartId !== undefined && consciousness !== ConsciousnessState.DEAD;
-
-      if (isViableCreature) {
+      if (isViable) {
         const anchorId = brainId ?? heartId!;
-        this.handleCreatureGraph(world, physics, graph, anchorId, totalWeight, maxRadius);
+
+        // Приоритет 1: Подграф, содержащий оригинальный rootPartId, является прямым наследником
+        let matchedRootId: string | null = null;
+        for (const [rootId, comp] of existingCreatureRoots) {
+          if (!claimedCreatureRootIds.has(rootId) && graph.includes(comp.assemblyRoot.rootPartId)) {
+            matchedRootId = rootId;
+            break;
+          }
+        }
+
+        // Приоритет 2: Если исходный якорь погиб, корень наследует подграф, имеющий пересечение по частям
+        if (!matchedRootId) {
+          for (const [rootId, comp] of existingCreatureRoots) {
+            if (
+              !claimedCreatureRootIds.has(rootId) &&
+              comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))
+            ) {
+              matchedRootId = rootId;
+              break;
+            }
+          }
+        }
+
+        if (matchedRootId) {
+          claimedCreatureRootIds.add(matchedRootId);
+          viablePlans.push({
+            graph,
+            anchorId,
+            totalWeight,
+            maxRadius,
+            targetRootId: matchedRootId,
+            isNewRoot: false,
+          });
+        } else {
+          // Разделение топологии (Topology Split): жизнеспособный фрагмент отделился от основного тела
+          let inheritedBehavior = 'IdleTree';
+          let inheritedName = 'Существо';
+
+          // Наследуем имя и поведение от прародителя, если возможно
+          for (const [rootId, comp] of existingCreatureRoots) {
+            if (comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))) {
+              const oldAi = world.getComponent(rootId, 'aiStats');
+              const oldMeta = world.getComponent(rootId, 'meta');
+              if (oldAi) inheritedBehavior = oldAi.behavior.current;
+              if (oldMeta) inheritedName = `${oldMeta.name} (Фрагмент)`;
+              break;
+            }
+          }
+
+          const newRootId = `creature_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+          viablePlans.push({
+            graph,
+            anchorId,
+            totalWeight,
+            maxRadius,
+            targetRootId: newRootId,
+            isNewRoot: true,
+            inheritedBehavior,
+            inheritedName,
+          });
+        }
       } else {
-        this.handleItemGraph(world, physics, graph, totalWeight, maxRadius, calculatedSize);
+        // Нежизнеспособный подграф (оторванная конечность или мертвое мясо)
+        let sumSqSize = 0;
+        for (const id of graph) {
+          const pStats = world.getComponent(id, 'physicsStats');
+          const partSize = pStats?.size ?? 10;
+          sumSqSize += partSize * partSize;
+        }
+        const calculatedSize = Math.max(1, Math.round(Math.sqrt(sumSqSize)));
+
+        itemPlans.push({
+          graph,
+          totalWeight,
+          maxRadius,
+          calculatedSize,
+        });
       }
+    }
+
+    // 4. Очистка старых корней существ, которые не были востребованы ни одним жизнеспособным подграфом
+    for (const [rootId] of existingCreatureRoots) {
+      if (!claimedCreatureRootIds.has(rootId)) {
+        const phys = world.getComponent(rootId, 'physicsBody');
+        if (phys) physics.unregisterBody(phys.body);
+        world.removeEntity(rootId);
+      }
+    }
+
+    // 5. Применение планов для живых существ
+    for (const plan of viablePlans) {
+      this.applyCreaturePlan(world, physics, plan);
+    }
+
+    // 6. Применение планов для предметов плоти
+    for (const plan of itemPlans) {
+      this.applyItemPlan(world, physics, plan);
     }
   }
 
-  private handleCreatureGraph(
+  private applyCreaturePlan(
     world: World,
     physics: PhysicsSystem,
-    graph: EntityId[],
-    anchorId: EntityId,
-    totalWeight: number,
-    maxRadius: number
+    plan: {
+      graph: EntityId[];
+      anchorId: EntityId;
+      totalWeight: number;
+      maxRadius: number;
+      targetRootId: string;
+      isNewRoot: boolean;
+      inheritedBehavior?: string;
+      inheritedName?: string;
+    }
   ): void {
-    const brain = world.getComponent(anchorId, 'bodyBrain');
-    let rootId = brain?.rootEntityId;
+    const rootId = plan.targetRootId;
+    const anchorTransform = world.getComponent(plan.anchorId, 'transform') ?? {
+      x: 0,
+      y: 0,
+      angle: 0,
+    };
 
-    // Если у якоря нет корня — ищем существующий корень существа
-    if (!rootId || !world.getEntity(rootId)) {
-      const existingRoot = world.getEntitiesWith('assemblyRoot').find(([id, comp]) => {
-        const tag = world.getComponent(id, 'tag');
-        return (
-          tag?.archetype === 'creature' &&
-          comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))
-        );
+    if (plan.isNewRoot) {
+      world.createEntity(rootId);
+      const rootConfig: EntityConfig = {
+        ai: { behavior: plan.inheritedBehavior || 'IdleTree' },
+        meta: { name: plan.inheritedName || 'Существо', entityType: 'creature' },
+      };
+      ARCHETYPE_ASSEMBLERS.creature(world, physics, null as any, rootId, rootConfig, {
+        x: anchorTransform.x,
+        y: anchorTransform.y,
       });
+    }
 
-      if (existingRoot) {
-        rootId = existingRoot[0];
-      } else {
-        rootId = `creature_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-        world.createEntity(rootId);
-        if (!world.getComponent(rootId, 'transform'))
-          world.addComponent(rootId, 'transform', { x: 0, y: 0, angle: 0 });
-        if (!world.getComponent(rootId, 'input'))
-          world.addComponent(rootId, 'input', {
-            desiredMoveVector: null,
-            turnDirection: 0,
-            turnRatio: 0,
-            isMovingForward: false,
-            isRunning: false,
-            isCrouching: false,
-            isSlowWalking: false,
-            wantsAttack: false,
-            desiredStance: 'standing',
-          });
-      }
+    // Регистрируем актуальную анатомическую сборку
+    world.addComponent(rootId, 'assemblyRoot', { rootPartId: plan.anchorId, partIds: plan.graph });
+    world.removeComponent(rootId, 'item');
 
-      if (brain) {
-        brain.rootEntityId = rootId;
+    // Привязываем все мозги подграфа к новому/актуальному корню
+    for (const partId of plan.graph) {
+      const brainComp = world.getComponent(partId, 'bodyBrain');
+      if (brainComp) {
+        brainComp.rootEntityId = rootId;
       }
     }
 
-    // Регистрируем связку анатомии на Корне
-    world.addComponent(rootId, 'assemblyRoot', { rootPartId: anchorId, partIds: graph });
-    world.removeComponent(rootId, 'item'); // Корень существа — не предмет
-
-    // 0.5. Агрегация органов чувств в PerceptionComponent
+    // Агрегация органов чувств
     const sensory = getSensoryStats(world, rootId);
     let perception = world.getComponent(rootId, 'perception');
     if (!perception) {
@@ -129,7 +245,7 @@ export class AnatomySystem {
       perception.hearingMaxDistance = sensory.hearing.maxDistance;
     }
 
-    // 0.6. Агрегация Локомоции и Сознания
+    // Агрегация локомоции и сознания
     const currentConsciousness = evaluateConsciousness(world, rootId);
     let consciousnessComp = world.getComponent(rootId, 'consciousness');
     if (!consciousnessComp) {
@@ -146,24 +262,28 @@ export class AnatomySystem {
       Object.assign(locomotionComp, currentLocomotion);
     }
 
-    // 1. Агрегация физических свойств в Root
+    // Агрегация физических свойств
     let rootPhysStats = world.getComponent(rootId, 'physicsStats');
     if (!rootPhysStats) {
       world.addComponent(rootId, 'physicsStats', {
-        radius: createStat(maxRadius),
-        weight: createStat(totalWeight),
+        radius: createStat(plan.maxRadius),
+        weight: createStat(plan.totalWeight),
         isSolid: true,
       });
       rootPhysStats = world.getComponent(rootId, 'physicsStats')!;
     } else {
-      setBaseStat(rootPhysStats.radius, maxRadius);
-      setBaseStat(rootPhysStats.weight, totalWeight);
+      setBaseStat(rootPhysStats.radius, plan.maxRadius);
+      setBaseStat(rootPhysStats.weight, plan.totalWeight);
     }
 
     let rootPhysBody = world.getComponent(rootId, 'physicsBody');
-    const rootTransform = world.getComponent(rootId, 'transform') ?? { x: 0, y: 0, angle: 0 };
+    const rootTransform = world.getComponent(rootId, 'transform') ?? anchorTransform;
+
     if (!rootPhysBody) {
-      const body = new Circle({ x: rootTransform.x, y: rootTransform.y }, Math.max(1, maxRadius));
+      const body = new Circle(
+        { x: rootTransform.x, y: rootTransform.y },
+        Math.max(1, plan.maxRadius)
+      );
       body.isStatic = false;
       world.addComponent(rootId, 'physicsBody', {
         body,
@@ -173,11 +293,10 @@ export class AnatomySystem {
       });
       physics.registerBody(rootId, body);
     } else if (rootPhysBody.body instanceof Circle) {
-      rootPhysBody.body.r = Math.max(1, maxRadius);
+      rootPhysBody.body.r = Math.max(1, plan.maxRadius);
       rootPhysBody.category = CollisionCategory.CREATURE;
     }
 
-    // 2. Логика ног: если стоять невозможно (0 целых ног) — принудительный prone
     if (!currentLocomotion.canStand) {
       const input = world.getComponent(rootId, 'input');
       if (input) {
@@ -185,15 +304,14 @@ export class AnatomySystem {
       }
     }
 
-    // 3. Синхронизация: части тела следуют за корнем и не имеют своих коллайдеров/предметов
-    for (const partId of graph) {
+    // Синхронизация: части тела следуют за корнем
+    for (const partId of plan.graph) {
       const partTransform = world.getComponent(partId, 'transform');
       if (partTransform) {
         partTransform.x = rootTransform.x;
         partTransform.y = rootTransform.y;
         partTransform.angle = rootTransform.angle;
       }
-      // Очищаем физику и свойства предметов с самих частей тела (они внутри существа)
       const physBody = world.getComponent(partId, 'physicsBody');
       if (physBody) {
         physics.unregisterBody(physBody.body);
@@ -203,32 +321,20 @@ export class AnatomySystem {
     }
   }
 
-  private handleItemGraph(
+  private applyItemPlan(
     world: World,
     physics: PhysicsSystem,
-    graph: EntityId[],
-    totalWeight: number,
-    maxRadius: number,
-    maxSize: number
-  ): void {
-    // 1. Очищаем старые корни существ, которые потеряли мозг и чьи части теперь стали предметом
-    const existingRoots = world.getEntitiesWith('assemblyRoot');
-    for (const [id, comp] of existingRoots) {
-      const tag = world.getComponent(id, 'tag');
-      if (
-        tag?.archetype === 'creature' &&
-        comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))
-      ) {
-        const phys = world.getComponent(id, 'physicsBody');
-        if (phys) physics.unregisterBody(phys.body);
-        world.removeEntity(id);
-      }
+    plan: {
+      graph: EntityId[];
+      totalWeight: number;
+      maxRadius: number;
+      calculatedSize: number;
     }
-
-    // 2. Находим центральную часть (максимум связей, при равенстве - наибольший размер size)
-    let anchorPartId = graph[0];
+  ): void {
+    // Центральная часть куска мяса/конечности
+    let anchorPartId = plan.graph[0];
     let maxLinks = -1;
-    for (const id of graph) {
+    for (const id of plan.graph) {
       const linkComp = world.getComponent(id, 'socketLink');
       const linksCount = linkComp ? Object.keys(linkComp.links).length : 0;
       if (linksCount > maxLinks) {
@@ -243,11 +349,11 @@ export class AnatomySystem {
       }
     }
 
-    // 3. Ищем существующий абстрактный Корень-предмет для этой связки
+    // Ищем существующую сборку-предмет, если этот кусок уже лежал на земле
     const assemblyRoots = world.getEntitiesWith('assemblyRoot');
     let rootItemId = assemblyRoots.find(([id, comp]) => {
       const isItem = world.getComponent(id, 'tag')?.archetype === 'item';
-      return isItem && graph.includes(comp.assemblyRoot.rootPartId);
+      return isItem && plan.graph.includes(comp.assemblyRoot.rootPartId);
     })?.[0];
 
     const anchorTransform = world.getComponent(anchorPartId, 'transform') ?? {
@@ -256,7 +362,6 @@ export class AnatomySystem {
       angle: 0,
     };
 
-    // 3. Если Корня-предмета нет — создаем абстрактную сущность-обертку
     if (!rootItemId || !world.getEntity(rootItemId)) {
       rootItemId = `item_assembly_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       world.createEntity(rootItemId);
@@ -267,12 +372,13 @@ export class AnatomySystem {
       });
     }
 
-    // Настраиваем свойства абстрактного Корня-предмета
     world.addComponent(rootItemId, 'tag', { archetype: 'item', subType: 'bodyPart' });
     world.addComponent(rootItemId, 'meta', { name: 'Часть тела', entityType: 'item' });
-    world.addComponent(rootItemId, 'assemblyRoot', { rootPartId: anchorPartId, partIds: graph });
+    world.addComponent(rootItemId, 'assemblyRoot', {
+      rootPartId: anchorPartId,
+      partIds: plan.graph,
+    });
 
-    // Добавляем компонент предмета на Корень (сами части тела остаются нетронутыми!)
     let itemComp = world.getComponent(rootItemId, 'item');
     if (!itemComp) {
       world.addComponent(rootItemId, 'item', {
@@ -280,41 +386,39 @@ export class AnatomySystem {
         type: 'bodyPart',
         maxStack: 1,
         count: 1,
-        size: maxSize,
+        size: plan.calculatedSize,
         equipTypes: [],
         equippable: false,
         equipTimeMultiplier: 1.0,
       });
     } else {
-      itemComp.size = maxSize;
+      itemComp.size = plan.calculatedSize;
     }
 
-    // Статы физики на Корне
     let rootPhysStats = world.getComponent(rootItemId, 'physicsStats');
     if (!rootPhysStats) {
       world.addComponent(rootItemId, 'physicsStats', {
-        radius: createStat(maxRadius),
-        weight: createStat(totalWeight),
-        size: maxSize,
+        radius: createStat(plan.maxRadius),
+        weight: createStat(plan.totalWeight),
+        size: plan.calculatedSize,
         isSolid: true,
       });
       rootPhysStats = world.getComponent(rootItemId, 'physicsStats')!;
     } else {
-      setBaseStat(rootPhysStats.radius, maxRadius);
-      setBaseStat(rootPhysStats.weight, totalWeight);
-      rootPhysStats.size = maxSize;
+      setBaseStat(rootPhysStats.radius, plan.maxRadius);
+      setBaseStat(rootPhysStats.weight, plan.totalWeight);
+      rootPhysStats.size = plan.calculatedSize;
     }
 
     const rootItemTransform = world.getComponent(rootItemId, 'transform') ?? anchorTransform;
     const ownership = world.getComponent(rootItemId, 'ownership');
 
-    // 4. Физическое тело и рендер для Корня-предмета на полу
     if (!ownership) {
       let physBody = world.getComponent(rootItemId, 'physicsBody');
       if (!physBody) {
         const body = new Circle(
           { x: rootItemTransform.x, y: rootItemTransform.y },
-          Math.max(1, maxRadius)
+          Math.max(1, plan.maxRadius)
         );
         body.isStatic = false;
         world.addComponent(rootItemId, 'physicsBody', {
@@ -325,13 +429,12 @@ export class AnatomySystem {
         });
         physics.registerBody(rootItemId, body);
       } else if (physBody.body instanceof Circle) {
-        physBody.body.r = Math.max(1, maxRadius);
+        physBody.body.r = Math.max(1, plan.maxRadius);
         physBody.category = CollisionCategory.ITEM;
       }
 
-      // Визуал лежащей связки на полу
       let renderable = world.getComponent(rootItemId, 'renderable');
-      const boxSize = maxRadius * 1.6;
+      const boxSize = plan.maxRadius * 1.6;
       if (!renderable) {
         world.addComponent(rootItemId, 'renderable', {
           zIndex: RENDER_Z_INDEX.ITEMS,
@@ -347,7 +450,6 @@ export class AnatomySystem {
         }
       }
     } else {
-      // Предмет поднят в инвентарь — отключаем физику и скрываем визуал
       const physBody = world.getComponent(rootItemId, 'physicsBody');
       if (physBody) {
         physics.unregisterBody(physBody.body);
@@ -359,15 +461,18 @@ export class AnatomySystem {
       }
     }
 
-    // 5. Синхронизируем положение частей тела с Корнем-предметом
-    for (const partId of graph) {
+    // Синхронизируем положение частей и очищаем ссылки на мозг старого существа
+    for (const partId of plan.graph) {
       const partTransform = world.getComponent(partId, 'transform');
       if (partTransform) {
         partTransform.x = rootItemTransform.x;
         partTransform.y = rootItemTransform.y;
         partTransform.angle = rootItemTransform.angle;
       }
-      // Очищаем физику, item и renderable с индивидуальных частей тела
+      const brainComp = world.getComponent(partId, 'bodyBrain');
+      if (brainComp) {
+        delete brainComp.rootEntityId;
+      }
       const physBody = world.getComponent(partId, 'physicsBody');
       if (physBody) {
         physics.unregisterBody(physBody.body);

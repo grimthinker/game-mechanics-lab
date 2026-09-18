@@ -8,6 +8,7 @@ import { assembleBodyPart } from './archetypes/BodyPartArchetype';
 import { Circle } from 'detect-collisions';
 import { createStat } from './stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../config/balanceConfig';
+import { CreatureBodyBlueprint, CREATURE_BLUEPRINTS } from './templates';
 
 export class EntityFactory {
   public generateId(prefix: string = 'ent'): EntityId {
@@ -32,29 +33,43 @@ export class EntityFactory {
     return id;
   }
 
-  public spawnModularHumanoid(
+  public spawnModularCreature(
     world: World,
     physics: PhysicsSystem,
     aiSystem: AISystem,
     position: Point,
+    blueprint: CreatureBodyBlueprint,
     behavior: string = 'IdleTree',
-    name: string = 'Существо'
+    name?: string
   ): EntityId {
     const rootId = this.generateId('creature');
     world.createEntity(rootId);
 
-    // Abstract Root Setup
-    const rootConfig: EntityConfig = { ai: { behavior }, meta: { name, entityType: 'creature' } };
+    const creatureName = name || blueprint.name;
+
+    // 1. Создание абстрактного корня существа
+    const rootConfig: EntityConfig = {
+      ai: { behavior },
+      meta: { name: creatureName, entityType: 'creature' },
+    };
     ARCHETYPE_ASSEMBLERS.creature(world, physics, aiSystem, rootId, rootConfig, position);
 
-    // Initial Physics and Render for Root (required for anatomy system and rendering)
-    const radius = 16;
+    // Первичный расчет радиуса и веса по частям шаблона
+    let maxRadius = 0;
+    let initialWeight = 0;
+    for (const part of blueprint.parts) {
+      const r = part.config.physics?.radius ?? 10;
+      if (r > maxRadius) maxRadius = r;
+      initialWeight += part.config.physics?.weight ?? 1;
+    }
+
     world.addComponent(rootId, 'physicsStats', {
-      radius: createStat(radius),
-      weight: createStat(10),
+      radius: createStat(maxRadius),
+      weight: createStat(initialWeight || 10),
       isSolid: true,
     });
-    const body = new Circle({ x: position.x, y: position.y }, radius);
+
+    const body = new Circle({ x: position.x, y: position.y }, maxRadius);
     body.isStatic = false;
     world.addComponent(rootId, 'physicsBody', {
       body,
@@ -71,7 +86,7 @@ export class EntityFactory {
       primitives: [
         {
           kind: 'circle',
-          radius,
+          radius: maxRadius,
           fill: '#34495e',
           stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
           strokeWidth: 2,
@@ -79,9 +94,9 @@ export class EntityFactory {
         {
           kind: 'polygon',
           points: [
-            { x: radius, y: 0 },
-            { x: 0, y: -radius },
-            { x: 0, y: radius },
+            { x: maxRadius, y: 0 },
+            { x: 0, y: -maxRadius },
+            { x: 0, y: maxRadius },
           ],
           fill: '#7f8c8d',
           stroke: '#95a5a6',
@@ -98,257 +113,115 @@ export class EntityFactory {
       hearingMaxDistance: BALANCE_CONFIG.senses.defaultHearingMaxDistance,
     });
 
-    // Body Parts Generation
-    const torsoId = this.generateId('part_torso');
-    const headId = this.generateId('part_head');
-    const armLId = this.generateId('part_arm_l');
-    const armRId = this.generateId('part_arm_r');
-    const legLId = this.generateId('part_leg_l');
-    const legRId = this.generateId('part_leg_r');
+    // 2. Генерация ID для всех частей тела шаблона
+    const partKeyToId = new Map<string, string>();
+    for (const part of blueprint.parts) {
+      partKeyToId.set(part.key, this.generateId(`part_${part.key}`));
+    }
 
-    const createSocketLink = (
-      strA: number,
-      strB: number,
-      sizeA: number,
-      sizeB: number,
-      targetEntityId: string,
-      targetSocketId: string
-    ) => {
-      const strength = Math.min(strA, strB);
-      return {
-        targetEntityId,
-        targetSocketId,
-        currentStrength: strength,
-        maxStrength: createStat(strength),
-        socketSize: sizeA + sizeB,
+    // 3. Подготовка структуры сокет-связей для каждой части
+    const partSocketLinks = new Map<string, Record<string, any>>();
+    for (const part of blueprint.parts) {
+      partSocketLinks.set(part.key, {});
+    }
+
+    for (const conn of blueprint.connections) {
+      const idA = partKeyToId.get(conn.fromPartKey);
+      const idB = partKeyToId.get(conn.toPartKey);
+      const partDefA = blueprint.parts.find((p) => p.key === conn.fromPartKey);
+      const partDefB = blueprint.parts.find((p) => p.key === conn.toPartKey);
+
+      if (idA && idB && partDefA && partDefB) {
+        const sockA = partDefA.config.socketDef?.sockets[conn.fromSocket];
+        const sockB = partDefB.config.socketDef?.sockets[conn.toSocket];
+
+        if (sockA && sockB) {
+          const strength = Math.min(sockA.strength, sockB.strength);
+          const socketSize = sockA.size + sockB.size;
+
+          partSocketLinks.get(conn.fromPartKey)![conn.fromSocket] = {
+            targetEntityId: idB,
+            targetSocketId: conn.toSocket,
+            currentStrength: strength,
+            maxStrength: createStat(strength),
+            socketSize,
+          };
+
+          partSocketLinks.get(conn.toPartKey)![conn.toSocket] = {
+            targetEntityId: idA,
+            targetSocketId: conn.fromSocket,
+            currentStrength: strength,
+            maxStrength: createStat(strength),
+            socketSize,
+          };
+        }
+      }
+    }
+
+    // 4. Создание и сборка частей тела
+    for (const part of blueprint.parts) {
+      const partId = partKeyToId.get(part.key)!;
+      world.createEntity(partId);
+
+      const partConfig: EntityConfig = JSON.parse(JSON.stringify(part.config));
+      partConfig.socketLink = {
+        links: partSocketLinks.get(part.key) || {},
       };
-    };
 
-    // Torso (Ядро / Сердце)
-    world.createEntity(torsoId);
-    assembleBodyPart(
-      world,
-      physics,
-      aiSystem,
-      torsoId,
-      {
-        tag: { archetype: 'bodyPart', subType: 'torso' },
-        meta: { name: 'Туловище' },
-        physics: { radius: 12, weight: 15, size: 20 },
-        heart: { requiresBrain: true },
-        socketDef: {
-          sockets: {
-            neck: { type: 'neck', size: 10, strength: 50 },
-            l_shoulder: { type: 'shoulder', size: 10, strength: 40 },
-            r_shoulder: { type: 'shoulder', size: 10, strength: 40 },
-            l_hip: { type: 'hip', size: 12, strength: 50 },
-            r_hip: { type: 'hip', size: 12, strength: 50 },
-          },
-        },
-        socketLink: {
-          links: {
-            neck: createSocketLink(50, 50, 10, 10, headId, 'base'),
-            l_shoulder: createSocketLink(40, 40, 10, 10, armLId, 'base'),
-            r_shoulder: createSocketLink(40, 40, 10, 10, armRId, 'base'),
-            l_hip: createSocketLink(50, 50, 12, 12, legLId, 'base'),
-            r_hip: createSocketLink(50, 50, 12, 12, legRId, 'base'),
-          },
-        },
-        equip: {
-          equipmentAreas: [
-            { id: 'torso', name: 'Туловище', type: 'torso', space: 20, itemIds: [] },
-          ],
-        },
-      },
-      position
-    );
+      if (partConfig.bodyBrain) {
+        partConfig.bodyBrain.rootEntityId = rootId;
+      }
 
-    // Head (Мозг, Зрение, Слух)
-    world.createEntity(headId);
-    assembleBodyPart(
-      world,
-      physics,
-      aiSystem,
-      headId,
-      {
-        tag: { archetype: 'bodyPart', subType: 'head' },
-        meta: { name: 'Голова' },
-        physics: { radius: 8, weight: 5, size: 10 },
-        vision: {
-          fovAngle: BALANCE_CONFIG.senses.defaultFovAngle,
-          clarity: BALANCE_CONFIG.senses.defaultVisionClarity,
-          maxDistance: BALANCE_CONFIG.senses.defaultVisionMaxDistance,
-        },
-        hearing: {
-          sensitivity: BALANCE_CONFIG.senses.defaultHearingSensitivity,
-          maxDistance: BALANCE_CONFIG.senses.defaultHearingMaxDistance,
-        },
-        socketDef: { sockets: { base: { type: 'neck', size: 10, strength: 50 } } },
-        socketLink: {
-          links: {
-            base: createSocketLink(50, 50, 10, 10, torsoId, 'neck'),
-          },
-        },
-        bodyBrain: { power: 100, isActive: true, rootEntityId: rootId },
-        equip: {
-          equipmentAreas: [{ id: 'head', name: 'Голова', type: 'head', space: 10, itemIds: [] }],
-        },
-      },
-      position
-    );
-    aiSystem.initBotBrain(world, headId, behavior);
+      assembleBodyPart(world, physics, aiSystem, partId, partConfig, position);
 
-    // Left Arm
-    world.createEntity(armLId);
-    assembleBodyPart(
-      world,
-      physics,
-      aiSystem,
-      armLId,
-      {
-        tag: { archetype: 'bodyPart', subType: 'arm' },
-        meta: { name: 'Левая рука' },
-        physics: { radius: 6, weight: 4, size: 10 },
-        socketDef: { sockets: { base: { type: 'shoulder', size: 10, strength: 40 } } },
-        socketLink: {
-          links: {
-            base: createSocketLink(40, 40, 10, 10, torsoId, 'l_shoulder'),
-          },
-        },
-        interactionSlots: {
-          id: 'hand_left',
-          name: 'Левая рука',
-          interactDist: 25,
-          strength: 15,
-          itemId: null,
-        },
-        equip: {
-          equipmentAreas: [
-            { id: 'hands_l', name: 'Левая рука', type: 'hands', space: 10, itemIds: [] },
-          ],
-        },
-      },
-      position
-    );
+      if (partConfig.bodyBrain) {
+        aiSystem.initBotBrain(world, partId, behavior);
+      }
+    }
 
-    // Right Arm
-    world.createEntity(armRId);
-    assembleBodyPart(
-      world,
-      physics,
-      aiSystem,
-      armRId,
-      {
-        tag: { archetype: 'bodyPart', subType: 'arm' },
-        meta: { name: 'Правая рука' },
-        physics: { radius: 6, weight: 4, size: 10 },
-        socketDef: { sockets: { base: { type: 'shoulder', size: 10, strength: 40 } } },
-        socketLink: {
-          links: {
-            base: createSocketLink(40, 40, 10, 10, torsoId, 'r_shoulder'),
-          },
-        },
-        interactionSlots: {
-          id: 'hand_right',
-          name: 'Правая рука',
-          interactDist: 25,
-          strength: 15,
-          itemId: null,
-        },
-        equip: {
-          equipmentAreas: [
-            { id: 'hands_r', name: 'Правая рука', type: 'hands', space: 10, itemIds: [] },
-          ],
-        },
-      },
-      position
-    );
+    // 5. Создание и привязка стартовых предметов (например, сумки)
+    if (blueprint.defaultItems) {
+      for (const itemDef of blueprint.defaultItems) {
+        const targetPartId = partKeyToId.get(itemDef.targetPartKey);
+        if (targetPartId) {
+          const itemId = this.generateId('item');
+          world.createEntity(itemId);
 
-    // Left Leg (Локомоция)
-    world.createEntity(legLId);
-    assembleBodyPart(
-      world,
-      physics,
-      aiSystem,
-      legLId,
-      {
-        tag: { archetype: 'bodyPart', subType: 'leg' },
-        meta: { name: 'Левая нога' },
-        physics: { radius: 7, weight: 6, size: 12 },
-        locomotion: {},
-        socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
-        socketLink: {
-          links: {
-            base: createSocketLink(50, 50, 12, 12, torsoId, 'l_hip'),
-          },
-        },
-        equip: {
-          equipmentAreas: [
-            { id: 'legs_l', name: 'Левая нога', type: 'legs', space: 12, itemIds: [] },
-          ],
-        },
-      },
-      position
-    );
+          const itemConfig: EntityConfig = JSON.parse(JSON.stringify(itemDef.config));
+          itemConfig.ownership = { ownerId: targetPartId, status: 'equipped' };
 
-    // Right Leg (Локомоция)
-    world.createEntity(legRId);
-    assembleBodyPart(
-      world,
-      physics,
-      aiSystem,
-      legRId,
-      {
-        tag: { archetype: 'bodyPart', subType: 'leg' },
-        meta: { name: 'Правая нога' },
-        physics: { radius: 7, weight: 6, size: 12 },
-        locomotion: {},
-        socketDef: { sockets: { base: { type: 'hip', size: 12, strength: 50 } } },
-        socketLink: {
-          links: {
-            base: createSocketLink(50, 50, 12, 12, torsoId, 'r_hip'),
-          },
-        },
-        equip: {
-          equipmentAreas: [
-            { id: 'legs_r', name: 'Правая нога', type: 'legs', space: 12, itemIds: [] },
-          ],
-        },
-      },
-      position
-    );
-    // Give the torso a bag by default
-    const bagId = this.generateId('item_bag');
-    world.createEntity(bagId);
-    ARCHETYPE_ASSEMBLERS.item(
-      world,
-      physics,
-      aiSystem,
-      bagId,
-      {
-        tag: { archetype: 'item', subType: 'bag' },
-        item: {
-          name: 'Сумка',
-          type: 'bag',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: ['torso'],
-          equippable: true,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 16, weight: 1, isSolid: true },
-        ownership: { ownerId: torsoId, status: 'equipped' },
-        inventory: { size: { width: 6, height: 4 } },
-      },
-      position
-    );
+          ARCHETYPE_ASSEMBLERS.item(world, physics, aiSystem, itemId, itemConfig, position);
 
-    const torsoEquip = world.getComponent(torsoId, 'equip');
-    if (torsoEquip) {
-      torsoEquip.equipmentAreas.find((a) => a.type === 'torso')?.itemIds.push(bagId);
+          const targetEquip = world.getComponent(targetPartId, 'equip');
+          if (targetEquip) {
+            const area = targetEquip.equipmentAreas.find((a) => a.type === itemDef.targetAreaType);
+            if (area) {
+              area.itemIds.push(itemId);
+            }
+          }
+        }
+      }
     }
 
     return rootId;
+  }
+
+  public spawnModularHumanoid(
+    world: World,
+    physics: PhysicsSystem,
+    aiSystem: AISystem,
+    position: Point,
+    behavior: string = 'IdleTree',
+    name: string = 'Существо'
+  ): EntityId {
+    return this.spawnModularCreature(
+      world,
+      physics,
+      aiSystem,
+      position,
+      CREATURE_BLUEPRINTS.humanoid,
+      behavior,
+      name
+    );
   }
 }

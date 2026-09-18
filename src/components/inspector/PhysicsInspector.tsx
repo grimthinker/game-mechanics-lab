@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { World } from '../../ecs/World';
 import { GameApp } from '../../GameApp';
-import { STANDARD_RADII, StandardRadius } from '../../ecs/types';
 import { calculateTotalEntityWeight } from '../../ecs/utils/hierarchy';
 import { t } from '../../locales';
 
@@ -20,8 +19,6 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   isReadOnly,
   onCommit,
 }) => {
-  const currentArchetype = world.getComponent(targetId, 'tag')?.archetype;
-  const isStandardRadiusOnly = currentArchetype === 'creature';
   const physStats = world.getComponent(targetId, 'physicsStats');
 
   const [radius, setRadius] = useState(physStats ? physStats.radius.base : 16);
@@ -83,35 +80,21 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
 
       <label>
         {t('physicsInspector.radius')}
-        {isStandardRadiusOnly ? (
-          <select
-            disabled={isReadOnly}
-            value={radius}
-            onChange={(e) => handleUpdate({ radius: Number(e.target.value) as StandardRadius })}
-          >
-            {STANDARD_RADII.map((r) => (
-              <option key={r} value={r}>
-                {r} px
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={radius}
-            min={1}
-            max={1000}
-            step={1}
-            onFocus={() => {
-              isFocusedRef.current = true;
-            }}
-            onBlur={() => {
-              isFocusedRef.current = false;
-            }}
-            onChange={(e) => handleUpdate({ radius: Math.max(1, Number(e.target.value)) })}
-          />
-        )}
+        <input
+          disabled={isReadOnly}
+          type="number"
+          value={radius}
+          min={1}
+          max={1000}
+          step={1}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+          }}
+          onChange={(e) => handleUpdate({ radius: Math.max(1, Number(e.target.value)) })}
+        />
       </label>
 
       <label>
