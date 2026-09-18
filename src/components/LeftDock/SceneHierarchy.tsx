@@ -271,7 +271,17 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
   onFocusEntity,
 }) => {
   const [search, setSearch] = useState('');
-  const [showEmptySlots, setShowEmptySlots] = useState(false);
+  const [showEmptySlots, setShowEmptySlots] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('scene_hierarchy_show_empty_slots');
+      if (saved !== null) return JSON.parse(saved);
+    } catch {}
+    return false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('scene_hierarchy_show_empty_slots', JSON.stringify(showEmptySlots));
+  }, [showEmptySlots]);
   const [activeNodeId, setActiveNodeId] = useState<string | null>(selectedEntityId);
   const lastSelectedRootRef = React.useRef<string | null>(selectedEntityId);
 
