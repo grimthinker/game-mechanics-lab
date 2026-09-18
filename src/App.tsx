@@ -347,6 +347,11 @@ export const App: React.FC = () => {
     }
     applyGlobalTimeScale(1.0); // Возвращаем нормальную скорость времени для игры
     applyGameMode(GameMode.GAME);
+
+    // Автоматически включаем 3D режим при входе в игру
+    setRenderMode('3d');
+    app.setRendererMode('3d');
+
     app.isPaused = false;
     setIsPaused(false);
     saveWorldToStorage(app, currentSnapshot);

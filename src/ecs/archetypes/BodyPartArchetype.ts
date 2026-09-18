@@ -105,4 +105,9 @@ export function assembleBodyPart(
       maxDistance: createStat(config.hearing.maxDistance),
     });
   }
+
+  // 16. Визуальная 3D-модель (ссылка на ассет)
+  if (config.visualModel) {
+    world.addComponent(id, 'visualModel', JSON.parse(JSON.stringify(config.visualModel)));
+  }
 }

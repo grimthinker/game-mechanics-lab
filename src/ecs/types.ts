@@ -17,6 +17,8 @@ import {
   AreaEffectorComponent,
   AttachmentComponent,
   GizmoComponent,
+  VisualModelComponent,
+  AnimatorComponent,
 } from './components/rendering';
 import {
   TransformComponent,
@@ -79,6 +81,8 @@ import {
 
 export interface EntityComponents {
   tag?: TagComponent;
+  visualModel?: VisualModelComponent;
+  animator?: AnimatorComponent;
   renderable?: RenderableComponent;
   areaEffector?: AreaEffectorComponent;
   attachment?: AttachmentComponent;
@@ -123,6 +127,8 @@ export interface EntityComponents {
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
   'tag',
+  'visualModel',
+  'animator',
   'renderable',
   'areaEffector',
   'attachment',
@@ -164,6 +170,8 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
 
 export interface EntityConfig {
   tag?: TagComponent;
+  visualModel?: VisualModelComponent;
+  animator?: AnimatorComponent;
   renderable?: RenderableComponent;
   areaEffector?: AreaEffectorComponent;
   attachment?: AttachmentComponent;

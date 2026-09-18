@@ -119,3 +119,18 @@ export interface GizmoComponent {
   icon?: string;
   radius?: number;
 }
+
+export interface VisualModelComponent {
+  modelId: string;
+  rigNodeName?: string;
+  materialId?: string;
+  castShadow?: boolean;
+  receiveShadow?: boolean;
+}
+
+export interface AnimatorComponent {
+  rigType: string;
+  currentAnimation: string;
+  playbackSpeed: number;
+  clipsMap: Record<string, string>;
+}

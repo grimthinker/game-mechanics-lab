@@ -116,6 +116,14 @@ export function assembleCreature(
 
   world.addComponent(id, 'activeAttacks', { attacks: [] });
 
+  if (config.visualModel) {
+    world.addComponent(id, 'visualModel', JSON.parse(JSON.stringify(config.visualModel)));
+  }
+
+  if (config.animator) {
+    world.addComponent(id, 'animator', JSON.parse(JSON.stringify(config.animator)));
+  }
+
   // 8. Трансформация (Базовая координата всего существа)
   const posX = position?.x ?? 0;
   const posY = position?.y ?? 0;

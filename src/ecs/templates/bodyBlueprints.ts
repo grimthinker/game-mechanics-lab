@@ -5,9 +5,12 @@ import { deg2Rad } from '../../utils';
 export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'humanoid',
   name: 'Гуманоид',
+  rigAsset: '3d/creatures/humanoid/rig.glb',
   parts: [
     {
       key: 'torso',
+      meshAsset: '3d/creatures/humanoid/mesh/torso.glb',
+      rigNodeName: 'Torso',
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Туловище' },
@@ -31,6 +34,8 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'head',
+      meshAsset: '3d/creatures/humanoid/mesh/head.glb',
+      rigNodeName: 'HeadPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'head' },
         meta: { name: 'Голова' },
@@ -57,6 +62,8 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'arm_l',
+      meshAsset: '3d/creatures/humanoid/mesh/leftarm.glb',
+      rigNodeName: 'LeftArmPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
         meta: { name: 'Левая рука' },
@@ -72,6 +79,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
           interactDist: 25,
           strength: 15,
           itemId: null,
+          rigSocketName: 'LeftHandSocket',
         },
         equip: {
           equipmentAreas: [
@@ -82,6 +90,8 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'arm_r',
+      meshAsset: '3d/creatures/humanoid/mesh/rightarm.glb',
+      rigNodeName: 'RightArmPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
         meta: { name: 'Правая рука' },
@@ -97,6 +107,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
           interactDist: 25,
           strength: 15,
           itemId: null,
+          rigSocketName: 'RightHandSocket',
         },
         equip: {
           equipmentAreas: [
@@ -107,6 +118,8 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'leg_l',
+      meshAsset: '3d/creatures/humanoid/mesh/leftleg.glb',
+      rigNodeName: 'LeftLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога' },
@@ -126,6 +139,8 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'leg_r',
+      meshAsset: '3d/creatures/humanoid/mesh/rightleg.glb',
+      rigNodeName: 'RightLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога' },

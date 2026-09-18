@@ -51,6 +51,15 @@ export class EntityFactory {
     const rootConfig: EntityConfig = {
       ai: { behavior },
       meta: { name: creatureName, entityType: 'creature' },
+      visualModel: blueprint.rigAsset ? { modelId: blueprint.rigAsset } : undefined,
+      animator: blueprint.rigAsset
+        ? {
+            rigType: blueprint.id,
+            currentAnimation: 'idle',
+            playbackSpeed: 1,
+            clipsMap: {},
+          }
+        : undefined,
     };
     ARCHETYPE_ASSEMBLERS.creature(world, physics, aiSystem, rootId, rootConfig, position);
 
@@ -167,6 +176,13 @@ export class EntityFactory {
       partConfig.socketLink = {
         links: partSocketLinks.get(part.key) || {},
       };
+
+      if (part.meshAsset) {
+        partConfig.visualModel = {
+          modelId: part.meshAsset,
+          rigNodeName: part.rigNodeName,
+        };
+      }
 
       if (partConfig.bodyBrain) {
         partConfig.bodyBrain.rootEntityId = rootId;

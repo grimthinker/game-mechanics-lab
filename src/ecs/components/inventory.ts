@@ -45,6 +45,7 @@ export interface InteractionSlot {
   interactDist: number;
   strength: number;
   itemId: EntityId | null;
+  rigSocketName?: string;
 }
 
 export type InteractionSlotsComponent = InteractionSlot;

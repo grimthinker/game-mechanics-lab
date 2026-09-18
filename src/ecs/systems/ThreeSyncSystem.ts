@@ -2,12 +2,27 @@ import * as THREE from 'three';
 import { World } from '../World';
 import { EntityId } from '../types';
 import { GameMode } from '../../config/gameConfig';
+import { AssetManager } from '../../rendering/AssetManager';
+import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
+import { BodyStructureType } from '../templates';
+import { getAggregatedInteractionSlots } from '../utils/hierarchy';
+
+interface AnimatorState {
+  mixer: THREE.AnimationMixer;
+  currentClipName: string;
+  currentAction: THREE.AnimationAction | null;
+  rig: THREE.Object3D;
+}
 
 export class ThreeSyncSystem {
   private scene: THREE.Scene;
   private meshes: Map<EntityId, THREE.Object3D> = new Map();
+  private loadingMeshes: Set<EntityId> = new Set();
 
-  // Кэшированные материалы для производительности
+  // Кэш для аниматоров (Стейт-машина)
+  private animators: Map<EntityId, AnimatorState> = new Map();
+
+  // Кэшированные материалы для производительности (фоллбэк)
   private matPlayer = new THREE.MeshLambertMaterial({ color: 0x2980b9 });
   private matEnemy = new THREE.MeshLambertMaterial({ color: 0xc0392b });
   private matIdle = new THREE.MeshLambertMaterial({ color: 0x34495e });
@@ -53,9 +68,16 @@ export class ThreeSyncSystem {
     this.scene = scene;
   }
 
-  public update(_dt: number, world: World, _gameMode: GameMode, selectedIds: Set<EntityId>): void {
+  public update(dt: number, world: World, _gameMode: GameMode, selectedIds: Set<EntityId>): void {
     const activeIds = new Set<EntityId>();
     const renderables = world.getEntitiesWith('transform', 'renderable');
+
+    // Обновляем миксеры с учетом локального масштаба времени (timeScale) сущности
+    for (const [id, state] of this.animators.entries()) {
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      state.mixer.timeScale = ts;
+      state.mixer.update(dt);
+    }
 
     for (const [id, { transform, renderable }] of renderables) {
       if (!renderable.isVisible) continue;
@@ -65,30 +87,40 @@ export class ThreeSyncSystem {
       const tag = world.getComponent(id, 'tag');
       const archetype = tag?.archetype;
 
-      // Пропускаем 2D маркеры редактора в 3D виде
       if (archetype === 'marker') continue;
 
       let obj = this.meshes.get(id);
 
-      // 1. Создание меша, если его еще нет
+      // 1. Создание меша
       if (!obj) {
-        obj = this.createMeshForEntity(world, id, archetype);
-        if (obj) {
-          this.scene.add(obj);
-          this.meshes.set(id, obj);
+        if (!this.loadingMeshes.has(id)) {
+          obj = this.createMeshForEntity(world, id, archetype);
+          if (obj) {
+            this.scene.add(obj);
+            this.meshes.set(id, obj);
+          }
         }
       }
 
       // 2. Обновление состояния меша
       if (obj) {
-        // Перенос координат: 2D(X, Y) -> 3D(X, Z).
-        obj.position.x = transform.x;
-        obj.position.z = transform.y;
+        const ownership = world.getComponent(id, 'ownership');
+        const isEquipped = ownership && ownership.status === 'equipped';
 
-        // В 2D поворот по часовой стрелке, в 3D вокруг Y против часовой, поэтому минус
-        obj.rotation.y = -transform.angle;
+        // Если предмет экипирован, его 3D координаты полностью управляются суставом рига (в который он вложен)
+        if (!isEquipped) {
+          obj.position.x = transform.x;
+          obj.position.z = transform.y;
+          // Компенсируем 90-градусный сдвиг (pi / 2) базового направления рига относительно 2D оси X
+          obj.rotation.y = -transform.angle + Math.PI / 2;
+          obj.scale.set(1, 1, 1);
+        } else {
+          // Сброс локальных трансформаций внутри сустава
+          obj.position.set(0, 0, 0);
+          obj.rotation.set(0, 0, 0);
+          obj.scale.set(1, 1, 1);
+        }
 
-        // Подсветка выделения
         const isSelected = selectedIds.has(id);
         obj.traverse((child) => {
           if (child instanceof THREE.Mesh && child.userData.isSelectionOutline !== undefined) {
@@ -96,69 +128,186 @@ export class ThreeSyncSystem {
           }
         });
 
-        // Высота меша и сплющивание при стойке или смерти
-        const health = world.getComponent(id, 'health');
-        if (health && !health.isAlive) {
-          obj.scale.set(1, 0.1, 1);
-          obj.position.y = 2;
-        } else if (archetype === 'creature') {
-          const STANCE_HEIGHTS: Record<string, number> = {
-            standing: 40,
-            crouching: 28,
-            prone: 14,
-          };
-          const transition = world.getComponent(id, 'stanceTransition');
-          let currentHeight = 40;
+        // 3. Управление анимацией и ригом модульного существа
+        if (obj.userData.isModularRig) {
+          const animState = this.animators.get(id);
+          const animatorComp = world.getComponent(id, 'animator');
 
-          if (transition && transition.totalDuration > 0) {
-            const progress = Math.min(
-              1,
-              Math.max(0, 1 - transition.timer / transition.totalDuration)
-            );
-            const fromH = STANCE_HEIGHTS[transition.fromStance] || 40;
-            const toH = STANCE_HEIGHTS[transition.toStance] || 40;
-            currentHeight = fromH + (toH - fromH) * progress;
-          } else {
-            const currentStance = world.getComponent(id, 'meta')?.stance || 'standing';
-            currentHeight = STANCE_HEIGHTS[currentStance] || 40;
-          }
+          if (animState && animatorComp) {
+            const health = world.getComponent(id, 'health');
+            const isAlive = health ? health.isAlive : true;
+            const activeAttacks = world.getComponent(id, 'activeAttacks');
+            const meta = world.getComponent(id, 'meta');
 
-          const scaleY = currentHeight / 40;
-          obj.scale.set(1, scaleY, 1);
-          obj.position.y = 0;
-        } else {
-          obj.scale.set(1, 1, 1);
-          obj.position.y = 0;
-        }
+            // Выбор целевой анимации на основе стейт-машины ECS
+            let targetAnim = 'stand_idle';
+            if (!isAlive) {
+              targetAnim = 'dead';
+            } else if (activeAttacks && activeAttacks.attacks.length > 0) {
+              targetAnim = 'attack';
+            } else if (meta?.actionMode === 'pickup') {
+              targetAnim = 'pickup';
+            } else {
+              const stance = meta?.stance || 'standing';
+              const moveMode = meta?.movementMode || 'immobile';
 
-        // Динамическое обновление материала зоны при изменении эффекта в редакторе
-        if (archetype === 'zone') {
-          const effector = world.getComponent(id, 'areaEffector');
-          if (effector) {
-            let mat = this.matZoneNeutral;
-            if (effector.effect === 'damage') mat = this.matZoneDmg;
-            else if (effector.effect === 'heal') mat = this.matZoneHeal;
-            else if (effector.effect === 'time_dilation') {
-              mat = effector.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
+              const prefix = stance.includes('crouch')
+                ? 'crouch'
+                : stance.includes('prone')
+                  ? 'prone'
+                  : 'stand';
+              const suffix =
+                moveMode === 'sprinting'
+                  ? 'sprint'
+                  : moveMode === 'jogging'
+                    ? 'jog'
+                    : moveMode === 'walking'
+                      ? 'walk'
+                      : 'idle';
+
+              if (prefix === 'prone' && suffix === 'walk') targetAnim = 'prone_crawl';
+              else if (
+                (prefix === 'prone' && suffix === 'sprint') ||
+                (prefix === 'prone' && suffix === 'jog')
+              )
+                targetAnim = 'prone_crawl';
+              else targetAnim = `${prefix}_${suffix}`;
             }
 
-            const mainMesh = obj.children.find(
-              (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
-            ) as THREE.Mesh;
-            if (mainMesh && mainMesh.material !== mat) {
-              mainMesh.material = mat;
+            if (animatorComp.currentAnimation !== targetAnim) {
+              animatorComp.currentAnimation = targetAnim;
+              this.playAnimation(id, animatorComp.rigType, targetAnim).catch((e) =>
+                console.warn(e)
+              );
+            }
+
+            // Управление отрубленными конечностями
+            const assembly = world.getComponent(id, 'assemblyRoot');
+            if (assembly && assembly.partIds) {
+              const currentPartIds = new Set(assembly.partIds);
+              obj.traverse((child) => {
+                if (child.userData.partId) {
+                  child.visible = currentPartIds.has(child.userData.partId);
+                }
+              });
+            }
+
+            // Прикрепление экипированного оружия/предметов в кости рук
+            const aggSlots = getAggregatedInteractionSlots(world, id);
+            for (const info of aggSlots) {
+              if (info.slot.itemId && info.slot.rigSocketName) {
+                const itemObj = this.meshes.get(info.slot.itemId);
+                if (itemObj) {
+                  const socketBone = animState.rig.getObjectByName(info.slot.rigSocketName);
+                  if (socketBone && itemObj.parent !== socketBone) {
+                    socketBone.add(itemObj);
+                    itemObj.position.set(0, 0, 0);
+                    itemObj.rotation.set(0, 0, 0);
+                  }
+                }
+              }
+            }
+          }
+        }
+        // 4. Фоллбэк-визуализация примитивов
+        else if (!isEquipped) {
+          const health = world.getComponent(id, 'health');
+          if (health && !health.isAlive) {
+            obj.scale.set(1, 0.1, 1);
+            obj.position.y = 2;
+          } else if (archetype === 'creature') {
+            const STANCE_HEIGHTS: Record<string, number> = {
+              standing: 40,
+              crouching: 28,
+              prone: 14,
+            };
+            const transition = world.getComponent(id, 'stanceTransition');
+            let currentHeight = 40;
+
+            if (transition && transition.totalDuration > 0) {
+              const progress = Math.min(
+                1,
+                Math.max(0, 1 - transition.timer / transition.totalDuration)
+              );
+              const fromH = STANCE_HEIGHTS[transition.fromStance] || 40;
+              const toH = STANCE_HEIGHTS[transition.toStance] || 40;
+              currentHeight = fromH + (toH - fromH) * progress;
+            } else {
+              const currentStance = world.getComponent(id, 'meta')?.stance || 'standing';
+              currentHeight = STANCE_HEIGHTS[currentStance] || 40;
+            }
+            obj.scale.set(1, currentHeight / 40, 1);
+            obj.position.y = 0;
+          }
+
+          if (archetype === 'zone') {
+            const effector = world.getComponent(id, 'areaEffector');
+            if (effector) {
+              let mat = this.matZoneNeutral;
+              if (effector.effect === 'damage') mat = this.matZoneDmg;
+              else if (effector.effect === 'heal') mat = this.matZoneHeal;
+              else if (effector.effect === 'time_dilation') {
+                mat = effector.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
+              }
+              const mainMesh = obj.children.find(
+                (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
+              ) as THREE.Mesh;
+              if (mainMesh && mainMesh.material !== mat) mainMesh.material = mat;
             }
           }
         }
       }
     }
 
-    // 3. Очистка удаленных из мира сущностей
+    // Очистка удаленных из мира сущностей
     for (const [id, mesh] of this.meshes.entries()) {
       if (!activeIds.has(id)) {
         this.scene.remove(mesh);
         this.meshes.delete(id);
+        this.animators.delete(id);
       }
+    }
+  }
+
+  private async playAnimation(entityId: EntityId, rigType: string, animKey: string) {
+    const state = this.animators.get(entityId);
+    if (!state) return;
+
+    const rigProfile = CREATURE_RIG_PROFILES[rigType as BodyStructureType];
+    if (!rigProfile) return;
+
+    // Фоллбэк на idle при отсутствии специфичной анимации
+    const animUrl = rigProfile.animations[animKey] || rigProfile.animations['stand_idle'];
+    if (!animUrl) return;
+
+    try {
+      const gltfAnim = await AssetManager.getInstance().loadGLTF(animUrl);
+      if (gltfAnim.animations && gltfAnim.animations.length > 0) {
+        const clip = gltfAnim.animations[0];
+        const action = state.mixer.clipAction(clip);
+
+        if (state.currentAction && state.currentAction !== action) {
+          action.reset();
+
+          // Для анимаций смерти и атаки ставим LoopOnce
+          if (animKey === 'dead' || animKey === 'attack' || animKey === 'pickup') {
+            action.setLoop(THREE.LoopOnce, 1);
+            action.clampWhenFinished = true;
+          } else {
+            action.setLoop(THREE.LoopRepeat, Infinity);
+          }
+
+          action.play();
+          action.crossFadeFrom(state.currentAction, 0.2, true);
+        } else if (!state.currentAction) {
+          action.play();
+        }
+
+        state.currentAction = action;
+        state.currentClipName = animKey;
+      }
+    } catch (e) {
+      console.warn(`[ThreeSyncSystem] Animation failed to load: ${animUrl}`);
     }
   }
 
@@ -167,10 +316,55 @@ export class ThreeSyncSystem {
     id: EntityId,
     archetype: string | undefined
   ): THREE.Object3D | undefined {
+    const animator = world.getComponent(id, 'animator');
+
+    // Сборка модульного рига для существ
+    if (animator && archetype === 'creature') {
+      this.loadingMeshes.add(id);
+      const group = new THREE.Group();
+      group.userData.entityId = id;
+      group.userData.isModularRig = true;
+      this.assembleModularRigAsync(id, group, world).catch(console.error);
+      return group;
+    }
+
+    // Загрузка реального 3D меша для оторванных конечностей и предметов на полу
+    const visual = world.getComponent(id, 'visualModel');
+    if (visual && visual.modelId && (archetype === 'item' || archetype === 'bodyPart')) {
+      const group = new THREE.Group();
+      group.userData.entityId = id;
+      this.loadingMeshes.add(id);
+
+      AssetManager.getInstance()
+        .getMesh(visual.modelId)
+        .then((mesh) => {
+          if (mesh) {
+            if (mesh.type === 'Scene' || mesh.type === 'Group') {
+              group.add(...mesh.children);
+            } else {
+              group.add(mesh);
+            }
+
+            // Добавляем невидимый куб для возможности клика и выделения
+            const physStats = world.getComponent(id, 'physicsStats');
+            const radius = physStats ? physStats.radius.current : 16;
+            const outlineGeo = new THREE.BoxGeometry(radius * 1.5, radius * 1.5, radius * 1.5);
+            const outline = new THREE.Mesh(outlineGeo, this.matSelection);
+            outline.userData.isSelectionOutline = true;
+            outline.visible = false;
+            group.add(outline);
+          }
+          this.loadingMeshes.delete(id);
+        })
+        .catch(console.error);
+
+      return group;
+    }
+
+    // --- ФОЛЛБЭК ДЛЯ ПРИМИТИВОВ (Зоны, Препятствия) ---
     const physStats = world.getComponent(id, 'physicsStats');
     const radius = physStats ? physStats.radius.current : 16;
     const group = new THREE.Group();
-
     let mainMesh: THREE.Mesh | null = null;
 
     if (archetype === 'creature') {
@@ -185,10 +379,9 @@ export class ThreeSyncSystem {
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = h / 2;
 
-      // "Нос" для индикации направления взгляда
       const noseGeo = new THREE.BoxGeometry(radius, radius * 0.4, radius * 0.4);
       const nose = new THREE.Mesh(noseGeo, mat);
-      nose.position.set(radius, h * 0.75, 0); // Смотрит в сторону +X
+      nose.position.set(radius, h * 0.75, 0);
       group.add(nose);
     } else if (archetype === 'obstacle') {
       let w = 100,
@@ -214,8 +407,7 @@ export class ThreeSyncSystem {
     } else if (archetype === 'item' || archetype === 'bodyPart') {
       const item = world.getComponent(id, 'item');
       let mat = this.matWeapon;
-      if (archetype === 'bodyPart')
-        mat = this.matEnemy; // Красновато-коричневый оттенок плоти
+      if (archetype === 'bodyPart') mat = this.matEnemy;
       else if (item?.type === 'armor') mat = this.matArmor;
       else if (item?.type === 'bag') mat = this.matBag;
 
@@ -231,10 +423,9 @@ export class ThreeSyncSystem {
       else if (effector?.effect === 'time_dilation') {
         mat = (effector.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
       }
-
       const geo = new THREE.CylinderGeometry(radius, radius, 2, 32);
       mainMesh = new THREE.Mesh(geo, mat);
-      mainMesh.position.y = 1; // Чуть выше пола
+      mainMesh.position.y = 1;
     }
 
     if (mainMesh) {
@@ -242,7 +433,6 @@ export class ThreeSyncSystem {
       mainMesh.userData.entityId = id;
       group.add(mainMesh);
 
-      // Создаем обводку выделения
       const outlineGeo = mainMesh.geometry.clone();
       const outline = new THREE.Mesh(outlineGeo, this.matSelection);
       outline.scale.set(1.05, 1.05, 1.05);
@@ -255,5 +445,84 @@ export class ThreeSyncSystem {
     }
 
     return undefined;
+  }
+
+  private async assembleModularRigAsync(
+    rootId: EntityId,
+    parentGroup: THREE.Group,
+    world: World
+  ): Promise<void> {
+    const animator = world.getComponent(rootId, 'animator');
+    const assembly = world.getComponent(rootId, 'assemblyRoot');
+    if (!animator || !assembly) {
+      this.loadingMeshes.delete(rootId);
+      return;
+    }
+
+    const rigProfile = CREATURE_RIG_PROFILES[animator.rigType as BodyStructureType];
+    if (!rigProfile || !rigProfile.rigAsset) {
+      this.loadingMeshes.delete(rootId);
+      return;
+    }
+
+    try {
+      const assetManager = AssetManager.getInstance();
+
+      const rig = await assetManager.getClonedRig(rigProfile.rigAsset);
+      if (!rig) throw new Error(`Rig ${rigProfile.rigAsset} failed to load`);
+
+      // Масштабируем риг, так как GLTF модели создаются в метрах (1 ед. = 1м),
+      // а мир движка работает в пикселях (где радиус существа 16px, а высота ~40-60px).
+      rig.scale.set(25, 25, 25);
+
+      parentGroup.add(rig);
+
+      const mixer = new THREE.AnimationMixer(rig);
+      this.animators.set(rootId, {
+        mixer,
+        currentClipName: '',
+        currentAction: null,
+        rig,
+      });
+
+      // Итерируемся по частям тела и собираем меши
+      for (const partId of assembly.partIds) {
+        const visual = world.getComponent(partId, 'visualModel');
+        if (visual && visual.modelId && visual.rigNodeName) {
+          const targetNode = rig.getObjectByName(visual.rigNodeName);
+          if (targetNode) {
+            const meshClone = await assetManager.getMesh(visual.modelId);
+            if (meshClone) {
+              meshClone.userData.partId = partId;
+
+              if (meshClone.type === 'Scene' || meshClone.type === 'Group') {
+                targetNode.add(...meshClone.children);
+              } else {
+                targetNode.add(meshClone);
+              }
+            }
+          } else {
+            console.warn(`[ThreeSync] Socket node ${visual.rigNodeName} not found in rig!`);
+          }
+        }
+      }
+
+      // Создаем фантомный цилиндр для выделения рамкой (Outline)
+      const physStats = world.getComponent(rootId, 'physicsStats');
+      const r = physStats ? physStats.radius.current : 16;
+      const outlineGeo = new THREE.CylinderGeometry(r * 1.1, r * 1.1, 45, 16);
+      const outline = new THREE.Mesh(outlineGeo, this.matSelection);
+      outline.position.y = 22.5;
+      outline.userData.isSelectionOutline = true;
+      outline.visible = false;
+      parentGroup.add(outline);
+
+      // Запускаем дефолтную анимацию
+      this.playAnimation(rootId, animator.rigType, 'stand_idle').catch(console.error);
+    } catch (err) {
+      console.error(`[ThreeSyncSystem] Error assembling rig for ${rootId}:`, err);
+    } finally {
+      this.loadingMeshes.delete(rootId);
+    }
   }
 }

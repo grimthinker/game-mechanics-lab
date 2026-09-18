@@ -4,6 +4,8 @@ export type BodyStructureType = 'humanoid' | 'quadruped' | 'arachnid';
 
 export interface BlueprintPartDef {
   key: string;
+  meshAsset?: string;
+  rigNodeName?: string;
   config: EntityConfig;
 }
 
@@ -23,6 +25,7 @@ export interface BlueprintItemDef {
 export interface CreatureBodyBlueprint {
   id: BodyStructureType;
   name: string;
+  rigAsset?: string;
   parts: BlueprintPartDef[];
   connections: BlueprintConnectionDef[];
   defaultItems?: BlueprintItemDef[];
