@@ -16,6 +16,8 @@ export class MovementModifierSystem {
       if (!health.isAlive) continue;
 
       const locomotion = world.getComponent(id, 'locomotionState') || {
+        speedMult: 1.0,
+        turnMult: 1.0,
         canSprint: true,
         forceProneOnMove: false,
       };
@@ -32,6 +34,32 @@ export class MovementModifierSystem {
 
       if (meta.stance === 'prone' || meta.stance?.includes('prone')) {
         input.isRunning = false;
+      }
+
+      // Запрещаем спринт во время активных атак (устранение эксплойта)
+      if (activeAttacks.attacks.length > 0) {
+        input.isRunning = false;
+      }
+
+      // Модификаторы локомоции (штрафы от сломанных или отсутствующих конечностей)
+      if (locomotion.speedMult !== 1.0) {
+        addModifier(movementStats.maxSpeed, {
+          id: 'locomotion_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: locomotion.speedMult,
+        });
+      } else {
+        removeModifier(movementStats.maxSpeed, 'locomotion_speed');
+      }
+
+      if (locomotion.turnMult !== 1.0) {
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'locomotion_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: locomotion.turnMult,
+        });
+      } else {
+        removeModifier(movementStats.maxTurnSpeed, 'locomotion_turn');
       }
 
       const movementMode = meta.movementMode ?? 'immobile';

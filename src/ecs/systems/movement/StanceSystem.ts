@@ -178,26 +178,6 @@ export class StanceSystem {
       } else {
         removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
       }
-
-      if (locomotion.speedMult !== 1.0) {
-        addModifier(movementStats.maxSpeed, {
-          id: 'locomotion_speed',
-          type: ModifierType.PERCENT_MULT,
-          value: locomotion.speedMult,
-        });
-      } else {
-        removeModifier(movementStats.maxSpeed, 'locomotion_speed');
-      }
-
-      if (locomotion.turnMult !== 1.0) {
-        addModifier(movementStats.maxTurnSpeed, {
-          id: 'locomotion_turn',
-          type: ModifierType.PERCENT_MULT,
-          value: locomotion.turnMult,
-        });
-      } else {
-        removeModifier(movementStats.maxTurnSpeed, 'locomotion_turn');
-      }
     }
   }
 }

@@ -20,6 +20,7 @@ export class ThreeSyncSystem {
   private scene: THREE.Scene;
   private meshes: Map<EntityId, THREE.Object3D> = new Map();
   private loadingMeshes: Set<EntityId> = new Set();
+  private loadingGenerations: Map<EntityId, number> = new Map();
   private unsubWorldUpdated: () => void;
 
   // Кэш для аниматоров (Стейт-машина)
@@ -99,6 +100,7 @@ export class ThreeSyncSystem {
     this.meshes.clear();
     this.animators.clear();
     this.loadingMeshes.clear();
+    this.loadingGenerations.clear();
   }
 
   public destroy(): void {
@@ -167,7 +169,17 @@ export class ThreeSyncSystem {
           obj.position.x = transform.x;
           obj.position.z = transform.y;
           obj.rotation.y = -transform.angle + Math.PI / 2;
-          obj.scale.set(1, 1, 1);
+
+          // Модульные существа масштабируются пропорционально текущему радиусу коллизии
+          if (obj.userData.isModularRig) {
+            const physStats = world.getComponent(id, 'physicsStats');
+            const radius = physStats ? physStats.radius.current : 16;
+            const baseRadius = 16;
+            const scaleFactor = radius / baseRadius;
+            obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
+          } else {
+            obj.scale.set(1, 1, 1);
+          }
         } else {
           // Сброс локальных трансформаций внутри сустава
           obj.position.set(0, 0, 0);
@@ -277,6 +289,8 @@ export class ThreeSyncSystem {
     // Очистка удаленных из мира сущностей с освобождением VRAM
     for (const [id, mesh] of this.meshes.entries()) {
       if (!activeIds.has(id)) {
+        // Инвалидируем все фоновые загрузки для этого ID
+        this.loadingGenerations.set(id, (this.loadingGenerations.get(id) ?? 0) + 1);
         ThreeSyncSystem.disposeObject(mesh);
         this.scene.remove(mesh);
         this.meshes.delete(id);
@@ -306,21 +320,24 @@ export class ThreeSyncSystem {
         const clip = gltfAnim.animations[0];
         const action = state.mixer.clipAction(clip);
 
+        action.reset();
+        action.setEffectiveTimeScale(1);
+        action.setEffectiveWeight(1);
+
+        const isOneShot = animKey === 'dead' || animKey === 'attack' || animKey === 'pickup';
+        if (isOneShot) {
+          action.setLoop(THREE.LoopOnce, 1);
+          action.clampWhenFinished = true;
+        } else {
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.clampWhenFinished = false;
+        }
+
+        action.fadeIn(0.15);
+        action.play();
+
         if (state.currentAction && state.currentAction !== action) {
-          action.reset();
-
-          // Для анимаций смерти и атаки ставим LoopOnce
-          if (animKey === 'dead' || animKey === 'attack' || animKey === 'pickup') {
-            action.setLoop(THREE.LoopOnce, 1);
-            action.clampWhenFinished = true;
-          } else {
-            action.setLoop(THREE.LoopRepeat, Infinity);
-          }
-
-          action.play();
-          action.crossFadeFrom(state.currentAction, 0.2, true);
-        } else if (!state.currentAction) {
-          action.play();
+          state.currentAction.fadeOut(0.15);
         }
 
         state.currentAction = action;
@@ -358,9 +375,20 @@ export class ThreeSyncSystem {
       group.userData.entityId = id;
       this.loadingMeshes.add(id);
 
+      const currentGen = (this.loadingGenerations.get(id) ?? 0) + 1;
+      this.loadingGenerations.set(id, currentGen);
+
       AssetManager.getInstance()
         .getClonedModel(visual.modelId)
         .then((mesh) => {
+          // Проверяем, не была ли сущность удалена, пересоздана или отменена во время загрузки
+          if (this.loadingGenerations.get(id) !== currentGen || !world.getEntity(id)) {
+            if (mesh) ThreeSyncSystem.disposeObject(mesh);
+            ThreeSyncSystem.disposeObject(group);
+            this.scene.remove(group);
+            return;
+          }
+
           if (mesh) {
             if (mesh.type === 'Scene' || mesh.type === 'Group') {
               group.add(...mesh.children);
@@ -378,9 +406,13 @@ export class ThreeSyncSystem {
             outline.visible = false;
             group.add(outline);
           }
-          this.loadingMeshes.delete(id);
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => {
+          if (this.loadingGenerations.get(id) === currentGen) {
+            this.loadingMeshes.delete(id);
+          }
+        });
 
       return group;
     }
@@ -491,16 +523,28 @@ export class ThreeSyncSystem {
       return;
     }
 
+    const currentGen = (this.loadingGenerations.get(rootId) ?? 0) + 1;
+    this.loadingGenerations.set(rootId, currentGen);
+
+    const isAborted = () =>
+      this.loadingGenerations.get(rootId) !== currentGen || !world.getEntity(rootId);
+
     try {
       const assetManager = AssetManager.getInstance();
 
       const rig = await assetManager.getClonedModel(rigProfile.rigAsset);
       if (!rig) throw new Error(`Rig ${rigProfile.rigAsset} failed to load`);
-      if (!world.getEntity(rootId)) {
+
+      // Проверка актуальности после загрузки скелета
+      if (isAborted()) {
         ThreeSyncSystem.disposeObject(rig);
+        ThreeSyncSystem.disposeObject(parentGroup);
+        this.scene.remove(parentGroup);
         return;
       }
 
+      // Приводим метровую модель рига (~1.8м) к базовой высоте игрового мира (~45 единиц)
+      rig.scale.set(25, 25, 25);
       parentGroup.add(rig);
 
       const mixer = new THREE.AnimationMixer(rig);
@@ -519,10 +563,15 @@ export class ThreeSyncSystem {
           const targetNode = rig.getObjectByName(visual.rigNodeName);
           if (targetNode) {
             const meshClone = await assetManager.getClonedModel(visual.modelId);
-            if (!world.getEntity(rootId)) {
+
+            // Проверка актуальности после загрузки каждой части тела
+            if (isAborted()) {
               if (meshClone) ThreeSyncSystem.disposeObject(meshClone);
+              ThreeSyncSystem.disposeObject(parentGroup);
+              this.scene.remove(parentGroup);
               return;
             }
+
             if (meshClone) {
               meshClone.userData.partId = partId;
               meshClone.userData.entityId = partId;
@@ -560,7 +609,9 @@ export class ThreeSyncSystem {
     } catch (err) {
       console.error(`[ThreeSyncSystem] Error assembling rig for ${rootId}:`, err);
     } finally {
-      this.loadingMeshes.delete(rootId);
+      if (this.loadingGenerations.get(rootId) === currentGen) {
+        this.loadingMeshes.delete(rootId);
+      }
     }
   }
 }

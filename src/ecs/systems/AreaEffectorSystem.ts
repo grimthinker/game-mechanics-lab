@@ -143,8 +143,8 @@ export class AreaEffectorSystem {
               (areaEffector.boundaryValue - areaEffector.centerValue) * t;
           }
 
-          const weight = targetPhysStats?.weight.current ?? 1;
-          const acceleration = forceMagnitude / Math.max(0.1, weight);
+          const weight = targetPhysStats?.totalWeight ?? targetPhysStats?.weight.current ?? 1;
+          const acceleration = forceMagnitude / Math.max(1, weight);
 
           const sign = areaEffector.effect === 'repel' ? 1 : -1;
           velocity.externalVx = (velocity.externalVx ?? 0) + sign * (ux / len) * acceleration * dt;

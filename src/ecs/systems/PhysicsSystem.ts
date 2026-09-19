@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { Point } from '../../types';
 import { PHYSICS_CONFIG } from '../../config/physicsConfig';
+import { calculateTotalEntityWeight } from '../utils/hierarchy';
 
 export class PhysicsSystem {
   public system: System;
@@ -261,9 +262,11 @@ export class PhysicsSystem {
   }
 
   public update(dt: number, world: World): void {
-    // Синхронизация радиуса и коллизий физических тел с актуальными статами
+    // Синхронизация радиуса, полного веса и коллизий физических тел с актуальными статами
     const statEntities = world.getEntitiesWith('physicsBody', 'physicsStats');
     for (const [id, { physicsBody, physicsStats }] of statEntities) {
+      physicsStats.totalWeight = calculateTotalEntityWeight(world, id);
+
       if (
         physicsBody.body instanceof Circle &&
         physicsBody.body.r !== physicsStats.radius.current
@@ -446,12 +449,11 @@ export class PhysicsSystem {
       const valid2 = health2 ? health2.isAlive : true;
 
       if (!valid1 || !valid2) return;
-
       const p1Stats = world.getComponent(id1, 'physicsStats');
-      const weight1 = p1Stats?.weight.current ?? 1;
+      const weight1 = p1Stats?.totalWeight ?? p1Stats?.weight.current ?? 1;
 
       const p2Stats = world.getComponent(id2, 'physicsStats');
-      const weight2 = p2Stats?.weight.current ?? 1;
+      const weight2 = p2Stats?.totalWeight ?? p2Stats?.weight.current ?? 1;
 
       const overlapX = response.overlapV.x;
       const overlapY = response.overlapV.y;

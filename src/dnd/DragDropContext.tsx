@@ -144,6 +144,13 @@ export const DragDropProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   }, []);
 
+  // Гарантированный сброс курсора при любом размонтировании или смене состояния перетаскивания
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = '';
+    };
+  }, [state.isDragging]);
+
   // Глобальные слушатели перемещения и отпускания мыши
   useEffect(() => {
     if (!state.isDragging) return;
@@ -193,17 +200,18 @@ export const DragDropProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('blur', handleBlur);
 
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('blur', handleBlur);
     };
   }, [state.isDragging, cancelDrag, restoreGroundVisibility, resetDragState]);
-
   return (
     <DragDropContext.Provider value={{ ...state, startDrag, setHoverTarget, cancelDrag, setApp }}>
       {children}

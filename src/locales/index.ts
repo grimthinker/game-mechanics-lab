@@ -5,7 +5,17 @@ import { en } from './en';
 export type LocaleType = 'ru' | 'en';
 const dictionaries: Record<LocaleType, any> = { ru, en };
 
-let currentLocale: LocaleType = (localStorage.getItem('game_engine_locale') as LocaleType) || 'ru';
+const savedLocale = localStorage.getItem('game_engine_locale');
+let currentLocale: LocaleType = savedLocale === 'en' || savedLocale === 'ru' ? savedLocale : 'ru';
+
+function syncHtmlLang(locale: LocaleType): void {
+  if (typeof document !== 'undefined' && document.documentElement) {
+    document.documentElement.lang = locale;
+  }
+}
+
+// Первичная синхронизация языка страницы с атрибутом тега <html>
+syncHtmlLang(currentLocale);
 
 const listeners = new Set<() => void>();
 
@@ -17,6 +27,7 @@ export function setLocale(locale: LocaleType): void {
   if (currentLocale === locale) return;
   currentLocale = locale;
   localStorage.setItem('game_engine_locale', locale);
+  syncHtmlLang(locale);
   listeners.forEach((cb) => cb());
 }
 

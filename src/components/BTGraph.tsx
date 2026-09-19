@@ -35,15 +35,70 @@ interface StaticGraphLayout {
   height: number;
 }
 
-function getTreeTopologyKey(node: BTNodeDTO, fallbackId: string = 'root_0'): string {
-  const nodeId = node.id || fallbackId;
+function getTreeTopologyKey(node: BTNodeDTO, path: string = 'root'): string {
+  const nodeSignature = `${path}_${node.category}_${node.name}`;
   if (!node.children || node.children.length === 0) {
-    return nodeId;
+    return nodeSignature;
   }
   const childrenKeys = node.children.map((child, idx) =>
-    getTreeTopologyKey(child, `${nodeId}_${idx}`)
+    getTreeTopologyKey(child, `${path}_${idx}`)
   );
-  return `${nodeId}(${childrenKeys.join(',')})`;
+  return `${nodeSignature}(${childrenKeys.join(',')})`;
+}
+
+// Глобальный кэш раскладки для предотвращения повторных расчетов Dagre
+const LAYOUT_CACHE = new Map<string, StaticGraphLayout>();
+
+function computeStaticGraphLayout(tree: BTNodeDTO): StaticGraphLayout {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 });
+  g.setDefaultEdgeLabel(() => ({}));
+
+  const processNode = (node: BTNodeDTO, fallbackId: string) => {
+    const nodeId = node.id || fallbackId;
+    g.setNode(nodeId, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    if (node.children) {
+      node.children.forEach((child, idx) => {
+        const childId = child.id || `${nodeId}_${idx}`;
+        g.setEdge(nodeId, childId, { status: child.status });
+        processNode(child, childId);
+      });
+    }
+  };
+
+  processNode(tree, 'root_0');
+  dagre.layout(g);
+
+  const nodePositions = new Map<string, { x: number; y: number; width: number; height: number }>();
+  g.nodes().forEach((nodeId) => {
+    const nodeData = g.node(nodeId);
+    if (nodeData) {
+      nodePositions.set(nodeId, {
+        x: nodeData.x,
+        y: nodeData.y,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+      });
+    }
+  });
+
+  const calculatedEdges: EdgeLayout[] = [];
+  g.edges().forEach((edge) => {
+    const edgeData = g.edge(edge);
+    calculatedEdges.push({
+      from: edge.v,
+      to: edge.w,
+      status: edgeData.status,
+      points: edgeData.points,
+    });
+  });
+
+  return {
+    nodePositions,
+    edges: calculatedEdges,
+    width: g.graph().width || 800,
+    height: g.graph().height || 600,
+  };
 }
 
 interface BTGraphProps {
@@ -84,60 +139,31 @@ export const BTGraph: React.FC<BTGraphProps> = ({
 
   const topologyKey = useMemo(() => getTreeTopologyKey(tree), [tree]);
 
-  const staticLayout = useMemo<StaticGraphLayout>(() => {
-    const g = new dagre.graphlib.Graph();
-    g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 });
-    g.setDefaultEdgeLabel(() => ({}));
+  // Быстрый доступ к кэшированной раскладке либо инициализация без зависания UI
+  const [staticLayout, setStaticLayout] = useState<StaticGraphLayout>(() => {
+    if (LAYOUT_CACHE.has(topologyKey)) {
+      return LAYOUT_CACHE.get(topologyKey)!;
+    }
+    const calculated = computeStaticGraphLayout(tree);
+    LAYOUT_CACHE.set(topologyKey, calculated);
+    return calculated;
+  });
 
-    const processNode = (node: BTNodeDTO, fallbackId: string) => {
-      const nodeId = node.id || fallbackId;
-      g.setNode(nodeId, { width: NODE_WIDTH, height: NODE_HEIGHT });
-      if (node.children) {
-        node.children.forEach((child, idx) => {
-          const childId = child.id || `${nodeId}_${idx}`;
-          g.setEdge(nodeId, childId, { status: child.status });
-          processNode(child, childId);
-        });
-      }
-    };
+  useEffect(() => {
+    if (LAYOUT_CACHE.has(topologyKey)) {
+      setStaticLayout(LAYOUT_CACHE.get(topologyKey)!);
+      return;
+    }
 
-    processNode(tree, 'root_0');
-    dagre.layout(g);
+    // Отложенный неблокирующий расчет для новых деревьев
+    const timer = setTimeout(() => {
+      const calculated = computeStaticGraphLayout(tree);
+      LAYOUT_CACHE.set(topologyKey, calculated);
+      setStaticLayout(calculated);
+    }, 0);
 
-    const nodePositions = new Map<
-      string,
-      { x: number; y: number; width: number; height: number }
-    >();
-    g.nodes().forEach((nodeId) => {
-      const nodeData = g.node(nodeId);
-      if (nodeData) {
-        nodePositions.set(nodeId, {
-          x: nodeData.x,
-          y: nodeData.y,
-          width: NODE_WIDTH,
-          height: NODE_HEIGHT,
-        });
-      }
-    });
-
-    const calculatedEdges: EdgeLayout[] = [];
-    g.edges().forEach((edge) => {
-      const edgeData = g.edge(edge);
-      calculatedEdges.push({
-        from: edge.v,
-        to: edge.w,
-        status: edgeData.status,
-        points: edgeData.points,
-      });
-    });
-
-    return {
-      nodePositions,
-      edges: calculatedEdges,
-      width: g.graph().width || 800,
-      height: g.graph().height || 600,
-    };
-  }, [topologyKey]);
+    return () => clearTimeout(timer);
+  }, [topologyKey, tree]);
 
   const nodes = useMemo(() => {
     const calculatedNodes: NodeLayout[] = [];

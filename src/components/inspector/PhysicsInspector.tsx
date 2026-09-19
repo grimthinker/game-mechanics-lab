@@ -38,7 +38,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
 
   if (!physStats) return null;
 
-  const totalWeight = calculateTotalEntityWeight(world, targetId);
+  const totalWeight = physStats.totalWeight ?? calculateTotalEntityWeight(world, targetId);
 
   const handleUpdate = (patch: { radius?: number; weight?: number; isSolid?: boolean }) => {
     const nextRadius = patch.radius ?? radius;

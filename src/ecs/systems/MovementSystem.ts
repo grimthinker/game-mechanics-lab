@@ -12,7 +12,7 @@ export class MovementSystem {
     const localDt = dt;
 
     this.stanceSystem.update(localDt, world);
-    this.movementModifierSystem.update(world);
     this.velocitySystem.update(dt, localDt, world);
+    this.movementModifierSystem.update(world);
   }
 }

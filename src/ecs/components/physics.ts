@@ -27,6 +27,7 @@ export function isValidStandardRadius(radius: number): radius is StandardRadius 
 export interface PhysicsConfig {
   radius: number;
   weight: number;
+  totalWeight?: number;
   size?: number;
   isSolid?: boolean;
   points?: Point[];
@@ -35,6 +36,7 @@ export interface PhysicsConfig {
 export interface PhysicsStatsComponent {
   radius: StatValue<number>;
   weight: StatValue<number>;
+  totalWeight?: number;
   size?: number;
   isSolid: boolean;
   points?: Point[];
