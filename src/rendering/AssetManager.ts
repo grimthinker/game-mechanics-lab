@@ -45,13 +45,10 @@ export class AssetManager {
     return promise;
   }
 
-  public async getClonedRig(url: string): Promise<THREE.Object3D | null> {
-    const gltf = await this.loadGLTF(url);
-    if (!gltf || !gltf.scene) return null;
-    return SkeletonUtils.clone(gltf.scene);
-  }
-
-  public async getMesh(url: string): Promise<THREE.Object3D | null> {
+  /**
+   * Загружает GLTF-модель и возвращает её глубокую копию с поддержкой скелетных ригов и мешей.
+   */
+  public async getClonedModel(url: string): Promise<THREE.Object3D | null> {
     const gltf = await this.loadGLTF(url);
     if (!gltf || !gltf.scene) return null;
     return SkeletonUtils.clone(gltf.scene);

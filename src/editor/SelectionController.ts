@@ -101,11 +101,10 @@ export class SelectionController {
       return [];
     }
 
-    const canvasRect = this.app.canvas.getBoundingClientRect();
-    const startX = start.x + canvasRect.left;
-    const startY = start.y + canvasRect.top;
-    const currentX = current.x + canvasRect.left;
-    const currentY = current.y + canvasRect.top;
+    const startX = start.x;
+    const startY = start.y;
+    const currentX = current.x;
+    const currentY = current.y;
 
     const p1 = this.app.getCanvasPoint(startX, startY);
     const p2 = this.app.getCanvasPoint(currentX, startY);

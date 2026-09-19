@@ -55,8 +55,15 @@ export class WorldSerializer {
     if (!entitiesData || !Array.isArray(entitiesData)) return;
 
     const entityMap = new Map<string, any>();
+    const allAssemblyPartIds = new Set<string>();
+
     for (const ent of entitiesData) {
       entityMap.set(ent.id, ent);
+      if (ent.components?.assemblyRoot?.partIds) {
+        for (const pId of ent.components.assemblyRoot.partIds) {
+          allAssemblyPartIds.add(pId);
+        }
+      }
     }
 
     const injectOwnershipRecursive = (
@@ -152,12 +159,13 @@ export class WorldSerializer {
         comps.renderable.isVisible = false;
       }
 
-      // Инициализация мозга и восстановление памяти (blackboard) для сущностей с bodyBrain
-      if (comps.bodyBrain) {
-        let behaviorId = 'IdleTree';
-        if (comps.bodyBrain.rootEntityId) {
+      // Инициализация мозга и восстановление памяти (blackboard) для агентов
+      const shouldInitBrain = comps.bodyBrain || comps.aiStats;
+      if (shouldInitBrain) {
+        let behaviorId = comps.aiStats?.behavior?.current ?? 'IdleTree';
+        if (comps.bodyBrain?.rootEntityId) {
           const rootEnt = entityMap.get(comps.bodyBrain.rootEntityId);
-          behaviorId = rootEnt?.components?.aiStats?.behavior?.current ?? 'IdleTree';
+          behaviorId = rootEnt?.components?.aiStats?.behavior?.current ?? behaviorId;
         }
         this.app.aiSystem.initBotBrain(this.app.world, ent.id, behaviorId);
 
@@ -267,6 +275,7 @@ export class WorldSerializer {
         });
         this.app.physics.registerBody(ent.id, body);
       } else if (comps.physicsStats && comps.transform && !isPossessedItem) {
+        const isPartOfCreature = allAssemblyPartIds.has(ent.id);
         const archetype =
           comps.tag?.archetype ??
           (comps.areaEffector || comps.zoneTrigger
@@ -277,7 +286,7 @@ export class WorldSerializer {
                 ? 'obstacle'
                 : 'creature');
 
-        if (archetype !== 'marker' && archetype !== 'bodyPart') {
+        if (archetype !== 'marker' && (!isPartOfCreature || archetype !== 'bodyPart')) {
           if (archetype === 'obstacle') {
             const points = comps.physicsStats.points ?? [
               { x: -50, y: -20 },

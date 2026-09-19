@@ -44,7 +44,6 @@ export const useCanvasInteraction = ({
 }: UseCanvasInteractionProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const clickedEntityIdRef = useRef<string | null>(null);
   const isMarqueeActiveRef = useRef<boolean>(false);
   const [cursorWorldPos, setCursorWorldPos] = useState<Point | null>(null);
 
@@ -141,7 +140,6 @@ export const useCanvasInteraction = ({
       ) {
         const gizmoHandle = app.gizmo.hitTest(point);
         if (gizmoHandle) {
-          clickedEntityIdRef.current = null;
           app.gizmo.startDrag(gizmoHandle, point);
           e.currentTarget.style.cursor = gizmoHandle === 'rotate' ? 'crosshair' : 'grabbing';
           return;
@@ -157,7 +155,6 @@ export const useCanvasInteraction = ({
           return; // Откладываем выделение до отпускания или сдвига мыши
         }
 
-        clickedEntityIdRef.current = entityId;
         if (e.shiftKey && app.selection.selectedEntityIds.has(entityId)) {
           app.selection.deselectEntity(entityId);
         } else {
@@ -169,10 +166,8 @@ export const useCanvasInteraction = ({
       }
 
       // 3. Клик по пустому месту — начинаем рамку выделения
-      clickedEntityIdRef.current = null;
       isMarqueeActiveRef.current = true;
-      const rect = containerRef.current!.getBoundingClientRect();
-      app.selection.startMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      app.selection.startMarquee({ x: e.clientX, y: e.clientY });
     }
   };
 
@@ -246,8 +241,7 @@ export const useCanvasInteraction = ({
 
     // Обновление рамки выделения
     if (isMarqueeActiveRef.current && (e.buttons & 1) === 1) {
-      const rect = containerRef.current!.getBoundingClientRect();
-      app.selection.updateMarquee({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      app.selection.updateMarquee({ x: e.clientX, y: e.clientY });
       e.currentTarget.style.cursor = 'crosshair';
       return;
     }
@@ -314,7 +308,6 @@ export const useCanvasInteraction = ({
       const id = dragCandidateRef.current.id;
       dragCandidateRef.current = null;
 
-      clickedEntityIdRef.current = id;
       if (e.shiftKey && app.selection.selectedEntityIds.has(id)) {
         app.selection.deselectEntity(id);
       } else {
@@ -374,8 +367,6 @@ export const useCanvasInteraction = ({
       updateStats();
       return;
     }
-
-    clickedEntityIdRef.current = null;
   };
 
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -464,7 +455,6 @@ export const useCanvasInteraction = ({
       app.endPan();
       app.selection.hoverEntity(null);
     }
-    clickedEntityIdRef.current = null;
     setCursorWorldPos(null);
   };
 

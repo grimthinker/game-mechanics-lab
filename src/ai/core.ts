@@ -36,7 +36,7 @@ export interface BTNodeDTO {
 export interface EntityUtils {
   getAllEntities: () => EntityAdapter[];
   getEntity: (id: string) => EntityAdapter | undefined;
-  getPath: (start: Point, end: Point, navmesh_radius_type?: StandardRadius) => Promise<Point[]>;
+  getPath: (start: Point, end: Point, navmesh_radius_type?: number) => Promise<Point[]>;
 }
 
 export type AttackStatus = 'idle' | 'attacking' | 'cooldown';

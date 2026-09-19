@@ -1,15 +1,17 @@
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
-import { EntityId, EntityConfig } from '../types';
+import { EntityId, EntityConfig, CollisionCategory, COLLISION_MASK_ALL } from '../types';
 import { Point } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
+import { Circle } from 'detect-collisions';
+import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
 export function assembleCreature(
   world: World,
-  _physics: PhysicsSystem,
-  _aiSystem: AISystem,
+  physics: PhysicsSystem,
+  aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
   position?: Point
@@ -128,4 +130,68 @@ export function assembleCreature(
   const posX = position?.x ?? 0;
   const posY = position?.y ?? 0;
   world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
+
+  // 9. Физические свойства и тело коллизии
+  const radius = config.physics?.radius ?? BALANCE_CONFIG.creature.radius;
+  const weight = config.physics?.weight ?? BALANCE_CONFIG.creature.weight;
+  const isSolid = config.physics?.isSolid ?? true;
+
+  world.addComponent(id, 'physicsStats', {
+    radius: createStat(radius),
+    weight: createStat(weight),
+    isSolid,
+  });
+
+  if (physics) {
+    const body = new Circle({ x: posX, y: posY }, radius);
+    body.isStatic = false;
+    world.addComponent(id, 'physicsBody', {
+      body,
+      isStatic: false,
+      category: CollisionCategory.CREATURE,
+      mask: COLLISION_MASK_ALL,
+    });
+    physics.registerBody(id, body);
+  }
+
+  // 10. Отрисовка на 2D холсте
+  if (config.renderable) {
+    world.addComponent(id, 'renderable', JSON.parse(JSON.stringify(config.renderable)));
+  } else {
+    world.addComponent(id, 'renderable', {
+      zIndex: 40,
+      isVisible: true,
+      syncWithTransform: true,
+      primitives: [
+        {
+          kind: 'circle',
+          radius,
+          fill: '#34495e',
+          stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
+          strokeWidth: 2,
+        },
+        {
+          kind: 'polygon',
+          points: [
+            { x: radius, y: 0 },
+            { x: 0, y: -radius },
+            { x: 0, y: radius },
+          ],
+          fill: '#7f8c8d',
+          stroke: '#95a5a6',
+          strokeWidth: 1.5,
+        },
+      ],
+    });
+  }
+
+  // 11. Органы чувств
+  if (config.perception) {
+    world.addComponent(id, 'perception', JSON.parse(JSON.stringify(config.perception)));
+  }
+
+  // 12. Инициализация логического мозга ИИ
+  if (aiSystem) {
+    aiSystem.initBotBrain(world, id, behavior);
+  }
 }

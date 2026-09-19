@@ -48,6 +48,15 @@ export class EntityFactory {
     const creatureName = name || blueprint.name;
 
     // 1. Создание абстрактного корня существа
+    // Первичный расчет радиуса и веса по частям шаблона
+    let maxRadius = 0;
+    let initialWeight = 0;
+    for (const part of blueprint.parts) {
+      const r = part.config.physics?.radius ?? 10;
+      if (r > maxRadius) maxRadius = r;
+      initialWeight += part.config.physics?.weight ?? 1;
+    }
+
     const rootConfig: EntityConfig = {
       ai: { behavior },
       meta: { name: creatureName, entityType: 'creature' },
@@ -60,67 +69,46 @@ export class EntityFactory {
             clipsMap: {},
           }
         : undefined,
+      physics: {
+        radius: maxRadius,
+        weight: initialWeight || 10,
+        isSolid: true,
+      },
+      perception: {
+        visionFovAngle: BALANCE_CONFIG.senses.defaultFovAngle,
+        visionClarity: BALANCE_CONFIG.senses.defaultVisionClarity,
+        visionMaxDistance: BALANCE_CONFIG.senses.defaultVisionMaxDistance,
+        hearingSensitivity: BALANCE_CONFIG.senses.defaultHearingSensitivity,
+        hearingMaxDistance: BALANCE_CONFIG.senses.defaultHearingMaxDistance,
+      },
+      renderable: {
+        zIndex: 40,
+        isVisible: true,
+        syncWithTransform: true,
+        primitives: [
+          {
+            kind: 'circle',
+            radius: maxRadius,
+            fill: '#34495e',
+            stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
+            strokeWidth: 2,
+          },
+          {
+            kind: 'polygon',
+            points: [
+              { x: maxRadius, y: 0 },
+              { x: 0, y: -maxRadius },
+              { x: 0, y: maxRadius },
+            ],
+            fill: '#7f8c8d',
+            stroke: '#95a5a6',
+            strokeWidth: 1.5,
+          },
+        ],
+      },
     };
+
     ARCHETYPE_ASSEMBLERS.creature(world, physics, aiSystem, rootId, rootConfig, position);
-
-    // Первичный расчет радиуса и веса по частям шаблона
-    let maxRadius = 0;
-    let initialWeight = 0;
-    for (const part of blueprint.parts) {
-      const r = part.config.physics?.radius ?? 10;
-      if (r > maxRadius) maxRadius = r;
-      initialWeight += part.config.physics?.weight ?? 1;
-    }
-
-    world.addComponent(rootId, 'physicsStats', {
-      radius: createStat(maxRadius),
-      weight: createStat(initialWeight || 10),
-      isSolid: true,
-    });
-
-    const body = new Circle({ x: position.x, y: position.y }, maxRadius);
-    body.isStatic = false;
-    world.addComponent(rootId, 'physicsBody', {
-      body,
-      isStatic: false,
-      category: CollisionCategory.CREATURE,
-      mask: COLLISION_MASK_ALL,
-    });
-    physics.registerBody(rootId, body);
-
-    world.addComponent(rootId, 'renderable', {
-      zIndex: 40,
-      isVisible: true,
-      syncWithTransform: true,
-      primitives: [
-        {
-          kind: 'circle',
-          radius: maxRadius,
-          fill: '#34495e',
-          stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
-          strokeWidth: 2,
-        },
-        {
-          kind: 'polygon',
-          points: [
-            { x: maxRadius, y: 0 },
-            { x: 0, y: -maxRadius },
-            { x: 0, y: maxRadius },
-          ],
-          fill: '#7f8c8d',
-          stroke: '#95a5a6',
-          strokeWidth: 1.5,
-        },
-      ],
-    });
-
-    world.addComponent(rootId, 'perception', {
-      visionFovAngle: BALANCE_CONFIG.senses.defaultFovAngle,
-      visionClarity: BALANCE_CONFIG.senses.defaultVisionClarity,
-      visionMaxDistance: BALANCE_CONFIG.senses.defaultVisionMaxDistance,
-      hearingSensitivity: BALANCE_CONFIG.senses.defaultHearingSensitivity,
-      hearingMaxDistance: BALANCE_CONFIG.senses.defaultHearingMaxDistance,
-    });
 
     // 2. Генерация ID для всех частей тела шаблона
     const partKeyToId = new Map<string, string>();

@@ -15,7 +15,7 @@ import { IRenderer, RenderContext } from './IRenderer';
 import { GizmoRenderer } from '../gizmos/GizmoRenderer';
 import { GizmoRenderData } from '../gizmos/types';
 import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
-import { findActiveBrain } from '../ecs/utils/anatomy';
+import { getEffectiveLogicBrain } from '../ecs/utils/anatomy';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 
 export class CanvasRenderer implements IRenderer {
@@ -133,8 +133,27 @@ export class CanvasRenderer implements IRenderer {
   ): void {
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
-    // Сортировка по zIndex (от меньшего к большему)
-    renderables.sort((a, b) => a[1].renderable.zIndex - b[1].renderable.zIndex);
+    // Сортировка по zIndex с учетом динамического состояния (мертвые объекты уходят вниз)
+    renderables.sort((a, b) => {
+      let zA = a[1].renderable.zIndex;
+      let zB = b[1].renderable.zIndex;
+
+      const tagA = world.getComponent(a[0], 'tag');
+      const healthA = world.getComponent(a[0], 'health');
+      if (healthA && !healthA.isAlive) {
+        if (tagA?.archetype === 'creature') zA = 20; // RENDER_Z_INDEX.CORPSES
+        if (tagA?.archetype === 'obstacle') zA = 0; // RENDER_Z_INDEX.ZONES
+      }
+
+      const tagB = world.getComponent(b[0], 'tag');
+      const healthB = world.getComponent(b[0], 'health');
+      if (healthB && !healthB.isAlive) {
+        if (tagB?.archetype === 'creature') zB = 20;
+        if (tagB?.archetype === 'obstacle') zB = 0;
+      }
+
+      return zA - zB;
+    });
 
     let attacksRendered = false;
 
@@ -159,7 +178,8 @@ export class CanvasRenderer implements IRenderer {
         selectedId,
         selectedIds,
         hoveredId,
-        world
+        world,
+        gameMode
       );
     }
 
@@ -195,14 +215,7 @@ export class CanvasRenderer implements IRenderer {
 
     for (const id of selectedIds) {
       const transform = world.getComponent(id, 'transform');
-      let brain = world.getComponent(id, 'brain') as any; // BTLogicComponent
-
-      if (!brain) {
-        const activeBrainId = findActiveBrain(world, id);
-        if (activeBrainId) {
-          brain = world.getComponent(activeBrainId, 'brain');
-        }
-      }
+      const brain = getEffectiveLogicBrain(world, id);
 
       if (!transform || !brain) continue;
 
@@ -309,10 +322,16 @@ export class CanvasRenderer implements IRenderer {
   }
 
   private renderScreenMarqueeBox(box: { start: Point; current: Point }): void {
-    const minX = Math.min(box.start.x, box.current.x);
-    const minY = Math.min(box.start.y, box.current.y);
-    const width = Math.abs(box.current.x - box.start.x);
-    const height = Math.abs(box.current.y - box.start.y);
+    const rect = this.canvas.getBoundingClientRect();
+    const startX = box.start.x - rect.left;
+    const startY = box.start.y - rect.top;
+    const currentX = box.current.x - rect.left;
+    const currentY = box.current.y - rect.top;
+
+    const minX = Math.min(startX, currentX);
+    const minY = Math.min(startY, currentY);
+    const width = Math.abs(currentX - startX);
+    const height = Math.abs(currentY - startY);
 
     this.ctx.save();
     this.ctx.fillStyle = 'rgba(52, 152, 219, 0.15)';
@@ -332,14 +351,241 @@ export class CanvasRenderer implements IRenderer {
     selectedId: EntityId | null,
     selectedIds: Set<EntityId>,
     hoveredId: EntityId | null,
-    world: World
+    world: World,
+    gameMode: string
   ): void {
+    const tag = world.getComponent(id, 'tag');
+    const archetype = tag?.archetype;
+
+    if (archetype === 'marker' && gameMode !== 'editor') return;
+
     this.ctx.save();
     this.ctx.translate(transform.x, transform.y);
     this.ctx.rotate(transform.angle);
 
-    for (const prim of renderable.primitives) {
-      this.drawPrimitive(prim, camera, transform.angle);
+    // Динамическая интерпретация визуального стиля в зависимости от архетипа
+    if (archetype === 'zone') {
+      const areaEffector = world.getComponent(id, 'areaEffector');
+      const meta = world.getComponent(id, 'meta');
+      if (areaEffector) {
+        let fillColor = 'rgba(255,255,255,0.1)';
+        let strokeColor = '#fff';
+        let icon = '';
+
+        if (areaEffector.effect === 'damage') {
+          fillColor = 'rgba(231, 76, 60, 0.2)';
+          strokeColor = '#e74c3c';
+          icon = '☠️';
+        } else if (areaEffector.effect === 'heal') {
+          fillColor = 'rgba(46, 204, 113, 0.2)';
+          strokeColor = '#2ecc71';
+          icon = '❤️';
+        } else if (areaEffector.effect === 'repel') {
+          fillColor = 'rgba(243, 156, 18, 0.2)';
+          strokeColor = '#f39c12';
+          icon = '💨';
+        } else if (areaEffector.effect === 'attract') {
+          fillColor = 'rgba(155, 89, 182, 0.2)';
+          strokeColor = '#9b59b6';
+          icon = '🌀';
+        } else if (areaEffector.effect === 'time_dilation') {
+          const isSpeedUp = areaEffector.valuePerSec > 1.0;
+          fillColor = isSpeedUp ? 'rgba(26, 188, 156, 0.2)' : 'rgba(52, 152, 219, 0.2)';
+          strokeColor = isSpeedUp ? '#1abc9c' : '#3498db';
+          icon = isSpeedUp ? '⚡' : '⏳';
+        }
+
+        this.drawPrimitive(
+          {
+            kind: 'circle',
+            radius: areaEffector.radius,
+            fill: fillColor,
+            stroke: strokeColor,
+            strokeWidth: 2,
+            dash: [6, 6],
+          },
+          camera,
+          transform.angle
+        );
+        this.drawPrimitive(
+          {
+            kind: 'text',
+            text: icon,
+            font: '20px sans-serif',
+            fill: '#ffffff',
+            ignoreRotation: true,
+            align: 'center',
+            baseline: 'middle',
+          },
+          camera,
+          transform.angle
+        );
+        if (meta) {
+          this.drawPrimitive(
+            {
+              kind: 'text',
+              text: meta.name,
+              offset: { x: 0, y: areaEffector.radius + 12 },
+              font: '11px sans-serif',
+              fill: strokeColor,
+              ignoreRotation: true,
+              align: 'center',
+              baseline: 'top',
+            },
+            camera,
+            transform.angle
+          );
+        }
+      }
+    } else if (archetype === 'obstacle') {
+      const health = world.getComponent(id, 'health');
+      const isAlive = health ? health.isAlive : true;
+      const physStats = world.getComponent(id, 'physicsStats');
+      const points =
+        physStats?.points ||
+        (renderable.primitives[0]?.kind === 'polygon' ? renderable.primitives[0].points : []);
+
+      if (isAlive) {
+        this.drawPrimitive(
+          { kind: 'polygon', points, fill: '#555555', stroke: '#777777', strokeWidth: 2 },
+          camera,
+          transform.angle
+        );
+      } else {
+        this.drawPrimitive(
+          {
+            kind: 'polygon',
+            points,
+            fill: 'rgba(80, 80, 80, 0.25)',
+            stroke: 'rgba(120, 120, 120, 0.4)',
+            strokeWidth: 2,
+            dash: [4, 4],
+          },
+          camera,
+          transform.angle
+        );
+      }
+    } else if (archetype === 'item' || archetype === 'bodyPart') {
+      const item = world.getComponent(id, 'item');
+      const physStats = world.getComponent(id, 'physicsStats');
+      const radius = physStats ? physStats.radius.current : 16;
+      let color = '#7f8c8d';
+      if (archetype === 'bodyPart' || tag?.subType === 'bodyPart') color = '#e67e22';
+      else if (item?.type === 'weapon') color = '#f1c40f';
+      else if (item?.type === 'armor') color = '#3498db';
+      else if (item?.type === 'bag') color = '#2ecc71';
+
+      const size = radius * 1.6;
+      this.drawPrimitive(
+        { kind: 'rect', width: size, height: size, fill: color },
+        camera,
+        transform.angle
+      );
+
+      if (item && item.count > 1) {
+        this.drawPrimitive(
+          {
+            kind: 'text',
+            text: `${item.count}`,
+            font: 'bold 10px sans-serif',
+            fill: '#ffffff',
+            ignoreRotation: true,
+            align: 'center',
+            baseline: 'middle',
+          },
+          camera,
+          transform.angle
+        );
+      }
+    } else if (archetype === 'creature') {
+      const health = world.getComponent(id, 'health');
+      const meta = world.getComponent(id, 'meta');
+      const aiStats = world.getComponent(id, 'aiStats');
+      const physStats = world.getComponent(id, 'physicsStats');
+
+      const isAlive = health ? health.isAlive : true;
+      const stance = meta?.stance ?? 'standing';
+      const movementMode = meta?.movementMode ?? 'immobile';
+      const radius = physStats ? physStats.radius.current : 16;
+
+      let bodyFill = '#34495e';
+      let bodyStroke = aiStats?.behavior?.current === 'PlayerTree' ? '#2980b9' : '#c0392b';
+      let arrowFill = '#7f8c8d';
+      let arrowStroke = '#95a5a6';
+
+      if (!isAlive) {
+        bodyFill = '#7f8c8d';
+        arrowFill = 'transparent';
+        arrowStroke = '#7f8c8d';
+      } else {
+        const STANCE_RGB: Record<string, [number, number, number]> = {
+          standing: [52, 73, 94],
+          crouching: [155, 89, 182],
+          prone: [121, 85, 72],
+        };
+        const transition = world.getComponent(id, 'stanceTransition');
+        if (transition && transition.totalDuration > 0) {
+          const progress = Math.min(
+            1,
+            Math.max(0, 1 - transition.timer / transition.totalDuration)
+          );
+          const fromRGB = STANCE_RGB[transition.fromStance] || STANCE_RGB.standing;
+          const toRGB = STANCE_RGB[transition.toStance] || STANCE_RGB.standing;
+          const r = Math.round(fromRGB[0] + (toRGB[0] - fromRGB[0]) * progress);
+          const g = Math.round(fromRGB[1] + (toRGB[1] - fromRGB[1]) * progress);
+          const b = Math.round(fromRGB[2] + (toRGB[2] - fromRGB[2]) * progress);
+          bodyFill = `rgb(${r}, ${g}, ${b})`;
+        } else if (stance === 'crouching') {
+          bodyFill = '#9b59b6';
+        } else if (stance === 'prone') {
+          bodyFill = '#795548';
+        }
+
+        switch (movementMode) {
+          case 'turning':
+            arrowFill = '#f1c40f';
+            arrowStroke = '#f39c12';
+            break;
+          case 'walking':
+            arrowFill = '#1abc9c';
+            arrowStroke = '#16a085';
+            break;
+          case 'jogging':
+            arrowFill = '#3498db';
+            arrowStroke = '#2980b9';
+            break;
+          case 'sprinting':
+            arrowFill = '#2ecc71';
+            arrowStroke = '#27ae60';
+            break;
+        }
+      }
+
+      this.drawPrimitive(
+        { kind: 'circle', radius, fill: bodyFill, stroke: bodyStroke, strokeWidth: 2 },
+        camera,
+        transform.angle
+      );
+      this.drawPrimitive(
+        {
+          kind: 'polygon',
+          points: [
+            { x: radius, y: 0 },
+            { x: 0, y: -radius },
+            { x: 0, y: radius },
+          ],
+          fill: arrowFill,
+          stroke: arrowStroke,
+          strokeWidth: 1.5,
+        },
+        camera,
+        transform.angle
+      );
+    } else {
+      // Фолбек для любых иных архетипов (если появятся)
+      for (const prim of renderable.primitives) {
+        this.drawPrimitive(prim, camera, transform.angle);
+      }
     }
 
     // Визуальный отклик урона и исцеления

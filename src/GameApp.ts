@@ -5,10 +5,10 @@ import { StealthSystem } from './ecs/systems/StealthSystem';
 import { AttackSystem } from './ecs/systems/AttackSystem';
 import { DamageSystem } from './ecs/systems/DamageSystem';
 import { AISystem } from './ecs/systems/AISystem';
-import { CanvasRenderSyncSystem } from './ecs/systems/CanvasRenderSyncSystem';
 import { InteractionSystem } from './ecs/systems/InteractionSystem';
 import { AreaEffectorSystem } from './ecs/systems/AreaEffectorSystem';
 import { AnatomySystem } from './ecs/systems/AnatomySystem';
+import { AnimationSyncSystem } from './ecs/systems/AnimationSyncSystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
@@ -24,11 +24,11 @@ import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
 import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
-import { Circle } from 'detect-collisions';
+import { Circle, Polygon } from 'detect-collisions';
 import { EventBus } from './core/EventBus';
 import { BTLogicComponent } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
-import { findActiveBrain } from './ecs/utils/anatomy';
+import { getEffectiveLogicBrain } from './ecs/utils/anatomy';
 import { EDITOR_CONFIG } from './config/editorConfig';
 import { deg2Rad, Radians } from './utils';
 import { compileTreeBlackboardSchema } from './ai/schema';
@@ -55,7 +55,6 @@ export class GameApp {
   public get history(): CommandHistory {
     return this.commandHistory;
   }
-  private isHistoryAction: boolean = false;
   private mouseScreenPos: Point | null = null;
 
   public physics: PhysicsSystem;
@@ -65,10 +64,10 @@ export class GameApp {
   private damageSystem: DamageSystem;
   public aiSystem: AISystem;
   private anatomySystem: AnatomySystem;
-  private canvasRenderSyncSystem: CanvasRenderSyncSystem;
   private threeSyncSystem: ThreeSyncSystem | null = null;
   public interactionSystem: InteractionSystem;
   private areaEffectorSystem: AreaEffectorSystem;
+  private animationSyncSystem: AnimationSyncSystem;
   private modifierSystem: ModifierSystem;
   public attachmentSystem: AttachmentSystem;
   public camera: Camera;
@@ -110,9 +109,9 @@ export class GameApp {
     this.damageSystem = new DamageSystem();
     this.aiSystem = new AISystem();
     this.anatomySystem = new AnatomySystem();
-    this.canvasRenderSyncSystem = new CanvasRenderSyncSystem();
     this.interactionSystem = new InteractionSystem();
     this.areaEffectorSystem = new AreaEffectorSystem();
+    this.animationSyncSystem = new AnimationSyncSystem();
     this.modifierSystem = new ModifierSystem();
     this.attachmentSystem = new AttachmentSystem();
     this.camera = new Camera();
@@ -149,8 +148,11 @@ export class GameApp {
     }
 
     if (mode === '2d') {
+      if (this.threeSyncSystem) {
+        this.threeSyncSystem.destroy();
+        this.threeSyncSystem = null;
+      }
       this.renderer = new CanvasRenderer(this.container);
-      this.threeSyncSystem = null;
     } else {
       const threeRenderer = new ThreeRenderer(this.container);
       this.renderer = threeRenderer;
@@ -293,8 +295,16 @@ export class GameApp {
       const oldPhys = this.world.getComponent(oldId, 'physicsBody');
       const physStats = this.world.getComponent(newId, 'physicsStats');
       if (oldPhys && trans && physStats) {
-        const body = new Circle({ x: trans.x, y: trans.y }, physStats.radius.current);
+        let body: Circle | Polygon;
+        if (physStats.points && physStats.points.length > 0) {
+          body = new Polygon({ x: trans.x, y: trans.y }, physStats.points);
+        } else {
+          body = new Circle({ x: trans.x, y: trans.y }, physStats.radius.current);
+        }
         body.isStatic = oldPhys.isStatic;
+        if (typeof body.setAngle === 'function') {
+          body.setAngle(trans.angle);
+        }
         this.world.addComponent(newId, 'physicsBody', {
           body,
           isStatic: oldPhys.isStatic,
@@ -320,7 +330,6 @@ export class GameApp {
     const validIds = ids.filter((id) => this.world.getEntity(id));
     if (validIds.length === 0) return [];
 
-    // При клонировании "до" пустое: оригинальные объекты не меняются
     const tx = new TransactionBuilder(this, 'Клонирование объектов');
     tx.captureBefore([]);
 
@@ -423,6 +432,12 @@ export class GameApp {
       }
       if (comp.areaEffector) {
         config.areaEffector = JSON.parse(JSON.stringify(comp.areaEffector));
+      }
+      if (comp.visualModel) {
+        config.visualModel = JSON.parse(JSON.stringify(comp.visualModel));
+      }
+      if (comp.animator) {
+        config.animator = JSON.parse(JSON.stringify(comp.animator));
       }
       if (comp.item) {
         config.item = JSON.parse(JSON.stringify(comp.item));
@@ -928,13 +943,7 @@ export class GameApp {
     }
 
     this.lastBTTargetId = targetId;
-    let brain = this.world.getComponent(targetId, 'brain') as BTLogicComponent | undefined;
-    if (!brain) {
-      const activeBrainId = findActiveBrain(this.world, targetId);
-      if (activeBrainId) {
-        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
-      }
-    }
+    const brain = getEffectiveLogicBrain(this.world, targetId);
 
     let schema = null;
     if (brain && brain.root_node) {
@@ -947,15 +956,8 @@ export class GameApp {
       btSchema: schema,
     });
   }
-
   public updateEntityBlackboard(entityId: string, key: string, value: any): void {
-    let brain = this.world.getComponent(entityId, 'brain') as BTLogicComponent | undefined;
-    if (!brain) {
-      const activeBrainId = findActiveBrain(this.world, entityId);
-      if (activeBrainId) {
-        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
-      }
-    }
+    const brain = getEffectiveLogicBrain(this.world, entityId);
     if (brain) {
       brain.blackboard.set(key, value);
       this.updateBTData(true);
@@ -963,13 +965,7 @@ export class GameApp {
   }
 
   public removeEntityBlackboardKey(entityId: string, key: string): void {
-    let brain = this.world.getComponent(entityId, 'brain') as BTLogicComponent | undefined;
-    if (!brain) {
-      const activeBrainId = findActiveBrain(this.world, entityId);
-      if (activeBrainId) {
-        brain = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
-      }
-    }
+    const brain = getEffectiveLogicBrain(this.world, entityId);
     if (brain) {
       brain.blackboard.remove(key);
       this.updateBTData(true);
@@ -993,6 +989,7 @@ export class GameApp {
     this.attachmentSystem.update(this.world, this.physics);
     this.areaEffectorSystem.update(dt, this.world, this.physics);
     this.damageSystem.update(dt, this.world);
+    this.animationSyncSystem.update(dt, this.world);
   }
 
   private loop(time: number): void {
@@ -1025,9 +1022,7 @@ export class GameApp {
 
     this.updateBTData(false);
 
-    if (this.activeRendererMode === '2d') {
-      this.canvasRenderSyncSystem.update(realDt, this.world, this.gameMode);
-    } else if (this.activeRendererMode === '3d' && this.threeSyncSystem) {
+    if (this.activeRendererMode === '3d' && this.threeSyncSystem) {
       this.threeSyncSystem.update(
         realDt,
         this.world,

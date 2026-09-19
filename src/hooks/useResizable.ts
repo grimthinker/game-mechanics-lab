@@ -27,10 +27,8 @@ export function useResizable({
   const [isResizing, setIsResizing] = useState<boolean>(false);
   const startCoordRef = useRef<number>(0);
   const startSizeRef = useRef<number>(size);
-
-  useEffect(() => {
-    localStorage.setItem(storageKey, size.toString());
-  }, [storageKey, size]);
+  const sizeRef = useRef<number>(size);
+  sizeRef.current = size;
 
   const startResizing = useCallback(
     (e: React.MouseEvent) => {
@@ -60,6 +58,7 @@ export function useResizable({
 
     const handleMouseUp = () => {
       setIsResizing(false);
+      localStorage.setItem(storageKey, sizeRef.current.toString());
     };
 
     // Слушатели с capture: true гарантированно перехватывают движение мыши даже если дочерние элементы вызывают stopPropagation()

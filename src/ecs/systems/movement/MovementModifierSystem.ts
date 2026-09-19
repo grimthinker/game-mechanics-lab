@@ -24,16 +24,6 @@ export class MovementModifierSystem {
         input.isRunning = false;
       }
 
-      const wantsToMove =
-        input.desiredMoveVector !== null ||
-        input.isMovingForward ||
-        (input.moveForward ?? 0) !== 0 ||
-        (input.moveStrafe ?? 0) !== 0;
-
-      if (locomotion.forceProneOnMove && wantsToMove) {
-        input.desiredStance = 'prone';
-      }
-
       const interactionAction = world.getComponent(id, 'interactionAction');
       if (interactionAction) {
         input.isRunning = false;

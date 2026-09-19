@@ -4,6 +4,26 @@ import { calculateTotalEntityWeight } from './hierarchy';
 import { createStat } from '../stats/StatEvaluator';
 
 /**
+ * Ищет активный логический мозг (BrainComponent) напрямую у сущности,
+ * либо через анатомический граф (bodyBrain).
+ */
+export function getEffectiveLogicBrain(
+  world: World,
+  entityId: EntityId
+): import('../../ai/core').BTLogicComponent | undefined {
+  let brain = world.getComponent(entityId, 'brain') as
+    import('../../ai/core').BTLogicComponent | undefined;
+  if (!brain) {
+    const activeBrainId = findActiveBrain(world, entityId);
+    if (activeBrainId) {
+      brain = world.getComponent(activeBrainId, 'brain') as
+        import('../../ai/core').BTLogicComponent | undefined;
+    }
+  }
+  return brain;
+}
+
+/**
  * Возвращает массив всех EntityId, соединенных в единый граф анатомии
  */
 export function traverseAnatomyGraph(world: World, startId: EntityId): EntityId[] {

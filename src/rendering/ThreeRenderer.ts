@@ -99,8 +99,8 @@ export class ThreeRenderer implements IRenderer {
       }
       let curr: THREE.Object3D | null = hit.object;
       while (curr) {
-        if (curr.userData && curr.userData.entityId) {
-          return curr.userData.entityId;
+        if (curr.userData && (curr.userData.partId || curr.userData.entityId)) {
+          return curr.userData.partId || curr.userData.entityId;
         }
         curr = curr.parent;
       }
@@ -118,6 +118,18 @@ export class ThreeRenderer implements IRenderer {
   }
 
   public destroy(): void {
+    if (this.scene) {
+      this.scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else if (child.material) {
+            child.material.dispose();
+          }
+        }
+      });
+    }
     this.renderer.dispose();
     if (this.canvas && this.canvas.parentNode) {
       this.canvas.parentNode.removeChild(this.canvas);

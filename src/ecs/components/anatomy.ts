@@ -36,6 +36,9 @@ export interface AssemblyRootComponent {
   partIds: string[];
 }
 
+/**
+ * ECS Tag-компонент, указывающий, что данная часть тела является опорной ходильной конечностью.
+ */
 export interface LocomotionComponent {}
 
 export const enum ConsciousnessState {

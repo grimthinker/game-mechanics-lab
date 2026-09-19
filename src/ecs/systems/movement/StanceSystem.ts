@@ -57,7 +57,13 @@ export class StanceSystem {
         canStand: true,
       };
 
-      if (!locomotion.canStand) {
+      const wantsToMove =
+        input.desiredMoveVector !== null ||
+        input.isMovingForward ||
+        (input.moveForward ?? 0) !== 0 ||
+        (input.moveStrafe ?? 0) !== 0;
+
+      if (!locomotion.canStand || (locomotion.forceProneOnMove && wantsToMove)) {
         input.desiredStance = 'prone';
       }
 

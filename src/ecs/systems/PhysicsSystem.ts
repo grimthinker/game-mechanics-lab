@@ -245,11 +245,15 @@ export class PhysicsSystem {
       // В detect-collisions response.overlapV выталкивает response.a из response.b
       const isBodyA = response.a === body;
       const pushX =
-        (response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x || 1)) *
-        (isBodyA ? -1 : 1);
+        response.overlapV.x !== 0
+          ? (response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x)) *
+            (isBodyA ? -1 : 1)
+          : 0;
       const pushY =
-        (response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y || 1)) *
-        (isBodyA ? -1 : 1);
+        response.overlapV.y !== 0
+          ? (response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y)) *
+            (isBodyA ? -1 : 1)
+          : 0;
 
       body.setPosition(body.x + pushX, body.y + pushY);
       this.system.updateBody(body);

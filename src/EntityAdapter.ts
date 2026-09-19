@@ -19,7 +19,7 @@ import { LOGIC_CONFIG } from './ai/config';
 import { Point } from './types';
 import { Radians } from './utils';
 import { calculateTotalEntityWeight, getAggregatedInteractionSlots } from './ecs/utils/hierarchy';
-import { findActiveBrain } from './ecs/utils/anatomy';
+import { getEffectiveLogicBrain } from './ecs/utils/anatomy';
 
 // Под-адаптеры по доменам
 import { MovementAdapter } from './ecs/adapters/MovementAdapter';
@@ -207,14 +207,7 @@ export class EntityAdapter implements IMovable, EntityController {
     return this.getComponent('perception');
   }
   public get brain(): BTLogicComponent | undefined {
-    let b = this.getComponent('brain') as BTLogicComponent | undefined;
-    if (!b) {
-      const activeBrainId = findActiveBrain(this.world, this.id);
-      if (activeBrainId) {
-        b = this.world.getComponent(activeBrainId, 'brain') as BTLogicComponent | undefined;
-      }
-    }
-    return b;
+    return getEffectiveLogicBrain(this.world, this.id);
   }
   public get attackStatus() {
     return this.combatAdapter.attackStatus;

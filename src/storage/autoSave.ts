@@ -40,11 +40,3 @@ export function loadWorldFromStorage(): AutoSaveData | null {
     return null;
   }
 }
-
-export function clearWorldAutoSave(): void {
-  try {
-    localStorage.removeItem(AUTOSAVE_STORAGE_KEY);
-  } catch (err) {
-    console.warn('[AutoSave] Не удалось удалить автосохранение из localStorage:', err);
-  }
-}

@@ -6,10 +6,12 @@ import { AssetManager } from '../../rendering/AssetManager';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { BodyStructureType } from '../templates';
 import { getAggregatedInteractionSlots } from '../utils/hierarchy';
+import { EventBus } from '../../core/EventBus';
 
 interface AnimatorState {
   mixer: THREE.AnimationMixer;
   currentClipName: string;
+  targetClipName: string;
   currentAction: THREE.AnimationAction | null;
   rig: THREE.Object3D;
 }
@@ -18,6 +20,7 @@ export class ThreeSyncSystem {
   private scene: THREE.Scene;
   private meshes: Map<EntityId, THREE.Object3D> = new Map();
   private loadingMeshes: Set<EntityId> = new Set();
+  private unsubWorldUpdated: () => void;
 
   // Кэш для аниматоров (Стейт-машина)
   private animators: Map<EntityId, AnimatorState> = new Map();
@@ -66,6 +69,37 @@ export class ThreeSyncSystem {
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+    this.unsubWorldUpdated = EventBus.on('world:updated', () => {
+      this.clearMeshes();
+    });
+  }
+
+  public static disposeObject(obj: THREE.Object3D): void {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry?.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else if (child.material) {
+          child.material.dispose();
+        }
+      }
+    });
+  }
+
+  public clearMeshes(): void {
+    for (const [, mesh] of this.meshes.entries()) {
+      ThreeSyncSystem.disposeObject(mesh);
+      this.scene.remove(mesh);
+    }
+    this.meshes.clear();
+    this.animators.clear();
+    this.loadingMeshes.clear();
+  }
+
+  public destroy(): void {
+    this.unsubWorldUpdated();
+    this.clearMeshes();
   }
 
   public update(dt: number, world: World, _gameMode: GameMode, selectedIds: Set<EntityId>): void {
@@ -107,11 +141,13 @@ export class ThreeSyncSystem {
         const ownership = world.getComponent(id, 'ownership');
         const isEquipped = ownership && ownership.status === 'equipped';
 
-        // Если предмет экипирован, его 3D координаты полностью управляются суставом рига (в который он вложен)
+        // Если предмет не экипирован, гарантируем его нахождение в корне сцены
         if (!isEquipped) {
+          if (obj.parent !== this.scene) {
+            this.scene.add(obj);
+          }
           obj.position.x = transform.x;
           obj.position.z = transform.y;
-          // Компенсируем 90-градусный сдвиг (pi / 2) базового направления рига относительно 2D оси X
           obj.rotation.y = -transform.angle + Math.PI / 2;
           obj.scale.set(1, 1, 1);
         } else {
@@ -134,50 +170,11 @@ export class ThreeSyncSystem {
           const animatorComp = world.getComponent(id, 'animator');
 
           if (animState && animatorComp) {
-            const health = world.getComponent(id, 'health');
-            const isAlive = health ? health.isAlive : true;
-            const activeAttacks = world.getComponent(id, 'activeAttacks');
-            const meta = world.getComponent(id, 'meta');
-
-            // Выбор целевой анимации на основе стейт-машины ECS
-            let targetAnim = 'stand_idle';
-            if (!isAlive) {
-              targetAnim = 'dead';
-            } else if (activeAttacks && activeAttacks.attacks.length > 0) {
-              targetAnim = 'attack';
-            } else if (meta?.actionMode === 'pickup') {
-              targetAnim = 'pickup';
-            } else {
-              const stance = meta?.stance || 'standing';
-              const moveMode = meta?.movementMode || 'immobile';
-
-              const prefix = stance.includes('crouch')
-                ? 'crouch'
-                : stance.includes('prone')
-                  ? 'prone'
-                  : 'stand';
-              const suffix =
-                moveMode === 'sprinting'
-                  ? 'sprint'
-                  : moveMode === 'jogging'
-                    ? 'jog'
-                    : moveMode === 'walking'
-                      ? 'walk'
-                      : 'idle';
-
-              if (prefix === 'prone' && suffix === 'walk') targetAnim = 'prone_crawl';
-              else if (
-                (prefix === 'prone' && suffix === 'sprint') ||
-                (prefix === 'prone' && suffix === 'jog')
-              )
-                targetAnim = 'prone_crawl';
-              else targetAnim = `${prefix}_${suffix}`;
-            }
-
-            if (animatorComp.currentAnimation !== targetAnim) {
-              animatorComp.currentAnimation = targetAnim;
-              this.playAnimation(id, animatorComp.rigType, targetAnim).catch((e) =>
-                console.warn(e)
+            // Воспроизведение анимации строго из состояния ECS без обратной мутации
+            if (animState.targetClipName !== animatorComp.currentAnimation) {
+              animState.targetClipName = animatorComp.currentAnimation;
+              this.playAnimation(id, animatorComp.rigType, animatorComp.currentAnimation).catch(
+                (e) => console.warn(e)
               );
             }
 
@@ -259,9 +256,10 @@ export class ThreeSyncSystem {
       }
     }
 
-    // Очистка удаленных из мира сущностей
+    // Очистка удаленных из мира сущностей с освобождением VRAM
     for (const [id, mesh] of this.meshes.entries()) {
       if (!activeIds.has(id)) {
+        ThreeSyncSystem.disposeObject(mesh);
         this.scene.remove(mesh);
         this.meshes.delete(id);
         this.animators.delete(id);
@@ -282,6 +280,10 @@ export class ThreeSyncSystem {
 
     try {
       const gltfAnim = await AssetManager.getInstance().loadGLTF(animUrl);
+
+      // Предотвращение гонки: если за время сети анимация сменилась, отменяем
+      if (state.targetClipName !== animKey) return;
+
       if (gltfAnim.animations && gltfAnim.animations.length > 0) {
         const clip = gltfAnim.animations[0];
         const action = state.mixer.clipAction(clip);
@@ -317,9 +319,12 @@ export class ThreeSyncSystem {
     archetype: string | undefined
   ): THREE.Object3D | undefined {
     const animator = world.getComponent(id, 'animator');
+    const rigProfile = animator
+      ? CREATURE_RIG_PROFILES[animator.rigType as BodyStructureType]
+      : null;
 
-    // Сборка модульного рига для существ
-    if (animator && archetype === 'creature') {
+    // Сборка модульного рига для существ (только при наличии валидного 3D-ассета рига)
+    if (animator && archetype === 'creature' && rigProfile?.rigAsset) {
       this.loadingMeshes.add(id);
       const group = new THREE.Group();
       group.userData.entityId = id;
@@ -336,7 +341,7 @@ export class ThreeSyncSystem {
       this.loadingMeshes.add(id);
 
       AssetManager.getInstance()
-        .getMesh(visual.modelId)
+        .getClonedModel(visual.modelId)
         .then((mesh) => {
           if (mesh) {
             if (mesh.type === 'Scene' || mesh.type === 'Group') {
@@ -468,12 +473,12 @@ export class ThreeSyncSystem {
     try {
       const assetManager = AssetManager.getInstance();
 
-      const rig = await assetManager.getClonedRig(rigProfile.rigAsset);
+      const rig = await assetManager.getClonedModel(rigProfile.rigAsset);
       if (!rig) throw new Error(`Rig ${rigProfile.rigAsset} failed to load`);
-
-      // Масштабируем риг, так как GLTF модели создаются в метрах (1 ед. = 1м),
-      // а мир движка работает в пикселях (где радиус существа 16px, а высота ~40-60px).
-      rig.scale.set(25, 25, 25);
+      if (!world.getEntity(rootId)) {
+        ThreeSyncSystem.disposeObject(rig);
+        return;
+      }
 
       parentGroup.add(rig);
 
@@ -481,6 +486,7 @@ export class ThreeSyncSystem {
       this.animators.set(rootId, {
         mixer,
         currentClipName: '',
+        targetClipName: '',
         currentAction: null,
         rig,
       });
@@ -491,9 +497,19 @@ export class ThreeSyncSystem {
         if (visual && visual.modelId && visual.rigNodeName) {
           const targetNode = rig.getObjectByName(visual.rigNodeName);
           if (targetNode) {
-            const meshClone = await assetManager.getMesh(visual.modelId);
+            const meshClone = await assetManager.getClonedModel(visual.modelId);
+            if (!world.getEntity(rootId)) {
+              if (meshClone) ThreeSyncSystem.disposeObject(meshClone);
+              return;
+            }
             if (meshClone) {
               meshClone.userData.partId = partId;
+              meshClone.userData.entityId = partId;
+
+              meshClone.traverse((c) => {
+                c.userData.partId = partId;
+                c.userData.entityId = partId;
+              });
 
               if (meshClone.type === 'Scene' || meshClone.type === 'Group') {
                 targetNode.add(...meshClone.children);

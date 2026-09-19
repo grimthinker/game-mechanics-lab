@@ -47,11 +47,11 @@ export class ItemTransferService {
       this.removeItem(validation.swapItemId, target);
       this.removeItem(itemId, source);
 
-      this.placeItem(itemId, target);
-      this.placeItem(validation.swapItemId, source);
+      this.placeItem(itemId, target, source);
+      this.placeItem(validation.swapItemId, source, target);
     } else {
       this.removeItem(itemId, source);
-      this.placeItem(itemId, target);
+      this.placeItem(itemId, target, source);
     }
 
     // Если перемещенный предмет был выбран на холсте, а теперь попал в экипировку/инвентарь:
@@ -74,7 +74,7 @@ export class ItemTransferService {
     return true;
   }
 
-  private removeItem(itemId: string, location: TransferTarget) {
+  private removeItem(itemId: string, location: TransferTarget): void {
     const world = this.app.world;
     if (location.type === 'slot') {
       const slot = world.getComponent(location.partId, 'interactionSlots');
@@ -119,7 +119,7 @@ export class ItemTransferService {
     if (renderable) renderable.isVisible = false;
   }
 
-  private placeItem(itemId: string, location: TransferTarget) {
+  private placeItem(itemId: string, location: TransferTarget, source?: TransferTarget): void {
     const world = this.app.world;
     const item = world.getComponent(itemId, 'item');
     if (!item) return;
@@ -172,8 +172,8 @@ export class ItemTransferService {
       });
     } else if (location.type === 'ground') {
       const transform = world.getComponent(itemId, 'transform');
-      let posX = location.position?.x ?? transform?.x ?? 0;
-      let posY = location.position?.y ?? transform?.y ?? 0;
+      let posX = location.position?.x ?? transform?.x;
+      let posY = location.position?.y ?? transform?.y;
 
       if (location.parentEntityId) {
         const parentTrans = world.getComponent(location.parentEntityId, 'transform');
@@ -182,6 +182,32 @@ export class ItemTransferService {
           posY = parentTrans.y;
         }
       }
+
+      if ((posX === undefined || posY === undefined) && source) {
+        if (source.type === 'slot') {
+          const sTrans = world.getComponent(source.partId, 'transform');
+          if (sTrans) {
+            posX = sTrans.x;
+            posY = sTrans.y;
+          }
+        } else if (source.type === 'area' || source.type === 'inventory') {
+          const sTrans = world.getComponent(source.containerId, 'transform');
+          if (sTrans) {
+            posX = sTrans.x;
+            posY = sTrans.y;
+          }
+        }
+      }
+
+      const canvas = this.app.canvas;
+      const cx = canvas ? canvas.width / 2 : 300;
+      const cy = canvas ? canvas.height / 2 : 300;
+      const scale = this.app.camera.scale || 1;
+      const defaultX = (cx - this.app.camera.offsetX) / scale;
+      const defaultY = (cy - this.app.camera.offsetY) / scale;
+
+      posX = posX ?? defaultX;
+      posY = posY ?? defaultY;
 
       if (transform) {
         transform.x = posX;

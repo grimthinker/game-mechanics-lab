@@ -41,6 +41,7 @@ export class AttachmentSystem {
       const phys = world.getComponent(id, 'physicsBody');
       if (phys && phys.body) {
         phys.body.setPosition(targetX, targetY);
+        physics.system.updateBody(phys.body);
       }
     }
   }

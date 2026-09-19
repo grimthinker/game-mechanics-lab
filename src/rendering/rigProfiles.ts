@@ -1,7 +1,7 @@
 import { BodyStructureType } from '../ecs/templates';
 
 export interface RigProfile {
-  rigAsset: string;
+  rigAsset: string | null;
   animations: Record<string, string>;
 }
 
@@ -26,7 +26,7 @@ export const CREATURE_RIG_PROFILES: Record<BodyStructureType, RigProfile> = {
       prone_crawl: '3d/creatures/humanoid/anim/ProneCrawl.glb',
 
       // Переходы между стойками
-      stand_to_crouch: '3d/creatures/humanoid/anim/CrouchIdle.glb', // Пока используем idle приседа, если нет отдельной анимации перехода StandToCrouch
+      stand_to_crouch: '3d/creatures/humanoid/anim/CrouchIdle.glb',
       crouch_to_stand: '3d/creatures/humanoid/anim/StandIdle.glb',
       stand_to_prone: '3d/creatures/humanoid/anim/StandToProne.glb',
       prone_to_stand: '3d/creatures/humanoid/anim/ProneToStand.glb',
@@ -48,11 +48,11 @@ export const CREATURE_RIG_PROFILES: Record<BodyStructureType, RigProfile> = {
     },
   },
   quadruped: {
-    rigAsset: '',
+    rigAsset: null,
     animations: {},
   },
   arachnid: {
-    rigAsset: '',
+    rigAsset: null,
     animations: {},
   },
 };

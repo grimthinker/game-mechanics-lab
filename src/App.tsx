@@ -23,6 +23,7 @@ import { PlacementMode, BlackboardPickingState } from './types';
 import { GameMode } from './config/gameConfig';
 import { GizmoTool } from './gizmos/types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { GlobalInput } from './input/GlobalInput';
 import './editor.css';
 import { createZoneConfig } from './ecs/archetypes';
 import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
@@ -304,6 +305,7 @@ export const App: React.FC = () => {
   }, []);
 
   const goToEditor = useCallback(() => {
+    GlobalInput.keys.clear();
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
@@ -320,6 +322,7 @@ export const App: React.FC = () => {
   }, [snapshot, applyGameMode]);
 
   const goToSimulation = useCallback(() => {
+    GlobalInput.keys.clear();
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
@@ -337,6 +340,7 @@ export const App: React.FC = () => {
   }, [applyGameMode, snapshot]);
 
   const goToGame = useCallback(() => {
+    GlobalInput.keys.clear();
     const app = appRef.current;
     if (!app) return;
     let currentSnapshot = snapshot;
@@ -351,7 +355,6 @@ export const App: React.FC = () => {
     // Автоматически включаем 3D режим при входе в игру
     setRenderMode('3d');
     app.setRendererMode('3d');
-
     app.isPaused = false;
     setIsPaused(false);
     saveWorldToStorage(app, currentSnapshot);
