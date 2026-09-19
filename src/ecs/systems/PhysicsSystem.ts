@@ -261,14 +261,28 @@ export class PhysicsSystem {
   }
 
   public update(dt: number, world: World): void {
-    // Синхронизация радиуса физических тел с актуальными статами (на случай баффов/дебаффов)
+    // Синхронизация радиуса и коллизий физических тел с актуальными статами
     const statEntities = world.getEntitiesWith('physicsBody', 'physicsStats');
-    for (const [_id, { physicsBody, physicsStats }] of statEntities) {
+    for (const [id, { physicsBody, physicsStats }] of statEntities) {
       if (
         physicsBody.body instanceof Circle &&
         physicsBody.body.r !== physicsStats.radius.current
       ) {
         physicsBody.body.r = physicsStats.radius.current;
+      }
+
+      // Синхронизация isSolid (включение/отключение коллизий)
+      const health = world.getComponent(id, 'health');
+      const isAlive = health ? health.isAlive : true;
+      const tag = world.getComponent(id, 'tag');
+
+      // Зоны и маркеры имеют свои особые маски, их не перезаписываем
+      if (tag?.archetype !== 'zone' && tag?.archetype !== 'marker') {
+        const expectedMask =
+          physicsStats.isSolid && isAlive ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+        if (physicsBody.mask !== expectedMask) {
+          physicsBody.mask = expectedMask;
+        }
       }
     }
 

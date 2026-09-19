@@ -32,6 +32,7 @@ export class AISystem {
       blackboard: new Blackboard(),
       event_queue: [],
       relations: {},
+      behaviorId: behaviorId,
     };
 
     world.addComponent(id, 'brain' as any, brain);
@@ -46,10 +47,13 @@ export class AISystem {
     const result: EntityAdapter[] = [];
     const entities = this.world.getEntitiesWith('meta', 'transform', 'input', 'aiStats', 'health');
 
-    // Собираем все ID существующих в мире сущностей для корректной очистки кэша
-    const allWorldIds = new Set(this.world.getAllEntities().map(([id]) => id));
+    for (const [id, comps] of entities) {
+      // Реактивное перестроение мозга при изменении aiStats.behavior
+      const brain = this.world.getComponent(id, 'brain');
+      if (brain && brain.behaviorId !== comps.aiStats.behavior.current) {
+        this.initBotBrain(this.world, id, comps.aiStats.behavior.current);
+      }
 
-    for (const [id] of entities) {
       const adapter = this.getEntityAdapter(id);
       // Если существо находится в сознании и имеет активный мозг — добавляем в обработку
       if (adapter && adapter.brain) {
@@ -63,9 +67,9 @@ export class AISystem {
       }
     }
 
-    // Очистка кэша от удаленных из мира сущностей (любого типа)
+    // Очистка кэша от удаленных из мира сущностей
     for (const id of this.adapters.keys()) {
-      if (!allWorldIds.has(id)) {
+      if (!this.world.hasEntity(id)) {
         this.adapters.delete(id);
       }
     }

@@ -284,4 +284,5 @@ export interface BTLogicComponent {
   event_queue: AIEvent[];
   relations: MobRelations;
   relations_group?: string | undefined;
+  behaviorId?: string;
 }

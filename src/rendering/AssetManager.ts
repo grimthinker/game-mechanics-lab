@@ -51,6 +51,38 @@ export class AssetManager {
   public async getClonedModel(url: string): Promise<THREE.Object3D | null> {
     const gltf = await this.loadGLTF(url);
     if (!gltf || !gltf.scene) return null;
-    return SkeletonUtils.clone(gltf.scene);
+    const clone = SkeletonUtils.clone(gltf.scene);
+
+    // Защищаем общую геометрию и материалы от случайного удаления
+    clone.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.userData.isSharedAsset = true;
+      }
+    });
+
+    return clone;
+  }
+
+  public clear(): void {
+    for (const gltf of this.gltfCache.values()) {
+      if (gltf && gltf.scene) {
+        gltf.scene.traverse((child: THREE.Object3D) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry?.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m: THREE.Material) => {
+                (m as any).map?.dispose();
+                m.dispose();
+              });
+            } else if (child.material) {
+              (child.material as any).map?.dispose();
+              child.material.dispose();
+            }
+          }
+        });
+      }
+    }
+    this.gltfCache.clear();
+    this.loadPromises.clear();
   }
 }

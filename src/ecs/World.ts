@@ -1,7 +1,7 @@
 import { EntityId, EntityComponents } from './types';
-
 export class World {
   private entities: Map<EntityId, EntityComponents> = new Map();
+  private queryCache: Map<string, Array<[EntityId, EntityComponents]>> = new Map();
 
   public createEntity(id: EntityId): EntityId {
     this.entities.set(id, {});
@@ -9,6 +9,16 @@ export class World {
   }
 
   public removeEntity(id: EntityId): boolean {
+    const entity = this.entities.get(id);
+    if (!entity) return false;
+
+    for (const cachedArray of this.queryCache.values()) {
+      const idx = cachedArray.findIndex((e) => e[0] === id);
+      if (idx !== -1) {
+        cachedArray.splice(idx, 1);
+      }
+    }
+
     return this.entities.delete(id);
   }
 
@@ -18,15 +28,40 @@ export class World {
     component: EntityComponents[K]
   ): void {
     const entity = this.entities.get(id);
-    if (entity) {
-      entity[key] = component;
+    if (!entity) return;
+
+    const isNew = entity[key] === undefined;
+    entity[key] = component;
+
+    if (isNew) {
+      for (const [queryKey, cachedArray] of this.queryCache.entries()) {
+        const queryKeys = queryKey.split(',');
+        if (queryKeys.includes(key as string)) {
+          const satisfies = queryKeys.every(
+            (k) => entity[k as keyof EntityComponents] !== undefined
+          );
+          if (satisfies) {
+            cachedArray.push([id, entity]);
+          }
+        }
+      }
     }
   }
 
   public removeComponent<K extends keyof EntityComponents>(id: EntityId, key: K): void {
     const entity = this.entities.get(id);
-    if (entity) {
-      delete entity[key];
+    if (!entity || entity[key] === undefined) return;
+
+    delete entity[key];
+
+    for (const [queryKey, cachedArray] of this.queryCache.entries()) {
+      const queryKeys = queryKey.split(',');
+      if (queryKeys.includes(key as string)) {
+        const idx = cachedArray.findIndex((e) => e[0] === id);
+        if (idx !== -1) {
+          cachedArray.splice(idx, 1);
+        }
+      }
     }
   }
 
@@ -41,17 +76,32 @@ export class World {
     return this.entities.get(id);
   }
 
+  public hasEntity(id: EntityId): boolean {
+    return this.entities.has(id);
+  }
+
   public getEntitiesWith<K extends keyof EntityComponents>(
     ...keys: K[]
   ): Array<[EntityId, Required<Pick<EntityComponents, K>> & EntityComponents]> {
-    const result: Array<[EntityId, any]> = [];
-    for (const [id, components] of this.entities.entries()) {
-      const hasAll = keys.every((k) => components[k] !== undefined);
-      if (hasAll) {
-        result.push([id, components]);
+    const queryKey = keys.slice().sort().join(',');
+
+    let cachedArray = this.queryCache.get(queryKey);
+    if (!cachedArray) {
+      cachedArray = [];
+      for (const [id, components] of this.entities.entries()) {
+        const hasAll = keys.every((k) => components[k] !== undefined);
+        if (hasAll) {
+          cachedArray.push([id, components]);
+        }
       }
+      this.queryCache.set(queryKey, cachedArray);
     }
-    return result;
+
+    // Возвращаем поверхностную копию, чтобы избежать багов с пропуском элементов
+    // при удалении сущностей или компонентов внутри итерации по этому массиву в системах.
+    return cachedArray.slice() as Array<
+      [EntityId, Required<Pick<EntityComponents, K>> & EntityComponents]
+    >;
   }
 
   public getAllEntities(): Array<[EntityId, EntityComponents]> {
@@ -60,5 +110,6 @@ export class World {
 
   public clear(): void {
     this.entities.clear();
+    this.queryCache.clear();
   }
 }

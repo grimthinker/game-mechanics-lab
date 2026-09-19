@@ -32,6 +32,7 @@ import { getEffectiveLogicBrain } from './ecs/utils/anatomy';
 import { EDITOR_CONFIG } from './config/editorConfig';
 import { deg2Rad, Radians } from './utils';
 import { compileTreeBlackboardSchema } from './ai/schema';
+import { AssetManager } from './rendering/AssetManager';
 
 // Контроллеры редактора
 import { SelectionController } from './editor/SelectionController';
@@ -121,7 +122,7 @@ export class GameApp {
     // Инициализация контроллеров
     this.selection = new SelectionController(this);
     this.gizmo = new GizmoController(this);
-    this.mutations = new EditorMutationsAPI(this.world, this.physics, this.aiSystem);
+    this.mutations = new EditorMutationsAPI(this.world);
     this.itemTransfer = new ItemTransferService(this);
 
     this.resizeCanvas();
@@ -926,6 +927,7 @@ export class GameApp {
     if (this.renderer.destroy) {
       this.renderer.destroy();
     }
+    AssetManager.getInstance().clear();
   }
 
   public updateBTData(force: boolean = false): void {

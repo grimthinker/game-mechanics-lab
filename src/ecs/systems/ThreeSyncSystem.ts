@@ -77,11 +77,15 @@ export class ThreeSyncSystem {
   public static disposeObject(obj: THREE.Object3D): void {
     obj.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        child.geometry?.dispose();
-        if (Array.isArray(child.material)) {
-          child.material.forEach((m) => m.dispose());
-        } else if (child.material) {
-          child.material.dispose();
+        if (!child.userData.isSharedAsset) {
+          child.geometry?.dispose();
+        }
+        if (!child.userData.isSharedAsset && !child.userData.isSharedMaterial) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else if (child.material) {
+            child.material.dispose();
+          }
         }
       }
     });
@@ -100,8 +104,22 @@ export class ThreeSyncSystem {
   public destroy(): void {
     this.unsubWorldUpdated();
     this.clearMeshes();
-  }
 
+    // Очищаем кэшированные фоллбэк-материалы
+    this.matPlayer.dispose();
+    this.matEnemy.dispose();
+    this.matIdle.dispose();
+    this.matObstacle.dispose();
+    this.matWeapon.dispose();
+    this.matArmor.dispose();
+    this.matBag.dispose();
+    this.matZoneDmg.dispose();
+    this.matZoneHeal.dispose();
+    this.matZoneNeutral.dispose();
+    this.matZoneSlow.dispose();
+    this.matZoneFast.dispose();
+    this.matSelection.dispose();
+  }
   public update(dt: number, world: World, _gameMode: GameMode, selectedIds: Set<EntityId>): void {
     const activeIds = new Set<EntityId>();
     const renderables = world.getEntitiesWith('transform', 'renderable');
@@ -356,6 +374,7 @@ export class ThreeSyncSystem {
             const outlineGeo = new THREE.BoxGeometry(radius * 1.5, radius * 1.5, radius * 1.5);
             const outline = new THREE.Mesh(outlineGeo, this.matSelection);
             outline.userData.isSelectionOutline = true;
+            outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
             outline.visible = false;
             group.add(outline);
           }
@@ -436,6 +455,7 @@ export class ThreeSyncSystem {
     if (mainMesh) {
       group.userData.entityId = id;
       mainMesh.userData.entityId = id;
+      mainMesh.userData.isSharedMaterial = true; // Защищаем кэшированный материал
       group.add(mainMesh);
 
       const outlineGeo = mainMesh.geometry.clone();
@@ -443,6 +463,7 @@ export class ThreeSyncSystem {
       outline.scale.set(1.05, 1.05, 1.05);
       outline.position.copy(mainMesh.position);
       outline.userData.isSelectionOutline = true;
+      outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
       outline.visible = false;
       group.add(outline);
 
@@ -530,6 +551,7 @@ export class ThreeSyncSystem {
       const outline = new THREE.Mesh(outlineGeo, this.matSelection);
       outline.position.y = 22.5;
       outline.userData.isSelectionOutline = true;
+      outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
       outline.visible = false;
       parentGroup.add(outline);
 

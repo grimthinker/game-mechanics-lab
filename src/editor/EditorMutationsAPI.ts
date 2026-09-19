@@ -8,11 +8,7 @@ import { Circle } from 'detect-collisions';
 import { deg2Rad } from '../utils';
 
 export class EditorMutationsAPI {
-  constructor(
-    private world: World,
-    private physics: PhysicsSystem,
-    private aiSystem: AISystem
-  ) {}
+  constructor(private world: World) {}
 
   public updateEntityMeta(id: string, patch: { name?: string; destructible?: boolean }): boolean {
     const meta = this.world.getComponent(id, 'meta');
@@ -39,15 +35,11 @@ export class EditorMutationsAPI {
     patch: { radius?: number; weight?: number; isSolid?: boolean }
   ): boolean {
     const physStats = this.world.getComponent(id, 'physicsStats');
-    const physBody = this.world.getComponent(id, 'physicsBody');
     if (!physStats) return false;
     let changed = false;
 
     if (patch.radius !== undefined && physStats.radius.base !== patch.radius) {
       setBaseStat(physStats.radius, patch.radius);
-      if (physBody && 'r' in physBody.body) {
-        (physBody.body as Circle).r = patch.radius;
-      }
       changed = true;
     }
     if (patch.weight !== undefined && physStats.weight.base !== patch.weight) {
@@ -56,9 +48,6 @@ export class EditorMutationsAPI {
     }
     if (patch.isSolid !== undefined && physStats.isSolid !== patch.isSolid) {
       physStats.isSolid = patch.isSolid;
-      if (physBody) {
-        physBody.mask = patch.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-      }
       changed = true;
     }
     return changed;
@@ -75,9 +64,7 @@ export class EditorMutationsAPI {
     }
     if (patch.hp !== undefined && health.current !== patch.hp) {
       health.current = Math.min(health.max.current, Math.max(0, patch.hp));
-      if (health.current <= 0) {
-        killEntity(this.world, id);
-      } else {
+      if (health.current > 0) {
         health.isAlive = true;
       }
       changed = true;
@@ -208,23 +195,18 @@ export class EditorMutationsAPI {
     if (!aiStats || aiStats.behavior.current === behavior) return false;
     aiStats.behavior.current = behavior;
     aiStats.behavior.base = behavior;
-    this.aiSystem.initBotBrain(this.world, id, behavior);
     return true;
   }
 
   public updateEntityAreaEffector(id: string, patch: any): boolean {
     const effector = this.world.getComponent(id, 'areaEffector');
     const physStats = this.world.getComponent(id, 'physicsStats');
-    const physBody = this.world.getComponent(id, 'physicsBody');
     if (!effector) return false;
 
     Object.assign(effector, patch);
     if (patch.radius !== undefined) {
       if (physStats && physStats.radius.base !== patch.radius) {
         setBaseStat(physStats.radius, patch.radius);
-      }
-      if (physBody && 'r' in physBody.body) {
-        (physBody.body as Circle).r = patch.radius;
       }
     }
     return true;
