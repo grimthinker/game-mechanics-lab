@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { GizmoTool } from '../gizmos/types';
+import { GizmoTool } from '../types';
 import { GameMode } from '../config/gameConfig';
 
 interface GlobalShortcutsProps {

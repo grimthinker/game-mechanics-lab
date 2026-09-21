@@ -91,6 +91,8 @@ export const useCanvasInteraction = ({
 
     // Действия на ЛКМ
     if (e.button === 0) {
+      if (app.gizmo.isDragging()) return; // Если уже тянем манипулятор, игнорируем клик для сцены
+
       const point = app.getCanvasPoint(e.clientX, e.clientY);
 
       // В режиме игры: подбор предмета через Ctrl+ЛКМ
@@ -137,10 +139,7 @@ export const useCanvasInteraction = ({
 
       if (placementMode) return;
 
-      // 1. Проверка клика по интерактивному манипулятору (Gizmo)
-      // (Старый 2D хит-тест отключен; 3D манипуляторы TransformControls будут добавлены на Этапе 6)
-
-      // 2. Клик по сущности на поле — выбор с поддержкой Shift (мультиселект / инверсия)
+      // Клик по сущности на поле — выбор с поддержкой Shift (мультиселект / инверсия)
       const entityId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
       if (entityId) {
         const comp = app.world.getEntity(entityId);
@@ -159,7 +158,7 @@ export const useCanvasInteraction = ({
         return;
       }
 
-      // 3. Клик по пустому месту — начинаем рамку выделения
+      // Клик по пустому месту — начинаем рамку выделения
       isMarqueeActiveRef.current = true;
       app.selection.startMarquee({ x: e.clientX, y: e.clientY });
     }
@@ -226,10 +225,7 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Обновление перетаскивания манипулятора
     if (app.gizmo.isDragging() && mode === GameMode.EDITOR) {
-      app.gizmo.setPendingDrag(point, e.shiftKey);
-      e.currentTarget.style.cursor = app.gizmo.activeHandle === 'rotate' ? 'crosshair' : 'grabbing';
       return;
     }
 
@@ -238,27 +234,6 @@ export const useCanvasInteraction = ({
       app.selection.updateMarquee({ x: e.clientX, y: e.clientY });
       e.currentTarget.style.cursor = 'crosshair';
       return;
-    }
-
-    // Проверка наведения на манипулятор (Gizmo Hover)
-    if (
-      mode === GameMode.EDITOR &&
-      app.selection.selectedEntityId &&
-      !placementMode &&
-      app.gizmo.tool !== 'select'
-    ) {
-      const gizmoHit = app.gizmo.hitTest(point);
-      app.gizmo.hoveredHandle = gizmoHit;
-      if (gizmoHit) {
-        app.selection.hoverEntity(null);
-        if (gizmoHit === 'x') e.currentTarget.style.cursor = 'ew-resize';
-        else if (gizmoHit === 'y') e.currentTarget.style.cursor = 'ns-resize';
-        else if (gizmoHit === 'center') e.currentTarget.style.cursor = 'move';
-        else if (gizmoHit === 'rotate') e.currentTarget.style.cursor = 'crosshair';
-        return;
-      }
-    } else {
-      app.gizmo.hoveredHandle = null;
     }
 
     // Подсветка при наведении
@@ -314,12 +289,7 @@ export const useCanvasInteraction = ({
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
-    // Завершение взаимодействия с манипулятором
     if (app.gizmo.isDragging() && mode === GameMode.EDITOR) {
-      app.gizmo.endDrag();
-      updateStats();
-      syncPlayerControls();
-      e.currentTarget.style.cursor = 'default';
       return;
     }
 
@@ -438,7 +408,6 @@ export const useCanvasInteraction = ({
       if (app.gizmo.isDragging()) {
         app.gizmo.cancelDrag(true);
       }
-      app.gizmo.hoveredHandle = null;
       if (isMarqueeActiveRef.current) {
         app.selection.marqueeBox = null;
         isMarqueeActiveRef.current = false;

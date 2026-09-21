@@ -17,6 +17,12 @@ export interface EventMap {
     path: Array<{ id: string; label: string }>;
     targetSection?: string;
   };
+  'gizmo:dragging-changed': { isDragging: boolean };
+  'gizmo:drag-update': {
+    id: string;
+    position: { x: number; y: number; z: number };
+    quaternion: { x: number; y: number; z: number; w: number };
+  };
 }
 
 type EventCallback<T> = (data: T) => void;

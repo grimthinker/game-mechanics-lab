@@ -21,7 +21,7 @@ import { DragGhostOverlay } from './dnd/DragGhostOverlay';
 import { MultiSelectionDrawer } from './components/MultiSelectionDrawer';
 import { PlacementMode, BlackboardPickingState } from './types';
 import { GameMode } from './config/gameConfig';
-import { GizmoTool } from './gizmos/types';
+import { GizmoTool } from './types';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { GlobalInput } from './input/GlobalInput';
 import './editor.css';

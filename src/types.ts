@@ -33,5 +33,7 @@ export interface ModularPlacementOptions {
   name: string;
 }
 
+export type GizmoTool = 'select' | 'translate' | 'rotate';
+
 export type PlacementMode =
   { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; options: ModularPlacementOptions };

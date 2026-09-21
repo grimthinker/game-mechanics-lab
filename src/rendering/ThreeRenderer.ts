@@ -1,9 +1,13 @@
 import * as THREE from 'three';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { IRenderer, RenderContext } from './IRenderer';
 import { Camera } from '../Camera';
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 import { EntityId } from '../ecs/types';
 import { World } from '../ecs/World';
+import { EventBus } from '../core/EventBus';
+import { GlobalInput } from '../input/GlobalInput';
+import { EDITOR_CONFIG } from '../config/editorConfig';
 
 export class ThreeRenderer implements IRenderer {
   private container: HTMLDivElement;
@@ -14,6 +18,8 @@ export class ThreeRenderer implements IRenderer {
   public renderer: THREE.WebGLRenderer;
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
+  public transformControl: TransformControls;
+  private isDraggingGizmo = false;
 
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -68,17 +74,36 @@ export class ThreeRenderer implements IRenderer {
     // 3D-оси координат (Красная: X, Зеленая: Y (Вверх), Синяя: Z)
     const axes = new THREE.AxesHelper(3);
     this.scene.add(axes);
+
+    // Манипулятор TransformControls
+    this.transformControl = new TransformControls(this.camera, this.renderer.domElement);
+    this.scene.add(this.transformControl.getHelper());
+
+    this.transformControl.addEventListener('dragging-changed', (event) => {
+      const isDragging = Boolean(event.value);
+      this.isDraggingGizmo = isDragging;
+      EventBus.emit('gizmo:dragging-changed', { isDragging });
+    });
+
+    this.transformControl.addEventListener('change', () => {
+      if (this.isDraggingGizmo && this.transformControl.object) {
+        const id = this.transformControl.object.userData.entityId;
+        if (id) {
+          EventBus.emit('gizmo:drag-update', {
+            id,
+            position: this.transformControl.object.position.clone(),
+            quaternion: this.transformControl.object.quaternion.clone(),
+          });
+        }
+      }
+    });
   }
 
   public getCanvas(): HTMLCanvasElement {
     return this.canvas;
   }
 
-  public screenToWorld(
-    clientX: number,
-    clientY: number,
-    _camera2D: Camera
-  ): import('../types').Vec3 {
+  public screenToWorld(clientX: number, clientY: number, _camera: Camera): import('../types').Vec3 {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -161,6 +186,9 @@ export class ThreeRenderer implements IRenderer {
     if (this.uiCanvas && this.uiCanvas.parentNode) {
       this.uiCanvas.parentNode.removeChild(this.uiCanvas);
     }
+    if (this.transformControl) {
+      this.transformControl.dispose();
+    }
   }
 
   public render(context: RenderContext): void {
@@ -183,6 +211,41 @@ export class ThreeRenderer implements IRenderer {
 
     this.camera.position.set(camX, camY, camZ);
     this.camera.lookAt(centerX, centerY, centerZ);
+
+    // Синхронизация манипулятора
+    if (
+      context.gameMode === 'editor' &&
+      context.editorData.selectedId &&
+      context.editorData.gizmoTool &&
+      context.editorData.gizmoTool !== 'select'
+    ) {
+      const mesh = this.scene.children.find(
+        (c) => c.userData.entityId === context.editorData.selectedId
+      );
+      const isOwned = !!context.world.getComponent(context.editorData.selectedId, 'ownership');
+
+      if (mesh && !isOwned) {
+        if (this.transformControl.object !== mesh) {
+          this.transformControl.attach(mesh);
+        }
+        if (this.transformControl.getMode() !== context.editorData.gizmoTool) {
+          this.transformControl.setMode(context.editorData.gizmoTool);
+        }
+
+        // Привязка к сетке через Shift
+        if (GlobalInput.keys.has('shift')) {
+          this.transformControl.setTranslationSnap(EDITOR_CONFIG.gridSnapSize);
+          this.transformControl.setRotationSnap(EDITOR_CONFIG.angleSnapStep);
+        } else {
+          this.transformControl.setTranslationSnap(null);
+          this.transformControl.setRotationSnap(null);
+        }
+      } else {
+        this.transformControl.detach();
+      }
+    } else {
+      this.transformControl.detach();
+    }
 
     this.renderer.render(this.scene, this.camera);
 
@@ -284,7 +347,8 @@ export class ThreeRenderer implements IRenderer {
       if (health && isObstacle) {
         const hp = health.current;
         const maxHp = health.max.current;
-        const barW = Math.max(30, radius * 1.5);
+        // Увеличим ширину бара, чтобы она не была слишком маленькой для метрических радиусов
+        const barW = Math.max(30, radius * 30);
         const barH = 5;
         const hpRatio = Math.max(0, Math.min(1, maxHp > 0 ? hp / maxHp : 0));
 

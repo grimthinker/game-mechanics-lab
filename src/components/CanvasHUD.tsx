@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Camera } from '../Camera';
-import { Point } from '../types';
-import { GizmoTool } from '../gizmos/types';
+import { Point, GizmoTool } from '../types';
 import { t } from '../locales';
 import { CAMERA_CONFIG } from '../config/cameraConfig';
 

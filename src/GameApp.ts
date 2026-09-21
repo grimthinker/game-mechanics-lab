@@ -1026,8 +1026,6 @@ export class GameApp {
       this.selection.selectedEntityIds
     );
 
-    this.gizmo.applyPendingDrag();
-
     this.renderer.render({
       camera: this.camera,
       world: this.world,
@@ -1039,6 +1037,7 @@ export class GameApp {
         hoveredId: this.selection.hoveredEntityId,
         marqueeBox: this.selection.marqueeBox,
         showAIDebug: this.showAIDebug,
+        gizmoTool: this.gizmo.tool,
       },
       showUIOverlays: this.showUIOverlays,
     });

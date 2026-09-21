@@ -4,14 +4,13 @@ import { Camera } from '../Camera';
 import { EntityId } from '../ecs/types';
 import { Point, Vec3 } from '../types';
 
-import { GizmoRenderData } from '../gizmos/types';
-
 export interface EditorRenderData {
   selectedId: EntityId | null;
   selectedIds: Set<EntityId>;
   hoveredId: EntityId | null;
   marqueeBox?: { start: Point; current: Point } | null;
   showAIDebug?: boolean;
+  gizmoTool?: 'select' | 'translate' | 'rotate';
 }
 
 export interface RenderContext {
