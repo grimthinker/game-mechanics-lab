@@ -30,6 +30,7 @@ import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
 import { EDITOR_CONFIG } from './config/editorConfig';
 import { t } from './locales';
 import { EventBus } from './core/EventBus';
+import { initRapier } from './physics/rapierLoader';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -37,11 +38,11 @@ export const App: React.FC = () => {
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
+  const [isWasmReady, setIsWasmReady] = useState<boolean>(false);
   const [isEngineReady, setIsEngineReady] = useState<boolean>(false);
   const [snapshot, setSnapshot] = useState<any>(null);
   const snapshotRef = useRef<any>(null);
   snapshotRef.current = snapshot;
-  const [renderMode, setRenderMode] = useState<'2d' | '3d'>('2d');
   const [showUIOverlays, setShowUIOverlays] = useState<boolean>(true);
   const [showAIDebug, setShowAIDebug] = useState<boolean>(false);
   const [gizmoTool, setGizmoTool] = useState<GizmoTool>('translate');
@@ -211,21 +212,34 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
 
-    const canvas = app.canvas;
-    const spawnPos = {
-      x: canvas ? canvas.width / 2 : 300,
-      y: canvas ? canvas.height / 2 : 300,
-    };
-
-    app.initDefaultWorld(spawnPos);
+    const spawnPos = { x: 0, y: 0, z: 0 };
+    app.initDefaultWorld(spawnPos as any);
     saveWorldToStorage(app);
     syncPlayerControls();
     updateStats();
   }, [closePieMenu, syncPlayerControls, updateStats]);
 
-  // Инициализация движка строго 1 раз при монтировании контейнера
+  // 1. Асинхронная инициализация WASM модуля Rapier3D
   useEffect(() => {
-    if (!containerRef.current) return;
+    let isCancelled = false;
+    initRapier()
+      .then(() => {
+        if (!isCancelled) {
+          setIsWasmReady(true);
+        }
+      })
+      .catch((err) => {
+        console.error('[RapierLoader] Ошибка инициализации WASM:', err);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  // 2. Инициализация движка строго 1 раз после монтирования контейнера и готовности WASM
+  useEffect(() => {
+    if (!isWasmReady || !containerRef.current) return;
     const app = new GameApp(containerRef.current);
     appRef.current = app;
     setApp(app);
@@ -245,12 +259,8 @@ export const App: React.FC = () => {
         app.camera.deserialize(autoSave.camera);
       }
     } else {
-      const canvas = app.canvas;
-      const spawnPos = {
-        x: canvas ? canvas.width / 2 : 300,
-        y: canvas ? canvas.height / 2 : 300,
-      };
-      app.initDefaultWorld(spawnPos);
+      const spawnPos = { x: 0, y: 0, z: 0 };
+      app.initDefaultWorld(spawnPos as any);
       saveWorldToStorage(app);
     }
 
@@ -258,13 +268,17 @@ export const App: React.FC = () => {
     app.updateBTData(true);
     setIsEngineReady(true);
 
+    // Доступ к движку из консоли браузера для отладки
+    (window as any).appRef = app;
+
     return () => {
+      delete (window as any).appRef;
       setApp(null);
       app.destroy();
       appRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setApp]);
+  }, [isWasmReady, setApp]);
 
   // Автосохранение при закрытии/скрытии вкладки браузера
   useEffect(() => {
@@ -352,9 +366,6 @@ export const App: React.FC = () => {
     applyGlobalTimeScale(1.0); // Возвращаем нормальную скорость времени для игры
     applyGameMode(GameMode.GAME);
 
-    // Автоматически включаем 3D режим при входе в игру
-    setRenderMode('3d');
-    app.setRendererMode('3d');
     app.isPaused = false;
     setIsPaused(false);
     saveWorldToStorage(app, currentSnapshot);
@@ -411,7 +422,7 @@ export const App: React.FC = () => {
     if (!app || !app.canvas) return;
     const transform = app.world.getComponent(id, 'transform');
     if (transform) {
-      app.camera.lookAt(transform.x, transform.y, app.canvas);
+      app.camera.lookAt(transform.x, transform.z ?? transform.y, app.canvas);
     }
   }, []);
 
@@ -474,8 +485,36 @@ export const App: React.FC = () => {
   return (
     <div
       id="app"
-      style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        overflow: 'hidden',
+        position: 'relative',
+      }}
     >
+      {/* Экран загрузки WASM ядра физики */}
+      {!isWasmReady && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: '#121212',
+            color: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            fontFamily: 'sans-serif',
+            fontSize: '13px',
+          }}
+        >
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>⚙️</div>
+          <div style={{ fontWeight: 'bold' }}>Инициализация физического ядра Rapier3D...</div>
+        </div>
+      )}
+
       {/* Верхняя панель управления скрывается в режиме игры */}
       {mode !== GameMode.GAME && (
         <TopBar
@@ -532,14 +571,6 @@ export const App: React.FC = () => {
           onUndo={handleUndo}
           onRedo={handleRedo}
           onOpenHotkeys={() => setIsHotkeysOpen(true)}
-          renderMode={renderMode}
-          onToggleRenderMode={() => {
-            const nextMode = renderMode === '2d' ? '3d' : '2d';
-            setRenderMode(nextMode);
-            if (appRef.current) {
-              appRef.current.setRendererMode(nextMode);
-            }
-          }}
           showUIOverlays={showUIOverlays}
           setShowUIOverlays={applyShowUIOverlays}
           showAIDebug={showAIDebug}
@@ -842,10 +873,10 @@ export const App: React.FC = () => {
                                   destructible: false,
                                 },
                                 physics: {
-                                  radius: 54,
+                                  radius: 2.0,
                                   weight: 1000,
                                   isSolid: true,
-                                  points: createRectanglePoints(100, 40),
+                                  points: createRectanglePoints(4.0, 1.0),
                                 },
                               },
                               pieMenuState.worldPos
@@ -874,10 +905,10 @@ export const App: React.FC = () => {
                                 },
                                 health: { hp: 100, maxHp: 100 },
                                 physics: {
-                                  radius: 42,
+                                  radius: 0.8,
                                   weight: 50,
                                   isSolid: true,
-                                  points: createRectanglePoints(60, 60),
+                                  points: createRectanglePoints(1.5, 1.5),
                                 },
                               },
                               pieMenuState.worldPos
@@ -897,7 +928,7 @@ export const App: React.FC = () => {
                           if (!app) return;
                           app.executeTransaction(t('history.spawnFireZone'), () => {
                             const id = app.spawnEntity(
-                              createZoneConfig('damage', 70, 15, t('palette.zoneFire')),
+                              createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
                               pieMenuState.worldPos
                             );
                             app.selection.selectEntity(id, true);
@@ -926,9 +957,9 @@ export const App: React.FC = () => {
                                   equippable: false,
                                   equipTimeMultiplier: 1.0,
                                 },
-                                physics: { radius: 16, weight: 1, isSolid: true },
+                                physics: { radius: 0.4, weight: 1, isSolid: true },
                                 weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
-                                weaponZone: { hitZoneType: 'forward_line', length: 150 },
+                                weaponZone: { hitZoneType: 'forward_line', length: 4.5 },
                               },
                               pieMenuState.worldPos
                             );

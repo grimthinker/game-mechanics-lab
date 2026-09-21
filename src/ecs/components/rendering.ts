@@ -1,77 +1,9 @@
-import { Point } from '../../types';
 import { EntityArchetype } from './base';
 
 export interface TagComponent {
   archetype: EntityArchetype;
   subType?: string;
 }
-
-export interface RenderCirclePrimitive {
-  kind: 'circle';
-  radius: number;
-  fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  dash?: number[];
-}
-
-export interface RenderRectPrimitive {
-  kind: 'rect';
-  width: number;
-  height: number;
-  fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  dash?: number[];
-}
-
-export interface RenderLinePrimitive {
-  kind: 'line';
-  from: Point;
-  to: Point;
-  stroke: string;
-  strokeWidth?: number;
-  dash?: number[];
-}
-
-export interface RenderArcPrimitive {
-  kind: 'arc';
-  radius: number;
-  startAngle: number;
-  endAngle: number;
-  fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  closed?: boolean;
-}
-
-export interface RenderPolygonPrimitive {
-  kind: 'polygon';
-  points: Point[];
-  fill?: string;
-  stroke?: string;
-  strokeWidth?: number;
-  dash?: number[];
-}
-
-export interface RenderTextPrimitive {
-  kind: 'text';
-  text: string;
-  offset?: Point;
-  font?: string;
-  fill: string;
-  ignoreRotation?: boolean;
-  align?: CanvasTextAlign;
-  baseline?: CanvasTextBaseline;
-}
-
-export type RenderPrimitive =
-  | RenderCirclePrimitive
-  | RenderRectPrimitive
-  | RenderLinePrimitive
-  | RenderArcPrimitive
-  | RenderPolygonPrimitive
-  | RenderTextPrimitive;
 
 export const RENDER_Z_INDEX = {
   ZONES: 0,
@@ -87,8 +19,7 @@ export const RENDER_Z_INDEX = {
 } as const;
 
 export interface RenderableComponent {
-  zIndex: number;
-  primitives: RenderPrimitive[];
+  zIndex?: number;
   isVisible: boolean;
   syncWithTransform?: boolean;
 }

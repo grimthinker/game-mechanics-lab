@@ -31,7 +31,7 @@ export class GizmoController {
     this.updateDrag(point, shiftKey);
   }
 
-  public hitTest(worldPoint: Point): GizmoHandle | null {
+  public hitTest(worldPoint: Point | { x: number; y: number; z?: number }): GizmoHandle | null {
     const selId = this.app.selection.selectedEntityId;
     if (!selId || this.tool === 'select') return null;
 
@@ -40,38 +40,38 @@ export class GizmoController {
 
     const invScale = 1 / this.app.camera.scale;
     const gx = transform.x;
-    const gy = transform.y;
+    const gz = transform.z ?? transform.y;
     const mx = worldPoint.x;
-    const my = worldPoint.y;
+    const mz = (worldPoint as any).z ?? worldPoint.y;
 
     if (this.tool === 'translate') {
-      const centerSize = 14 * invScale;
-      if (Math.abs(mx - gx) <= centerSize / 2 && Math.abs(my - gy) <= centerSize / 2) {
+      const centerSize = 1.0 * invScale;
+      if (Math.abs(mx - gx) <= centerSize / 2 && Math.abs(mz - gz) <= centerSize / 2) {
         return 'center';
       }
 
-      const axisLen = 65 * invScale;
-      const hitTolerance = 9 * invScale;
+      const axisLen = 3.5 * invScale;
+      const hitTolerance = 0.6 * invScale;
 
       if (
         mx >= gx + centerSize / 2 &&
-        mx <= gx + axisLen + 15 * invScale &&
-        Math.abs(my - gy) <= hitTolerance
+        mx <= gx + axisLen + 0.8 * invScale &&
+        Math.abs(mz - gz) <= hitTolerance
       ) {
         return 'x';
       }
 
       if (
-        my >= gy + centerSize / 2 &&
-        my <= gy + axisLen + 15 * invScale &&
+        mz >= gz + centerSize / 2 &&
+        mz <= gz + axisLen + 0.8 * invScale &&
         Math.abs(mx - gx) <= hitTolerance
       ) {
         return 'y';
       }
     } else if (this.tool === 'rotate') {
-      const ringRadius = 55 * invScale;
-      const ringThickness = 10 * invScale;
-      const dist = Math.hypot(mx - gx, my - gy);
+      const ringRadius = 2.8 * invScale;
+      const ringThickness = 0.6 * invScale;
+      const dist = Math.hypot(mx - gx, mz - gz);
       if (Math.abs(dist - ringRadius) <= ringThickness) {
         return 'rotate';
       }
@@ -80,7 +80,10 @@ export class GizmoController {
     return null;
   }
 
-  public startDrag(handle: GizmoHandle, worldPoint: Point): boolean {
+  public startDrag(
+    handle: GizmoHandle,
+    worldPoint: Point | { x: number; y: number; z?: number }
+  ): boolean {
     const selId = this.app.selection.selectedEntityId;
     if (!selId) return false;
 
@@ -100,21 +103,22 @@ export class GizmoController {
       const t = this.app.world.getComponent(entId, 'transform');
       if (t) {
         initialEntities.set(entId, {
-          pos: { x: t.x, y: t.y },
+          pos: { x: t.x, y: t.z ?? t.y },
           angle: t.angle,
         });
       }
     }
 
-    const anchorPos = { x: anchorTransform.x, y: anchorTransform.y };
-    const startAngle = Math.atan2(worldPoint.y - anchorPos.y, worldPoint.x - anchorPos.x);
+    const anchorPos = { x: anchorTransform.x, y: anchorTransform.z ?? anchorTransform.y };
+    const wpZ = (worldPoint as any).z ?? worldPoint.y;
+    const startAngle = Math.atan2(wpZ - anchorPos.y, worldPoint.x - anchorPos.x);
 
     this.activeHandle = handle;
     this.dragState = {
       tool: this.tool,
       handle,
-      startPoint: { x: worldPoint.x, y: worldPoint.y },
-      currentPoint: { x: worldPoint.x, y: worldPoint.y },
+      startPoint: { x: worldPoint.x, y: wpZ },
+      currentPoint: { x: worldPoint.x, y: wpZ },
       anchorPos,
       startAngle,
       currentAngle: startAngle,
@@ -126,17 +130,21 @@ export class GizmoController {
     return true;
   }
 
-  public updateDrag(worldPoint: Point, shiftKey: boolean = false): void {
+  public updateDrag(
+    worldPoint: Point | { x: number; y: number; z?: number },
+    shiftKey: boolean = false
+  ): void {
     if (!this.dragState) return;
 
-    this.dragState.currentPoint = { x: worldPoint.x, y: worldPoint.y };
+    const wpZ = (worldPoint as any).z ?? worldPoint.y;
+    this.dragState.currentPoint = { x: worldPoint.x, y: wpZ };
 
     if (this.dragState.tool === 'translate') {
       let rawDx = worldPoint.x - this.dragState.startPoint.x;
-      let rawDy = worldPoint.y - this.dragState.startPoint.y;
+      let rawDz = wpZ - this.dragState.startPoint.y;
 
       if (this.dragState.handle === 'x') {
-        rawDy = 0;
+        rawDz = 0;
       } else if (this.dragState.handle === 'y') {
         rawDx = 0;
       }
@@ -144,28 +152,27 @@ export class GizmoController {
       if (shiftKey) {
         const snapGrid = EDITOR_CONFIG.gridSnapSize;
         rawDx = Math.round(rawDx / snapGrid) * snapGrid;
-        rawDy = Math.round(rawDy / snapGrid) * snapGrid;
+        rawDz = Math.round(rawDz / snapGrid) * snapGrid;
       }
 
       for (const [entId, initData] of this.dragState.initialEntities.entries()) {
         const t = this.app.world.getComponent(entId, 'transform');
         const phys = this.app.world.getComponent(entId, 'physicsBody');
         const newX = initData.pos.x + rawDx;
-        const newY = initData.pos.y + rawDy;
+        const newZ = initData.pos.y + rawDz;
 
         if (t) {
           t.x = newX;
-          t.y = newY;
+          t.z = newZ;
         }
-        if (phys && phys.body) {
-          phys.body.setPosition(newX, newY);
-          this.app.physics.system.updateBody(phys.body);
+        if (phys && phys.rawBody) {
+          phys.rawBody.setTranslation({ x: newX, y: t?.y ?? 0, z: newZ }, true);
         }
       }
       this.app.attachmentSystem.update(this.app.world, this.app.physics);
     } else if (this.dragState.tool === 'rotate') {
       const anchor = this.dragState.anchorPos;
-      const currentAngle = Math.atan2(worldPoint.y - anchor.y, worldPoint.x - anchor.x);
+      const currentAngle = Math.atan2(wpZ - anchor.y, worldPoint.x - anchor.x);
       this.dragState.currentAngle = currentAngle;
 
       let deltaAngle = currentAngle - this.dragState.startAngle;
@@ -187,26 +194,32 @@ export class GizmoController {
         if (newAngle < -Math.PI) newAngle += Math.PI * 2;
 
         let newX = initData.pos.x;
-        let newY = initData.pos.y;
+        let newZ = initData.pos.y;
 
         if (this.dragState.initialEntities.size > 1) {
           const relX = initData.pos.x - anchor.x;
-          const relY = initData.pos.y - anchor.y;
-          newX = anchor.x + relX * Math.cos(deltaAngle) - relY * Math.sin(deltaAngle);
-          newY = anchor.y + relX * Math.sin(deltaAngle) + relY * Math.cos(deltaAngle);
+          const relZ = initData.pos.y - anchor.y;
+          newX = anchor.x + relX * Math.cos(deltaAngle) - relZ * Math.sin(deltaAngle);
+          newZ = anchor.y + relX * Math.sin(deltaAngle) + relZ * Math.cos(deltaAngle);
         }
 
         if (t) {
           t.x = newX;
-          t.y = newY;
+          t.z = newZ;
           t.angle = newAngle as Radians;
+          const half = -newAngle * 0.5;
+          t.rotation = {
+            x: 0,
+            y: Math.sin(half),
+            z: 0,
+            w: Math.cos(half),
+          };
         }
-        if (phys && phys.body) {
-          phys.body.setPosition(newX, newY);
-          if (typeof phys.body.setAngle === 'function') {
-            phys.body.setAngle(newAngle);
+        if (phys && phys.rawBody) {
+          phys.rawBody.setTranslation({ x: newX, y: t?.y ?? 0, z: newZ }, true);
+          if (t?.rotation) {
+            phys.rawBody.setRotation(t.rotation, true);
           }
-          this.app.physics.system.updateBody(phys.body);
         }
       }
       this.app.attachmentSystem.update(this.app.world, this.app.physics);
@@ -248,15 +261,21 @@ export class GizmoController {
         const phys = this.app.world.getComponent(entId, 'physicsBody');
         if (t) {
           t.x = initData.pos.x;
-          t.y = initData.pos.y;
+          t.z = initData.pos.y;
           t.angle = initData.angle;
+          const half = -initData.angle * 0.5;
+          t.rotation = {
+            x: 0,
+            y: Math.sin(half),
+            z: 0,
+            w: Math.cos(half),
+          };
         }
-        if (phys && phys.body) {
-          phys.body.setPosition(initData.pos.x, initData.pos.y);
-          if (typeof phys.body.setAngle === 'function') {
-            phys.body.setAngle(initData.angle);
+        if (phys && phys.rawBody) {
+          phys.rawBody.setTranslation({ x: initData.pos.x, y: t?.y ?? 0, z: initData.pos.y }, true);
+          if (t?.rotation) {
+            phys.rawBody.setRotation(t.rotation, true);
           }
-          this.app.physics.system.updateBody(phys.body);
         }
       }
       this.app.attachmentSystem.update(this.app.world, this.app.physics);

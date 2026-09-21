@@ -1,4 +1,3 @@
-import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, ModifierType } from '../types';
@@ -18,40 +17,45 @@ export class AreaEffectorSystem {
       this.pulseTimer = 0;
     }
 
-    const effectors = world.getEntitiesWith('areaEffector', 'transform', 'physicsBody');
+    // Зоны могут не иметь physicsBody, если мы удалим их физику, опираемся только на Transform
+    const effectors = world.getEntitiesWith('areaEffector', 'transform');
+    // Собираем всех потенциальных жертв заранее, чтобы избежать N*M запросов к ECS
+    const targets = world.getEntitiesWith('transform', 'health', 'physicsStats', 'physicsBody');
 
-    for (const [
-      zoneId,
-      { areaEffector, transform: zoneTransform, physicsBody: zonePhys },
-    ] of effectors) {
+    for (const [zoneId, { areaEffector, transform: zoneTransform }] of effectors) {
       const attachment = world.getComponent(zoneId, 'attachment');
 
-      // Поиск перекрывающихся тел через пространственный движок (с учетом радиусов существ)
-      physics.system.checkOne(zonePhys.body, (response) => {
-        const otherBody = response.b === zonePhys.body ? response.a : response.b;
-        const targetId = physics.getEntityByBody(otherBody);
-        if (!targetId) return;
+      for (const [
+        targetId,
+        { transform: targetTransform, health, physicsStats, physicsBody },
+      ] of targets) {
+        if (!health.isAlive) continue;
 
-        const targetPhys = world.getComponent(targetId, 'physicsBody');
-        if (
-          !targetPhys ||
-          (targetPhys.category & (CollisionCategory.CREATURE | CollisionCategory.ITEM)) === 0
-        )
-          return;
+        if ((physicsBody.category & (CollisionCategory.CREATURE | CollisionCategory.ITEM)) === 0) {
+          continue;
+        }
 
         // Иммунитет носителя ауры
         if (areaEffector.ignoreParent && attachment && attachment.parentId === targetId) {
-          return;
+          continue;
         }
 
-        const health = world.getComponent(targetId, 'health');
-        if (!health || !health.isAlive) return;
+        const targetRadius = physicsStats.radius.current ?? 0.4;
+
+        // Математическое вычисление дистанции между центрами сфер в 3D пространстве
+        const dx = targetTransform.x - zoneTransform.x;
+        const dy = targetTransform.y - zoneTransform.y;
+        const dz = targetTransform.z - zoneTransform.z;
+        const dist = Math.hypot(dx, dy, dz);
+
+        const effectiveRadius = areaEffector.radius + targetRadius;
+        if (dist > effectiveRadius) continue; // Объект вне зоны
 
         const targetTs = world.getComponent(targetId, 'timeScale')?.multiplier.current ?? 1.0;
         const localDt = dt * targetTs;
         const deltaValue = areaEffector.valuePerSec * localDt;
 
-        // Поле замедления/ускорения времени (с поддержкой плавного затухания от центра к краям)
+        // Поле замедления/ускорения времени
         if (areaEffector.effect === 'time_dilation') {
           const targetTimeScale = world.getComponent(targetId, 'timeScale');
           if (targetTimeScale) {
@@ -63,22 +67,10 @@ export class AreaEffectorSystem {
               areaEffector.centerValue !== undefined &&
               areaEffector.boundaryValue !== undefined
             ) {
-              const targetTransform = world.getComponent(targetId, 'transform');
-              const targetPhysStats = world.getComponent(targetId, 'physicsStats');
-              if (targetTransform) {
-                const targetRadius =
-                  targetPhysStats?.radius.current ??
-                  (targetPhys.body instanceof Circle ? targetPhys.body.r : 16);
-                const effectiveRadius = areaEffector.radius + targetRadius;
-                const dist = Math.hypot(
-                  targetTransform.x - zoneTransform.x,
-                  targetTransform.y - zoneTransform.y
-                );
-                const t = Math.min(1, Math.max(0, dist / effectiveRadius));
-                timeMultiplier =
-                  areaEffector.centerValue +
-                  (areaEffector.boundaryValue - areaEffector.centerValue) * t;
-              }
+              const t = Math.min(1, Math.max(0, dist / effectiveRadius));
+              timeMultiplier =
+                areaEffector.centerValue +
+                (areaEffector.boundaryValue - areaEffector.centerValue) * t;
             }
 
             addModifier(targetTimeScale.multiplier, {
@@ -88,7 +80,7 @@ export class AreaEffectorSystem {
               duration: 0.15, // Быстро спадает при выходе из зоны
             });
           }
-          return;
+          continue;
         }
 
         // 1. Урон
@@ -109,27 +101,18 @@ export class AreaEffectorSystem {
         else if (areaEffector.effect === 'heal') {
           applyHeal(world, targetId, deltaValue, isPulseTick);
         }
-        // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и расстояния
+        // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и 3D вектора
         else if (areaEffector.effect === 'repel' || areaEffector.effect === 'attract') {
-          const targetTransform = world.getComponent(targetId, 'transform');
-          const targetPhysStats = world.getComponent(targetId, 'physicsStats');
           const velocity = world.getComponent(targetId, 'velocity');
-          if (!targetTransform || !velocity) return;
+          if (!velocity) continue;
 
-          const targetRadius =
-            targetPhysStats?.radius.current ??
-            (targetPhys.body instanceof Circle ? targetPhys.body.r : 16);
-          const effectiveRadius = areaEffector.radius + targetRadius;
-
-          const dx = targetTransform.x - zoneTransform.x;
-          const dy = targetTransform.y - zoneTransform.y;
-          const dist = Math.hypot(dx, dy);
-
-          if (areaEffector.effect === 'attract' && dist <= 4) return;
+          // Защита от деления на ноль и дерганья в самом центре воронки
+          if (areaEffector.effect === 'attract' && dist <= 0.2) continue;
 
           const ux = dist > 0.001 ? dx / dist : Math.random() - 0.5;
           const uy = dist > 0.001 ? dy / dist : Math.random() - 0.5;
-          const len = Math.hypot(ux, uy) || 1;
+          const uz = dist > 0.001 ? dz / dist : Math.random() - 0.5;
+          const len = Math.hypot(ux, uy, uz) || 1;
 
           let forceMagnitude = areaEffector.valuePerSec;
           if (
@@ -143,14 +126,15 @@ export class AreaEffectorSystem {
               (areaEffector.boundaryValue - areaEffector.centerValue) * t;
           }
 
-          const weight = targetPhysStats?.totalWeight ?? targetPhysStats?.weight.current ?? 1;
+          const weight = physicsStats.totalWeight ?? physicsStats.weight.current ?? 1;
           const acceleration = forceMagnitude / Math.max(1, weight);
 
           const sign = areaEffector.effect === 'repel' ? 1 : -1;
           velocity.externalVx = (velocity.externalVx ?? 0) + sign * (ux / len) * acceleration * dt;
           velocity.externalVy = (velocity.externalVy ?? 0) + sign * (uy / len) * acceleration * dt;
+          velocity.externalVz = (velocity.externalVz ?? 0) + sign * (uz / len) * acceleration * dt;
         }
-      });
+      }
     }
   }
 }

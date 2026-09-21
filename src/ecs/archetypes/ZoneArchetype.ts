@@ -1,4 +1,3 @@
-import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
@@ -11,7 +10,7 @@ import {
   RenderableComponent,
   ZoneEffectType,
 } from '../types';
-import { Point } from '../../types';
+import { Point, Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 import { t } from '../../locales';
@@ -63,7 +62,7 @@ export function getZoneVisuals(
 
 export function createZoneConfig(
   effect: ZoneEffectType,
-  radius: number = 80,
+  radius: number = 2.5,
   valuePerSec: number = 15,
   name?: string,
   ignoreParent: boolean = true,
@@ -104,12 +103,12 @@ export function assembleZone(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point
+  position?: Point | Vec3
 ): void {
   const effector = config.areaEffector ??
     (config as any).zoneTrigger ?? {
       effect: 'damage',
-      radius: 80,
+      radius: 2.5,
       valuePerSec: 15,
       ignoreParent: true,
     };
@@ -142,54 +141,27 @@ export function assembleZone(
     isSolid: false,
   });
 
-  // 6. Трансформация и тело-сенсор
+  // 6. Трансформация и тело-сенсор в 3D
   const posX = position?.x ?? 0;
-  const posY = position?.y ?? 0;
-  world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
+  const hasZ = position && 'z' in position;
+  const posY = hasZ ? (position as Vec3).y : 0;
+  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  world.addComponent(id, 'transform', {
+    x: posX,
+    y: posY,
+    z: posZ,
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    angle: 0 as Radians,
+  });
 
-  const body = new Circle({ x: posX, y: posY }, radius);
-  body.isStatic = false;
   const category = CollisionCategory.TRIGGER_ZONE;
   const mask = CollisionCategory.CREATURE | CollisionCategory.ITEM;
-  world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask, isTrigger: true });
-  physics.registerBody(id, body);
+  world.addComponent(id, 'physicsBody', { isStatic: false, category, mask, isTrigger: true });
 
-  // 7. Универсальный рендер (слой 0 — земля/зоны)
-  const visuals = getZoneVisuals(effect, effector.valuePerSec);
-
-  const renderable: RenderableComponent = {
+  // 7. Компонент видимости
+  world.addComponent(id, 'renderable', {
     zIndex: RENDER_Z_INDEX.ZONES,
     isVisible: true,
     syncWithTransform: true,
-    primitives: [
-      {
-        kind: 'circle',
-        radius,
-        fill: visuals.fillColor,
-        stroke: visuals.strokeColor,
-        strokeWidth: 2,
-        dash: [6, 6],
-      },
-      {
-        kind: 'text',
-        text: visuals.icon,
-        font: '20px sans-serif',
-        fill: '#ffffff',
-        ignoreRotation: true,
-        align: 'center',
-        baseline: 'middle',
-      },
-      {
-        kind: 'text',
-        text: name,
-        offset: { x: 0, y: radius + 8 },
-        font: '11px sans-serif',
-        fill: visuals.strokeColor,
-        ignoreRotation: true,
-        align: 'center',
-        baseline: 'top',
-      },
-    ],
-  };
-  world.addComponent(id, 'renderable', renderable);
+  });
 }

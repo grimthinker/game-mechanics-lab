@@ -1,14 +1,55 @@
 import { World } from '../ecs/World';
-import { PhysicsSystem } from '../ecs/systems/PhysicsSystem';
-import { AISystem } from '../ecs/systems/AISystem';
 import { setBaseStat } from '../ecs/stats/StatEvaluator';
-import { killEntity } from '../ecs/utils/health';
-import { COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../ecs/types';
-import { Circle } from 'detect-collisions';
 import { deg2Rad } from '../utils';
 
 export class EditorMutationsAPI {
   constructor(private world: World) {}
+
+  public updateEntityTransform(
+    id: string,
+    patch: { x?: number; y?: number; z?: number; angle?: number }
+  ): boolean {
+    const transform = this.world.getComponent(id, 'transform');
+    if (!transform) return false;
+    let changed = false;
+
+    if (patch.x !== undefined && transform.x !== patch.x) {
+      transform.x = patch.x;
+      changed = true;
+    }
+    if (patch.y !== undefined && transform.y !== patch.y) {
+      transform.y = patch.y;
+      changed = true;
+    }
+    if (patch.z !== undefined && transform.z !== patch.z) {
+      transform.z = patch.z;
+      changed = true;
+    }
+    if (patch.angle !== undefined && transform.angle !== patch.angle) {
+      transform.angle = patch.angle;
+      const half = -patch.angle * 0.5;
+      transform.rotation = {
+        x: 0,
+        y: Math.sin(half),
+        z: 0,
+        w: Math.cos(half),
+      };
+      changed = true;
+    }
+
+    // Синхронизация позиции тела в Rapier3D при ручной правке из инспектора
+    if (changed) {
+      const phys = this.world.getComponent(id, 'physicsBody');
+      if (phys?.rawBody) {
+        phys.rawBody.setTranslation({ x: transform.x, y: transform.y, z: transform.z }, true);
+        phys.rawBody.setRotation(transform.rotation, true);
+        phys.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        phys.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      }
+    }
+
+    return changed;
+  }
 
   public updateEntityMeta(id: string, patch: { name?: string; destructible?: boolean }): boolean {
     const meta = this.world.getComponent(id, 'meta');
@@ -563,7 +604,7 @@ export class EditorMutationsAPI {
   public addEntityInteractionSlot(
     partId: string,
     defaultName: string = 'Новая рука',
-    interactDist: number = 25,
+    interactDist: number = 1.5,
     strength: number = 15
   ): boolean {
     if (this.world.getComponent(partId, 'interactionSlots')) return false;

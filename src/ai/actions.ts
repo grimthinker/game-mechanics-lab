@@ -88,9 +88,12 @@ export class BTActionPursue extends BTAction {
 
     const selfPos = entity.getPos();
     const dx = targetPos.x - selfPos.x;
-    const dy = targetPos.y - selfPos.y;
+    const dz =
+      (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
+        ? (targetPos as any).z - (selfPos as any).z
+        : targetPos.y - selfPos.y;
 
-    if (dx * dx + dy * dy <= this.stopDistSq) {
+    if (dx * dx + dz * dz <= this.stopDistSq) {
       entity.stop();
       entity.stopTurning();
       return NodeStatus.SUCCESS;
@@ -289,11 +292,14 @@ export class BTActionRotateToPos extends BTAction {
 
     const selfPos = entity.getPos();
     const dx = targetPos.x - selfPos.x;
-    const dy = targetPos.y - selfPos.y;
+    const dz =
+      (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
+        ? (targetPos as any).z - (selfPos as any).z
+        : targetPos.y - selfPos.y;
 
-    if (dx === 0 && dy === 0) return NodeStatus.SUCCESS;
+    if (dx === 0 && dz === 0) return NodeStatus.SUCCESS;
 
-    const targetAngle = Math.atan2(dy, dx);
+    const targetAngle = Math.atan2(dz, dx);
     const currentAngle = entity.angle;
 
     // Нормализация разницы углов в диапазон [-PI, PI]
@@ -365,15 +371,19 @@ export class BTActionFollowPathSmooth extends BTAction {
       return NodeStatus.SUCCESS;
     }
 
-    // Расчет вектора и угла к следующей путевой точке
+    // Расчет вектора и угла к следующей путевой точке по плоскости XZ
     const target = path[0];
     const dx = target.x - selfPos.x;
-    const dy = target.y - selfPos.y;
-    const dist = Math.hypot(dx, dy);
+    const dz =
+      (target as any).z !== undefined && (selfPos as any).z !== undefined
+        ? (target as any).z - (selfPos as any).z
+        : target.y - selfPos.y;
+    const dist = Math.hypot(dx, dz);
 
     if (dist > 0.001) {
-      entity.setDesiredMoveVector({ x: dx / dist, y: dy / dist });
-      const targetAngle = Math.atan2(dy, dx) as Radians;
+      // Передаем Z-компоненту в Y вектора направления (особенность InputController)
+      entity.setDesiredMoveVector({ x: dx / dist, y: dz / dist });
+      const targetAngle = Math.atan2(dz, dx) as Radians;
       entity.setTargetLookAngle(targetAngle);
     } else {
       entity.stop();
@@ -382,8 +392,13 @@ export class BTActionFollowPathSmooth extends BTAction {
     return NodeStatus.RUNNING;
   }
 
-  private getDist(p1: Point, p2: Point): number {
-    return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  private getDist(
+    p1: { x: number; y: number; z?: number },
+    p2: { x: number; y: number; z?: number }
+  ): number {
+    const dx = p2.x - p1.x;
+    const dz = p2.z !== undefined && p1.z !== undefined ? p2.z - p1.z : p2.y - p1.y;
+    return Math.hypot(dx, dz);
   }
 
   protected stopAction(entity: EntityAdapter): void {

@@ -8,7 +8,6 @@ import { killEntity } from './health';
 import { evaluateConsciousness, getPartStatus, PartStatus } from './anatomyStatus';
 import { ConsciousnessState } from '../types';
 import { BEHAVIOR_TREES } from '../../ai/trees_library';
-import { Circle } from 'detect-collisions';
 
 export function forceDropItemFromPart(
   world: World,
@@ -39,16 +38,29 @@ export function forceDropItemFromPart(
 
   const physStats = world.getComponent(itemId, 'physicsStats');
   if (physStats) {
-    const body = new Circle({ x: dropX, y: dropY }, physStats.radius.current);
-    body.isStatic = false;
     const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+
+    let rawBody: any;
+    let rawCollider: any;
+
+    if (physics.driver && physics.driver.isReady) {
+      rawBody = physics.driver.createDynamicBody({ x: dropX, y: 1.5, z: dropY }, itemId);
+      rawCollider = physics.driver.createBallCollider(
+        physStats.radius.current ?? 0.3,
+        rawBody,
+        physStats.weight.current
+      );
+      rawCollider.setRestitution(0.3);
+    }
+
     world.addComponent(itemId, 'physicsBody', {
-      body,
+      rawBody,
+      rawCollider,
+      bodyType: 'dynamic',
       isStatic: false,
       category: CollisionCategory.ITEM,
       mask,
     });
-    physics.registerBody(itemId, body);
   }
 }
 

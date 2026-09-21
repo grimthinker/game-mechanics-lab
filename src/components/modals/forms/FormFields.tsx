@@ -279,28 +279,28 @@ export const WeaponFormFields: React.FC<{
     {/* Специфические поля для зоны */}
     {['forward_line', 'angle', 'shrapnel'].includes(values.hitZoneType) && (
       <label>
-        Дальность / Длина:
+        Дальность / Длина (м):
         <input
           disabled={isReadOnly}
           type="number"
           value={values.length}
-          min={0}
-          max={2000}
-          step={10}
+          min={0.1}
+          max={50}
+          step={0.5}
           onChange={(e) => onChange({ length: Number(e.target.value) })}
         />
       </label>
     )}
     {values.hitZoneType === 'radius' && (
       <label>
-        Радиус:
+        Радиус (м):
         <input
           disabled={isReadOnly}
           type="number"
           value={values.radius}
-          min={0}
-          max={500}
-          step={5}
+          min={0.1}
+          max={30}
+          step={0.5}
           onChange={(e) => onChange({ radius: Number(e.target.value) })}
         />
       </label>

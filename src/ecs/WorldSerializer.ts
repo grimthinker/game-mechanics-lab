@@ -6,7 +6,6 @@ import {
   COLLISION_MASK_NONE,
   SERIALIZABLE_COMPONENT_KEYS,
 } from './types';
-import { Circle, Polygon } from 'detect-collisions';
 import { deg2Rad, Radians } from '../utils';
 import { evaluateStat } from './stats/StatEvaluator';
 
@@ -131,7 +130,9 @@ export class WorldSerializer {
       // Удаляем старую сущность, если восстанавливаем поверх (например, при Undo)
       if (this.app.world.getEntity(ent.id)) {
         const phys = this.app.world.getComponent(ent.id, 'physicsBody');
-        if (phys) this.app.physics.unregisterBody(phys.body);
+        if (phys) {
+          if (phys.rawBody) this.app.physicsDriver.removeRigidBody(phys.rawBody);
+        }
         this.app.world.removeEntity(ent.id);
         this.app.aiSystem.unregisterEntity(ent.id);
       }
@@ -143,6 +144,23 @@ export class WorldSerializer {
       for (const key of SERIALIZABLE_COMPONENT_KEYS) {
         if (comps[key] !== undefined) {
           this.app.world.addComponent(ent.id, key, comps[key]);
+        }
+      }
+
+      // Нормализация 3D трансформации
+      const trans = this.app.world.getComponent(ent.id, 'transform');
+      if (trans) {
+        trans.z = trans.z ?? 0;
+        if (!trans.rotation) {
+          const yaw = trans.angle ?? 0;
+          trans.rotation = { x: 0, y: Math.sin(yaw * 0.5), z: 0, w: Math.cos(yaw * 0.5) };
+        }
+        if (trans.angle === undefined) {
+          const siny_cosp =
+            2 * (trans.rotation.w * trans.rotation.y + trans.rotation.x * trans.rotation.z);
+          const cosy_cosp =
+            1 - 2 * (trans.rotation.y * trans.rotation.y + trans.rotation.z * trans.rotation.z);
+          trans.angle = Math.atan2(siny_cosp, cosy_cosp);
         }
       }
 
@@ -263,17 +281,12 @@ export class WorldSerializer {
 
       // 3. Реставрация физического тела для объектов с физикой
       if (comps.tag?.archetype === 'marker' && comps.transform && !isPossessedItem) {
-        const radius = comps.gizmo?.radius ?? 14;
-        const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
-        body.isStatic = true;
         this.app.world.addComponent(ent.id, 'physicsBody', {
-          body,
           isStatic: true,
           category: CollisionCategory.NONE,
           mask: COLLISION_MASK_NONE,
           isTrigger: true,
         });
-        this.app.physics.registerBody(ent.id, body);
       } else if (comps.physicsStats && comps.transform && !isPossessedItem) {
         const isPartOfCreature = allAssemblyPartIds.has(ent.id);
         const archetype =
@@ -289,37 +302,74 @@ export class WorldSerializer {
         if (archetype !== 'marker' && (!isPartOfCreature || archetype !== 'bodyPart')) {
           if (archetype === 'obstacle') {
             const points = comps.physicsStats.points ?? [
-              { x: -50, y: -20 },
-              { x: 50, y: -20 },
-              { x: 50, y: 20 },
-              { x: -50, y: 20 },
+              { x: -2, y: -0.5 },
+              { x: 2, y: -0.5 },
+              { x: 2, y: 0.5 },
+              { x: -2, y: 0.5 },
             ];
-            const body = new Polygon({ x: comps.transform.x, y: comps.transform.y }, points);
-            body.setAngle(comps.transform.angle ?? 0);
-            body.isStatic = true;
             const category = CollisionCategory.OBSTACLE;
             const isAlive = comps.health ? comps.health.isAlive : true;
             const isSolid = comps.physicsStats.isSolid && isAlive;
             const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
+            let rawBody: any = undefined;
+            let rawCollider: any = undefined;
+
+            if (this.app.physicsDriver?.isReady) {
+              const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0, z: trans?.z ?? 0 };
+              rawBody = this.app.physicsDriver.createFixedBody(pos3D, ent.id);
+              const angle = trans?.angle ?? 0;
+              rawBody.setRotation(
+                { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+                false
+              );
+
+              let minX = points[0]?.x ?? -2,
+                maxX = points[0]?.x ?? 2;
+              let minY = points[0]?.y ?? -0.5,
+                maxY = points[0]?.y ?? 0.5;
+              for (const p of points) {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+              }
+              const hx = Math.max(0.1, (maxX - minX) / 2);
+              const hy = 0.75; // 1.5м / 2
+              const hz = Math.max(0.1, (maxY - minY) / 2);
+
+              rawCollider = this.app.physicsDriver.createCuboidCollider(hx, hy, hz, rawBody, 0, hy);
+            }
+
             this.app.world.addComponent(ent.id, 'physicsBody', {
-              body,
+              rawBody,
+              rawCollider,
+              bodyType: 'fixed',
               isStatic: true,
               category,
               mask,
             });
-            this.app.physics.registerBody(ent.id, body);
           } else {
-            const radius = comps.physicsStats.radius.current;
-            const body = new Circle({ x: comps.transform.x, y: comps.transform.y }, radius);
-
             let isStatic = false;
             let isTrigger = false;
             let category = CollisionCategory.CREATURE;
             let mask = comps.physicsStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
+            let rawBody: any = undefined;
+            let rawCollider: any = undefined;
+
             if (archetype === 'item') {
               category = CollisionCategory.ITEM;
+
+              // Восстанавливаем 3D тело Rapier для предметов при загрузке мира
+              if (this.app.physicsDriver?.isReady) {
+                const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 2.5, z: trans?.z ?? 0 };
+                rawBody = this.app.physicsDriver.createDynamicBody(pos3D, ent.id);
+                const r = comps.physicsStats?.radius?.current ?? 0.4;
+                const w = comps.physicsStats?.weight?.current ?? 1;
+                rawCollider = this.app.physicsDriver.createBallCollider(r, rawBody, w);
+                rawCollider.setRestitution(0.3);
+              }
             } else if (archetype === 'zone') {
               category = CollisionCategory.TRIGGER_ZONE;
               mask = CollisionCategory.CREATURE;
@@ -327,15 +377,15 @@ export class WorldSerializer {
               isStatic = false;
             }
 
-            body.isStatic = isStatic;
             this.app.world.addComponent(ent.id, 'physicsBody', {
-              body,
+              rawBody,
+              rawCollider,
+              bodyType: archetype === 'item' ? 'dynamic' : undefined,
               isStatic,
               category,
               mask,
               isTrigger,
             });
-            this.app.physics.registerBody(ent.id, body);
           }
         }
       }
@@ -345,10 +395,12 @@ export class WorldSerializer {
           this.app.world.addComponent(ent.id, 'velocity', {
             vx: 0,
             vy: 0,
+            vz: 0,
             currentSpeed: 0,
             currentTurnSpeed: 0 as Radians,
             externalVx: 0,
             externalVy: 0,
+            externalVz: 0,
           });
         }
         if (!this.app.world.getComponent(ent.id, 'input')) {

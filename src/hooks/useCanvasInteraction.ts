@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { GameApp } from '../GameApp';
 import { GameMode } from '../config/gameConfig';
-import { PlacementMode, Point, BlackboardPickingState } from '../types';
+import { PlacementMode, Point, BlackboardPickingState, Vec3 } from '../types';
 import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { useDragDrop } from '../dnd/DragDropContext';
@@ -45,7 +45,7 @@ export const useCanvasInteraction = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const isMarqueeActiveRef = useRef<boolean>(false);
-  const [cursorWorldPos, setCursorWorldPos] = useState<Point | null>(null);
+  const [cursorWorldPos, setCursorWorldPos] = useState<Vec3 | null>(null);
 
   const { isDragging, startDrag, setHoverTarget } = useDragDrop();
   const dragCandidateRef = useRef<{ id: string; startX: number; startY: number } | null>(null);
@@ -95,7 +95,12 @@ export const useCanvasInteraction = ({
 
       // В режиме игры: подбор предмета через Ctrl+ЛКМ
       if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
-        const targetEntityId = app.selection.pickNearestEntity(point);
+        const targetEntityId = app.selection.pickNearestEntity(
+          point,
+          undefined,
+          e.clientX,
+          e.clientY
+        );
         if (targetEntityId) {
           const itemComp = app.world.getComponent(targetEntityId, 'item');
           const tagComp = app.world.getComponent(targetEntityId, 'tag');
@@ -133,18 +138,7 @@ export const useCanvasInteraction = ({
       if (placementMode) return;
 
       // 1. Проверка клика по интерактивному манипулятору (Gizmo)
-      if (
-        mode === GameMode.EDITOR &&
-        app.selection.selectedEntityId &&
-        app.gizmo.tool !== 'select'
-      ) {
-        const gizmoHandle = app.gizmo.hitTest(point);
-        if (gizmoHandle) {
-          app.gizmo.startDrag(gizmoHandle, point);
-          e.currentTarget.style.cursor = gizmoHandle === 'rotate' ? 'crosshair' : 'grabbing';
-          return;
-        }
-      }
+      // (Старый 2D хит-тест отключен; 3D манипуляторы TransformControls будут добавлены на Этапе 6)
 
       // 2. Клик по сущности на поле — выбор с поддержкой Shift (мультиселект / инверсия)
       const entityId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
@@ -194,7 +188,7 @@ export const useCanvasInteraction = ({
     }
 
     const point = app.getCanvasPoint(e.clientX, e.clientY);
-    setCursorWorldPos({ x: Math.round(point.x), y: Math.round(point.y) });
+    setCursorWorldPos({ x: Math.round(point.x), y: Math.round(point.y), z: Math.round(point.z) });
 
     if (isDragging) {
       setHoverTarget({ type: 'ground' });
@@ -272,7 +266,7 @@ export const useCanvasInteraction = ({
     if (placementMode) {
       app.selection.hoverEntity(null);
     } else {
-      const nearestId = app.selection.pickNearestEntity(point);
+      const nearestId = app.selection.pickNearestEntity(point, undefined, e.clientX, e.clientY);
       app.selection.hoverEntity(nearestId);
       isHoveringEntity = nearestId !== null;
     }

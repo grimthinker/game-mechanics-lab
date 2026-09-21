@@ -166,15 +166,21 @@ export class ThreeSyncSystem {
           if (obj.parent !== this.scene) {
             this.scene.add(obj);
           }
-          obj.position.x = transform.x;
-          obj.position.z = transform.y;
-          obj.rotation.y = -transform.angle + Math.PI / 2;
+          obj.position.set(transform.x, transform.y, transform.z);
+          if (transform.rotation) {
+            obj.quaternion.set(
+              transform.rotation.x,
+              transform.rotation.y,
+              transform.rotation.z,
+              transform.rotation.w
+            );
+          }
 
-          // Модульные существа масштабируются пропорционально текущему радиусу коллизии
+          // Модульные существа масштабируются пропорционально метрическому радиусу коллизии (база = 0.4м)
           if (obj.userData.isModularRig) {
             const physStats = world.getComponent(id, 'physicsStats');
-            const radius = physStats ? physStats.radius.current : 16;
-            const baseRadius = 16;
+            const radius = physStats ? physStats.radius.current : 0.4;
+            const baseRadius = 0.4;
             const scaleFactor = radius / baseRadius;
             obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
           } else {
@@ -239,31 +245,32 @@ export class ThreeSyncSystem {
         // 4. Фоллбэк-визуализация примитивов
         else if (!isEquipped) {
           const health = world.getComponent(id, 'health');
-          if (health && !health.isAlive) {
+          // В блинчик сплющиваются только погибшие существа (трупы), но не предметы!
+          if (health && !health.isAlive && archetype === 'creature') {
             obj.scale.set(1, 0.1, 1);
-            obj.position.y = 2;
+            obj.position.y = 0.05;
           } else if (archetype === 'creature') {
             const STANCE_HEIGHTS: Record<string, number> = {
-              standing: 40,
-              crouching: 28,
-              prone: 14,
+              standing: 1.8,
+              crouching: 1.2,
+              prone: 0.4,
             };
             const transition = world.getComponent(id, 'stanceTransition');
-            let currentHeight = 40;
+            let currentHeight = 1.8;
 
             if (transition && transition.totalDuration > 0) {
               const progress = Math.min(
                 1,
                 Math.max(0, 1 - transition.timer / transition.totalDuration)
               );
-              const fromH = STANCE_HEIGHTS[transition.fromStance] || 40;
-              const toH = STANCE_HEIGHTS[transition.toStance] || 40;
+              const fromH = STANCE_HEIGHTS[transition.fromStance] || 1.8;
+              const toH = STANCE_HEIGHTS[transition.toStance] || 1.8;
               currentHeight = fromH + (toH - fromH) * progress;
             } else {
               const currentStance = world.getComponent(id, 'meta')?.stance || 'standing';
-              currentHeight = STANCE_HEIGHTS[currentStance] || 40;
+              currentHeight = STANCE_HEIGHTS[currentStance] || 1.8;
             }
-            obj.scale.set(1, currentHeight / 40, 1);
+            obj.scale.set(1, currentHeight / 1.8, 1);
             obj.position.y = 0;
           }
 
@@ -419,7 +426,7 @@ export class ThreeSyncSystem {
 
     // --- ФОЛЛБЭК ДЛЯ ПРИМИТИВОВ (Зоны, Препятствия) ---
     const physStats = world.getComponent(id, 'physicsStats');
-    const radius = physStats ? physStats.radius.current : 16;
+    const radius = physStats ? physStats.radius.current : 0.4;
     const group = new THREE.Group();
     let mainMesh: THREE.Mesh | null = null;
 
@@ -430,7 +437,7 @@ export class ThreeSyncSystem {
       if (behavior === 'PlayerTree') mat = this.matPlayer;
       else if (behavior === 'AttackerTree') mat = this.matEnemy;
 
-      const h = 40;
+      const h = 1.8;
       const geo = new THREE.CylinderGeometry(radius, radius, h, 16);
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = h / 2;
@@ -440,23 +447,24 @@ export class ThreeSyncSystem {
       nose.position.set(radius, h * 0.75, 0);
       group.add(nose);
     } else if (archetype === 'obstacle') {
-      let w = 100,
-        d = 40;
-      if (physStats?.points) {
-        let minX = 0,
-          maxX = 0,
-          minY = 0,
-          maxY = 0;
+      let w = 4.0,
+        d = 1.0;
+      if (physStats?.points && physStats.points.length > 0) {
+        let minX = physStats.points[0].x,
+          maxX = physStats.points[0].x,
+          minY = physStats.points[0].y,
+          maxY = physStats.points[0].y;
         physStats.points.forEach((p) => {
           if (p.x < minX) minX = p.x;
           if (p.x > maxX) maxX = p.x;
           if (p.y < minY) minY = p.y;
           if (p.y > maxY) maxY = p.y;
         });
-        w = maxX - minX;
-        d = maxY - minY;
+        w = Math.max(0.2, maxX - minX);
+        d = Math.max(0.2, maxY - minY);
       }
-      const h = 60;
+      // Метрическая высота стены (1.5 метра)
+      const h = 1.5;
       const geo = new THREE.BoxGeometry(w, h, d);
       mainMesh = new THREE.Mesh(geo, this.matObstacle);
       mainMesh.position.y = h / 2;
@@ -470,7 +478,7 @@ export class ThreeSyncSystem {
       const size = radius * 1.5;
       const geo = new THREE.BoxGeometry(size, size, size);
       mainMesh = new THREE.Mesh(geo, mat);
-      mainMesh.position.y = size / 2;
+      mainMesh.position.y = 0; // Центр меша совпадает с центром тяжести тела Rapier
     } else if (archetype === 'zone') {
       const effector = world.getComponent(id, 'areaEffector');
       let mat = this.matZoneNeutral;
@@ -543,8 +551,11 @@ export class ThreeSyncSystem {
         return;
       }
 
-      // Приводим метровую модель рига (~1.8м) к базовой высоте игрового мира (~45 единиц)
-      rig.scale.set(25, 25, 25);
+      // Метрический масштаб рига: 1 единица = 1 метр
+      rig.scale.set(1, 1, 1);
+      // Компенсация ориентации 3D-моделей (GLTF смотрит в +Z, физика смотрит в +X)
+      rig.rotation.y = Math.PI / 2;
+
       parentGroup.add(rig);
 
       const mixer = new THREE.AnimationMixer(rig);
@@ -593,12 +604,12 @@ export class ThreeSyncSystem {
         }
       }
 
-      // Создаем фантомный цилиндр для выделения рамкой (Outline)
+      // Цилиндр выделения в метрическом масштабе
       const physStats = world.getComponent(rootId, 'physicsStats');
-      const r = physStats ? physStats.radius.current : 16;
-      const outlineGeo = new THREE.CylinderGeometry(r * 1.1, r * 1.1, 45, 16);
+      const r = physStats ? physStats.radius.current : 0.4;
+      const outlineGeo = new THREE.CylinderGeometry(r * 1.1, r * 1.1, 1.8, 16);
       const outline = new THREE.Mesh(outlineGeo, this.matSelection);
-      outline.position.y = 22.5;
+      outline.position.y = 0.9;
       outline.userData.isSelectionOutline = true;
       outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
       outline.visible = false;

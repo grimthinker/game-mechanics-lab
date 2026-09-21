@@ -1,5 +1,5 @@
 import { World } from '../World';
-import { Point } from '../../types';
+import { Point, Vec3 } from '../../types';
 import { calculateTotalEntityWeight, isDescendantOf, isItemEquippableToArea } from './hierarchy';
 import { findActiveBrain } from './anatomy';
 
@@ -7,7 +7,7 @@ export type TransferTarget =
   | { type: 'slot'; partId: string }
   | { type: 'area'; containerId: string; areaId: string }
   | { type: 'inventory'; containerId: string; row?: number; col?: number }
-  | { type: 'ground'; position?: Point; parentEntityId?: string };
+  | { type: 'ground'; position?: Point | Vec3; parentEntityId?: string };
 
 /**
  * Проверяет, может ли предмет быть поднят с земли/карты.

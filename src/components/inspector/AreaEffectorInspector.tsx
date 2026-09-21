@@ -134,15 +134,15 @@ export const AreaEffectorInspector: React.FC<AreaEffectorInspectorProps> = ({
       )}
 
       <label>
-        Радиус зоны (px):
+        Радиус зоны (м):
         <input
           disabled={isReadOnly}
           type="number"
           value={values.radius}
-          min={20}
-          max={2000}
-          step={10}
-          onChange={(e) => handleChange({ radius: Math.max(10, Number(e.target.value)) })}
+          min={0.5}
+          max={50}
+          step={0.5}
+          onChange={(e) => handleChange({ radius: Math.max(0.5, Number(e.target.value)) })}
         />
       </label>
 

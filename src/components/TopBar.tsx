@@ -22,8 +22,6 @@ export interface TopBarProps {
   onUndo: () => void;
   onRedo: () => void;
   onOpenHotkeys: () => void;
-  renderMode: '2d' | '3d';
-  onToggleRenderMode: () => void;
   showUIOverlays: boolean;
   setShowUIOverlays: (val: boolean) => void;
   showAIDebug: boolean;
@@ -50,8 +48,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   onUndo,
   onRedo,
   onOpenHotkeys,
-  renderMode,
-  onToggleRenderMode,
   showUIOverlays,
   setShowUIOverlays,
   showAIDebug,
@@ -309,20 +305,6 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       {/* Правая часть: Настройки отображения и Язык */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button
-          className="btn btn-sm"
-          style={{
-            backgroundColor: renderMode === '3d' ? '#9b59b6' : 'transparent',
-            color: renderMode === '3d' ? '#fff' : '#bdc3c7',
-            border: '1px solid #9b59b6',
-            padding: '2px 8px',
-            fontSize: '11px',
-          }}
-          onClick={onToggleRenderMode}
-        >
-          {renderMode === '2d' ? t('topbar.toggleRenderer2D') : t('topbar.toggleRenderer3D')}
-        </button>
-
         <label
           style={{
             display: 'flex',

@@ -71,11 +71,11 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
       {[
         {
-          label: 'Макс. скорость (px/с):',
+          label: 'Макс. скорость (м/с):',
           key: 'maxSpeed',
-          tooltip: 'Максимальная скорость передвижения (пикселей в секунду)',
-          step: 10,
-          max: 1000,
+          tooltip: 'Максимальная скорость передвижения (метров в секунду)',
+          step: 0.1,
+          max: 30,
         },
         {
           label: 'Макс. скорость поворота (°/с):',

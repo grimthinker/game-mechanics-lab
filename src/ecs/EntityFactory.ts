@@ -2,10 +2,9 @@ import { World } from './World';
 import { PhysicsSystem } from './systems/PhysicsSystem';
 import { AISystem } from './systems/AISystem';
 import { EntityId, EntityConfig, CollisionCategory, COLLISION_MASK_ALL } from './types';
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 import { ARCHETYPE_ASSEMBLERS, detectArchetype } from './archetypes';
 import { assembleBodyPart } from './archetypes/BodyPartArchetype';
-import { Circle } from 'detect-collisions';
 import { createStat } from './stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../config/balanceConfig';
 import { CreatureBodyBlueprint, CREATURE_BLUEPRINTS } from './templates';
@@ -20,7 +19,7 @@ export class EntityFactory {
     physics: PhysicsSystem,
     aiSystem: AISystem,
     config: EntityConfig,
-    position?: Point,
+    position?: Point | Vec3,
     forcedId?: string
   ): EntityId {
     const id = forcedId || this.generateId('ent');
@@ -37,7 +36,7 @@ export class EntityFactory {
     world: World,
     physics: PhysicsSystem,
     aiSystem: AISystem,
-    position: Point,
+    position: Point | Vec3,
     blueprint: CreatureBodyBlueprint,
     behavior: string = 'IdleTree',
     name?: string
@@ -52,7 +51,7 @@ export class EntityFactory {
     let maxRadius = 0;
     let initialWeight = 0;
     for (const part of blueprint.parts) {
-      const r = part.config.physics?.radius ?? 10;
+      const r = part.config.physics?.radius ?? 0.2;
       if (r > maxRadius) maxRadius = r;
       initialWeight += part.config.physics?.weight ?? 1;
     }
@@ -85,26 +84,6 @@ export class EntityFactory {
         zIndex: 40,
         isVisible: true,
         syncWithTransform: true,
-        primitives: [
-          {
-            kind: 'circle',
-            radius: maxRadius,
-            fill: '#34495e',
-            stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
-            strokeWidth: 2,
-          },
-          {
-            kind: 'polygon',
-            points: [
-              { x: maxRadius, y: 0 },
-              { x: 0, y: -maxRadius },
-              { x: 0, y: maxRadius },
-            ],
-            fill: '#7f8c8d',
-            stroke: '#95a5a6',
-            strokeWidth: 1.5,
-          },
-        ],
       },
     };
 
@@ -226,7 +205,7 @@ export class EntityFactory {
     world: World,
     physics: PhysicsSystem,
     aiSystem: AISystem,
-    position: Point,
+    position: Point | Vec3,
     behavior: string = 'IdleTree',
     name: string = 'Существо'
   ): EntityId {

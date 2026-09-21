@@ -11,10 +11,14 @@ export function rad2Deg(rad: Radians | number): Degrees {
   return ((rad * 180) / Math.PI) as Degrees;
 }
 
-export function vec2_distance_to(start: Point, end: Point): number {
+export function vec2_distance_to(
+  start: { x: number; y: number; z?: number },
+  end: { x: number; y: number; z?: number }
+): number {
   const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  return Math.sqrt(dx * dx + dy * dy);
+  // Если у точек есть координата z (3D мир), горизонтальная дистанция вычисляется на плоскости XZ
+  const dz = end.z !== undefined && start.z !== undefined ? end.z - start.z : end.y - start.y;
+  return Math.sqrt(dx * dx + dz * dz);
 }
 
 export function nowInSeconds(): number {

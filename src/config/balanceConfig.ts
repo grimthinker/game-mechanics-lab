@@ -6,17 +6,17 @@ import { deg2Rad } from '../utils';
  */
 export const BALANCE_CONFIG = {
   creature: {
-    /** Базовый радиус коллизии существа (в пикселях) */
-    radius: 16 as StandardRadius,
-    /** Масса существа (влияет на физическое отталкивание и инерцию при столкновениях) */
-    weight: 10,
+    /** Базовый радиус коллизии существа (в метрах) */
+    radius: 0.4 as StandardRadius,
+    /** Масса существа (в кг) */
+    weight: 75,
     /** Текущее здоровье существа при первичном спавне */
     hp: 100,
     /** Максимальный запас здоровья существа */
     maxHp: 100,
 
-    /** Максимальная скорость движения (пикселей в секунду) */
-    maxSpeed: 150,
+    /** Максимальная скорость движения (метров в секунду) */
+    maxSpeed: 4.5,
     /** Максимальная скорость поворота корпуса (радиан в секунду) */
     maxTurnSpeed: Math.PI * 1.5,
 
@@ -74,12 +74,12 @@ export const BALANCE_CONFIG = {
     defaultFovAngle: Math.PI * 0.75,
     /** Базовая четкость зрения */
     defaultVisionClarity: 1.0,
-    /** Максимальная дальность зрения (px) */
-    defaultVisionMaxDistance: 400,
+    /** Максимальная дальность зрения (в метрах) */
+    defaultVisionMaxDistance: 25.0,
     /** Базовая чуткость слуха */
     defaultHearingSensitivity: 1.0,
-    /** Максимальная дальность слуха (px) */
-    defaultHearingMaxDistance: 500,
+    /** Максимальная дальность слуха (в метрах) */
+    defaultHearingMaxDistance: 30.0,
     /** Множитель характеристик сломанных органов чувств */
     brokenSenseMultiplier: 0.5,
   },

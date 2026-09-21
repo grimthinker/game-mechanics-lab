@@ -61,16 +61,24 @@ export class ThreeRenderer implements IRenderer {
     dirLight.position.set(200, 500, 300);
     this.scene.add(dirLight);
 
-    // Добавляем сетку для ориентации в пространстве
-    const grid = new THREE.GridHelper(5000, 100, 0x444444, 0x222222);
+    // Метрическая сетка: 50x50 метров, шаг 1 метр
+    const grid = new THREE.GridHelper(50, 50, 0x555555, 0x333333);
     this.scene.add(grid);
+
+    // 3D-оси координат (Красная: X, Зеленая: Y (Вверх), Синяя: Z)
+    const axes = new THREE.AxesHelper(3);
+    this.scene.add(axes);
   }
 
   public getCanvas(): HTMLCanvasElement {
     return this.canvas;
   }
 
-  public screenToWorld(clientX: number, clientY: number, _camera2D: Camera): Point {
+  public screenToWorld(
+    clientX: number,
+    clientY: number,
+    _camera2D: Camera
+  ): import('../types').Vec3 {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -79,10 +87,26 @@ export class ThreeRenderer implements IRenderer {
     const hit = this.raycaster.ray.intersectPlane(this.groundPlane, this.intersectionPoint);
 
     if (hit) {
-      // 3D X -> 2D X, 3D Z -> 2D Y
-      return { x: hit.x, y: hit.z };
+      return { x: hit.x, y: 0, z: hit.z };
     }
-    return { x: 0, y: 0 };
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  public projectToScreen(pos: import('../types').Vec3): import('../types').Vec3 | null {
+    const vector = new THREE.Vector3(pos.x, pos.y, pos.z);
+    vector.project(this.camera);
+
+    // Если объект за спиной камеры
+    if (vector.z > 1.0) {
+      return null;
+    }
+
+    const rect = this.canvas.getBoundingClientRect();
+    return {
+      x: (vector.x * 0.5 + 0.5) * rect.width,
+      y: (-(vector.y * 0.5) + 0.5) * rect.height,
+      z: vector.z,
+    };
   }
 
   public pickEntity(clientX: number, clientY: number): EntityId | null {
@@ -144,21 +168,21 @@ export class ThreeRenderer implements IRenderer {
     const h = this.canvas.height;
     const scale = context.camera.scale;
 
-    // Вычисляем центральную точку мира, на которую смотрит камера
-    const centerX = (w / 2 - context.camera.offsetX) / scale;
-    const centerY = (h / 2 - context.camera.offsetY) / scale;
+    // Точка фокуса берется напрямую из 3D-камеры в мировых координатах
+    const centerX = context.camera.targetX;
+    const centerY = context.camera.targetY;
+    const centerZ = context.camera.targetZ;
 
-    // Сферические координаты на основе зума и поворота/наклона
-    const dist = Math.max(200, 800 / scale);
-    const camY = dist * Math.sin(context.camera.pitch);
+    // Сферические координаты орбиты в метрах
+    const dist = Math.max(4, 18 / scale);
+    const camY = centerY + dist * Math.sin(context.camera.pitch);
     const groundDist = dist * Math.cos(context.camera.pitch);
 
-    // Синхронизированный поворот с 2D (знак плюс обеспечивает вращение по часовой стрелке)
     const camX = centerX + groundDist * Math.sin(context.camera.yaw);
-    const camZ = centerY + groundDist * Math.cos(context.camera.yaw);
+    const camZ = centerZ + groundDist * Math.cos(context.camera.yaw);
 
     this.camera.position.set(camX, camY, camZ);
-    this.camera.lookAt(centerX, 0, centerY);
+    this.camera.lookAt(centerX, centerY, centerZ);
 
     this.renderer.render(this.scene, this.camera);
 
@@ -171,6 +195,31 @@ export class ThreeRenderer implements IRenderer {
     if (context.editorData.hoveredId) {
       this.renderItemTooltip(context.world, context.editorData.hoveredId);
     }
+    if (context.editorData.marqueeBox) {
+      this.renderScreenMarqueeBox(context.editorData.marqueeBox);
+    }
+  }
+
+  private renderScreenMarqueeBox(box: { start: Point; current: Point }): void {
+    const rect = this.canvas.getBoundingClientRect();
+    const startX = box.start.x - rect.left;
+    const startY = box.start.y - rect.top;
+    const currentX = box.current.x - rect.left;
+    const currentY = box.current.y - rect.top;
+
+    const minX = Math.min(startX, currentX);
+    const minY = Math.min(startY, currentY);
+    const width = Math.abs(currentX - startX);
+    const height = Math.abs(currentY - startY);
+
+    this.uiCtx.save();
+    this.uiCtx.fillStyle = 'rgba(52, 152, 219, 0.15)';
+    this.uiCtx.strokeStyle = 'rgba(52, 152, 219, 0.85)';
+    this.uiCtx.lineWidth = 1.5;
+    this.uiCtx.setLineDash([5, 3]);
+    this.uiCtx.fillRect(minX, minY, width, height);
+    this.uiCtx.strokeRect(minX, minY, width, height);
+    this.uiCtx.restore();
   }
 
   private renderUIOverlays(world: World, gameMode: string): void {
@@ -207,16 +256,18 @@ export class ThreeRenderer implements IRenderer {
       const physStats = world.getComponent(id, 'physicsStats');
       const radius = physStats?.radius.current ?? 16;
 
-      // Определяем высоту 3D-модели для позиционирования UI над ней
-      let meshHeight = 40;
-      if (isObstacle) meshHeight = 60;
-      else if (archetype === 'zone') meshHeight = 2;
-      else if (archetype === 'creature') {
-        meshHeight = 40;
-      }
+      // Метрическая высота моделей для позиционирования UI над ними
+      let meshHeight = 1.8;
+      if (isObstacle) meshHeight = 1.6;
+      else if (archetype === 'zone') meshHeight = 0.1;
+      else if (archetype === 'creature') meshHeight = 1.8;
 
       // Проекция 3D точки (верхушка меша) на 2D экран
-      const pos3D = new THREE.Vector3(transform.x, meshHeight + 5, transform.y);
+      const pos3D = new THREE.Vector3(
+        transform.x,
+        transform.y + meshHeight + 0.3,
+        transform.z ?? transform.y
+      );
       pos3D.project(this.camera);
 
       // Отбрасываем объекты за спиной камеры
@@ -260,10 +311,15 @@ export class ThreeRenderer implements IRenderer {
     if (!entity || !entity.transform || !entity.item) return;
 
     const transform = entity.transform;
-    const radius = entity.physicsStats?.radius.current ?? 16;
-    const meshHeight = radius * 1.5;
+    const radius = entity.physicsStats?.radius.current ?? 0.4;
+    const meshHeight = Math.max(0.3, radius * 1.5);
 
-    const pos3D = new THREE.Vector3(transform.x, meshHeight + 15, transform.y);
+    // Корректные 3D координаты в метрах (высота Y + сдвиг, глубина Z)
+    const pos3D = new THREE.Vector3(
+      transform.x,
+      transform.y + meshHeight + 0.2,
+      transform.z ?? transform.y
+    );
     pos3D.project(this.camera);
 
     if (pos3D.z > 1) return;

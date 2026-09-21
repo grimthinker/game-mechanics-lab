@@ -25,9 +25,9 @@ export class BTServiceFindNearestTarget extends BTService {
   protected tickService(entity: EntityAdapter): void {
     const bb = entity.brain!.blackboard;
 
-    const range = bb.get('detectDist') ?? 400;
+    const range = bb.get('detectDist') ?? LOGIC_CONFIG.detectDist;
     const rangeSq = bb.get('detectDistSq') ?? range * range;
-    const loseDist = bb.get('loseTargetDist') ?? 600;
+    const loseDist = bb.get('loseTargetDist') ?? LOGIC_CONFIG.loseTargetDist;
     const loseDistSq = bb.get('loseTargetDistSq') ?? loseDist * loseDist;
 
     // При полной слепоте и глухоте (все органы чувств уничтожены) цель не может быть обнаружена или удерживаться
@@ -48,8 +48,11 @@ export class BTServiceFindNearestTarget extends BTService {
         const selfPos = entity.getPos();
         const targetPos = target.getPos();
         const dx = targetPos.x - selfPos.x;
-        const dy = targetPos.y - selfPos.y;
-        const distSq = dx * dx + dy * dy;
+        const dz =
+          (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
+            ? (targetPos as any).z - (selfPos as any).z
+            : targetPos.y - selfPos.y;
+        const distSq = dx * dx + dz * dz;
 
         if (distSq > loseDistSq) {
           shouldLose = true;
@@ -78,10 +81,13 @@ export class BTServiceFindNearestTarget extends BTService {
       const dx = targetPos.x - selfPos.x;
       if (dx > range || dx < -range) continue;
 
-      const dy = targetPos.y - selfPos.y;
-      if (dy > range || dy < -range) continue;
+      const dz =
+        (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
+          ? (targetPos as any).z - (selfPos as any).z
+          : targetPos.y - selfPos.y;
+      if (dz > range || dz < -range) continue;
 
-      const distSq = dx * dx + dy * dy;
+      const distSq = dx * dx + dz * dz;
 
       if (distSq < minDistSq) {
         minDistSq = distSq;
@@ -139,8 +145,11 @@ export class BTServicePathUpdater extends BTService {
       const selfPos = entity.getPos();
       const targetPos = target.getPos();
       const dx = targetPos.x - selfPos.x;
-      const dy = targetPos.y - selfPos.y;
-      const distSq = dx * dx + dy * dy;
+      const dz =
+        (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
+          ? (targetPos as any).z - (selfPos as any).z
+          : targetPos.y - selfPos.y;
+      const distSq = dx * dx + dz * dz;
 
       this.updatePathingLogic(entity, selfPos, targetPos, distSq);
     }
@@ -157,8 +166,12 @@ export class BTServicePathUpdater extends BTService {
     let shouldRequest = false;
 
     const pdx = selfPos.x - this.lastStartPos.x;
-    const pdy = selfPos.y - this.lastStartPos.y;
-    if (pdx * pdx + pdy * pdy > this.pushedDistanceSq) {
+    const pdz =
+      (selfPos as any).z !== undefined
+        ? (selfPos as any).z - (this.lastStartPos as any).z
+        : selfPos.y - this.lastStartPos.y;
+
+    if (pdx * pdx + pdz * pdz > this.pushedDistanceSq) {
       shouldRequest = true;
     }
 
@@ -171,10 +184,14 @@ export class BTServicePathUpdater extends BTService {
       const currentThreshold =
         this.params.minTargetMoveThreshold +
         t * (this.params.maxTargetMoveThreshold - this.params.minTargetMoveThreshold);
-      const tdx = targetPos.x - this.lastTargetPos.x;
-      const tdy = targetPos.y - this.lastTargetPos.y;
 
-      if (tdx * tdx + tdy * tdy > currentThreshold * currentThreshold) {
+      const tdx = targetPos.x - this.lastTargetPos.x;
+      const tdz =
+        (targetPos as any).z !== undefined
+          ? (targetPos as any).z - (this.lastTargetPos as any).z
+          : targetPos.y - this.lastTargetPos.y;
+
+      if (tdx * tdx + tdz * tdz > currentThreshold * currentThreshold) {
         shouldRequest = true;
       }
     }
@@ -239,8 +256,8 @@ export class BTServiceSyncStats extends BTService {
     const stats = entity.aiStats;
     const bb = entity.brain!.blackboard;
 
-    let detectDist = stats.detectDist ?? 400;
-    let loseTargetDist = stats.loseTargetDist ?? 600;
+    let detectDist = stats.detectDist ?? LOGIC_CONFIG.detectDist;
+    let loseTargetDist = stats.loseTargetDist ?? LOGIC_CONFIG.loseTargetDist;
 
     // Синхронизация данных агрегированных органов чувств
     const perception = entity.perception;
@@ -272,9 +289,9 @@ export class BTServiceSyncStats extends BTService {
     bb.set('maxHealth', entity.maxHp);
 
     const selfPos = entity.getPos();
-    bb.set('pos', { x: selfPos.x, y: selfPos.y });
+    bb.set('pos', { x: selfPos.x, y: selfPos.y, z: (selfPos as any).z ?? selfPos.y });
 
-    const stopDist = stats.followStopDist ?? 40;
+    const stopDist = stats.followStopDist ?? 2.0;
 
     bb.set('followStopDist', stopDist);
     bb.set('followUpDist', stopDist + 10);

@@ -12,11 +12,10 @@ import { AnimationSyncSystem } from './ecs/systems/AnimationSyncSystem';
 import { ModifierSystem } from './ecs/systems/ModifierSystem';
 import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
-import { CanvasRenderer } from './rendering/CanvasRenderer';
 import { ThreeRenderer } from './rendering/ThreeRenderer';
 import { ThreeSyncSystem } from './ecs/systems/ThreeSyncSystem';
 import { IRenderer } from './rendering/IRenderer';
-import { Point } from './types';
+import { Point, Vec3 } from './types';
 import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode } from './config/gameConfig';
 import { WorldSerializer } from './ecs/WorldSerializer';
@@ -24,7 +23,6 @@ import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
 import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
-import { Circle, Polygon } from 'detect-collisions';
 import { EventBus } from './core/EventBus';
 import { BTLogicComponent } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
@@ -45,6 +43,10 @@ import { TransactionBuilder } from './history/TransactionBuilder';
 import { EntitySnapshotCommand } from './history/commands/EntitySnapshotCommand';
 import { ItemTransferService } from './editor/ItemTransferService';
 
+// Физический драйвер 3D
+import { IPhysicsDriver } from './physics/IPhysicsDriver';
+import { RapierPhysicsDriver } from './physics/RapierPhysicsDriver';
+
 export { EntityAdapter } from './EntityAdapter';
 
 export class GameApp {
@@ -59,13 +61,14 @@ export class GameApp {
   private mouseScreenPos: Point | null = null;
 
   public physics: PhysicsSystem;
+  public physicsDriver: IPhysicsDriver;
   private movementSystem: MovementSystem;
   private stealthSystem: StealthSystem;
   private attackSystem: AttackSystem;
-  private damageSystem: DamageSystem;
+  public damageSystem: DamageSystem;
   public aiSystem: AISystem;
   private anatomySystem: AnatomySystem;
-  private threeSyncSystem: ThreeSyncSystem | null = null;
+  private threeSyncSystem: ThreeSyncSystem;
   public interactionSystem: InteractionSystem;
   private areaEffectorSystem: AreaEffectorSystem;
   private animationSyncSystem: AnimationSyncSystem;
@@ -73,7 +76,6 @@ export class GameApp {
   public attachmentSystem: AttachmentSystem;
   public camera: Camera;
 
-  public activeRendererMode: '2d' | '3d' = '2d';
   public showUIOverlays: boolean = true;
   public showAIDebug: boolean = false;
   public globalTimeScale: number = 1.0;
@@ -101,9 +103,13 @@ export class GameApp {
 
   constructor(container: HTMLDivElement) {
     this.container = container;
-    this.renderer = new CanvasRenderer(container);
+    const threeRenderer = new ThreeRenderer(container);
+    this.renderer = threeRenderer;
+    this.threeSyncSystem = new ThreeSyncSystem(threeRenderer.scene);
     this.world = new World();
+    this.physicsDriver = new RapierPhysicsDriver();
     this.physics = new PhysicsSystem();
+    this.physics.driver = this.physicsDriver;
     this.movementSystem = new MovementSystem();
     this.stealthSystem = new StealthSystem();
     this.attackSystem = new AttackSystem();
@@ -140,28 +146,6 @@ export class GameApp {
     return this.renderer.getCanvas();
   }
 
-  public setRendererMode(mode: '2d' | '3d'): void {
-    if (this.activeRendererMode === mode) return;
-    this.activeRendererMode = mode;
-
-    if (this.renderer.destroy) {
-      this.renderer.destroy();
-    }
-
-    if (mode === '2d') {
-      if (this.threeSyncSystem) {
-        this.threeSyncSystem.destroy();
-        this.threeSyncSystem = null;
-      }
-      this.renderer = new CanvasRenderer(this.container);
-    } else {
-      const threeRenderer = new ThreeRenderer(this.container);
-      this.renderer = threeRenderer;
-      this.threeSyncSystem = new ThreeSyncSystem(threeRenderer.scene);
-    }
-    this.resizeCanvas();
-  }
-
   public resizeCanvas(width?: number, height?: number): void {
     let w = width;
     let h = height;
@@ -172,7 +156,7 @@ export class GameApp {
     this.renderer.resize(w, h);
   }
 
-  public spawnEntity(config: EntityConfig, position?: Point, forcedId?: string): string {
+  public spawnEntity(config: EntityConfig, position?: Point | Vec3, forcedId?: string): string {
     return this.entityFactory.spawnEntity(
       this.world,
       this.physics,
@@ -296,24 +280,13 @@ export class GameApp {
       const oldPhys = this.world.getComponent(oldId, 'physicsBody');
       const physStats = this.world.getComponent(newId, 'physicsStats');
       if (oldPhys && trans && physStats) {
-        let body: Circle | Polygon;
-        if (physStats.points && physStats.points.length > 0) {
-          body = new Polygon({ x: trans.x, y: trans.y }, physStats.points);
-        } else {
-          body = new Circle({ x: trans.x, y: trans.y }, physStats.radius.current);
-        }
-        body.isStatic = oldPhys.isStatic;
-        if (typeof body.setAngle === 'function') {
-          body.setAngle(trans.angle);
-        }
         this.world.addComponent(newId, 'physicsBody', {
-          body,
           isStatic: oldPhys.isStatic,
           category: oldPhys.category,
           mask: oldPhys.mask,
           isTrigger: oldPhys.isTrigger,
         });
-        this.physics.registerBody(newId, body);
+        // TODO: На шаге 5 мы добавим клонирование RigidBody Rapier.
       }
 
       if (bodyBrain && bodyBrain.isActive) {
@@ -490,7 +463,16 @@ export class GameApp {
       }
       config.transform = {
         x: targetPos.x,
-        y: targetPos.y,
+        y: comp.transform.y ?? 0,
+        z: comp.transform.z ?? targetPos.y,
+        rotation: comp.transform.rotation
+          ? { ...comp.transform.rotation }
+          : {
+              x: 0,
+              y: Math.sin(comp.transform.angle * 0.5),
+              z: 0,
+              w: Math.cos(comp.transform.angle * 0.5),
+            },
         angle: comp.transform.angle,
       };
 
@@ -499,11 +481,6 @@ export class GameApp {
       const newTrans = this.world.getComponent(newId, 'transform');
       if (newTrans) {
         newTrans.angle = comp.transform.angle;
-      }
-      const newPhys = this.world.getComponent(newId, 'physicsBody');
-      if (newPhys?.body && typeof newPhys.body.setAngle === 'function') {
-        newPhys.body.setAngle(comp.transform.angle);
-        this.physics.system.updateBody(newPhys.body);
       }
 
       newIds.push(newId);
@@ -625,7 +602,11 @@ export class GameApp {
       }
     }
     const phys = this.world.getComponent(id, 'physicsBody');
-    if (phys) this.physics.unregisterBody(phys.body);
+    if (phys) {
+      if (phys.rawBody) {
+        this.physicsDriver.removeRigidBody(phys.rawBody);
+      }
+    }
     this.aiSystem.unregisterEntity(id);
     this.world.removeEntity(id);
   }
@@ -634,7 +615,9 @@ export class GameApp {
     const entities = this.world.getAllEntities();
     for (const [id, comp] of entities) {
       if (comp.physicsBody) {
-        this.physics.unregisterBody(comp.physicsBody.body);
+        if (comp.physicsBody.rawBody) {
+          this.physicsDriver.removeRigidBody(comp.physicsBody.rawBody);
+        }
       }
       this.world.removeEntity(id);
     }
@@ -646,33 +629,33 @@ export class GameApp {
   public initDefaultWorld(center?: Point): void {
     this.clearWorld();
     this.commandHistory.clear();
-    const spawnPos: Point = center ?? {
-      x: this.canvas.width / 2,
-      y: this.canvas.height / 2,
-    };
+
+    // Метрический спавн в 3D (1 единица = 1 метр)
+    const spawnPos = { x: 0, y: 0, z: 0 };
 
     this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
       this.aiSystem,
-      spawnPos,
+      spawnPos as any,
       'PlayerTree',
       'Игрок'
     );
-    this.spawnEntity(createZoneConfig('damage', 70, 15), { x: spawnPos.x + 180, y: spawnPos.y });
-    this.spawnEntity(createZoneConfig('heal', 70, 15), { x: spawnPos.x - 180, y: spawnPos.y });
+
+    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: 4.5, y: 0, z: 0 } as any);
+    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: -4.5, y: 0, z: 0 } as any);
     this.spawnEntity(
-      createZoneConfig('repel', 70, 200, 'Зона отталкивания', false, false, false, true, 7000, 0),
-      { x: spawnPos.x - 180, y: spawnPos.y - 180 }
+      createZoneConfig('repel', 2.5, 20, 'Зона отталкивания', false, false, false, true, 50, 0),
+      { x: -4.5, y: 0, z: -4.5 } as any
     );
     this.spawnEntity(
-      createZoneConfig('attract', 70, 200, 'Зона притягивания', false, false, false, true, 7000, 0),
-      { x: spawnPos.x + 180, y: spawnPos.y - 180 }
+      createZoneConfig('attract', 2.5, 20, 'Зона притягивания', false, false, false, true, 50, 0),
+      { x: 4.5, y: 0, z: -4.5 } as any
     );
     this.spawnEntity(
       createZoneConfig(
         'time_dilation',
-        70,
+        2.5,
         0.4,
         'Зона замедления (0.4x)',
         false,
@@ -680,12 +663,12 @@ export class GameApp {
         false,
         false
       ),
-      { x: spawnPos.x - 180, y: spawnPos.y + 180 }
+      { x: -4.5, y: 0, z: 4.5 } as any
     );
     this.spawnEntity(
       createZoneConfig(
         'time_dilation',
-        70,
+        2.5,
         1.8,
         'Зона ускорения (1.8x)',
         false,
@@ -693,7 +676,7 @@ export class GameApp {
         false,
         false
       ),
-      { x: spawnPos.x + 180, y: spawnPos.y + 180 }
+      { x: 4.5, y: 0, z: 4.5 } as any
     );
 
     this.spawnEntity(
@@ -702,22 +685,23 @@ export class GameApp {
         meta: { name: 'Каменная стена', entityType: 'obstacle', destructible: true },
         health: { hp: 100, maxHp: 100 },
         physics: {
-          radius: 65,
+          radius: 2.0,
           weight: 1000,
           isSolid: true,
           points: [
-            { x: -60, y: -25 },
-            { x: 60, y: -25 },
-            { x: 60, y: 25 },
-            { x: -60, y: 25 },
+            { x: -2, y: -0.5 },
+            { x: 2, y: -0.5 },
+            { x: 2, y: 0.5 },
+            { x: -2, y: 0.5 },
           ],
         },
       },
-      { x: spawnPos.x, y: spawnPos.y + 160 }
+      { x: 0, y: 0, z: 4.0 } as any
     );
 
-    const itemsX = spawnPos.x + 80;
+    const itemsX = -1.5;
 
+    // Спавним предметы на высоте Y = 2.5 - 3.5 метра в воздухе (в безопасной зоне)
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
@@ -731,17 +715,17 @@ export class GameApp {
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 16, weight: 1, isSolid: true },
+        physics: { radius: 0.4, weight: 1, isSolid: true },
         weaponStats: { baseDamage: 30, prepTime: 0.3, castTime: 0, recoveryTime: 0.4 },
         weaponZone: {
           hitZoneType: 'radius',
-          radius: 50,
+          radius: 2.0,
           pierceObstacles: false,
           pierceCreatures: false,
           pierceItems: false,
         },
       },
-      { x: itemsX, y: spawnPos.y - 100 }
+      { x: itemsX, y: 3.0, z: -2.0 } as any
     );
 
     this.spawnEntity(
@@ -757,11 +741,11 @@ export class GameApp {
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 16, weight: 1, isSolid: true },
+        physics: { radius: 0.4, weight: 2, isSolid: true },
         weaponStats: { baseDamage: 15, prepTime: 0.4, castTime: 0, recoveryTime: 0.5 },
         weaponZone: {
           hitZoneType: 'shrapnel',
-          length: 120,
+          length: 4.0,
           angle: deg2Rad(60),
           rayCount: 5,
           pierceObstacles: false,
@@ -769,7 +753,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: spawnPos.y - 50 }
+      { x: itemsX, y: 2.5, z: -1.0 } as any
     );
 
     this.spawnEntity(
@@ -785,17 +769,17 @@ export class GameApp {
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 16, weight: 1, isSolid: true },
+        physics: { radius: 0.4, weight: 3, isSolid: true },
         weaponStats: { baseDamage: 25, prepTime: 0.2, castTime: 0, recoveryTime: 0.3 },
         weaponZone: {
           hitZoneType: 'forward_line',
-          length: 150,
+          length: 4.5,
           pierceObstacles: false,
           pierceCreatures: false,
           pierceItems: false,
         },
       },
-      { x: itemsX, y: spawnPos.y }
+      { x: itemsX, y: 3.5, z: 0.0 } as any
     );
 
     this.spawnEntity(
@@ -811,10 +795,10 @@ export class GameApp {
           equippable: true,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 16, weight: 20, isSolid: true },
+        physics: { radius: 0.4, weight: 20, isSolid: true },
         armorStats: { defense: 25, flatReduction: 5 },
       },
-      { x: itemsX, y: spawnPos.y + 50 }
+      { x: itemsX, y: 2.2, z: 1.0 } as any
     );
 
     this.spawnEntity(
@@ -830,10 +814,11 @@ export class GameApp {
           equippable: true,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 16, weight: 10, isSolid: true },
+        physics: { radius: 0.3, weight: 10, isSolid: true },
         armorStats: { defense: 15, flatReduction: 2 },
       },
-      { x: itemsX, y: spawnPos.y + 100 }
+      // Спавним шлем ровно над каменной стеной (стена находится в X=0, Z=4.0, высота 1.5м)
+      { x: 0.0, y: 3.5, z: 4.0 } as any
     );
   }
 
@@ -924,9 +909,11 @@ export class GameApp {
   public destroy(): void {
     this.isRunning = false;
     window.removeEventListener('resize', this.handleResize);
+    this.threeSyncSystem.destroy();
     if (this.renderer.destroy) {
       this.renderer.destroy();
     }
+    this.physicsDriver.destroy();
     AssetManager.getInstance().clear();
   }
 
@@ -1002,6 +989,10 @@ export class GameApp {
 
     if (!this.isPaused) {
       const simulatedDt = realDt * this.globalTimeScale;
+
+      // Тикаем физический драйвер 3D с фиксированным шагом
+      this.physicsDriver.step(simulatedDt);
+
       const MAX_SUBSTEP = 1 / 60;
       const steps = Math.min(10, Math.max(1, Math.ceil(simulatedDt / MAX_SUBSTEP)));
       const stepDt = simulatedDt / steps;
@@ -1009,6 +1000,9 @@ export class GameApp {
       for (let i = 0; i < steps; i++) {
         this.updateSystems(stepDt);
       }
+
+      // Синхронизируем позиции Rapier в ECS ПОСЛЕ систем, чтобы никто не перетирал координаты перед рендером
+      this.syncDynamicBodiesToTransforms();
 
       if (this.gameMode === GameMode.GAME) {
         const isAnyPlayerAlive = this.world
@@ -1024,50 +1018,15 @@ export class GameApp {
 
     this.updateBTData(false);
 
-    if (this.activeRendererMode === '3d' && this.threeSyncSystem) {
-      this.threeSyncSystem.update(
-        realDt,
-        this.world,
-        this.gameMode,
-        this.selection.selectedEntityIds
-      );
-    }
+    // Постоянная синхронизация Three.js сцены с миром ECS
+    this.threeSyncSystem.update(
+      realDt,
+      this.world,
+      this.gameMode,
+      this.selection.selectedEntityIds
+    );
 
     this.gizmo.applyPendingDrag();
-
-    let gizmoRenderData: import('./gizmos/types').GizmoRenderData | null = null;
-    if (
-      this.gameMode === GameMode.EDITOR &&
-      this.selection.selectedEntityId &&
-      this.gizmo.tool !== 'select'
-    ) {
-      const isOwned = !!this.world.getComponent(this.selection.selectedEntityId, 'ownership');
-      const transform = this.world.getComponent(this.selection.selectedEntityId, 'transform');
-      if (transform && !isOwned) {
-        let dragDelta: Point | undefined = undefined;
-        let dragDeltaAngle: number | undefined = undefined;
-
-        if (this.gizmo.dragState) {
-          dragDelta = {
-            x: transform.x - this.gizmo.dragState.anchorPos.x,
-            y: transform.y - this.gizmo.dragState.anchorPos.y,
-          };
-          dragDeltaAngle = this.gizmo.dragState.appliedDeltaAngle;
-        }
-
-        gizmoRenderData = {
-          tool: this.gizmo.tool,
-          position: { x: transform.x, y: transform.y },
-          angle: transform.angle,
-          initialAngle: this.gizmo.dragState?.initialAnchorAngle,
-          hoveredHandle: this.gizmo.hoveredHandle,
-          activeHandle: this.gizmo.activeHandle,
-          isDragging: this.gizmo.isDragging(),
-          dragDelta,
-          dragDeltaAngle,
-        };
-      }
-    }
 
     this.renderer.render({
       camera: this.camera,
@@ -1079,7 +1038,6 @@ export class GameApp {
         selectedIds: this.selection.selectedEntityIds,
         hoveredId: this.selection.hoveredEntityId,
         marqueeBox: this.selection.marqueeBox,
-        gizmo: gizmoRenderData,
         showAIDebug: this.showAIDebug,
       },
       showUIOverlays: this.showUIOverlays,
@@ -1097,24 +1055,63 @@ export class GameApp {
     }
   }
 
-  public updatePlayerAim(worldPoint: Point): void {
+  public updatePlayerAim(worldPoint: Point | Vec3): void {
     const entities = this.world.getEntitiesWith('transform', 'input', 'health', 'aiStats');
     for (const [, { transform, input, health, aiStats }] of entities) {
       if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
         const dx = worldPoint.x - transform.x;
-        const dy = worldPoint.y - transform.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 1) {
-          input.targetLookAngle = Math.atan2(dy, dx) as Radians;
+        const dz =
+          (worldPoint as Vec3).z !== undefined
+            ? (worldPoint as Vec3).z - transform.z
+            : worldPoint.y - transform.z;
+
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.05) {
+          input.targetLookAngle = Math.atan2(dz, dx) as Radians;
         }
       }
     }
   }
-
   public clearPlayerAim(): void {
     const entities = this.world.getEntitiesWith('input');
     for (const [, { input }] of entities) {
       input.targetLookAngle = undefined;
+    }
+  }
+
+  /**
+   * Считывает координаты и ориентацию из симуляции Rapier3D для всех Dynamic тел
+   */
+  private syncDynamicBodiesToTransforms(): void {
+    const dynamicEntities = this.world.getEntitiesWith('transform', 'physicsBody');
+    for (const [, { transform, physicsBody }] of dynamicEntities) {
+      if (physicsBody.rawBody && physicsBody.bodyType === 'dynamic') {
+        // Если тело заснуло на старте — принудительно будим его при тике
+        if (physicsBody.rawBody.isSleeping()) {
+          physicsBody.rawBody.wakeUp();
+        }
+
+        const translation = physicsBody.rawBody.translation();
+        const rotation = physicsBody.rawBody.rotation();
+
+        transform.x = translation.x;
+        transform.y = translation.y;
+        transform.z = translation.z;
+
+        transform.rotation.x = rotation.x;
+        transform.rotation.y = rotation.y;
+        transform.rotation.z = rotation.z;
+        transform.rotation.w = rotation.w;
+
+        // Вычисляем угол рыскания Yaw вокруг вертикальной оси Y
+        const siny_cosp = 2 * (rotation.w * rotation.y + rotation.x * rotation.z);
+        const cosy_cosp = 1 - 2 * (rotation.y * rotation.y + rotation.z * rotation.z);
+        transform.angle = Math.atan2(siny_cosp, cosy_cosp);
+
+        // if (physicsBody.body) {
+        //   physicsBody.body.setPosition(translation.x, translation.z);
+        // }
+      }
     }
   }
 
@@ -1130,11 +1127,18 @@ export class GameApp {
   public zoomAt(clientX: number, clientY: number, deltaY: number): void {
     this.camera.zoomAt(clientX, clientY, deltaY, this.canvas);
   }
-  public getCanvasPoint(clientX: number, clientY: number): Point {
+  public getCanvasPoint(clientX: number, clientY: number): Vec3 {
     return this.renderer.screenToWorld(clientX, clientY, this.camera);
   }
 
   // --- Методы-фасады (delegates) для обратной совместимости с Инспектором ---
+
+  public updateEntityTransform(
+    id: string,
+    patch: { x?: number; y?: number; z?: number; angle?: number }
+  ): boolean {
+    return this.mutations.updateEntityTransform(id, patch);
+  }
 
   public updateEntityMeta(id: string, patch: { name?: string; destructible?: boolean }): boolean {
     return this.mutations.updateEntityMeta(id, patch);

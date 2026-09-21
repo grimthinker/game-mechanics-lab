@@ -25,7 +25,9 @@ export class EntitySnapshotCommand implements ICommand {
     for (const id of this.allAffectedIds) {
       if (this.app.world.getEntity(id)) {
         const phys = this.app.world.getComponent(id, 'physicsBody');
-        if (phys) this.app.physics.unregisterBody(phys.body);
+        if (phys) {
+          if (phys.rawBody) this.app.physicsDriver.removeRigidBody(phys.rawBody);
+        }
         this.app.world.removeEntity(id);
         this.app.aiSystem.unregisterEntity(id);
       }

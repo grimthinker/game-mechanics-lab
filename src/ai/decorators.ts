@@ -121,7 +121,7 @@ export class BTDecoratorCheckEngaged extends BTDecorator {
   public static readonly nodeName = 'Проверка боя';
   public static readonly description =
     'Проверяет, находится ли цель на расстоянии ближе или равном engageDist единицам, иначе прерывает дочерний узел';
-  public static readonly defaultParams = { engageDist: 1000 };
+  public static readonly defaultParams = { engageDist: 5.0 };
 
   private params: typeof BTDecoratorCheckEngaged.defaultParams;
 

@@ -1,4 +1,3 @@
-import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
@@ -12,7 +11,7 @@ import {
   RENDER_Z_INDEX,
   RenderableComponent,
 } from '../types';
-import { Point } from '../../types';
+import { Point, Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 
@@ -22,7 +21,7 @@ export function assembleItem(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point
+  position?: Point | Vec3
 ): void {
   const itemData: ItemData = {
     name: config.item?.name ?? 'Предмет',
@@ -34,7 +33,7 @@ export function assembleItem(
     equippable: config.item?.equippable ?? false,
     equipTimeMultiplier: config.item?.equipTimeMultiplier ?? 1.0,
   };
-  const radius = config.physics?.radius ?? 16;
+  const radius = config.physics?.radius ?? 0.3;
   const weight = config.physics?.weight ?? 1;
   const isSolid = config.physics?.isSolid ?? true;
 
@@ -127,39 +126,49 @@ export function assembleItem(
     });
   }
 
-  // 6. Трансформация и физическое тело на карте
+  // 6. Трансформация и физическое тело на карте в 3D
   const posX = position?.x ?? 0;
-  const posY = position?.y ?? 0;
-  world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
+  const hasZ = position && 'z' in position;
+  const posY = hasZ ? (position as Vec3).y : 0.2;
+  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  world.addComponent(id, 'transform', {
+    x: posX,
+    y: posY,
+    z: posZ,
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    angle: 0 as Radians,
+  });
 
   if (!isPossessed) {
-    const body = new Circle({ x: posX, y: posY }, radius);
-    body.isStatic = false;
     const category = CollisionCategory.ITEM;
     const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-    world.addComponent(id, 'physicsBody', { body, isStatic: false, category, mask });
-    physics.registerBody(id, body);
+
+    // Нативное динамическое тело Rapier3D с гравитацией
+    let rawBody: import('@dimforge/rapier3d-compat').default.RigidBody | undefined;
+    let rawCollider: import('@dimforge/rapier3d-compat').default.Collider | undefined;
+
+    if (physics.driver && physics.driver.isReady) {
+      const pos3D = { x: posX, y: posY, z: posZ };
+      rawBody = physics.driver.createDynamicBody(pos3D, id);
+      rawCollider = physics.driver.createBallCollider(radius, rawBody, weight);
+      // Небольшой отскок при падении на пол
+      rawCollider.setRestitution(0.3);
+    }
+
+    world.addComponent(id, 'physicsBody', {
+      rawBody,
+      rawCollider,
+      bodyType: 'dynamic',
+      isStatic: false,
+      category,
+      mask,
+    });
   }
 
-  // 7. Универсальный компонент отрисовки (Renderable)
-  let color = '#7f8c8d';
-  if (itemData.type === 'weapon') color = '#f1c40f';
-  else if (itemData.type === 'armor') color = '#3498db';
-  else if (itemData.type === 'bag') color = '#2ecc71';
-
-  const size = radius * 1.6;
-  const renderable: RenderableComponent = {
+  // 7. Компонент видимости
+  world.addComponent(id, 'renderable', {
     zIndex: RENDER_Z_INDEX.ITEMS,
     isVisible: !isPossessed,
     syncWithTransform: true,
-    primitives: [
-      {
-        kind: 'rect',
-        width: size,
-        height: size,
-        fill: color,
-      },
-    ],
-  };
-  world.addComponent(id, 'renderable', renderable);
+  });
 }

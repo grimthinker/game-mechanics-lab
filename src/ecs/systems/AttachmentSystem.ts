@@ -39,17 +39,16 @@ export class AttachmentSystem {
 
       // 4. Синхронизация физического тела-сенсора
       const phys = world.getComponent(id, 'physicsBody');
-      if (phys && phys.body) {
-        phys.body.setPosition(targetX, targetY);
-        physics.system.updateBody(phys.body);
+      if (phys && phys.rawBody) {
+        phys.rawBody.setTranslation({ x: targetX, y: transform.y, z: targetY }, true);
       }
     }
   }
 
   private removeEntitySafe(world: World, physics: PhysicsSystem, id: EntityId): void {
     const phys = world.getComponent(id, 'physicsBody');
-    if (phys) {
-      physics.unregisterBody(phys.body);
+    if (phys && phys.rawBody) {
+      physics.driver?.removeRigidBody(phys.rawBody);
     }
     world.removeEntity(id);
   }

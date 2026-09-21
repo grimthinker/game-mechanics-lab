@@ -40,10 +40,12 @@ export interface CreatureMetaComponent {
 export interface VelocityComponent {
   vx: number;
   vy: number;
+  vz: number;
   currentSpeed: number;
   currentTurnSpeed: Radians;
   externalVx?: number;
   externalVy?: number;
+  externalVz?: number;
 }
 
 export interface InputComponent {

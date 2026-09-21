@@ -8,14 +8,14 @@ export interface AutoSaveData {
   camera: CameraState;
 }
 
-export const AUTOSAVE_STORAGE_KEY = 'game_world_autosave';
+export const AUTOSAVE_STORAGE_KEY = 'game_world_autosave_v2';
 
 export function saveWorldToStorage(app: GameApp, editorSnapshot?: any): boolean {
   try {
     const worldData = editorSnapshot ?? app.serializeWorld();
     const cameraData = app.camera.serialize();
     const payload: AutoSaveData = {
-      version: 1,
+      version: 2,
       timestamp: Date.now(),
       world: worldData,
       camera: cameraData,
@@ -33,7 +33,7 @@ export function loadWorldFromStorage(): AutoSaveData | null {
     const raw = localStorage.getItem(AUTOSAVE_STORAGE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw);
-    if (!data || typeof data !== 'object' || !data.world) return null;
+    if (!data || typeof data !== 'object' || data.version !== 2 || !data.world) return null;
     return data as AutoSaveData;
   } catch (err) {
     console.warn('[AutoSave] Не удалось загрузить состояние из localStorage:', err);

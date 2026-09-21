@@ -1,4 +1,3 @@
-import { System, Line, Circle, Polygon, Body } from 'detect-collisions';
 import { World } from '../World';
 import {
   EntityId,
@@ -7,272 +6,24 @@ import {
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
 } from '../types';
-import { Point } from '../../types';
-import { PHYSICS_CONFIG } from '../../config/physicsConfig';
 import { calculateTotalEntityWeight } from '../utils/hierarchy';
+import { IPhysicsDriver } from '../../physics/IPhysicsDriver';
 
 export class PhysicsSystem {
-  public system: System;
   public obstaclesEnabled: boolean = true;
-  private bodyToEntityMap: WeakMap<object, EntityId> = new WeakMap();
+  public driver: IPhysicsDriver | null = null;
 
-  // Единый переиспользуемый сенсор для запросов мыши (Zero-Allocation)
-  private cursorSensor: Circle;
-
-  constructor() {
-    this.system = new System();
-
-    // Инициализируем сенсор один раз и навсегда добавляем в пространственный индекс
-    this.cursorSensor = new Circle({ x: 0, y: 0 }, 1);
-    this.system.insert(this.cursorSensor);
-  }
-
-  /**
-   * Точный запрос клика в точку worldPoint через BVH + SAT за O(log N).
-   * Возвращает список EntityId тел, перекрывающих данную точку.
-   */
-  public queryPointAt(worldPoint: Point): EntityId[] {
-    this.cursorSensor.setPosition(worldPoint.x, worldPoint.y);
-    this.cursorSensor.r = 1;
-    this.system.updateBody(this.cursorSensor);
-
-    const hitEntityIds: EntityId[] = [];
-    const seen = new Set<EntityId>();
-
-    this.system.checkOne(this.cursorSensor, (response) => {
-      const otherBody = response.b === this.cursorSensor ? response.a : response.b;
-      const id = this.bodyToEntityMap.get(otherBody);
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        hitEntityIds.push(id);
-      }
-    });
-
-    return hitEntityIds;
-  }
-
-  /**
-   * Пространственный запрос тел в радиусе searchRadius через BVH за O(log N).
-   * Возвращает EntityId и глубину проникновения overlap.
-   */
-  public queryEntitiesInRadius(
-    center: Point,
-    searchRadius: number
-  ): Array<{ id: EntityId; overlap: number }> {
-    this.cursorSensor.setPosition(center.x, center.y);
-    this.cursorSensor.r = Math.max(0.001, searchRadius);
-    this.system.updateBody(this.cursorSensor);
-
-    const candidates: Array<{ id: EntityId; overlap: number }> = [];
-    const seen = new Set<EntityId>();
-
-    this.system.checkOne(this.cursorSensor, (response) => {
-      const otherBody = response.b === this.cursorSensor ? response.a : response.b;
-      const id = this.bodyToEntityMap.get(otherBody);
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        candidates.push({ id, overlap: response.overlap });
-      }
-    });
-
-    return candidates;
-  }
-
-  /**
-   * Пространственный запрос тел внутри прямоугольной рамки за O(log N).
-   */
-  public queryEntitiesInBox(minX: number, minY: number, maxX: number, maxY: number): EntityId[] {
-    const width = Math.max(1, maxX - minX);
-    const height = Math.max(1, maxY - minY);
-    const boxPoly = new Polygon({ x: minX, y: minY }, [
-      { x: 0, y: 0 },
-      { x: width, y: 0 },
-      { x: width, y: height },
-      { x: 0, y: height },
-    ]);
-    this.system.insert(boxPoly);
-
-    const hitIds: EntityId[] = [];
-    const seen = new Set<EntityId>();
-
-    this.system.checkOne(boxPoly, (response) => {
-      const other = response.b === boxPoly ? response.a : response.b;
-      const id = this.bodyToEntityMap.get(other);
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        hitIds.push(id);
-      }
-    });
-
-    this.system.remove(boxPoly);
-    return hitIds;
-  }
-
-  /**
-   * Пространственный запрос тел внутри произвольного полигона за O(log N).
-   */
-  public queryEntitiesInPolygon(points: Point[]): EntityId[] {
-    const poly = new Polygon({ x: 0, y: 0 }, points);
-    this.system.insert(poly);
-
-    const hitIds: EntityId[] = [];
-    const seen = new Set<EntityId>();
-
-    this.system.checkOne(poly, (response) => {
-      const other = response.b === poly ? response.a : response.b;
-      const id = this.bodyToEntityMap.get(other);
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        hitIds.push(id);
-      }
-    });
-
-    this.system.remove(poly);
-    return hitIds;
-  }
-
-  public registerBody(entityId: EntityId, body: Body): void {
-    this.bodyToEntityMap.set(body, entityId);
-    this.system.insert(body);
-  }
-
-  public unregisterBody(body: Body): void {
-    this.bodyToEntityMap.delete(body);
-    this.system.remove(body);
-  }
-
-  public getEntityByBody(body: object): EntityId | undefined {
-    return this.bodyToEntityMap.get(body);
-  }
-
-  public getCollisionFilter(body: object, world: World): { category: number; mask: number } {
-    if (body instanceof Line) {
-      return {
-        category: CollisionCategory.OBSTACLE,
-        mask: COLLISION_MASK_ALL,
-      };
-    }
-    const entityId = this.bodyToEntityMap.get(body);
-    if (entityId) {
-      const phys = world.getComponent(entityId, 'physicsBody');
-      if (phys) {
-        return { category: phys.category, mask: phys.mask };
-      }
-    }
-    return {
-      category: CollisionCategory.NONE,
-      mask: COLLISION_MASK_NONE,
-    };
-  }
+  constructor() {}
 
   public setObstaclesEnabled(enabled: boolean): void {
     this.obstaclesEnabled = enabled;
   }
 
-  public moveEntitySafe(world: World, entityId: EntityId, dx: number, dy: number): void {
-    const transform = world.getComponent(entityId, 'transform');
-    const phys = world.getComponent(entityId, 'physicsBody');
-    if (!transform || !phys) return;
-
-    const body = phys.body;
-
-    // Синхронизируем тело из Transform перед началом перемещения (SSOT)
-    body.setPosition(transform.x, transform.y);
-    if (typeof body.setAngle === 'function') {
-      body.setAngle(transform.angle);
-    }
-    this.system.updateBody(body);
-
-    // Если тело не сталкивается с препятствиями (бестелесное), двигаем напрямую
-    if ((phys.mask & CollisionCategory.OBSTACLE) === 0) {
-      body.setPosition(body.x + dx, body.y + dy);
-      transform.x = body.x;
-      transform.y = body.y;
-      return;
-    }
-
-    const radius = body instanceof Circle ? body.r : 16;
-    const moveSq = dx * dx + dy * dy;
-    const radiusThreshold = radius * PHYSICS_CONFIG.R_mult;
-
-    let steps = 1;
-    if (moveSq > radiusThreshold * radiusThreshold) {
-      const maxDim = Math.max(Math.abs(dx), Math.abs(dy));
-      steps = maxDim / radiusThreshold;
-      steps = steps > 2 ? Math.ceil(steps) : 2;
-    }
-
-    const stepX = dx / steps;
-    const stepY = dy / steps;
-
-    for (let i = 0; i < steps; i++) {
-      body.setPosition(body.x + stepX, body.y + stepY);
-      this.system.updateBody(body);
-      if (body instanceof Circle) {
-        this.resolveObstaclesForBody(body, world);
-      }
-    }
-
-    transform.x = body.x;
-    transform.y = body.y;
-  }
-
-  private resolveObstaclesForBody(body: Circle, world: World): void {
-    if (!this.obstaclesEnabled) return;
-
-    this.system.checkOne(body, (response) => {
-      const wall = response.b === body ? response.a : response.b;
-      if (!wall.isStatic) return;
-
-      const bodyFilter = this.getCollisionFilter(body, world);
-      const wallFilter = this.getCollisionFilter(wall, world);
-      if (
-        (bodyFilter.mask & wallFilter.category) === 0 ||
-        (wallFilter.mask & bodyFilter.category) === 0
-      ) {
-        return;
-      }
-
-      const wallEntityId = this.bodyToEntityMap.get(wall);
-      if (wallEntityId) {
-        const phys = world.getComponent(wallEntityId, 'physicsBody');
-        if (phys?.isTrigger) return;
-        const physStats = world.getComponent(wallEntityId, 'physicsStats');
-        if (physStats && !physStats.isSolid) return;
-        const health = world.getComponent(wallEntityId, 'health');
-        if (health && !health.isAlive) return;
-      }
-
-      // В detect-collisions response.overlapV выталкивает response.a из response.b
-      const isBodyA = response.a === body;
-      const pushX =
-        response.overlapV.x !== 0
-          ? (response.overlapV.x + PHYSICS_CONFIG.B * Math.sign(response.overlapV.x)) *
-            (isBodyA ? -1 : 1)
-          : 0;
-      const pushY =
-        response.overlapV.y !== 0
-          ? (response.overlapV.y + PHYSICS_CONFIG.B * Math.sign(response.overlapV.y)) *
-            (isBodyA ? -1 : 1)
-          : 0;
-
-      body.setPosition(body.x + pushX, body.y + pushY);
-      this.system.updateBody(body);
-    });
-  }
-
   public update(dt: number, world: World): void {
-    // Синхронизация радиуса, полного веса и коллизий физических тел с актуальными статами
+    // Синхронизация полного веса и коллизий физических тел с актуальными статами
     const statEntities = world.getEntitiesWith('physicsBody', 'physicsStats');
     for (const [id, { physicsBody, physicsStats }] of statEntities) {
       physicsStats.totalWeight = calculateTotalEntityWeight(world, id);
-
-      if (
-        physicsBody.body instanceof Circle &&
-        physicsBody.body.r !== physicsStats.radius.current
-      ) {
-        physicsBody.body.r = physicsStats.radius.current;
-      }
 
       // Синхронизация isSolid (включение/отключение коллизий)
       const health = world.getComponent(id, 'health');
@@ -289,37 +40,11 @@ export class PhysicsSystem {
       }
     }
 
-    // Предварительная синхронизация тела из Transform (SSOT -> Body) для всех динамических и измененных статических объектов
-    const allPhysEntities = world.getEntitiesWith('transform', 'physicsBody');
-    for (const [_id, { transform, physicsBody }] of allPhysEntities) {
-      if (physicsBody.body) {
-        if (!physicsBody.isStatic) {
-          physicsBody.body.setPosition(transform.x, transform.y);
-          if (typeof physicsBody.body.setAngle === 'function') {
-            physicsBody.body.setAngle(transform.angle);
-          }
-          this.system.updateBody(physicsBody.body);
-        } else {
-          // Синхронизируем статические тела (например, препятствия), если их transform изменился (поворот, перемещение, десериализация)
-          const bodyAny = physicsBody.body as any;
-          const bodyAngle = typeof bodyAny.angle === 'number' ? bodyAny.angle : 0;
-          if (
-            bodyAny.x !== transform.x ||
-            bodyAny.y !== transform.y ||
-            bodyAngle !== transform.angle
-          ) {
-            physicsBody.body.setPosition(transform.x, transform.y);
-            if (typeof bodyAny.setAngle === 'function') {
-              bodyAny.setAngle(transform.angle);
-            }
-            this.system.updateBody(physicsBody.body);
-          }
-        }
-      }
-    }
-
     const movingEntities = world.getEntitiesWith('transform', 'velocity');
     for (const [id, { transform, velocity }] of movingEntities) {
+      const phys = world.getComponent(id, 'physicsBody');
+      if (phys?.rawBody && phys.bodyType === 'dynamic') continue;
+
       const health = world.getComponent(id, 'health');
       if (health && !health.isAlive) continue;
 
@@ -327,304 +52,57 @@ export class PhysicsSystem {
       const localDt = dt * ts;
 
       const selfDx = (velocity.vx ?? 0) * localDt;
-      const selfDy = (velocity.vy ?? 0) * localDt;
+      const selfDz = (velocity.vz ?? 0) * localDt;
 
       const extVx = velocity.externalVx ?? 0;
-      const extVy = velocity.externalVy ?? 0;
+      const extVz = velocity.externalVz ?? 0;
 
       const totalDx = selfDx + extVx * localDt;
-      const totalDy = selfDy + extVy * localDt;
+      const totalDz = selfDz + extVz * localDt;
 
-      if (totalDx !== 0 || totalDy !== 0) {
-        this.moveEntitySafe(world, id, totalDx, totalDy);
+      // Перемещение персонажей по плоскости пола XZ
+      if (totalDx !== 0 || totalDz !== 0) {
+        transform.x += totalDx;
+        transform.z += totalDz;
+      }
+
+      // Синхронизируем положение и ориентацию кинематического тела в Rapier3D
+      if (phys?.rawBody && phys.bodyType === 'kinematicPositionBased') {
+        phys.rawBody.setNextKinematicTranslation({
+          x: transform.x,
+          y: transform.y,
+          z: transform.z,
+        });
+        if (transform.rotation) {
+          phys.rawBody.setNextKinematicRotation(transform.rotation);
+        }
       }
 
       // Затухание внешнего импульса (трение / инерция)
-      if (extVx !== 0 || extVy !== 0) {
+      if (extVx !== 0 || extVz !== 0) {
         const damping = 5.0;
         const factor = Math.max(0, 1 - damping * localDt);
         velocity.externalVx = extVx * factor;
-        velocity.externalVy = extVy * factor;
+        velocity.externalVz = extVz * factor;
 
         if (Math.abs(velocity.externalVx) < 0.01) velocity.externalVx = 0;
-        if (Math.abs(velocity.externalVy) < 0.01) velocity.externalVy = 0;
+        if (Math.abs(velocity.externalVz) < 0.01) velocity.externalVz = 0;
       }
     }
-
-    this.system.update();
-
-    this.system.checkAll((response) => {
-      const c1 = response.a;
-      const c2 = response.b;
-      if (c1.isStatic || c2.isStatic) return;
-
-      const filter1 = this.getCollisionFilter(c1, world);
-      const filter2 = this.getCollisionFilter(c2, world);
-
-      // Проверяем взаимное столкновение групп
-      if ((filter1.mask & filter2.category) === 0 || (filter2.mask & filter1.category) === 0)
-        return;
-
-      const id1 = this.bodyToEntityMap.get(c1);
-      const id2 = this.bodyToEntityMap.get(c2);
-      if (!id1 || !id2) return;
-
-      // --- Слияние стакующихся предметов на земле ---
-      const tag1 = world.getComponent(id1, 'tag');
-      const tag2 = world.getComponent(id2, 'tag');
-      if (tag1?.archetype === 'item' && tag2?.archetype === 'item') {
-        const item1 = world.getComponent(id1, 'item');
-        const item2 = world.getComponent(id2, 'item');
-
-        if (
-          item1 &&
-          item2 &&
-          item1.name === item2.name &&
-          item1.maxStack > 1 &&
-          item2.maxStack > 1 &&
-          !world.getComponent(id1, 'ownership') &&
-          !world.getComponent(id2, 'ownership')
-        ) {
-          const isTargeted =
-            world
-              .getEntitiesWith('interactionAction')
-              .some(
-                ([_, { interactionAction }]) =>
-                  interactionAction.targetId === id1 || interactionAction.targetId === id2
-              ) ||
-            world
-              .getEntitiesWith('pickupIntent')
-              .some(
-                ([_, { pickupIntent }]) =>
-                  pickupIntent.targetItemId === id1 || pickupIntent.targetItemId === id2
-              );
-
-          if (!isTargeted) {
-            let receiver = item1;
-            let giver = item2;
-            let giverId = id2;
-            let giverBody = c2 as Body;
-
-            const count1 = item1.count ?? 1;
-            const count2 = item2.count ?? 1;
-            item1.count = count1;
-            item2.count = count2;
-
-            if (receiver.count! >= receiver.maxStack) {
-              receiver = item2;
-              giver = item1;
-              giverId = id1;
-              giverBody = c1 as Body;
-            }
-
-            const space = receiver.maxStack - (receiver.count ?? 1);
-            const giverCount = giver.count ?? 1;
-            if (space > 0 && giverCount > 0 && receiver !== giver) {
-              const transfer = Math.min(space, giverCount);
-              receiver.count = (receiver.count ?? 1) + transfer;
-              giver.count = giverCount - transfer;
-
-              if (giver.count <= 0) {
-                this.unregisterBody(giverBody);
-                world.removeEntity(giverId);
-                return;
-              }
-            }
-          }
-        }
-      }
-      // --- Конец слияния ---
-
-      const p1 = world.getComponent(id1, 'physicsBody');
-      const p2 = world.getComponent(id2, 'physicsBody');
-      if (!p1 || !p2) return;
-
-      // Триггеры и сенсоры не должны физически выталкивать объекты
-      if (p1.isTrigger || p2.isTrigger) return;
-
-      const health1 = world.getComponent(id1, 'health');
-      const valid1 = health1 ? health1.isAlive : true;
-
-      const health2 = world.getComponent(id2, 'health');
-      const valid2 = health2 ? health2.isAlive : true;
-
-      if (!valid1 || !valid2) return;
-      const p1Stats = world.getComponent(id1, 'physicsStats');
-      const weight1 = p1Stats?.totalWeight ?? p1Stats?.weight.current ?? 1;
-
-      const p2Stats = world.getComponent(id2, 'physicsStats');
-      const weight2 = p2Stats?.totalWeight ?? p2Stats?.weight.current ?? 1;
-
-      const overlapX = response.overlapV.x;
-      const overlapY = response.overlapV.y;
-
-      const totalMass = weight1 + weight2;
-      const ratio1 = weight2 / totalMass;
-      const ratio2 = weight1 / totalMass;
-
-      const mult = Math.min(PHYSICS_CONFIG.C, dt * PHYSICS_CONFIG.A);
-      const maxCorrection = 6.0; // Защита от телепортации / взрыва физики при лагах
-      const deltaX1 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapX * ratio1));
-      const deltaY1 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapY * ratio1));
-      const deltaX2 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapX * ratio2));
-      const deltaY2 = Math.max(-maxCorrection, Math.min(maxCorrection, mult * overlapY * ratio2));
-
-      if (Math.abs(deltaX1) > PHYSICS_CONFIG.d_min || Math.abs(deltaY1) > PHYSICS_CONFIG.d_min) {
-        p1.body.setPosition(p1.body.x - deltaX1, p1.body.y - deltaY1);
-        const t1 = world.getComponent(id1, 'transform');
-        if (t1) {
-          t1.x = p1.body.x;
-          t1.y = p1.body.y;
-        }
-      }
-      if (Math.abs(deltaX2) > PHYSICS_CONFIG.d_min || Math.abs(deltaY2) > PHYSICS_CONFIG.d_min) {
-        p2.body.setPosition(p2.body.x + deltaX2, p2.body.y + deltaY2);
-        const t2 = world.getComponent(id2, 'transform');
-        if (t2) {
-          t2.x = p2.body.x;
-          t2.y = p2.body.y;
-        }
-      }
-    });
-
-    if (this.obstaclesEnabled) {
-      const entities = world.getEntitiesWith('physicsBody', 'transform');
-      for (const [id, { physicsBody, transform }] of entities) {
-        const health = world.getComponent(id, 'health');
-        if (health && !health.isAlive) continue;
-        if (physicsBody.isTrigger || physicsBody.isStatic) continue;
-        if ((physicsBody.mask & CollisionCategory.OBSTACLE) === 0) continue;
-
-        if (physicsBody.body instanceof Circle) {
-          this.resolveObstaclesForBody(physicsBody.body, world);
-          transform.x = physicsBody.body.x;
-          transform.y = physicsBody.body.y;
-          this.system.updateBody(physicsBody.body);
-        }
-      }
-    }
-
-    // Финальная синхронизация позиций Body обратно в Transform для всех нестатичных тел после разрешения коллизий
-    for (const [_id, { transform, physicsBody }] of allPhysEntities) {
-      if (!physicsBody.isStatic && !physicsBody.isTrigger && physicsBody.body) {
-        transform.x = physicsBody.body.x;
-        transform.y = physicsBody.body.y;
-      }
-    }
-  }
-
-  private canRayReachTarget(
-    from: Point,
-    rayEnd: Point,
-    targetId: EntityId,
-    zone: HitZoneConfig,
-    attackerId: EntityId,
-    world: World
-  ): boolean {
-    const disabledBodies: any[] = [];
-    let result = false;
-
-    try {
-      // Исключаем атакующего из проверки коллизий луча
-      const attackerPhys = world.getComponent(attackerId, 'physicsBody');
-      if (attackerPhys && attackerPhys.body) {
-        this.system.remove(attackerPhys.body);
-        disabledBodies.push(attackerPhys.body);
-      }
-
-      while (true) {
-        const rayResult = this.system.raycast(from, rayEnd);
-
-        // Если луч ни во что не уперся, значит путь чист
-        if (!rayResult) {
-          result = true;
-          break;
-        }
-
-        const hitBody = rayResult.body;
-        const hitEntityId = this.bodyToEntityMap.get(hitBody);
-
-        // Если попали точно в цель
-        if (hitEntityId === targetId) {
-          result = true;
-          break;
-        }
-
-        let canPierce = false;
-
-        // Разбираемся с типом препятствия
-        if (hitBody instanceof Line) {
-          canPierce = !!zone.pierceObstacles;
-        } else if (hitEntityId) {
-          const hitHealth = world.getComponent(hitEntityId, 'health');
-          const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
-          const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
-
-          const isDead = hitHealth && !hitHealth.isAlive;
-          const isNonSolid =
-            (hitPhys && hitPhys.mask === COLLISION_MASK_NONE) ||
-            (hitPhysStats && !hitPhysStats.isSolid);
-
-          // Мертвых, бестелесных и триггеры (например ауры) всегда игнорируем
-          if (isDead || isNonSolid || hitPhys?.isTrigger) {
-            canPierce = true;
-          } else {
-            const category = hitPhys?.category ?? CollisionCategory.NONE;
-            if (category === CollisionCategory.CREATURE) {
-              canPierce = !!zone.pierceCreatures;
-            } else if (category === CollisionCategory.ITEM) {
-              canPierce = !!zone.pierceItems;
-            } else if (category === CollisionCategory.OBSTACLE) {
-              canPierce = !!zone.pierceObstacles;
-            }
-          }
-        } else {
-          // Если это тело без Entity (например, статические линии геометрии)
-          if (hitBody instanceof Line) {
-            canPierce = !!zone.pierceObstacles;
-          }
-        }
-
-        if (canPierce) {
-          // Временно отключаем тело и продолжаем пускать луч
-          this.system.remove(hitBody);
-          disabledBodies.push(hitBody);
-        } else {
-          // Попали в непробиваемое препятствие
-          result = false;
-          break;
-        }
-      }
-    } finally {
-      // Обязательно возвращаем все временно отключенные тела обратно в физический движок
-      for (const body of disabledBodies) {
-        this.system.insert(body);
-      }
-    }
-
-    return result;
-  }
-
-  private getDistanceToSegment(p: Point, a: Point, b: Point): number {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const lenSq = dx * dx + dy * dy;
-    if (lenSq === 0) {
-      return Math.hypot(p.x - a.x, p.y - a.y);
-    }
-    let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
-    t = Math.max(0, Math.min(1, t));
-    const projX = a.x + t * dx;
-    const projY = a.y + t * dy;
-    return Math.hypot(p.x - projX, p.y - projY);
   }
 
   public checkWeaponHits(attackerId: EntityId, zone: HitZoneConfig, world: World): EntityId[] {
     const hitEntities: EntityId[] = [];
     const attackerTransform = world.getComponent(attackerId, 'transform');
-    if (!attackerTransform) return hitEntities;
+    if (!attackerTransform || !this.driver) return hitEntities;
 
-    const pos = { x: attackerTransform.x, y: attackerTransform.y };
+    // Смещение по высоте, чтобы луч/сфера исходили из груди, а не скользили по полу (ступням)
+    const heightOffset = 0.9;
+    const pos = {
+      x: attackerTransform.x,
+      y: attackerTransform.y + heightOffset,
+      z: attackerTransform.z,
+    };
     const angle = attackerTransform.angle;
 
     const isTargetValid = (targetId: EntityId) => {
@@ -642,122 +120,139 @@ export class PhysicsSystem {
 
     if (zone.hitZoneType === 'radius' || zone.hitZoneType === 'angle') {
       const checkRadius =
-        zone.hitZoneType === 'radius' ? (zone.radius ?? 50) : (zone.length ?? 120);
-      const testCircle = new Circle(pos, checkRadius);
-      const candidates = new Set<EntityId>();
+        zone.hitZoneType === 'radius' ? (zone.radius ?? 2.5) : (zone.length ?? 4.5);
 
-      this.system.checkOne(testCircle, (response) => {
-        const otherBody = response.b === testCircle ? response.a : response.b;
-        const targetId = this.bodyToEntityMap.get(otherBody);
-        if (targetId && isTargetValid(targetId)) {
-          candidates.add(targetId);
-        }
-      });
+      const candidates = this.driver.queryEntitiesInSphere(pos, checkRadius);
 
       for (const targetId of candidates) {
+        if (!isTargetValid(targetId)) continue;
+
         const transform = world.getComponent(targetId, 'transform');
         if (!transform) continue;
 
-        const targetPos = { x: transform.x, y: transform.y };
+        const targetY = transform.y + heightOffset;
 
         if (zone.hitZoneType === 'angle') {
           const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
-          const physBody = world.getComponent(targetId, 'physicsBody');
-          let inSector = false;
+          const targetAngle = Math.atan2(transform.z - pos.z, transform.x - pos.x);
 
-          if (physBody?.body instanceof Polygon) {
-            for (const pt of physBody.body.calcPoints) {
-              const wx = physBody.body.x + pt.x;
-              const wy = physBody.body.y + pt.y;
-              const a = Math.atan2(wy - pos.y, wx - pos.x);
-              const diff = Math.abs(Math.atan2(Math.sin(a - angle), Math.cos(a - angle)));
-              if (diff <= maxAngle) {
-                inSector = true;
+          let diff = Math.abs(
+            Math.atan2(Math.sin(targetAngle - angle), Math.cos(targetAngle - angle))
+          );
+
+          const physStats = world.getComponent(targetId, 'physicsStats');
+          const targetRadius = physStats?.radius.current ?? 0.4;
+          const dist = Math.hypot(transform.x - pos.x, transform.z - pos.z);
+          const angularTolerance = dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;
+
+          if (diff > maxAngle + angularTolerance) {
+            continue;
+          }
+        }
+
+        // Проверка препятствий (Line of Sight)
+        if (zone.pierceObstacles && zone.pierceCreatures && zone.pierceItems) {
+          hitEntities.push(targetId);
+        } else {
+          // Пускаем луч к цели, чтобы проверить перекрытие
+          const dx = transform.x - pos.x;
+          const dy = targetY - pos.y;
+          const dz = transform.z - pos.z;
+          const dist = Math.hypot(dx, dy, dz);
+
+          if (dist > 0.001) {
+            const dir = { x: dx / dist, y: dy / dist, z: dz / dist };
+            const hitList = this.driver.castRayMultiple(pos, dir, dist, true, attackerId);
+
+            let blocked = false;
+            for (const hit of hitList) {
+              if (hit.entityId === targetId) break; // Дошли до цели
+
+              const tag = world.getComponent(hit.entityId, 'tag');
+              const meta = world.getComponent(hit.entityId, 'meta');
+              const arch = tag?.archetype ?? meta?.entityType;
+              const phys = world.getComponent(hit.entityId, 'physicsBody');
+              const health = world.getComponent(hit.entityId, 'health');
+
+              if (health && !health.isAlive) continue;
+              if (phys?.isTrigger) continue;
+
+              let canPierce = false;
+              if (arch === 'creature') canPierce = !!zone.pierceCreatures;
+              else if (arch === 'item') canPierce = !!zone.pierceItems;
+              else if (arch === 'obstacle') canPierce = !!zone.pierceObstacles;
+
+              if (!canPierce) {
+                blocked = true;
                 break;
               }
             }
-          }
 
-          if (!inSector) {
-            const targetAngle = Math.atan2(targetPos.y - pos.y, targetPos.x - pos.x);
-            const diff = Math.abs(
-              Math.atan2(Math.sin(targetAngle - angle), Math.cos(targetAngle - angle))
-            );
-            const physStats = world.getComponent(targetId, 'physicsStats');
-            const targetRadius = physStats?.radius.current ?? 16;
-            const dist = Math.hypot(targetPos.x - pos.x, targetPos.y - pos.y);
-            const angularTolerance = dist > 0 ? Math.asin(Math.min(1, targetRadius / dist)) : 0;
-            if (diff <= maxAngle + angularTolerance) {
-              inSector = true;
+            if (!blocked) {
+              hitEntities.push(targetId);
             }
+          } else {
+            hitEntities.push(targetId);
           }
-
-          if (!inSector) continue;
-        }
-
-        if (zone.pierceObstacles && zone.pierceCreatures && zone.pierceItems) {
-          hitEntities.push(targetId);
-        } else if (this.canRayReachTarget(pos, targetPos, targetId, zone, attackerId, world)) {
-          hitEntities.push(targetId);
         }
       }
-
       return hitEntities;
     }
 
-    const targets = world.getEntitiesWith('transform', 'physicsBody', 'health');
+    const hitSet = new Set<string>();
 
-    for (const [targetId, { transform, physicsBody }] of targets) {
-      if (!isTargetValid(targetId)) continue;
+    const processRayHits = (hitList: Array<{ entityId: string; toi: number }>) => {
+      for (const hit of hitList) {
+        const targetId = hit.entityId;
 
-      const physStats = world.getComponent(targetId, 'physicsStats');
-      const targetRadius = physStats?.radius.current ?? 16;
-      let isHit = false;
-      const targetPos = { x: transform.x, y: transform.y };
+        const tag = world.getComponent(targetId, 'tag');
+        const meta = world.getComponent(targetId, 'meta');
+        const arch = tag?.archetype ?? meta?.entityType;
+        const phys = world.getComponent(targetId, 'physicsBody');
+        const health = world.getComponent(targetId, 'health');
 
-      switch (zone.hitZoneType) {
-        case 'forward_line': {
-          const len = zone.length ?? 150;
-          const endPoint = {
-            x: pos.x + Math.cos(angle) * len,
-            y: pos.y + Math.sin(angle) * len,
-          };
-          const distToLine = this.getDistanceToSegment(targetPos, pos, endPoint);
-          if (distToLine <= targetRadius) {
-            if (this.canRayReachTarget(pos, endPoint, targetId, zone, attackerId, world)) {
-              isHit = true;
-            }
-          }
-          break;
+        const isDead = health && !health.isAlive;
+        const isTrigger = phys?.isTrigger;
+
+        // Мертвецов и триггеры всегда прошиваем насквозь
+        if (isDead || isTrigger) continue;
+
+        let canPierce = false;
+        if (arch === 'creature') canPierce = !!zone.pierceCreatures;
+        else if (arch === 'item') canPierce = !!zone.pierceItems;
+        else if (arch === 'obstacle') canPierce = !!zone.pierceObstacles;
+
+        if (isTargetValid(targetId)) {
+          hitSet.add(targetId);
         }
-        case 'shrapnel': {
-          const len = zone.length ?? 120;
-          const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
-          const count = zone.rayCount ?? 5;
-          for (let i = 0; i < count; i++) {
-            const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
-            const rayAngle = angle + fraction * (maxAngle * 2);
-            const endPoint = {
-              x: pos.x + Math.cos(rayAngle) * len,
-              y: pos.y + Math.sin(rayAngle) * len,
-            };
-            const distToRay = this.getDistanceToSegment(targetPos, pos, endPoint);
-            if (distToRay <= targetRadius) {
-              if (this.canRayReachTarget(pos, endPoint, targetId, zone, attackerId, world)) {
-                isHit = true;
-                break;
-              }
-            }
-          }
+
+        // Если пробитие для данного типа не разрешено — луч прерывается
+        if (!canPierce) {
           break;
         }
       }
+    };
 
-      if (isHit) {
-        hitEntities.push(targetId);
+    if (zone.hitZoneType === 'forward_line') {
+      const length = zone.length ?? 6.0;
+      const dir = { x: Math.cos(angle), y: 0, z: Math.sin(angle) };
+      const hitList = this.driver.castRayMultiple(pos, dir, length, true, attackerId);
+      processRayHits(hitList);
+    } else if (zone.hitZoneType === 'shrapnel') {
+      const length = zone.length ?? 5.0;
+      const maxAngle = (zone.angle ?? Math.PI / 3) / 2;
+      const count = zone.rayCount ?? 5;
+
+      for (let i = 0; i < count; i++) {
+        const fraction = count > 1 ? i / (count - 1) - 0.5 : 0;
+        const rayAngle = angle + fraction * (maxAngle * 2);
+        const dir = { x: Math.cos(rayAngle), y: 0, z: Math.sin(rayAngle) };
+
+        const hitList = this.driver.castRayMultiple(pos, dir, length, true, attackerId);
+        processRayHits(hitList);
       }
     }
 
-    return hitEntities;
+    return Array.from(hitSet);
   }
 }

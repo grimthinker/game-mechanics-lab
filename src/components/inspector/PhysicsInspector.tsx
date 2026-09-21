@@ -84,16 +84,16 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
           disabled={isReadOnly}
           type="number"
           value={radius}
-          min={1}
-          max={1000}
-          step={1}
+          min={0.05}
+          max={50}
+          step={0.05}
           onFocus={() => {
             isFocusedRef.current = true;
           }}
           onBlur={() => {
             isFocusedRef.current = false;
           }}
-          onChange={(e) => handleUpdate({ radius: Math.max(1, Number(e.target.value)) })}
+          onChange={(e) => handleUpdate({ radius: Math.max(0.05, Number(e.target.value)) })}
         />
       </label>
 

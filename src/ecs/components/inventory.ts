@@ -1,5 +1,5 @@
 import { EntityId } from './base';
-import { Point } from '../../types';
+import { Point, Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { t } from '../../locales';
 
@@ -130,7 +130,7 @@ export interface InteractionActionComponent {
   timer: number;
   totalDuration: number;
   phase?: InteractionPhase;
-  targetItemPos?: Point;
+  targetItemPos?: Vec3;
   elapsedInReach?: number;
   wantsCancel?: boolean;
   relativeDist?: number;

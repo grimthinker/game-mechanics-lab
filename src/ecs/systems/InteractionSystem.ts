@@ -1,7 +1,6 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, EntityId, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
-import { Circle } from 'detect-collisions';
 import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
 import { Radians } from '../../utils';
 import {
@@ -16,6 +15,7 @@ import {
   canItemBeEquippedToArea,
   canItemBeHeldInSlot,
 } from '../utils/itemValidation';
+import RAPIER from '@dimforge/rapier3d-compat';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -154,8 +154,11 @@ export class InteractionSystem {
       }
       if (isTargetAlreadyTargeted) continue;
 
-      const dist = Math.hypot(targetTransform.x - transform.x, targetTransform.y - transform.y);
-      const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 16;
+      const dist = Math.hypot(
+        targetTransform.x - transform.x,
+        (targetTransform.z ?? targetTransform.y) - (transform.z ?? transform.y)
+      );
+      const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 0.4;
       const targetRadius = targetPhysStats.radius.current;
       const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
 
@@ -186,7 +189,7 @@ export class InteractionSystem {
         targetId: targetItemId,
         slotIndex: bestSlotInfo.localSlotIndex,
         partId: bestSlotInfo.partId,
-        targetItemPos: { x: targetTransform.x, y: targetTransform.y },
+        targetItemPos: { x: targetTransform.x, y: targetTransform.y, z: targetTransform.z },
         timer: GAMEPLAY_CONFIG.pickupReachDuration,
         totalDuration: GAMEPLAY_CONFIG.pickupReachDuration,
         elapsedInReach: 0,
@@ -230,17 +233,19 @@ export class InteractionSystem {
 
           let dropX = action.targetItemPos?.x ?? transform.x;
           let dropY = action.targetItemPos?.y ?? transform.y;
+          let dropZ = action.targetItemPos?.z ?? transform.z ?? transform.y;
 
           if (action.relativeDist !== undefined && action.relativeAngle !== undefined) {
             const currentAngle = transform.angle + action.relativeAngle;
             dropX = transform.x + Math.cos(currentAngle) * action.relativeDist;
-            dropY = transform.y + Math.sin(currentAngle) * action.relativeDist;
+            dropZ = (transform.z ?? transform.y) + Math.sin(currentAngle) * action.relativeDist;
           }
 
           const itTransform = world.getComponent(targetId, 'transform');
           if (itTransform) {
             itTransform.x = dropX;
             itTransform.y = dropY;
+            itTransform.z = dropZ;
           }
 
           const renderable = world.getComponent(targetId, 'renderable');
@@ -249,17 +254,26 @@ export class InteractionSystem {
           }
 
           const physStats = world.getComponent(targetId, 'physicsStats');
-          if (physStats) {
-            const body = new Circle({ x: dropX, y: dropY }, physStats.radius.current);
-            body.isStatic = false;
+          if (physStats && physics.driver && physics.driver.isReady) {
+            const radius = physStats.radius.current ?? 0.3;
+            const weight = physStats.weight.current ?? 1;
             const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+
+            const rawBody = physics.driver.createDynamicBody(
+              { x: dropX, y: dropY + 0.5, z: dropZ },
+              targetId
+            );
+            const rawCollider = physics.driver.createBallCollider(radius, rawBody, weight);
+            rawCollider.setRestitution(0.3);
+
             world.addComponent(targetId, 'physicsBody', {
-              body,
+              rawBody,
+              rawCollider,
+              bodyType: 'dynamic',
               isStatic: false,
               category: CollisionCategory.ITEM,
               mask,
             });
-            physics.registerBody(targetId, body);
           }
         }
 
@@ -356,14 +370,14 @@ export class InteractionSystem {
             }
 
             const targetTransform = world.getComponent(targetId, 'transform');
-            const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 16;
-            const targetRadius = targetPhysStats.radius.current;
+            const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 0.4;
+            const targetRadius = targetPhysStats.radius.current ?? 0.3;
 
             let isOutOfReach = false;
             if (targetTransform) {
               const currentDist = Math.hypot(
                 targetTransform.x - transform.x,
-                targetTransform.y - transform.y
+                (targetTransform.z ?? targetTransform.y) - (transform.z ?? transform.y)
               );
               const distBetweenBorders = Math.max(0, currentDist - myRadius - targetRadius);
               if (distBetweenBorders > slot.interactDist) {
@@ -401,9 +415,11 @@ export class InteractionSystem {
             let relativeAngle = 0 as Radians;
             if (targetTransformEntity && selfTransform) {
               const dx = targetTransformEntity.x - selfTransform.x;
-              const dy = targetTransformEntity.y - selfTransform.y;
-              relativeDist = Math.hypot(dx, dy);
-              const worldAngle = Math.atan2(dy, dx);
+              const dz =
+                (targetTransformEntity.z ?? targetTransformEntity.y) -
+                (selfTransform.z ?? selfTransform.y);
+              relativeDist = Math.hypot(dx, dz);
+              const worldAngle = Math.atan2(dz, dx);
               let relAngle = worldAngle - selfTransform.angle;
               relAngle = Math.atan2(Math.sin(relAngle), Math.cos(relAngle));
               relativeAngle = relAngle as Radians;
@@ -413,8 +429,8 @@ export class InteractionSystem {
             world.addComponent(targetId, 'ownership', { ownerId: id, status: 'equipped' });
 
             const physBody = world.getComponent(targetId, 'physicsBody');
-            if (physBody) {
-              physics.unregisterBody(physBody.body);
+            if (physBody && physBody.rawBody) {
+              physics.driver?.removeRigidBody(physBody.rawBody);
               world.removeComponent(targetId, 'physicsBody');
             }
             const renderable = world.getComponent(targetId, 'renderable');
@@ -556,78 +572,34 @@ export class InteractionSystem {
     const physStats = world.getComponent(itemId, 'physicsStats');
 
     if (itemTransform && physStats) {
-      const itemRadius = physStats.radius.current;
+      const itemRadius = physStats.radius.current ?? 0.3;
       const dropDist = slot.interactDist;
 
-      const startPoint = { x: transform.x, y: transform.y };
-      let endPoint = {
-        x: transform.x + Math.cos(transform.angle) * dropDist,
-        y: transform.y + Math.sin(transform.angle) * dropDist,
-      };
+      // Нативный 3D-луч для проверки препятствий при выбрасывании
+      const startPoint = { x: transform.x, y: transform.y + 0.9, z: transform.z };
+      const dir = { x: Math.cos(transform.angle), y: 0, z: Math.sin(transform.angle) };
 
-      const disabledBodies: any[] = [];
-      const dropperPhys = world.getComponent(entityId, 'physicsBody');
+      let safeDist = dropDist;
 
-      // Временно убираем тело того, кто бросает предмет, чтобы луч не застрял в нем самом
-      if (dropperPhys && dropperPhys.body) {
-        physics.system.remove(dropperPhys.body);
-        disabledBodies.push(dropperPhys.body);
-      }
-
-      try {
-        while (true) {
-          const rayResult = physics.system.raycast(startPoint, endPoint);
-          if (!rayResult) break; // Путь чист
-
-          const hitBody = rayResult.body;
-          const hitEntityId = physics.getEntityByBody(hitBody);
-          let blocksDrop = false;
-
-          if (hitEntityId) {
-            const hitPhys = world.getComponent(hitEntityId, 'physicsBody');
-            const hitPhysStats = world.getComponent(hitEntityId, 'physicsStats');
-            const hitHealth = world.getComponent(hitEntityId, 'health');
-
-            const isTrigger = hitPhys?.isTrigger;
-            const isDead = hitHealth && !hitHealth.isAlive;
-            const isSolid = hitPhysStats?.isSolid ?? hitPhys?.mask !== 0;
-
-            // Останавливаем луч только о живые существа, целые препятствия и предметы с коллизией
-            if (!isTrigger && !isDead && isSolid) {
-              blocksDrop = true;
-            }
-          } else {
-            // Геометрия без EntityId (базовые границы)
-            blocksDrop = true;
-          }
-
-          if (blocksDrop) {
-            const hitPoint = (rayResult as any).point || rayResult;
-            const hitDist = Math.hypot(hitPoint.x - startPoint.x, hitPoint.y - startPoint.y);
-            const safeDist = Math.max(0, hitDist - itemRadius - 1);
-
-            endPoint = {
-              x: startPoint.x + Math.cos(transform.angle) * safeDist,
-              y: startPoint.y + Math.sin(transform.angle) * safeDist,
-            };
+      if (physics.driver && physics.driver.isReady) {
+        const hits = physics.driver.castRayMultiple(startPoint, dir, dropDist, true, entityId);
+        for (const hit of hits) {
+          const hitHealth = world.getComponent(hit.entityId, 'health');
+          const hitPhys = world.getComponent(hit.entityId, 'physicsBody');
+          const isDead = hitHealth && !hitHealth.isAlive;
+          if (!isDead && !hitPhys?.isTrigger) {
+            safeDist = Math.max(0, hit.toi - itemRadius - 0.1);
             break;
-          } else {
-            // Игнорируем мертвые тела и триггеры, временно отключая их и продолжая луч
-            physics.system.remove(hitBody);
-            disabledBodies.push(hitBody);
           }
-        }
-      } finally {
-        for (const b of disabledBodies) {
-          physics.system.insert(b);
         }
       }
 
-      itemTransform.x = endPoint.x;
-      itemTransform.y = endPoint.y;
+      const endX = transform.x + Math.cos(transform.angle) * safeDist;
+      const endZ = transform.z + Math.sin(transform.angle) * safeDist;
 
-      const body = new Circle({ x: itemTransform.x, y: itemTransform.y }, itemRadius);
-      body.isStatic = false;
+      itemTransform.x = endX;
+      itemTransform.z = endZ;
+
       const mask = physStats.isSolid
         ? CollisionCategory.OBSTACLE |
           CollisionCategory.CREATURE |
@@ -637,13 +609,30 @@ export class InteractionSystem {
           CollisionCategory.PARTICLE
         : 0;
 
+      let rawBody: RAPIER.RigidBody | undefined;
+      let rawCollider: RAPIER.Collider | undefined;
+
+      if (physics.driver && physics.driver.isReady) {
+        rawBody = physics.driver.createDynamicBody(
+          { x: endX, y: transform.y + 0.5, z: endZ },
+          itemId
+        );
+        rawCollider = physics.driver.createBallCollider(
+          itemRadius,
+          rawBody,
+          physStats.weight.current
+        );
+        rawCollider.setRestitution(0.3);
+      }
+
       world.addComponent(itemId, 'physicsBody', {
-        body,
+        rawBody,
+        rawCollider,
+        bodyType: 'dynamic',
         isStatic: false,
         category: CollisionCategory.ITEM,
         mask,
       });
-      physics.registerBody(itemId, body);
     }
   }
 }

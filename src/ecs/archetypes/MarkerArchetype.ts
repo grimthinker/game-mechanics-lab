@@ -1,4 +1,3 @@
-import { Circle } from 'detect-collisions';
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
@@ -10,7 +9,7 @@ import {
   CollisionCategory,
   COLLISION_MASK_NONE,
 } from '../types';
-import { Point } from '../../types';
+import { Point, Vec3 } from '../../types';
 import { Radians } from '../../utils';
 
 export function assembleMarker(
@@ -19,18 +18,15 @@ export function assembleMarker(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point
+  position?: Point | Vec3
 ): void {
   const gizmo = config.gizmo ?? {
     type: 'marker',
     color: '#9b59b6',
     icon: '📍',
-    radius: 14,
+    radius: 0.4,
   };
 
-  const radius = gizmo.radius ?? 14;
-  const color = gizmo.color ?? '#9b59b6';
-  const icon = gizmo.icon ?? '📍';
   const name = config.meta?.name ?? gizmo.type;
 
   // 1. Тег архетипа
@@ -45,56 +41,30 @@ export function assembleMarker(
   // 3. Компонент гизмо
   world.addComponent(id, 'gizmo', gizmo);
 
-  // 4. Трансформация и физическое тело-сенсор для выборки в check2d
+  // 4. Трансформация и физическое тело-сенсор для выборки в 3D
   const posX = position?.x ?? 0;
-  const posY = position?.y ?? 0;
-  world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
+  const hasZ = position && 'z' in position;
+  const posY = hasZ ? (position as Vec3).y : 0;
+  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  world.addComponent(id, 'transform', {
+    x: posX,
+    y: posY,
+    z: posZ,
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    angle: 0 as Radians,
+  });
 
-  const body = new Circle({ x: posX, y: posY }, radius);
-  body.isStatic = true;
   world.addComponent(id, 'physicsBody', {
-    body,
     isStatic: true,
     category: CollisionCategory.NONE,
     mask: COLLISION_MASK_NONE,
     isTrigger: true,
   });
-  physics.registerBody(id, body);
 
-  // 5. Универсальный компонент отрисовки (Renderable)
-  const renderable: RenderableComponent = {
+  // 5. Компонент видимости
+  world.addComponent(id, 'renderable', {
     zIndex: RENDER_Z_INDEX.GIZMOS,
     isVisible: true,
     syncWithTransform: true,
-    primitives: [
-      {
-        kind: 'circle',
-        radius,
-        fill: 'rgba(155, 89, 182, 0.15)',
-        stroke: color,
-        strokeWidth: 1.5,
-        dash: [4, 4],
-      },
-      {
-        kind: 'text',
-        text: icon,
-        font: '14px sans-serif',
-        fill: '#ffffff',
-        ignoreRotation: true,
-        align: 'center',
-        baseline: 'middle',
-      },
-      {
-        kind: 'text',
-        text: name,
-        offset: { x: 0, y: radius + 4 },
-        font: '10px sans-serif',
-        fill: '#bbbbbb',
-        ignoreRotation: true,
-        align: 'center',
-        baseline: 'top',
-      },
-    ],
-  };
-  world.addComponent(id, 'renderable', renderable);
+  });
 }

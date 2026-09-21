@@ -4,16 +4,18 @@ import { CAMERA_CONFIG } from './config/cameraConfig';
 
 export interface CameraState {
   scale: number;
-  offsetX: number;
-  offsetY: number;
+  targetX: number;
+  targetY: number;
+  targetZ: number;
   yaw: number;
   pitch: number;
 }
 
 export class Camera {
   public scale: number = CAMERA_CONFIG.defaultZoom;
-  public offsetX: number = 0;
-  public offsetY: number = 0;
+  public targetX: number = 0;
+  public targetY: number = 0;
+  public targetZ: number = 0;
   public yaw: number = 0;
   public pitch: number = CAMERA_CONFIG.defaultPitch;
   public readonly minScale: number = CAMERA_CONFIG.minScale;
@@ -81,16 +83,17 @@ export class Camera {
 
   public pan(clientX: number, clientY: number): void {
     if (!this.isPanning) return;
-    const dx = (clientX - this.panStartX) * this.panSpeed;
-    const dy = (clientY - this.panStartY) * this.panSpeed;
+    const metricFactor = (0.04 / this.scale) * this.panSpeed;
+    const dx = (clientX - this.panStartX) * metricFactor;
+    const dy = (clientY - this.panStartY) * metricFactor;
     this.totalPanDistance += Math.hypot(dx, dy);
 
-    // Учитываем текущий угол поворота камеры, чтобы панорамирование шло по экранным осям
+    // Сдвигаем точку фокуса targetX и targetZ вдоль плоскости пола XZ с учетом угла камеры
     const unRotDx = dx * Math.cos(-this.yaw) - dy * Math.sin(-this.yaw);
-    const unRotDy = dx * Math.sin(-this.yaw) + dy * Math.cos(-this.yaw);
+    const unRotDz = dx * Math.sin(-this.yaw) + dy * Math.cos(-this.yaw);
 
-    this.offsetX += unRotDx;
-    this.offsetY += unRotDy;
+    this.targetX -= unRotDx;
+    this.targetZ -= unRotDz;
     this.panStartX = clientX;
     this.panStartY = clientY;
   }
@@ -102,89 +105,40 @@ export class Camera {
   }
 
   public zoomAt(clientX: number, clientY: number, deltaY: number, canvas: HTMLCanvasElement): void {
-    const factor = deltaY < 0 ? 1.1 : 0.9;
-    const newScale = Math.min(this.maxScale, Math.max(this.minScale, this.scale * factor));
-    const rect = canvas.getBoundingClientRect();
-    const screen = { x: clientX - rect.left, y: clientY - rect.top };
-
-    // 1. Узнаем точные мировые координаты точки под курсором ДО изменения масштаба
-    const worldPoint = this.getCanvasPoint(clientX, clientY, canvas);
-
-    // 2. Применяем новый масштаб
-    this.scale = newScale;
-
-    // 3. Вычисляем новые offsetX/offsetY так, чтобы точка осталась ровно под курсором с учетом yaw
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const dx = screen.x - cx;
-    const dy = screen.y - cy;
-
-    const unRotX = dx * Math.cos(-this.yaw) - dy * Math.sin(-this.yaw);
-    const unRotY = dx * Math.sin(-this.yaw) + dy * Math.cos(-this.yaw);
-
-    this.offsetX = unRotX + cx - worldPoint.x * this.scale;
-    this.offsetY = unRotY + cy - worldPoint.y * this.scale;
+    // В 3D масштабирование плавно регулирует дистанцию орбиты без рывков фокуса
+    const factor = deltaY < 0 ? 1.15 : 0.85;
+    this.scale = Math.min(this.maxScale, Math.max(this.minScale, this.scale * factor));
   }
 
-  public getCanvasPoint(clientX: number, clientY: number, canvas: HTMLCanvasElement): Point {
-    const rect = canvas.getBoundingClientRect();
-    const screenX = clientX - rect.left;
-    const screenY = clientY - rect.top;
-
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-    const dx = screenX - cx;
-    const dy = screenY - cy;
-
-    // Снимаем вращение
-    const unRotX = dx * Math.cos(-this.yaw) - dy * Math.sin(-this.yaw);
-    const unRotY = dx * Math.sin(-this.yaw) + dy * Math.cos(-this.yaw);
-
-    const px = unRotX + cx;
-    const py = unRotY + cy;
-
-    return {
-      x: (px - this.offsetX) / this.scale,
-      y: (py - this.offsetY) / this.scale,
-    };
+  public lookAt(worldX: number, worldZ: number, _canvas?: HTMLCanvasElement): void {
+    this.targetX = worldX;
+    this.targetZ = worldZ;
   }
 
-  public lookAt(worldX: number, worldY: number, canvas: HTMLCanvasElement): void {
-    this.offsetX = canvas.width / 2 - worldX * this.scale;
-    this.offsetY = canvas.height / 2 - worldY * this.scale;
-  }
-
-  public reset(canvas: HTMLCanvasElement): void {
-    this.scale = CAMERA_CONFIG.defaultZoom;
-    this.offsetX = canvas.width / 2;
-    this.offsetY = canvas.height / 2;
-    this.yaw = 0;
-    this.pitch = CAMERA_CONFIG.defaultPitch;
-  }
-
-  public resetZoomAndRotation(canvas: HTMLCanvasElement): void {
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-
-    // 1. Вычисляем мировые координаты точки, которая сейчас находится в центре экрана
-    const worldX = (cx - this.offsetX) / this.scale;
-    const worldY = (cy - this.offsetY) / this.scale;
-
-    // 2. Сбрасываем масштаб, угол и наклон к значениям по умолчанию
+  public reset(_canvas?: HTMLCanvasElement): void {
+    this.targetX = 0;
+    this.targetY = 0;
+    this.targetZ = 0;
     this.scale = CAMERA_CONFIG.defaultZoom;
     this.yaw = 0;
     this.pitch = CAMERA_CONFIG.defaultPitch;
+  }
 
-    // 3. Корректируем смещение так, чтобы центр экрана остался на тех же мировых координатах
-    this.offsetX = cx - worldX * this.scale;
-    this.offsetY = cy - worldY * this.scale;
+  public resetZoomAndRotation(_canvas?: HTMLCanvasElement): void {
+    this.targetX = 0;
+    this.targetY = 0;
+    this.targetZ = 0;
+    this.scale = CAMERA_CONFIG.defaultZoom;
+    this.yaw = 0;
+    this.pitch = CAMERA_CONFIG.defaultPitch;
   }
 
   public serialize(): CameraState {
     return {
       scale: this.scale,
-      offsetX: this.offsetX,
-      offsetY: this.offsetY,
+      targetX: this.targetX,
+      targetY: this.targetY,
+      targetZ: this.targetZ,
       yaw: this.yaw,
       pitch: this.pitch,
     };
@@ -194,11 +148,14 @@ export class Camera {
     if (typeof data.scale === 'number' && !Number.isNaN(data.scale)) {
       this.scale = Math.min(this.maxScale, Math.max(this.minScale, data.scale));
     }
-    if (typeof data.offsetX === 'number' && !Number.isNaN(data.offsetX)) {
-      this.offsetX = data.offsetX;
+    if (typeof data.targetX === 'number' && !Number.isNaN(data.targetX)) {
+      this.targetX = data.targetX;
     }
-    if (typeof data.offsetY === 'number' && !Number.isNaN(data.offsetY)) {
-      this.offsetY = data.offsetY;
+    if (typeof data.targetY === 'number' && !Number.isNaN(data.targetY)) {
+      this.targetY = data.targetY;
+    }
+    if (typeof data.targetZ === 'number' && !Number.isNaN(data.targetZ)) {
+      this.targetZ = data.targetZ;
     }
     if (typeof data.yaw === 'number' && !Number.isNaN(data.yaw)) {
       this.yaw = data.yaw;

@@ -26,13 +26,11 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
     vision ? Math.round(rad2Deg(vision.fovAngle.base)) : 135
   );
   const [clarity, setClarity] = useState(vision ? vision.clarity.base : 1.0);
-  const [visionMaxDistance, setVisionMaxDistance] = useState(
-    vision ? vision.maxDistance.base : 400
-  );
+  const [visionMaxDistance, setVisionMaxDistance] = useState(vision ? vision.maxDistance.base : 25);
 
   const [sensitivity, setSensitivity] = useState(hearing ? hearing.sensitivity.base : 1.0);
   const [hearingMaxDistance, setHearingMaxDistance] = useState(
-    hearing ? hearing.maxDistance.base : 500
+    hearing ? hearing.maxDistance.base : 30
   );
 
   useEffect(() => {
@@ -125,9 +123,9 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
               disabled={isReadOnly}
               type="number"
               value={visionMaxDistance}
-              min={10}
-              max={2000}
-              step={10}
+              min={1}
+              max={150}
+              step={1}
               style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
               onChange={(e) => {
                 const val = Number(e.target.value);
@@ -195,9 +193,9 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
               disabled={isReadOnly}
               type="number"
               value={hearingMaxDistance}
-              min={10}
-              max={2000}
-              step={10}
+              min={1}
+              max={150}
+              step={1}
               style={{ width: '70px', padding: '2px 4px', textAlign: 'right' }}
               onChange={(e) => {
                 const val = Number(e.target.value);

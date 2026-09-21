@@ -2,7 +2,7 @@ import { World } from '../ecs/World';
 import { PhysicsSystem } from '../ecs/systems/PhysicsSystem';
 import { Camera } from '../Camera';
 import { EntityId } from '../ecs/types';
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 
 import { GizmoRenderData } from '../gizmos/types';
 
@@ -11,7 +11,6 @@ export interface EditorRenderData {
   selectedIds: Set<EntityId>;
   hoveredId: EntityId | null;
   marqueeBox?: { start: Point; current: Point } | null;
-  gizmo?: GizmoRenderData | null;
   showAIDebug?: boolean;
 }
 
@@ -30,6 +29,7 @@ export interface IRenderer {
   render(context: RenderContext): void;
   destroy?(): void;
   getCanvas(): HTMLCanvasElement;
-  screenToWorld(clientX: number, clientY: number, camera2D: Camera): Point;
+  screenToWorld(clientX: number, clientY: number, camera: Camera): Vec3;
   pickEntity?(clientX: number, clientY: number): EntityId | null;
+  projectToScreen?(pos: Vec3): Vec3 | null;
 }

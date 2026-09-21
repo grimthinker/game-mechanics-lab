@@ -16,7 +16,7 @@ import {
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
-import { Point } from './types';
+import { Point, Vec3 } from './types';
 import { Radians } from './utils';
 import { calculateTotalEntityWeight, getAggregatedInteractionSlots } from './ecs/utils/hierarchy';
 import { getEffectiveLogicBrain } from './ecs/utils/anatomy';
@@ -89,7 +89,7 @@ export class EntityAdapter implements IMovable, EntityController {
   public get targetLookAngle(): Radians | undefined {
     return this.getComponent('input')?.targetLookAngle;
   }
-  public get pos(): Point {
+  public get pos(): Vec3 {
     return this.movementAdapter.pos;
   }
   public get angle(): Radians {

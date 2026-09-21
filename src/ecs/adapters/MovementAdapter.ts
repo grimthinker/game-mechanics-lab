@@ -5,8 +5,8 @@ import {
   CreatureDirectionMode,
   CreatureActionMode,
 } from '../types';
-import { Point } from '../../types';
-import { Radians } from '../../utils';
+import { Vec3, Radians, Point } from '../../types';
+import { quat_getYaw } from '../../math/quat';
 
 export class MovementAdapter {
   constructor(
@@ -24,18 +24,19 @@ export class MovementAdapter {
     return this.getComponent('input');
   }
 
-  public get pos(): Point {
+  public get pos(): Vec3 {
     const transform = this.getComponent('transform');
-    return transform ? { x: transform.x, y: transform.y } : { x: 0, y: 0 };
+    return transform ? { x: transform.x, y: transform.y, z: transform.z } : { x: 0, y: 0, z: 0 };
   }
 
   public get angle(): Radians {
     const transform = this.getComponent('transform');
-    return (transform ? transform.angle : 0) as Radians;
+    if (!transform) return 0 as Radians;
+    return transform.rotation ? quat_getYaw(transform.rotation) : (transform.angle ?? 0);
   }
 
   public get radius(): number {
-    return this.getComponent('physicsStats')?.radius.current ?? 16;
+    return this.getComponent('physicsStats')?.radius.current ?? 0.4;
   }
 
   public get stance(): import('../types').CreatureStance {

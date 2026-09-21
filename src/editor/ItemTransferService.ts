@@ -5,8 +5,8 @@ import {
   findItemLocation,
   validateItemTransfer,
 } from '../ecs/utils/itemValidation';
-import { Circle } from 'detect-collisions';
 import { CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../ecs/types';
+import RAPIER from '@dimforge/rapier3d-compat';
 
 export class ItemTransferService {
   constructor(private app: GameApp) {}
@@ -110,7 +110,9 @@ export class ItemTransferService {
     } else if (location.type === 'ground') {
       const physBody = world.getComponent(itemId, 'physicsBody');
       if (physBody) {
-        this.app.physics.unregisterBody(physBody.body);
+        if (physBody.rawBody) {
+          this.app.physicsDriver.removeRigidBody(physBody.rawBody);
+        }
         world.removeComponent(itemId, 'physicsBody');
       }
     }
@@ -174,12 +176,14 @@ export class ItemTransferService {
       const transform = world.getComponent(itemId, 'transform');
       let posX = location.position?.x ?? transform?.x;
       let posY = location.position?.y ?? transform?.y;
+      let posZ = (location.position as any)?.z ?? transform?.z;
 
       if (location.parentEntityId) {
         const parentTrans = world.getComponent(location.parentEntityId, 'transform');
         if (parentTrans) {
           posX = parentTrans.x;
           posY = parentTrans.y;
+          posZ = parentTrans.z ?? 0;
         }
       }
 
@@ -189,45 +193,66 @@ export class ItemTransferService {
           if (sTrans) {
             posX = sTrans.x;
             posY = sTrans.y;
+            posZ = sTrans.z ?? 0;
           }
         } else if (source.type === 'area' || source.type === 'inventory') {
           const sTrans = world.getComponent(source.containerId, 'transform');
           if (sTrans) {
             posX = sTrans.x;
             posY = sTrans.y;
+            posZ = sTrans.z ?? 0;
           }
         }
       }
 
-      const canvas = this.app.canvas;
-      const cx = canvas ? canvas.width / 2 : 300;
-      const cy = canvas ? canvas.height / 2 : 300;
-      const scale = this.app.camera.scale || 1;
-      const defaultX = (cx - this.app.camera.offsetX) / scale;
-      const defaultY = (cy - this.app.camera.offsetY) / scale;
+      const defaultX = this.app.camera.targetX ?? 0;
+      const defaultY = (this.app.camera.targetY ?? 0) + 1.0;
+      const defaultZ = this.app.camera.targetZ ?? 0;
 
       posX = posX ?? defaultX;
       posY = posY ?? defaultY;
+      posZ = posZ ?? defaultZ;
 
       if (transform) {
         transform.x = posX;
         transform.y = posY;
+        transform.z = posZ;
       } else {
-        world.addComponent(itemId, 'transform', { x: posX, y: posY, angle: 0 });
+        world.addComponent(itemId, 'transform', {
+          x: posX,
+          y: posY,
+          z: posZ,
+          rotation: { x: 0, y: 0, z: 0, w: 1 },
+          angle: 0,
+        });
       }
 
       const physStats = world.getComponent(itemId, 'physicsStats');
       if (physStats) {
-        const body = new Circle({ x: posX, y: posY }, physStats.radius.current);
-        body.isStatic = false;
+        const radius = physStats.radius.current ?? 0.3;
+        const weight = physStats.weight.current ?? 1;
+
         const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+
+        // Нативное 3D Dynamic тело Rapier
+        let rawBody: RAPIER.RigidBody | undefined;
+        let rawCollider: RAPIER.Collider | undefined;
+
+        if (this.app.physicsDriver && this.app.physicsDriver.isReady) {
+          const pos3D = { x: posX, y: posY ?? 1.5, z: posZ };
+          rawBody = this.app.physicsDriver.createDynamicBody(pos3D, itemId);
+          rawCollider = this.app.physicsDriver.createBallCollider(radius, rawBody, weight);
+          rawCollider.setRestitution(0.3);
+        }
+
         world.addComponent(itemId, 'physicsBody', {
-          body,
+          rawBody,
+          rawCollider,
+          bodyType: 'dynamic',
           isStatic: false,
           category: CollisionCategory.ITEM,
           mask,
         });
-        this.app.physics.registerBody(itemId, body);
       }
       const renderable = world.getComponent(itemId, 'renderable');
       if (renderable) renderable.isVisible = true;

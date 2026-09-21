@@ -89,9 +89,9 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: false,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 1, isSolid: true },
+            physics: { radius: 0.4, weight: 1, isSolid: true },
             weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
-            weaponZone: { hitZoneType: 'forward_line', length: 150 },
+            weaponZone: { hitZoneType: 'forward_line', length: 4.5 },
           }),
         },
         {
@@ -110,9 +110,9 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: false,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 1, isSolid: true },
+            physics: { radius: 0.4, weight: 1, isSolid: true },
             weaponStats: { baseDamage: 15, prepTime: 0.4, recoveryTime: 0.5 },
-            weaponZone: { hitZoneType: 'shrapnel', length: 120, angle: deg2Rad(60), rayCount: 5 },
+            weaponZone: { hitZoneType: 'shrapnel', length: 4.0, angle: deg2Rad(60), rayCount: 5 },
           }),
         },
         {
@@ -131,9 +131,9 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: false,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 1, isSolid: true },
+            physics: { radius: 0.4, weight: 1, isSolid: true },
             weaponStats: { baseDamage: 30, prepTime: 0.3, recoveryTime: 0.4 },
-            weaponZone: { hitZoneType: 'radius', radius: 50 },
+            weaponZone: { hitZoneType: 'radius', radius: 2.0 },
           }),
         },
       ],
@@ -157,7 +157,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: true,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 1.5, isSolid: true },
+            physics: { radius: 0.4, weight: 1.5, isSolid: true },
             armorStats: { defense: 5, flatReduction: 0 },
             equip: {
               equipmentAreas: [
@@ -196,7 +196,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: true,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 12, isSolid: true },
+            physics: { radius: 0.4, weight: 12, isSolid: true },
             armorStats: { defense: 20, flatReduction: 3 },
             inventory: { size: { width: 3, height: 2 } },
             equip: {
@@ -235,7 +235,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: true,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 20, isSolid: true },
+            physics: { radius: 0.4, weight: 20, isSolid: true },
             armorStats: { defense: 25, flatReduction: 5 },
           }),
         },
@@ -255,7 +255,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: true,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 10, isSolid: true },
+            physics: { radius: 0.3, weight: 10, isSolid: true },
             armorStats: { defense: 15, flatReduction: 2 },
           }),
         },
@@ -275,7 +275,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: true,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 16, weight: 1, isSolid: true },
+            physics: { radius: 0.4, weight: 1, isSolid: true },
             inventory: { size: { width: 6, height: 4 } },
           }),
         },
@@ -293,10 +293,10 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
             tag: { archetype: 'obstacle' },
             meta: { name: t('palette.wall'), entityType: 'obstacle', destructible: false },
             physics: {
-              radius: 54,
+              radius: 2.0,
               weight: 1000,
               isSolid: true,
-              points: createRectanglePoints(100, 40),
+              points: createRectanglePoints(4.0, 1.0),
             },
           }),
         },
@@ -310,10 +310,10 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
             meta: { name: t('palette.crate'), entityType: 'obstacle', destructible: true },
             health: { hp: 100, maxHp: 100 },
             physics: {
-              radius: 42,
+              radius: 0.8,
               weight: 50,
               isSolid: true,
-              points: createRectanglePoints(60, 60),
+              points: createRectanglePoints(1.5, 1.5),
             },
           }),
         },
@@ -327,14 +327,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           name: t('palette.zoneFire'),
           description: t('palette.zoneFireDesc'),
           icon: '🔥',
-          createConfig: () => createZoneConfig('damage', 70, 15, t('palette.zoneFire')),
+          createConfig: () => createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
         },
         {
           id: 'zone_heal',
           name: t('palette.zoneHeal'),
           description: t('palette.zoneHealDesc'),
           icon: '💚',
-          createConfig: () => createZoneConfig('heal', 70, 15, t('palette.zoneHeal')),
+          createConfig: () => createZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
         },
         {
           id: 'zone_repel',
@@ -344,14 +344,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           createConfig: () =>
             createZoneConfig(
               'repel',
-              70,
-              200,
+              2.5,
+              20,
               t('palette.zoneRepel'),
               false,
               false,
               false,
               true,
-              7000,
+              50,
               0
             ),
         },
@@ -363,14 +363,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           createConfig: () =>
             createZoneConfig(
               'attract',
-              70,
-              200,
+              2.5,
+              20,
               t('palette.zoneAttract'),
               false,
               false,
               false,
               true,
-              7000,
+              50,
               0
             ),
         },
@@ -382,7 +382,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           createConfig: () =>
             createZoneConfig(
               'time_dilation',
-              70,
+              2.5,
               0.5,
               t('palette.zoneTimeSlow'),
               false,
@@ -399,7 +399,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           createConfig: () =>
             createZoneConfig(
               'time_dilation',
-              70,
+              2.5,
               1.8,
               t('palette.zoneTimeFast'),
               false,
@@ -416,7 +416,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           createConfig: () =>
             createZoneConfig(
               'time_dilation',
-              90,
+              3.5,
               0.5,
               t('palette.zoneTimeVortex'),
               false,

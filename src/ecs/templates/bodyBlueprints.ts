@@ -1,7 +1,6 @@
 import { BodyStructureType, CreatureBodyBlueprint } from './types';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 import { deg2Rad } from '../../utils';
-
 export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'humanoid',
   name: 'Гуманоид',
@@ -14,7 +13,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Туловище' },
-        physics: { radius: 12, weight: 15, size: 20 },
+        physics: { radius: 0.3, weight: 15, size: 20 },
         heart: { requiresBrain: true },
         socketDef: {
           sockets: {
@@ -39,7 +38,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'head' },
         meta: { name: 'Голова' },
-        physics: { radius: 8, weight: 5, size: 10 },
+        physics: { radius: 0.2, weight: 5, size: 10 },
         vision: {
           fovAngle: BALANCE_CONFIG.senses.defaultFovAngle,
           clarity: BALANCE_CONFIG.senses.defaultVisionClarity,
@@ -67,7 +66,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
         meta: { name: 'Левая рука' },
-        physics: { radius: 6, weight: 4, size: 10 },
+        physics: { radius: 0.15, weight: 4, size: 10 },
         socketDef: {
           sockets: {
             base: { type: 'shoulder', size: 10, strength: 40 },
@@ -76,7 +75,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'hand_left',
           name: 'Левая рука',
-          interactDist: 25,
+          interactDist: 1.5,
           strength: 15,
           itemId: null,
           rigSocketName: 'LeftHandSocket',
@@ -95,7 +94,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
         meta: { name: 'Правая рука' },
-        physics: { radius: 6, weight: 4, size: 10 },
+        physics: { radius: 0.15, weight: 4, size: 10 },
         socketDef: {
           sockets: {
             base: { type: 'shoulder', size: 10, strength: 40 },
@@ -104,7 +103,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'hand_right',
           name: 'Правая рука',
-          interactDist: 25,
+          interactDist: 1.5,
           strength: 15,
           itemId: null,
           rigSocketName: 'RightHandSocket',
@@ -123,7 +122,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога' },
-        physics: { radius: 7, weight: 6, size: 12 },
+        physics: { radius: 0.2, weight: 6, size: 12 },
         locomotion: {},
         socketDef: {
           sockets: {
@@ -144,7 +143,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога' },
-        physics: { radius: 7, weight: 6, size: 12 },
+        physics: { radius: 0.2, weight: 6, size: 12 },
         locomotion: {},
         socketDef: {
           sockets: {
@@ -182,7 +181,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
           equippable: true,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 16, weight: 1, isSolid: true },
+        physics: { radius: 0.4, weight: 1, isSolid: true },
         inventory: { size: { width: 6, height: 4 } },
       },
     },
@@ -198,7 +197,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Туловище' },
-        physics: { radius: 14, weight: 22, size: 25 },
+        physics: { radius: 0.35, weight: 22, size: 25 },
         heart: { requiresBrain: true },
         socketDef: {
           sockets: {
@@ -222,15 +221,15 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'head' },
         meta: { name: 'Голова' },
-        physics: { radius: 9, weight: 6, size: 12 },
+        physics: { radius: 0.25, weight: 6, size: 12 },
         vision: {
           fovAngle: deg2Rad(150),
           clarity: 1.0,
-          maxDistance: 420,
+          maxDistance: 25,
         },
         hearing: {
           sensitivity: 1.4,
-          maxDistance: 600,
+          maxDistance: 35,
         },
         socketDef: {
           sockets: {
@@ -241,7 +240,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'jaw',
           name: 'Пасть',
-          interactDist: 20,
+          interactDist: 1.2,
           strength: 20,
           itemId: null,
         },
@@ -257,7 +256,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Передняя левая лапа' },
-        physics: { radius: 6, weight: 5, size: 10 },
+        physics: { radius: 0.15, weight: 5, size: 10 },
         locomotion: {},
         socketDef: {
           sockets: {
@@ -271,7 +270,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Передняя правая лапа' },
-        physics: { radius: 6, weight: 5, size: 10 },
+        physics: { radius: 0.15, weight: 5, size: 10 },
         locomotion: {},
         socketDef: {
           sockets: {
@@ -285,7 +284,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Задняя левая лапа' },
-        physics: { radius: 7, weight: 6, size: 12 },
+        physics: { radius: 0.2, weight: 6, size: 12 },
         locomotion: {},
         socketDef: {
           sockets: {
@@ -299,7 +298,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Задняя правая лапа' },
-        physics: { radius: 7, weight: 6, size: 12 },
+        physics: { radius: 0.2, weight: 6, size: 12 },
         locomotion: {},
         socketDef: {
           sockets: {
@@ -313,7 +312,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'tail' },
         meta: { name: 'Хвост' },
-        physics: { radius: 4, weight: 2, size: 6 },
+        physics: { radius: 0.1, weight: 2, size: 6 },
         socketDef: {
           sockets: {
             base: { type: 'tail', size: 6, strength: 25 },
@@ -351,17 +350,17 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Головогрудь' },
-        physics: { radius: 13, weight: 18, size: 22 },
+        physics: { radius: 0.35, weight: 18, size: 22 },
         heart: { requiresBrain: true },
         bodyBrain: { power: 100, isActive: true },
         vision: {
           fovAngle: deg2Rad(260),
           clarity: 0.9,
-          maxDistance: 380,
+          maxDistance: 25,
         },
         hearing: {
           sensitivity: 1.5,
-          maxDistance: 450,
+          maxDistance: 30,
         },
         socketDef: {
           sockets: {
@@ -385,7 +384,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Брюшко' },
-        physics: { radius: 12, weight: 16, size: 20 },
+        physics: { radius: 0.3, weight: 16, size: 20 },
         socketDef: {
           sockets: {
             base: { type: 'abdomen', size: 16, strength: 60 },
@@ -403,7 +402,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
         meta: { name: 'Левая хелицера' },
-        physics: { radius: 5, weight: 3, size: 7 },
+        physics: { radius: 0.15, weight: 3, size: 7 },
         socketDef: {
           sockets: {
             base: { type: 'chelicera', size: 8, strength: 35 },
@@ -412,7 +411,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'chelicera_l',
           name: 'Левая хелицера',
-          interactDist: 20,
+          interactDist: 1.2,
           strength: 12,
           itemId: null,
         },
@@ -423,7 +422,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
         meta: { name: 'Правая хелицера' },
-        physics: { radius: 5, weight: 3, size: 7 },
+        physics: { radius: 0.15, weight: 3, size: 7 },
         socketDef: {
           sockets: {
             base: { type: 'chelicera', size: 8, strength: 35 },
@@ -432,7 +431,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'chelicera_r',
           name: 'Правая хелицера',
-          interactDist: 20,
+          interactDist: 1.2,
           strength: 12,
           itemId: null,
         },
@@ -443,7 +442,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога 1' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -453,7 +452,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога 2' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -463,7 +462,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога 3' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -473,7 +472,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Левая нога 4' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -483,7 +482,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога 1' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -493,7 +492,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога 2' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -503,7 +502,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога 3' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },
@@ -513,7 +512,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Правая нога 4' },
-        physics: { radius: 5, weight: 3, size: 8 },
+        physics: { radius: 0.15, weight: 3, size: 8 },
         locomotion: {},
         socketDef: { sockets: { base: { type: 'arachnid_leg', size: 8, strength: 35 } } },
       },

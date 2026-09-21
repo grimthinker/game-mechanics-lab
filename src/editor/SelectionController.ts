@@ -101,20 +101,21 @@ export class SelectionController {
       return [];
     }
 
-    const startX = start.x;
-    const startY = start.y;
-    const currentX = current.x;
-    const currentY = current.y;
+    const rect = this.app.canvas.getBoundingClientRect();
+    const startX = start.x - rect.left;
+    const startY = start.y - rect.top;
+    const currentX = current.x - rect.left;
+    const currentY = current.y - rect.top;
 
-    const p1 = this.app.getCanvasPoint(startX, startY);
-    const p2 = this.app.getCanvasPoint(currentX, startY);
-    const p3 = this.app.getCanvasPoint(currentX, currentY);
-    const p4 = this.app.getCanvasPoint(startX, currentY);
+    const minX = Math.min(startX, currentX);
+    const maxX = Math.max(startX, currentX);
+    const minY = Math.min(startY, currentY);
+    const maxY = Math.max(startY, currentY);
 
-    const rawIds = this.app.physics.queryEntitiesInPolygon([p1, p2, p3, p4]);
     const filteredIds: string[] = [];
+    const entities = this.app.world.getEntitiesWith('transform');
 
-    for (const id of rawIds) {
+    for (const [id, { transform }] of entities) {
       const renderable = this.app.world.getComponent(id, 'renderable');
       if (renderable && !renderable.isVisible) continue;
 
@@ -126,7 +127,25 @@ export class SelectionController {
         continue;
       }
 
-      filteredIds.push(id);
+      if (this.app.renderer.projectToScreen) {
+        const meshHeight = archetype === 'creature' ? 0.9 : 0.2;
+        const screenPos = this.app.renderer.projectToScreen({
+          x: transform.x,
+          y: transform.y + meshHeight,
+          z: transform.z,
+        });
+
+        if (screenPos) {
+          if (
+            screenPos.x >= minX &&
+            screenPos.x <= maxX &&
+            screenPos.y >= minY &&
+            screenPos.y <= maxY
+          ) {
+            filteredIds.push(id);
+          }
+        }
+      }
     }
 
     this.selectedEntityIds = new Set(filteredIds);
@@ -140,58 +159,33 @@ export class SelectionController {
   }
 
   public pickEntityAt(worldPoint: Point, clientX?: number, clientY?: number): string | null {
-    if (
-      this.app.activeRendererMode === '3d' &&
-      clientX !== undefined &&
-      clientY !== undefined &&
-      this.app.renderer.pickEntity
-    ) {
-      const hit3dId = this.app.renderer.pickEntity(clientX, clientY);
-      if (hit3dId) return hit3dId;
+    // 3D Raycasting через Three.js: клик проверяется строго по геометрии
+    if (clientX !== undefined && clientY !== undefined && this.app.renderer.pickEntity) {
+      return this.app.renderer.pickEntity(clientX, clientY);
     }
-
-    const isEditor = this.app.gameMode === GameMode.EDITOR;
-    const hitIds = this.app.physics.queryPointAt(worldPoint);
-    const hits: { id: string; zIndex: number }[] = [];
-
-    for (const entityId of hitIds) {
-      const renderable = this.app.world.getComponent(entityId, 'renderable');
-      if (renderable && !renderable.isVisible) continue;
-
-      const physicsBody = this.app.world.getComponent(entityId, 'physicsBody');
-      const physStats = this.app.world.getComponent(entityId, 'physicsStats');
-      if (!isEditor && !physicsBody && !physStats) continue;
-
-      hits.push({ id: entityId, zIndex: renderable?.zIndex ?? 0 });
-    }
-
-    if (hits.length > 0) {
-      hits.sort((a, b) => b.zIndex - a.zIndex);
-      return hits[0].id;
-    }
-
-    if (isEditor) {
-      return this.pickNearestEntity(worldPoint);
-    }
-
     return null;
   }
 
   public pickNearestEntity(
     worldPoint: Point,
-    maxDistanceRatio: number = VISUAL_CONFIG.creatureHoverScreenRatio ?? 0.02
+    maxDistanceRatio: number = VISUAL_CONFIG.creatureHoverScreenRatio ?? 0.02,
+    clientX?: number,
+    clientY?: number
   ): string | null {
+    // При наведении мыши используем точный 3D Raycaster
+    if (clientX !== undefined && clientY !== undefined && this.app.renderer.pickEntity) {
+      return this.app.renderer.pickEntity(clientX, clientY);
+    }
+
+    // Фолбэк по дистанции 3D (если Raycaster недоступен)
     const isEditor = this.app.gameMode === GameMode.EDITOR;
-    const maxScreenDistancePx = this.app.canvas.width * maxDistanceRatio;
-    const maxWorldDist = maxScreenDistancePx / this.app.camera.scale;
+    const maxWorldDist = 2.0; // 2 метра
 
-    const candidates = this.app.physics.queryEntitiesInRadius(worldPoint, maxWorldDist);
-
+    const entities = this.app.world.getEntitiesWith('transform');
     let nearestId: string | null = null;
     let minDistance = Infinity;
-    let bestZIndex = -Infinity;
 
-    for (const { id: entityId, overlap } of candidates) {
+    for (const [entityId, { transform }] of entities) {
       const renderable = this.app.world.getComponent(entityId, 'renderable');
       if (renderable && !renderable.isVisible) continue;
 
@@ -199,16 +193,19 @@ export class SelectionController {
       const physStats = this.app.world.getComponent(entityId, 'physicsStats');
       if (!isEditor && !physicsBody && !physStats) continue;
 
-      const distToBoundary = Math.max(0, maxWorldDist - overlap);
-      const zIndex = renderable?.zIndex ?? 0;
+      const targetZ = transform.z ?? transform.y;
+      const wZ = (worldPoint as any).z ?? worldPoint.y;
+      const dx = transform.x - worldPoint.x;
+      const dy = transform.y - 0;
+      const dz = targetZ - wZ;
+      const dist = Math.hypot(dx, dy, dz);
 
-      if (distToBoundary < minDistance - 0.001) {
+      const radius = physStats?.radius.current ?? 0.4;
+      const distToBoundary = Math.max(0, dist - radius);
+
+      if (distToBoundary < minDistance && distToBoundary <= maxWorldDist) {
         minDistance = distToBoundary;
         nearestId = entityId;
-        bestZIndex = zIndex;
-      } else if (Math.abs(distToBoundary - minDistance) <= 0.001 && zIndex > bestZIndex) {
-        nearestId = entityId;
-        bestZIndex = zIndex;
       }
     }
 

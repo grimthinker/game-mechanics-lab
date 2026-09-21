@@ -29,8 +29,8 @@ export interface ZoneTypeParams {
 
 export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
   angle: {
-    length: 100,
-    radius: 50,
+    length: 4.5,
+    radius: 2.5,
     angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
@@ -38,8 +38,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     pierceItems: false,
   },
   radius: {
-    length: 100,
-    radius: 50,
+    length: 4.5,
+    radius: 2.5,
     angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
@@ -47,8 +47,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     pierceItems: false,
   },
   forward_line: {
-    length: 150,
-    radius: 50,
+    length: 6.0,
+    radius: 2.5,
     angle: deg2Rad(30),
     rayCount: 5,
     pierceObstacles: false,
@@ -56,8 +56,8 @@ export const DEFAULT_ZONE_PARAMS: Record<HitZoneType, ZoneTypeParams> = {
     pierceItems: false,
   },
   shrapnel: {
-    length: 120,
-    radius: 50,
+    length: 5.0,
+    radius: 2.5,
     angle: deg2Rad(60),
     rayCount: 5,
     pierceObstacles: false,

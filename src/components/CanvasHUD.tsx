@@ -7,7 +7,7 @@ import { CAMERA_CONFIG } from '../config/cameraConfig';
 
 export interface CanvasHUDProps {
   camera: Camera | null | undefined;
-  cursorWorldPos: Point | null;
+  cursorWorldPos: Point | { x: number; y: number; z?: number } | null;
   onResetCamera: () => void;
   gizmoTool?: GizmoTool;
   onSelectGizmoTool?: (tool: GizmoTool) => void;
@@ -25,8 +25,8 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
   const [rotateSpeed, setRotateSpeed] = useState(() => camera?.rotateSpeed ?? 1.0);
 
   const scalePercent = camera ? Math.round(camera.scale * 100) : 100;
-  const cameraX = camera ? Math.round(-camera.offsetX / camera.scale) : 0;
-  const cameraY = camera ? Math.round(-camera.offsetY / camera.scale) : 0;
+  const cameraX = camera ? camera.targetX.toFixed(1) : '0.0';
+  const cameraZ = camera ? camera.targetZ.toFixed(1) : '0.0';
 
   return (
     <div
@@ -87,7 +87,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
         <div style={{ borderLeft: '1px solid #333', paddingLeft: '8px' }}>
           <span style={{ color: '#888' }}>{t('hud.camera')} </span>
           <span style={{ color: '#3498db' }}>
-            X:{cameraX} Y:{cameraY}
+            X:{cameraX}m Z:{cameraZ}m
           </span>
         </div>
 
@@ -95,7 +95,8 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           <span style={{ color: '#888' }}>{t('hud.cursor')} </span>
           {cursorWorldPos ? (
             <span style={{ color: '#2ecc71' }}>
-              X:{cursorWorldPos.x} Y:{cursorWorldPos.y}
+              X:{cursorWorldPos.x.toFixed(1)}m Z:
+              {((cursorWorldPos as any).z ?? cursorWorldPos.y).toFixed(1)}m
             </span>
           ) : (
             <span style={{ color: '#666' }}>—</span>

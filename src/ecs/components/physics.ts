@@ -1,16 +1,26 @@
-import { Body } from 'detect-collisions';
-import { Point } from '../../types';
-import { Radians } from '../../utils';
+import RAPIER from '@dimforge/rapier3d-compat';
+import { Point, Vec3, Quat, Radians } from '../../types';
 import { StatValue } from './stats';
+
+export type PhysicsBodyType = 'dynamic' | 'fixed' | 'kinematicPositionBased';
 
 export interface TransformComponent {
   x: number;
   y: number;
+  z: number;
+  rotation: Quat;
+  /** Вспомогательное поле рыскания (Yaw) для обратной совместимости систем */
   angle: Radians;
 }
 
 export interface PhysicsBodyComponent {
-  body: Body;
+  /** Нативное твердое тело Rapier3D (WASM) */
+  rawBody?: RAPIER.RigidBody;
+  /** Основной коллайдер тела в Rapier3D */
+  rawCollider?: RAPIER.Collider;
+  /** Тип физического поведения в 3D */
+  bodyType?: PhysicsBodyType;
+
   isStatic: boolean;
   category: number;
   mask: number;

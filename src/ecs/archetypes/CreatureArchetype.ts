@@ -2,10 +2,9 @@ import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
 import { EntityId, EntityConfig, CollisionCategory, COLLISION_MASK_ALL } from '../types';
-import { Point } from '../../types';
+import { Point, Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
-import { Circle } from 'detect-collisions';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
 export function assembleCreature(
@@ -14,7 +13,7 @@ export function assembleCreature(
   aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point
+  position?: Point | Vec3
 ): void {
   const behavior = config.ai?.behavior ?? 'IdleTree';
 
@@ -41,9 +40,9 @@ export function assembleCreature(
     healFlashTimer: 0,
   });
 
-  // 4. Передвижение
-  const maxSpeed = config.movement?.maxSpeed ?? 150;
-  const maxTurnSpeed = config.movement?.maxTurnSpeed ?? ((Math.PI * 1.5) as Radians);
+  // 4. Передвижение (в метрической системе)
+  const maxSpeed = config.movement?.maxSpeed ?? BALANCE_CONFIG.creature.maxSpeed;
+  const maxTurnSpeed = config.movement?.maxTurnSpeed ?? BALANCE_CONFIG.creature.maxTurnSpeed;
   world.addComponent(id, 'movementStats', {
     maxSpeed: createStat(maxSpeed),
     maxTurnSpeed: createStat(maxTurnSpeed),
@@ -73,10 +72,12 @@ export function assembleCreature(
   world.addComponent(id, 'velocity', {
     vx: 0,
     vy: 0,
+    vz: 0,
     currentSpeed: 0,
     currentTurnSpeed: 0 as Radians,
     externalVx: 0,
     externalVy: 0,
+    externalVz: 0,
   });
 
   world.addComponent(id, 'input', {
@@ -126,10 +127,18 @@ export function assembleCreature(
     world.addComponent(id, 'animator', JSON.parse(JSON.stringify(config.animator)));
   }
 
-  // 8. Трансформация (Базовая координата всего существа)
+  // 8. Трансформация (Базовая координата всего существа в 3D)
   const posX = position?.x ?? 0;
-  const posY = position?.y ?? 0;
-  world.addComponent(id, 'transform', { x: posX, y: posY, angle: 0 as Radians });
+  const hasZ = position && 'z' in position;
+  const posY = hasZ ? (position as Vec3).y : 0;
+  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  world.addComponent(id, 'transform', {
+    x: posX,
+    y: posY,
+    z: posZ,
+    rotation: { x: 0, y: 0, z: 0, w: 1 },
+    angle: 0 as Radians,
+  });
 
   // 9. Физические свойства и тело коллизии
   const radius = config.physics?.radius ?? BALANCE_CONFIG.creature.radius;
@@ -143,47 +152,19 @@ export function assembleCreature(
   });
 
   if (physics) {
-    const body = new Circle({ x: posX, y: posY }, radius);
-    body.isStatic = false;
     world.addComponent(id, 'physicsBody', {
-      body,
       isStatic: false,
       category: CollisionCategory.CREATURE,
       mask: COLLISION_MASK_ALL,
     });
-    physics.registerBody(id, body);
   }
 
-  // 10. Отрисовка на 2D холсте
-  if (config.renderable) {
-    world.addComponent(id, 'renderable', JSON.parse(JSON.stringify(config.renderable)));
-  } else {
-    world.addComponent(id, 'renderable', {
-      zIndex: 40,
-      isVisible: true,
-      syncWithTransform: true,
-      primitives: [
-        {
-          kind: 'circle',
-          radius,
-          fill: '#34495e',
-          stroke: behavior === 'PlayerTree' ? '#2980b9' : '#c0392b',
-          strokeWidth: 2,
-        },
-        {
-          kind: 'polygon',
-          points: [
-            { x: radius, y: 0 },
-            { x: 0, y: -radius },
-            { x: 0, y: radius },
-          ],
-          fill: '#7f8c8d',
-          stroke: '#95a5a6',
-          strokeWidth: 1.5,
-        },
-      ],
-    });
-  }
+  // 10. Компонент видимости
+  world.addComponent(id, 'renderable', {
+    zIndex: 40,
+    isVisible: config.renderable?.isVisible ?? true,
+    syncWithTransform: true,
+  });
 
   // 11. Органы чувств
   if (config.perception) {
