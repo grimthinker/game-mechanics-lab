@@ -25,6 +25,7 @@ export interface PhysicsBodyComponent {
   category: number;
   mask: number;
   isTrigger?: boolean;
+  currentColliderStance?: string;
 }
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
@@ -41,6 +42,8 @@ export interface PhysicsConfig {
   size?: number;
   isSolid?: boolean;
   points?: Point[];
+  linearDamping?: number;
+  angularDamping?: number;
 }
 
 export interface PhysicsStatsComponent {

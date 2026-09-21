@@ -19,18 +19,45 @@ export class PhysicsSystem {
     this.obstaclesEnabled = enabled;
   }
 
+  public updateCreatureColliderStance(
+    world: World,
+    id: EntityId,
+    stance: string,
+    radius: number
+  ): void {
+    if (!this.driver || !this.driver.isReady) return;
+    const phys = world.getComponent(id, 'physicsBody');
+    if (!phys?.rawCollider) return;
+
+    if (phys.currentColliderStance === stance) return;
+    phys.currentColliderStance = stance;
+
+    let targetHeight = 1.8;
+    let capRadius = radius;
+
+    if (stance === 'crouching' || stance === 'stand_to_crouch' || stance === 'crouch_to_stand') {
+      targetHeight = 1.2;
+    } else if (stance === 'prone' || stance.includes('prone')) {
+      targetHeight = 0.4;
+      capRadius = Math.min(radius, 0.2);
+    }
+
+    const halfHeight = Math.max(0.01, (targetHeight - 2 * capRadius) / 2);
+    const offsetY = halfHeight + capRadius;
+
+    this.driver.updateCapsuleCollider(phys.rawCollider, halfHeight, capRadius, offsetY);
+  }
+
   public update(dt: number, world: World): void {
     // Синхронизация полного веса и коллизий физических тел с актуальными статами
     const statEntities = world.getEntitiesWith('physicsBody', 'physicsStats');
     for (const [id, { physicsBody, physicsStats }] of statEntities) {
       physicsStats.totalWeight = calculateTotalEntityWeight(world, id);
 
-      // Синхронизация isSolid (включение/отключение коллизий)
       const health = world.getComponent(id, 'health');
       const isAlive = health ? health.isAlive : true;
       const tag = world.getComponent(id, 'tag');
 
-      // Зоны и маркеры имеют свои особые маски, их не перезаписываем
       if (tag?.archetype !== 'zone' && tag?.archetype !== 'marker') {
         const expectedMask =
           physicsStats.isSolid && isAlive ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
@@ -40,6 +67,7 @@ export class PhysicsSystem {
       }
     }
 
+    // 1. Движение персонажей через Kinematic Character Controller (KCC) с 3D-гравитацией
     const movingEntities = world.getEntitiesWith('transform', 'velocity');
     for (const [id, { transform, velocity }] of movingEntities) {
       const phys = world.getComponent(id, 'physicsBody');
@@ -55,38 +83,134 @@ export class PhysicsSystem {
       const selfDz = (velocity.vz ?? 0) * localDt;
 
       const extVx = velocity.externalVx ?? 0;
+      const extVy = velocity.externalVy ?? 0;
       const extVz = velocity.externalVz ?? 0;
 
-      const totalDx = selfDx + extVx * localDt;
-      const totalDz = selfDz + extVz * localDt;
+      // Гравитация (-9.81 м/с²) и предел скорости свободного падения
+      velocity.vy = (velocity.vy ?? 0) - 9.81 * localDt;
+      velocity.vy = Math.max(-20.0, velocity.vy);
 
-      // Перемещение персонажей по плоскости пола XZ
-      if (totalDx !== 0 || totalDz !== 0) {
-        transform.x += totalDx;
-        transform.z += totalDz;
-      }
+      const desiredDx = selfDx + extVx * localDt;
+      const desiredDy = (velocity.vy + extVy) * localDt;
+      const desiredDz = selfDz + extVz * localDt;
 
-      // Синхронизируем положение и ориентацию кинематического тела в Rapier3D
-      if (phys?.rawBody && phys.bodyType === 'kinematicPositionBased') {
-        phys.rawBody.setNextKinematicTranslation({
-          x: transform.x,
-          y: transform.y,
-          z: transform.z,
-        });
-        if (transform.rotation) {
-          phys.rawBody.setNextKinematicRotation(transform.rotation);
+      if (phys?.rawCollider && phys.bodyType === 'kinematicPositionBased' && this.driver?.isReady) {
+        const physStats = world.getComponent(id, 'physicsStats');
+        const characterMass = physStats?.totalWeight ?? physStats?.weight.current ?? 75;
+
+        // Расчет перемещения через KCC контроллер
+        const { movement, isGrounded } = this.driver.computeCharacterMovement(
+          phys.rawCollider,
+          { x: desiredDx, y: desiredDy, z: desiredDz },
+          characterMass
+        );
+
+        transform.x += movement.x;
+        transform.y += movement.y;
+        transform.z += movement.z;
+
+        if (isGrounded) {
+          velocity.vy = 0;
+        } else if (Math.abs(movement.y - desiredDy) > 0.0001) {
+          // Если фактическое движение по Y отличается от желаемого — мы столкнулись с полом или потолком
+          velocity.vy = 0;
         }
+
+        // Страховочный сброс при выпадении за пределы мира
+        if (transform.y < -10) {
+          transform.y = 0;
+          velocity.vy = 0;
+        }
+
+        if (phys.rawBody) {
+          phys.rawBody.setNextKinematicTranslation({
+            x: transform.x,
+            y: transform.y,
+            z: transform.z,
+          });
+          if (transform.rotation) {
+            phys.rawBody.setNextKinematicRotation(transform.rotation);
+          }
+        }
+      } else {
+        transform.x += desiredDx;
+        transform.z += desiredDz;
       }
 
       // Затухание внешнего импульса (трение / инерция)
-      if (extVx !== 0 || extVz !== 0) {
+      if (extVx !== 0 || extVy !== 0 || extVz !== 0) {
         const damping = 5.0;
         const factor = Math.max(0, 1 - damping * localDt);
         velocity.externalVx = extVx * factor;
+        velocity.externalVy = extVy * factor;
         velocity.externalVz = extVz * factor;
 
         if (Math.abs(velocity.externalVx) < 0.01) velocity.externalVx = 0;
+        if (Math.abs(velocity.externalVy) < 0.01) velocity.externalVy = 0;
         if (Math.abs(velocity.externalVz) < 0.01) velocity.externalVz = 0;
+      }
+    }
+
+    // 2. Мягкое расталкивание существ (Soft Collision) пропорционально массе
+    const activeCreatures = world
+      .getEntitiesWith('transform', 'physicsStats', 'health', 'physicsBody')
+      .filter(
+        ([, comp]) =>
+          comp.health.isAlive &&
+          comp.physicsBody.bodyType === 'kinematicPositionBased' &&
+          comp.physicsStats.isSolid
+      );
+
+    for (let i = 0; i < activeCreatures.length; i++) {
+      const [, compA] = activeCreatures[i];
+      const rA = compA.physicsStats.radius.current ?? 0.4;
+      const mA = compA.physicsStats.totalWeight ?? compA.physicsStats.weight.current ?? 75;
+
+      for (let j = i + 1; j < activeCreatures.length; j++) {
+        const [, compB] = activeCreatures[j];
+        const rB = compB.physicsStats.radius.current ?? 0.4;
+        const mB = compB.physicsStats.totalWeight ?? compB.physicsStats.weight.current ?? 75;
+
+        const dx = compA.transform.x - compB.transform.x;
+        const dz = compA.transform.z - compB.transform.z;
+        const distSq = dx * dx + dz * dz;
+        const minDist = rA + rB;
+
+        if (distSq < minDist * minDist) {
+          const dist = Math.sqrt(distSq);
+          const overlap = minDist - (dist > 0.0001 ? dist : 0);
+          const nx = dist > 0.0001 ? dx / dist : 1;
+          const nz = dist > 0.0001 ? dz / dist : 0;
+
+          const totalMass = Math.max(0.1, mA + mB);
+          const ratioA = mB / totalMass;
+          const ratioB = mA / totalMass;
+
+          const pushFactor = 0.5; // Плавное демпфирование расталкивания
+          const pushX = nx * overlap * pushFactor;
+          const pushZ = nz * overlap * pushFactor;
+
+          compA.transform.x += pushX * ratioA;
+          compA.transform.z += pushZ * ratioA;
+
+          compB.transform.x -= pushX * ratioB;
+          compB.transform.z -= pushZ * ratioB;
+
+          if (compA.physicsBody.rawBody) {
+            compA.physicsBody.rawBody.setNextKinematicTranslation({
+              x: compA.transform.x,
+              y: compA.transform.y,
+              z: compA.transform.z,
+            });
+          }
+          if (compB.physicsBody.rawBody) {
+            compB.physicsBody.rawBody.setNextKinematicTranslation({
+              x: compB.transform.x,
+              y: compB.transform.y,
+              z: compB.transform.z,
+            });
+          }
+        }
       }
     }
   }

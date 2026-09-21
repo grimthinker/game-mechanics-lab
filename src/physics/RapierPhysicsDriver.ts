@@ -1,5 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import { IPhysicsDriver, PhysicsDriverStats } from './IPhysicsDriver';
+import { Vec3 } from '../types';
 
 export class RapierPhysicsDriver implements IPhysicsDriver {
   private world: RAPIER.World | null = null;
@@ -17,6 +18,9 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
   private groundBody: RAPIER.RigidBody | null = null;
   private groundCollider: RAPIER.Collider | null = null;
 
+  // Переиспользуемый инстанс KCC
+  private characterController: RAPIER.KinematicCharacterController | null = null;
+
   constructor() {
     const gravity = new RAPIER.Vector3(0.0, -9.81, 0.0);
     this.world = new RAPIER.World(gravity);
@@ -26,8 +30,16 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     // Создаем базовый статический пол 100x100 метров на уровне Y = 0
     this.createGround(100, 1.0, 0.0);
 
+    // Инициализация KCC контроллера с автоподъемом на ступени и мягким скольжением
+    const offset = 0.02; // отступ 2 см для исключения залипания
+    this.characterController = this.world.createCharacterController(offset);
+    this.characterController.enableAutostep(0.3, 0.2, true); // шаг на препятствия до 30 см
+    this.characterController.enableSnapToGround(0.3); // прилипание к земле на спусках до 30 см
+    this.characterController.setApplyImpulsesToDynamicBodies(true); // передача импульса ящикам и предметам
+    this.characterController.setSlideEnabled(true);
+
     console.log(
-      '[RapierPhysicsDriver] Физический мир Rapier3D создан (гравитация: 0, -9.81, 0, пол создан на Y = 0.0)'
+      '[RapierPhysicsDriver] Физический мир Rapier3D создан (гравитация: 0, -9.81, 0, KCC активирован)'
     );
   }
 
@@ -98,20 +110,17 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     this.world.removeRigidBody(body);
   }
 
-  public createDynamicBody(pos: import('../types').Vec3, entityId?: string): RAPIER.RigidBody {
+  public createDynamicBody(pos: Vec3, entityId?: string): RAPIER.RigidBody {
     const desc = RAPIER.RigidBodyDesc.dynamic().setTranslation(pos.x, pos.y, pos.z);
     return this.createRigidBody(desc, entityId);
   }
 
-  public createFixedBody(pos: import('../types').Vec3, entityId?: string): RAPIER.RigidBody {
+  public createFixedBody(pos: Vec3, entityId?: string): RAPIER.RigidBody {
     const desc = RAPIER.RigidBodyDesc.fixed().setTranslation(pos.x, pos.y, pos.z);
     return this.createRigidBody(desc, entityId);
   }
 
-  public createKinematicPositionBody(
-    pos: import('../types').Vec3,
-    entityId?: string
-  ): RAPIER.RigidBody {
+  public createKinematicPositionBody(pos: Vec3, entityId?: string): RAPIER.RigidBody {
     const desc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(pos.x, pos.y, pos.z);
     return this.createRigidBody(desc, entityId);
   }
@@ -126,6 +135,100 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
       desc.setMass(mass);
     }
     return this.createCollider(desc, parent);
+  }
+
+  public createCapsuleCollider(
+    halfHeight: number,
+    radius: number,
+    parent: RAPIER.RigidBody,
+    mass?: number,
+    offsetY?: number
+  ): RAPIER.Collider {
+    const desc = RAPIER.ColliderDesc.capsule(Math.max(0.01, halfHeight), Math.max(0.01, radius));
+    if (offsetY !== undefined && offsetY !== 0) {
+      desc.setTranslation(0.0, offsetY, 0.0);
+    }
+    if (mass !== undefined && mass > 0) {
+      desc.setMass(mass);
+    }
+    return this.createCollider(desc, parent);
+  }
+
+  public updateCapsuleCollider(
+    collider: RAPIER.Collider,
+    halfHeight: number,
+    radius: number,
+    offsetY: number
+  ): void {
+    if (!this.world) return;
+    // В Rapier3D напрямую методы setHalfHeight и setRadius отсутствуют, нужно использовать setShape
+    const newShape = new RAPIER.Capsule(Math.max(0.01, halfHeight), Math.max(0.01, radius));
+    collider.setShape(newShape);
+    collider.setTranslationWrtParent({ x: 0, y: offsetY, z: 0 });
+  }
+
+  public computeCharacterMovement(
+    collider: RAPIER.Collider,
+    desiredTranslation: Vec3,
+    characterMass: number
+  ): { movement: Vec3; isGrounded: boolean } {
+    if (!this.world || !this.characterController) {
+      return { movement: desiredTranslation, isGrounded: true };
+    }
+
+    this.characterController.setCharacterMass(characterMass);
+    // Исключаем сенсоры и кинематические тела (других существ) для мягкого расталкивания солвером
+    const filterFlags =
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS | RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC;
+
+    this.characterController.computeColliderMovement(collider, desiredTranslation, filterFlags);
+
+    const computed = this.characterController.computedMovement();
+    const isGrounded = this.characterController.computedGrounded();
+
+    return {
+      movement: { x: computed.x, y: computed.y, z: computed.z },
+      isGrounded,
+    };
+  }
+
+  public checkCeilingClearance(
+    pos: Vec3,
+    radius: number,
+    currentHeight: number,
+    targetHeight: number,
+    ignoreEntityId?: string
+  ): boolean {
+    if (!this.world) return false;
+
+    const halfHeight = Math.max(0.01, (targetHeight - 2 * radius) / 2);
+    const capsuleCenterY = pos.y + halfHeight + radius;
+
+    const shapePos = new RAPIER.Vector3(pos.x, capsuleCenterY, pos.z);
+    const shapeRot = { w: 1.0, x: 0.0, y: 0.0, z: 0.0 };
+    const shape = new RAPIER.Capsule(halfHeight, radius);
+
+    let isBlocked = false;
+
+    this.world.intersectionsWithShape(shapePos, shapeRot, shape, (collider: RAPIER.Collider) => {
+      const parent = collider.parent();
+      if (parent) {
+        const entityId = this.getEntityIdByBody(parent);
+        if (entityId && entityId === ignoreEntityId) {
+          return true;
+        }
+        if (collider.isSensor()) {
+          return true;
+        }
+        if (parent.isFixed() || parent.isDynamic()) {
+          isBlocked = true;
+          return false;
+        }
+      }
+      return true;
+    });
+
+    return isBlocked;
   }
 
   public createCuboidCollider(
@@ -179,7 +282,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     return { body, collider };
   }
 
-  public queryEntitiesInSphere(center: import('../types').Vec3, radius: number): string[] {
+  public queryEntitiesInSphere(center: Vec3, radius: number): string[] {
     if (!this.world) return [];
     const hitIds = new Set<string>();
     const shapePos = new RAPIER.Vector3(center.x, center.y, center.z);
@@ -198,8 +301,8 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
   }
 
   public castRayMultiple(
-    start: import('../types').Vec3,
-    direction: import('../types').Vec3,
+    start: Vec3,
+    direction: Vec3,
     maxToi: number,
     solid: boolean,
     ignoreEntityId?: string
@@ -272,6 +375,10 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     this.groundBody = null;
     this.groundCollider = null;
 
+    if (this.characterController) {
+      this.characterController.free();
+      this.characterController = null;
+    }
     if (this.eventQueue) {
       this.eventQueue.free();
       this.eventQueue = null;

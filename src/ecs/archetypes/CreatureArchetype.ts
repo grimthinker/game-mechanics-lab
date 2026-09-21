@@ -156,6 +156,7 @@ export function assembleCreature(
       isStatic: false,
       category: CollisionCategory.CREATURE,
       mask: COLLISION_MASK_ALL,
+      currentColliderStance: config.meta?.stance ?? 'standing',
     });
   }
 

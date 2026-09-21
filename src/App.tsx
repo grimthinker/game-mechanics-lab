@@ -212,8 +212,7 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
 
-    const spawnPos = { x: 0, y: 0, z: 0 };
-    app.initDefaultWorld(spawnPos as any);
+    app.initDefaultWorld();
     saveWorldToStorage(app);
     syncPlayerControls();
     updateStats();
@@ -259,8 +258,7 @@ export const App: React.FC = () => {
         app.camera.deserialize(autoSave.camera);
       }
     } else {
-      const spawnPos = { x: 0, y: 0, z: 0 };
-      app.initDefaultWorld(spawnPos as any);
+      app.initDefaultWorld();
       saveWorldToStorage(app);
     }
 

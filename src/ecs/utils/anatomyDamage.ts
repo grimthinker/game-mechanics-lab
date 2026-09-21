@@ -24,11 +24,13 @@ export function forceDropItemFromPart(
   const partTransform = world.getComponent(partId, 'transform');
   const dropX = partTransform ? partTransform.x : 0;
   const dropY = partTransform ? partTransform.y : 0;
+  const dropZ = partTransform ? (partTransform.z ?? 0) : 0;
 
   const itemTransform = world.getComponent(itemId, 'transform');
   if (itemTransform) {
     itemTransform.x = dropX;
     itemTransform.y = dropY;
+    itemTransform.z = dropZ;
   }
 
   const renderable = world.getComponent(itemId, 'renderable');
@@ -44,13 +46,20 @@ export function forceDropItemFromPart(
     let rawCollider: any;
 
     if (physics.driver && physics.driver.isReady) {
-      rawBody = physics.driver.createDynamicBody({ x: dropX, y: 1.5, z: dropY }, itemId);
-      rawCollider = physics.driver.createBallCollider(
-        physStats.radius.current ?? 0.3,
+      rawBody = physics.driver.createDynamicBody({ x: dropX, y: dropY + 0.5, z: dropZ }, itemId);
+      const radius = physStats.radius.current ?? 0.3;
+      const size = radius * 0.8;
+
+      rawCollider = physics.driver.createCuboidCollider(
+        size / 2,
+        size / 2,
+        size / 2,
         rawBody,
         physStats.weight.current
       );
       rawCollider.setRestitution(0.3);
+      rawBody.setLinearDamping(0.95);
+      rawBody.setAngularDamping(0.95);
     }
 
     world.addComponent(itemId, 'physicsBody', {

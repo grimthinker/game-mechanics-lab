@@ -291,7 +291,16 @@ export class AnatomySystem {
         { x: rootTransform.x, y: rootTransform.y, z: rootTransform.z },
         rootId
       );
-      rawCollider = physics.driver.createBallCollider(plan.maxRadius, rawBody, plan.totalWeight);
+      const radius = plan.maxRadius;
+      const halfHeight = Math.max(0.01, (1.8 - 2 * radius) / 2);
+      const offsetY = halfHeight + radius;
+      rawCollider = physics.driver.createCapsuleCollider(
+        halfHeight,
+        radius,
+        rawBody,
+        plan.totalWeight,
+        offsetY
+      );
     }
 
     if (!rootPhysBody) {
@@ -302,11 +311,13 @@ export class AnatomySystem {
         isStatic: false,
         category: CollisionCategory.CREATURE,
         mask: COLLISION_MASK_ALL,
+        currentColliderStance: 'standing',
       });
     } else {
       rootPhysBody.rawBody = rawBody;
       rootPhysBody.rawCollider = rawCollider;
       rootPhysBody.bodyType = 'kinematicPositionBased';
+      rootPhysBody.currentColliderStance = 'standing';
     }
 
     if (!currentLocomotion.canStand) {
@@ -438,12 +449,17 @@ export class AnatomySystem {
           { x: rootItemTransform.x, y: rootItemTransform.y + 0.5, z: rootItemTransform.z },
           rootItemId
         );
-        rawCollider = physics.driver.createBallCollider(
-          Math.max(0.3, plan.maxRadius),
+        const size = plan.maxRadius * 0.8;
+        rawCollider = physics.driver.createCuboidCollider(
+          size / 2,
+          size / 2,
+          size / 2,
           rawBody,
           plan.totalWeight
         );
         rawCollider.setRestitution(0.3);
+        rawBody.setLinearDamping(0.95);
+        rawBody.setAngularDamping(0.95);
       }
 
       if (!rootPhysBody) {

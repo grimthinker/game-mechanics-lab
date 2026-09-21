@@ -617,12 +617,17 @@ export class InteractionSystem {
           { x: endX, y: transform.y + 0.5, z: endZ },
           itemId
         );
-        rawCollider = physics.driver.createBallCollider(
-          itemRadius,
+        const size = itemRadius * 0.8;
+        rawCollider = physics.driver.createCuboidCollider(
+          size / 2,
+          size / 2,
+          size / 2,
           rawBody,
           physStats.weight.current
         );
         rawCollider.setRestitution(0.3);
+        rawBody.setLinearDamping(0.95);
+        rawBody.setAngularDamping(0.95);
       }
 
       world.addComponent(itemId, 'physicsBody', {

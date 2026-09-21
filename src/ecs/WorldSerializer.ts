@@ -365,10 +365,20 @@ export class WorldSerializer {
               if (this.app.physicsDriver?.isReady) {
                 const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 2.5, z: trans?.z ?? 0 };
                 rawBody = this.app.physicsDriver.createDynamicBody(pos3D, ent.id);
-                const r = comps.physicsStats?.radius?.current ?? 0.4;
+                const r = comps.physicsStats?.radius?.current ?? 0.3;
                 const w = comps.physicsStats?.weight?.current ?? 1;
-                rawCollider = this.app.physicsDriver.createBallCollider(r, rawBody, w);
+
+                const size = r * 0.8;
+                rawCollider = this.app.physicsDriver.createCuboidCollider(
+                  size / 2,
+                  size / 2,
+                  size / 2,
+                  rawBody,
+                  w
+                );
                 rawCollider.setRestitution(0.3);
+                rawBody.setLinearDamping(0.95);
+                rawBody.setAngularDamping(0.95);
               }
             } else if (archetype === 'zone') {
               category = CollisionCategory.TRIGGER_ZONE;
@@ -377,14 +387,37 @@ export class WorldSerializer {
               isStatic = false;
             }
 
+            if (archetype === 'creature' && this.app.physicsDriver?.isReady) {
+              const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0, z: trans?.z ?? 0 };
+              rawBody = this.app.physicsDriver.createKinematicPositionBody(pos3D, ent.id);
+              const r = comps.physicsStats?.radius?.current ?? 0.4;
+              const w = comps.physicsStats?.weight?.current ?? 75;
+              const halfHeight = Math.max(0.01, (1.8 - 2 * r) / 2);
+              const offsetY = halfHeight + r;
+              rawCollider = this.app.physicsDriver.createCapsuleCollider(
+                halfHeight,
+                r,
+                rawBody,
+                w,
+                offsetY
+              );
+            }
+
             this.app.world.addComponent(ent.id, 'physicsBody', {
               rawBody,
               rawCollider,
-              bodyType: archetype === 'item' ? 'dynamic' : undefined,
+              bodyType:
+                archetype === 'item'
+                  ? 'dynamic'
+                  : archetype === 'creature'
+                    ? 'kinematicPositionBased'
+                    : undefined,
               isStatic,
               category,
               mask,
               isTrigger,
+              currentColliderStance:
+                archetype === 'creature' ? comps.meta?.stance || 'standing' : undefined,
             });
           }
         }

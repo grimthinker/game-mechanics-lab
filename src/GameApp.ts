@@ -626,31 +626,34 @@ export class GameApp {
     EventBus.emit('world:updated');
   }
 
-  public initDefaultWorld(center?: Point): void {
+  public initDefaultWorld(center?: Point | Vec3): void {
     this.clearWorld();
     this.commandHistory.clear();
 
-    // Метрический спавн в 3D (1 единица = 1 метр)
-    const spawnPos = { x: 0, y: 0, z: 0 };
+    const p = center ?? { x: 0, y: 2.0, z: 0 };
+    const hasZ = 'z' in p;
+    const bx = p.x;
+    const by = hasZ ? (p as Vec3).y : 2.0;
+    const bz = hasZ ? (p as Vec3).z : (p.y ?? 0);
 
     this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
       this.aiSystem,
-      spawnPos as any,
+      { x: bx, y: by, z: bz } as any,
       'PlayerTree',
       'Игрок'
     );
 
-    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: 4.5, y: 0, z: 0 } as any);
-    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: -4.5, y: 0, z: 0 } as any);
+    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz } as any);
+    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx - 4.5, y: by, z: bz } as any);
     this.spawnEntity(
       createZoneConfig('repel', 2.5, 20, 'Зона отталкивания', false, false, false, true, 50, 0),
-      { x: -4.5, y: 0, z: -4.5 } as any
+      { x: bx - 4.5, y: by, z: bz - 4.5 } as any
     );
     this.spawnEntity(
       createZoneConfig('attract', 2.5, 20, 'Зона притягивания', false, false, false, true, 50, 0),
-      { x: 4.5, y: 0, z: -4.5 } as any
+      { x: bx + 4.5, y: by, z: bz - 4.5 } as any
     );
     this.spawnEntity(
       createZoneConfig(
@@ -663,7 +666,7 @@ export class GameApp {
         false,
         false
       ),
-      { x: -4.5, y: 0, z: 4.5 } as any
+      { x: bx - 4.5, y: by, z: bz + 4.5 } as any
     );
     this.spawnEntity(
       createZoneConfig(
@@ -676,7 +679,7 @@ export class GameApp {
         false,
         false
       ),
-      { x: 4.5, y: 0, z: 4.5 } as any
+      { x: bx + 4.5, y: by, z: bz + 4.5 } as any
     );
 
     this.spawnEntity(
@@ -696,12 +699,12 @@ export class GameApp {
           ],
         },
       },
-      { x: 0, y: 0, z: 4.0 } as any
+      { x: bx, y: by, z: bz + 4.0 } as any
     );
 
-    const itemsX = -1.5;
+    const itemsX = bx - 1.5;
 
-    // Спавним предметы на высоте Y = 2.5 - 3.5 метра в воздухе (в безопасной зоне)
+    // Спавним предметы на высоте в воздухе (в безопасной зоне)
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
@@ -725,7 +728,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: 3.0, z: -2.0 } as any
+      { x: itemsX, y: by + 1.0, z: bz - 2.0 } as any
     );
 
     this.spawnEntity(
@@ -753,7 +756,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: 2.5, z: -1.0 } as any
+      { x: itemsX, y: by + 0.5, z: bz - 1.0 } as any
     );
 
     this.spawnEntity(
@@ -779,7 +782,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: 3.5, z: 0.0 } as any
+      { x: itemsX, y: by + 1.5, z: bz + 0.0 } as any
     );
 
     this.spawnEntity(
@@ -798,7 +801,7 @@ export class GameApp {
         physics: { radius: 0.4, weight: 20, isSolid: true },
         armorStats: { defense: 25, flatReduction: 5 },
       },
-      { x: itemsX, y: 2.2, z: 1.0 } as any
+      { x: itemsX, y: by + 0.2, z: bz + 1.0 } as any
     );
 
     this.spawnEntity(
@@ -817,8 +820,7 @@ export class GameApp {
         physics: { radius: 0.3, weight: 10, isSolid: true },
         armorStats: { defense: 15, flatReduction: 2 },
       },
-      // Спавним шлем ровно над каменной стеной (стена находится в X=0, Z=4.0, высота 1.5м)
-      { x: 0.0, y: 3.5, z: 4.0 } as any
+      { x: bx, y: by + 1.5, z: bz + 4.0 } as any
     );
   }
 
@@ -972,7 +974,7 @@ export class GameApp {
     this.aiSystem.update(dt, this.world);
     this.interactionSystem.update(dt, this.world, this.physics);
     this.attackSystem.update(dt, this.world, this.physics);
-    this.movementSystem.update(dt, this.world);
+    this.movementSystem.update(dt, this.world, this.physics);
     this.stealthSystem.update(dt, this.world);
     this.physics.update(dt, this.world);
     this.attachmentSystem.update(this.world, this.physics);
@@ -990,18 +992,19 @@ export class GameApp {
     if (!this.isPaused) {
       const simulatedDt = realDt * this.globalTimeScale;
 
-      // Тикаем физический драйвер 3D с фиксированным шагом
-      this.physicsDriver.step(simulatedDt);
-
       const MAX_SUBSTEP = 1 / 60;
       const steps = Math.min(10, Math.max(1, Math.ceil(simulatedDt / MAX_SUBSTEP)));
       const stepDt = simulatedDt / steps;
 
+      // 1. Сначала обновляем ECS-системы (расчет KCC и выставление позиций кинематики) ДО шага физики
       for (let i = 0; i < steps; i++) {
         this.updateSystems(stepDt);
       }
 
-      // Синхронизируем позиции Rapier в ECS ПОСЛЕ систем, чтобы никто не перетирал координаты перед рендером
+      // 2. Затем выполняем шаг физического мира Rapier с учетом новых позиций тел
+      this.physicsDriver.step(simulatedDt);
+
+      // 3. Синхронизируем позиции динамических тел из Rapier в ECS
       this.syncDynamicBodiesToTransforms();
 
       if (this.gameMode === GameMode.GAME) {

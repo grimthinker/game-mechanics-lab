@@ -1,4 +1,5 @@
 import { World } from '../../World';
+import { PhysicsSystem } from '../PhysicsSystem';
 import {
   BaseCreatureStance,
   TransitionCreatureStance,
@@ -6,6 +7,12 @@ import {
   ModifierType,
 } from '../../types';
 import { addModifier, removeModifier } from '../../stats/StatEvaluator';
+
+const STANCE_HEIGHTS: Record<BaseCreatureStance, number> = {
+  standing: 1.8,
+  crouching: 1.2,
+  prone: 0.4,
+};
 
 function getTransitionStance(
   from: BaseCreatureStance,
@@ -36,7 +43,7 @@ function getTransitionDuration(
 }
 
 export class StanceSystem {
-  public update(localDt: number, world: World): void {
+  public update(localDt: number, world: World, physics?: PhysicsSystem): void {
     const entities = world.getEntitiesWith('input', 'health', 'meta', 'movementStats');
 
     for (const [id, { input, health, meta, movementStats }] of entities) {
@@ -71,8 +78,25 @@ export class StanceSystem {
       if (meta.stance === 'crouching') currentBaseStance = 'crouching';
       else if (meta.stance === 'prone') currentBaseStance = 'prone';
 
-      const desiredStance: BaseCreatureStance =
+      let desiredStance: BaseCreatureStance =
         input.desiredStance ?? (input.isCrouching ? 'crouching' : currentBaseStance);
+
+      // Проверка потолка (Can Stand Up Check) при попытке подняться выше
+      const curH = STANCE_HEIGHTS[currentBaseStance] ?? 1.8;
+      const desH = STANCE_HEIGHTS[desiredStance] ?? 1.8;
+
+      if (desH > curH && physics?.driver?.isReady) {
+        const transform = world.getComponent(id, 'transform');
+        const physStats = world.getComponent(id, 'physicsStats');
+        const radius = physStats?.radius.current ?? 0.4;
+        if (transform) {
+          const isBlocked = physics.driver.checkCeilingClearance(transform, radius, curH, desH, id);
+          if (isBlocked) {
+            desiredStance = currentBaseStance;
+            input.desiredStance = currentBaseStance;
+          }
+        }
+      }
 
       const activeTransition = world.getComponent(id, 'stanceTransition');
 
@@ -177,6 +201,13 @@ export class StanceSystem {
         });
       } else {
         removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
+      }
+
+      // Обновление размеров физической капсулы под текущую стойку
+      if (physics) {
+        const physStats = world.getComponent(id, 'physicsStats');
+        const radius = physStats?.radius.current ?? 0.4;
+        physics.updateCreatureColliderStance(world, id, meta.stance || 'standing', radius);
       }
     }
   }

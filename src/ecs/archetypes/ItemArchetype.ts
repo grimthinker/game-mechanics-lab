@@ -150,9 +150,20 @@ export function assembleItem(
     if (physics.driver && physics.driver.isReady) {
       const pos3D = { x: posX, y: posY, z: posZ };
       rawBody = physics.driver.createDynamicBody(pos3D, id);
-      rawCollider = physics.driver.createBallCollider(radius, rawBody, weight);
-      // Небольшой отскок при падении на пол
+
+      const size = radius * 0.8; // Уменьшенный в 2 раза куб
+      rawCollider = physics.driver.createCuboidCollider(
+        size / 2,
+        size / 2,
+        size / 2,
+        rawBody,
+        weight
+      );
       rawCollider.setRestitution(0.3);
+
+      // Применяем демпфирование для реалистичного затухания полета и вращения
+      rawBody.setLinearDamping(config.physics?.linearDamping ?? 0.95);
+      rawBody.setAngularDamping(config.physics?.angularDamping ?? 0.95);
     }
 
     world.addComponent(id, 'physicsBody', {

@@ -1,4 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
+import { Vec3 } from '../types';
 
 export interface PhysicsDriverStats {
   stepCount: number;
@@ -29,16 +30,49 @@ export interface IPhysicsDriver {
   removeRigidBody(body: RAPIER.RigidBody): void;
 
   /** Создает динамическое тело с позицией (падающее под силой тяжести) */
-  createDynamicBody(pos: import('../types').Vec3, entityId?: string): RAPIER.RigidBody;
+  createDynamicBody(pos: Vec3, entityId?: string): RAPIER.RigidBody;
 
   /** Создает фиксированное неподвижное тело (препятствия, стены) */
-  createFixedBody(pos: import('../types').Vec3, entityId?: string): RAPIER.RigidBody;
+  createFixedBody(pos: Vec3, entityId?: string): RAPIER.RigidBody;
 
   /** Создает кинематическое тело (для существ, управляемых напрямую кодом) */
-  createKinematicPositionBody(pos: import('../types').Vec3, entityId?: string): RAPIER.RigidBody;
+  createKinematicPositionBody(pos: Vec3, entityId?: string): RAPIER.RigidBody;
 
   /** Создает сферический коллайдер */
   createBallCollider(radius: number, parent: RAPIER.RigidBody, mass?: number): RAPIER.Collider;
+
+  /** Создает вертикальный капсульный коллайдер с опциональным вертикальным смещением */
+  createCapsuleCollider(
+    halfHeight: number,
+    radius: number,
+    parent: RAPIER.RigidBody,
+    mass?: number,
+    offsetY?: number
+  ): RAPIER.Collider;
+
+  /** Обновляет размеры и относительное смещение существующего капсульного коллайдера */
+  updateCapsuleCollider(
+    collider: RAPIER.Collider,
+    halfHeight: number,
+    radius: number,
+    offsetY: number
+  ): void;
+
+  /** Вычисляет разрешенное движение кинематического персонажа через KCC с учетом препятствий и гравитации */
+  computeCharacterMovement(
+    collider: RAPIER.Collider,
+    desiredTranslation: Vec3,
+    characterMass: number
+  ): { movement: Vec3; isGrounded: boolean };
+
+  /** Проверяет наличие свободного пространства над головой для подъема из приседа/лежа */
+  checkCeilingClearance(
+    pos: Vec3,
+    radius: number,
+    currentHeight: number,
+    targetHeight: number,
+    ignoreEntityId?: string
+  ): boolean;
 
   /** Создает коллайдер-кубоид (hx, hy, hz — половины размеров по осям) с опциональным вертикальным смещением */
   createCuboidCollider(
@@ -57,12 +91,12 @@ export interface IPhysicsDriver {
   ): { body: RAPIER.RigidBody; collider: RAPIER.Collider };
 
   /** Запрашивает все сущности в радиусе (сферическое перекрытие в 3D) */
-  queryEntitiesInSphere(center: import('../types').Vec3, radius: number): string[];
+  queryEntitiesInSphere(center: Vec3, radius: number): string[];
 
   /** Пускает луч и возвращает отсортированный по дальности список всех попаданий */
   castRayMultiple(
-    start: import('../types').Vec3,
-    direction: import('../types').Vec3,
+    start: Vec3,
+    direction: Vec3,
     maxToi: number,
     solid: boolean,
     ignoreEntityId?: string
