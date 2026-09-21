@@ -101,6 +101,9 @@ export class GizmoController {
             phys.rawBody.setRotation(newRot, true);
             phys.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
             phys.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            if (phys.rawBody.isSleeping()) {
+              phys.rawBody.wakeUp();
+            }
           }
         }
       }

@@ -97,6 +97,10 @@ export class GameApp {
   private lastBTUpdate: number = 0;
   private lastBTTargetId: string | null = null;
 
+  private physicsAccumulator: number = 0;
+  private readonly FIXED_DT: number = 1 / 60;
+  private readonly MAX_ACCUMULATOR_DT: number = 0.2;
+
   public gameMode: GameMode = GameMode.EDITOR;
 
   private handleResize = () => this.resizeCanvas();
@@ -630,10 +634,10 @@ export class GameApp {
     this.clearWorld();
     this.commandHistory.clear();
 
-    const p = center ?? { x: 0, y: 2.0, z: 0 };
+    const p = center ?? { x: 0, y: 0, z: 0 };
     const hasZ = 'z' in p;
     const bx = p.x;
-    const by = hasZ ? (p as Vec3).y : 2.0;
+    const by = hasZ ? (p as Vec3).y : 0;
     const bz = hasZ ? (p as Vec3).z : (p.y ?? 0);
 
     this.entityFactory.spawnModularHumanoid(
@@ -986,25 +990,21 @@ export class GameApp {
   private loop(time: number): void {
     if (!this.isRunning) return;
 
-    const realDt = Math.min(0.1, (time - this.lastTime) / 1000);
+    const realDt = Math.min(this.MAX_ACCUMULATOR_DT, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
     if (!this.isPaused) {
       const simulatedDt = realDt * this.globalTimeScale;
+      this.physicsAccumulator += simulatedDt;
 
-      const MAX_SUBSTEP = 1 / 60;
-      const steps = Math.min(10, Math.max(1, Math.ceil(simulatedDt / MAX_SUBSTEP)));
-      const stepDt = simulatedDt / steps;
-
-      // 1. Сначала обновляем ECS-системы (расчет KCC и выставление позиций кинематики) ДО шага физики
-      for (let i = 0; i < steps; i++) {
-        this.updateSystems(stepDt);
+      // Детерминированный цикл FixedUpdate: логика и физика тикают со строго фиксированным шагом 1/60 с
+      while (this.physicsAccumulator >= this.FIXED_DT) {
+        this.updateSystems(this.FIXED_DT);
+        this.physicsDriver.step(this.FIXED_DT);
+        this.physicsAccumulator -= this.FIXED_DT;
       }
 
-      // 2. Затем выполняем шаг физического мира Rapier с учетом новых позиций тел
-      this.physicsDriver.step(simulatedDt);
-
-      // 3. Синхронизируем позиции динамических тел из Rapier в ECS
+      // Синхронизируем позиции динамических тел из Rapier в ECS
       this.syncDynamicBodiesToTransforms();
 
       if (this.gameMode === GameMode.GAME) {
@@ -1017,6 +1017,8 @@ export class GameApp {
           EventBus.emit('game:playerDied');
         }
       }
+    } else {
+      this.physicsAccumulator = 0;
     }
 
     this.updateBTData(false);
@@ -1088,9 +1090,9 @@ export class GameApp {
     const dynamicEntities = this.world.getEntitiesWith('transform', 'physicsBody');
     for (const [, { transform, physicsBody }] of dynamicEntities) {
       if (physicsBody.rawBody && physicsBody.bodyType === 'dynamic') {
-        // Если тело заснуло на старте — принудительно будим его при тике
+        // Если тело спит — его координаты гарантированно не изменились, пропускаем такт
         if (physicsBody.rawBody.isSleeping()) {
-          physicsBody.rawBody.wakeUp();
+          continue;
         }
 
         const translation = physicsBody.rawBody.translation();

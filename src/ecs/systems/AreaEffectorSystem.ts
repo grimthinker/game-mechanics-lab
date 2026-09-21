@@ -103,9 +103,6 @@ export class AreaEffectorSystem {
         }
         // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и 3D вектора
         else if (areaEffector.effect === 'repel' || areaEffector.effect === 'attract') {
-          const velocity = world.getComponent(targetId, 'velocity');
-          if (!velocity) continue;
-
           // Защита от деления на ноль и дерганья в самом центре воронки
           if (areaEffector.effect === 'attract' && dist <= 0.2) continue;
 
@@ -126,10 +123,31 @@ export class AreaEffectorSystem {
               (areaEffector.boundaryValue - areaEffector.centerValue) * t;
           }
 
-          const weight = physicsStats.totalWeight ?? physicsStats.weight.current ?? 1;
-          const acceleration = forceMagnitude / Math.max(1, weight);
-
           const sign = areaEffector.effect === 'repel' ? 1 : -1;
+          const weight = physicsStats.totalWeight ?? physicsStats.weight.current ?? 1;
+
+          // Для динамических тел Rapier (ящики, выброшенные предметы) прикладываем физический импульс и будим тело
+          if (physicsBody.rawBody && physicsBody.bodyType === 'dynamic') {
+            if (physicsBody.rawBody.isSleeping()) {
+              physicsBody.rawBody.wakeUp();
+            }
+            const impulseMag = forceMagnitude * dt;
+            physicsBody.rawBody.applyImpulse(
+              {
+                x: sign * (ux / len) * impulseMag,
+                y: sign * (uy / len) * impulseMag,
+                z: sign * (uz / len) * impulseMag,
+              },
+              true
+            );
+            continue;
+          }
+
+          // Для кинематических персонажей передаем импульс в скорость ECS
+          const velocity = world.getComponent(targetId, 'velocity');
+          if (!velocity) continue;
+
+          const acceleration = forceMagnitude / Math.max(1, weight);
           velocity.externalVx = (velocity.externalVx ?? 0) + sign * (ux / len) * acceleration * dt;
           velocity.externalVy = (velocity.externalVy ?? 0) + sign * (uy / len) * acceleration * dt;
           velocity.externalVz = (velocity.externalVz ?? 0) + sign * (uz / len) * acceleration * dt;

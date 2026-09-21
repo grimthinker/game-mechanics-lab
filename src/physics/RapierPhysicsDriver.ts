@@ -5,10 +5,8 @@ import { Vec3 } from '../types';
 export class RapierPhysicsDriver implements IPhysicsDriver {
   private world: RAPIER.World | null = null;
   private eventQueue: RAPIER.EventQueue | null = null;
-  private accumulator: number = 0;
   private stepCount: number = 0;
   public fixedTimestep: number = 1 / 60;
-  private readonly maxSubsteps: number = 4;
 
   // Маппинг связей дескрипторов тел и сущностей ECS
   private bodyHandleToEntityMap: Map<number, string> = new Map();
@@ -33,7 +31,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     // Инициализация KCC контроллера с автоподъемом на ступени и мягким скольжением
     const offset = 0.02; // отступ 2 см для исключения залипания
     this.characterController = this.world.createCharacterController(offset);
-    this.characterController.enableAutostep(0.3, 0.2, true); // шаг на препятствия до 30 см
+    this.characterController.enableAutostep(0.12, 0.2, false); // шаг на мелкие бордюры до 12 см, не залезая на динамические предметы
     this.characterController.enableSnapToGround(0.3); // прилипание к земле на спусках до 30 см
     this.characterController.setApplyImpulsesToDynamicBodies(true); // передача импульса ящикам и предметам
     this.characterController.setSlideEnabled(true);
@@ -47,23 +45,14 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     return this.world !== null;
   }
 
-  public step(dt: number): void {
+  public step(dt?: number): void {
     if (!this.world) return;
 
-    this.accumulator += dt;
-
-    let substeps = 0;
-    while (this.accumulator >= this.fixedTimestep && substeps < this.maxSubsteps) {
-      this.world.step(this.eventQueue || undefined);
-      this.accumulator -= this.fixedTimestep;
-      this.stepCount++;
-      substeps++;
+    if (dt !== undefined && dt > 0) {
+      this.world.integrationParameters.dt = dt;
     }
-
-    // Защита от "спирали смерти" при сильных лагах и просадках FPS
-    if (this.accumulator >= this.fixedTimestep) {
-      this.accumulator = 0;
-    }
+    this.world.step(this.eventQueue || undefined);
+    this.stepCount++;
   }
 
   public setGravity(x: number, y: number, z: number): void {
@@ -183,6 +172,16 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
 
     this.characterController.computeColliderMovement(collider, desiredTranslation, filterFlags);
 
+    // Точечно будим спящие динамические тела, с которыми столкнулся KCC на этом шаге
+    const numCollisions = this.characterController.numComputedCollisions();
+    for (let i = 0; i < numCollisions; i++) {
+      const collision = this.characterController.computedCollision(i);
+      const parentBody = collision?.collider?.parent();
+      if (parentBody && parentBody.isDynamic() && parentBody.isSleeping()) {
+        parentBody.wakeUp();
+      }
+    }
+
     const computed = this.characterController.computedMovement();
     const isGrounded = this.characterController.computedGrounded();
 
@@ -190,6 +189,17 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
       movement: { x: computed.x, y: computed.y, z: computed.z },
       isGrounded,
     };
+  }
+
+  public wakeUpDynamicBodiesInRadius(center: Vec3, radius: number): void {
+    if (!this.world) return;
+    const ids = this.queryEntitiesInSphere(center, radius);
+    for (const id of ids) {
+      const body = this.getBodyByEntityId(id);
+      if (body && body.isDynamic() && body.isSleeping()) {
+        body.wakeUp();
+      }
+    }
   }
 
   public checkCeilingClearance(

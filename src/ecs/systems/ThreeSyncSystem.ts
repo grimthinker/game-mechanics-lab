@@ -850,6 +850,9 @@ export class ThreeSyncSystem {
       outline.visible = false;
       parentGroup.add(outline);
 
+      const box = new THREE.Box3().setFromObject(rig);
+      const visualCorrectionY = -box.min.y; // Автоматически поднимет или опустит меш так, чтобы нижняя точка всегда касалась Y = 0
+      rig.position.set(0, visualCorrectionY, 0);
       // Запускаем дефолтную анимацию
       this.playAnimation(rootId, animator.rigType, 'stand_idle').catch(console.error);
     } catch (err) {

@@ -109,26 +109,34 @@ export class PhysicsSystem {
         transform.y += movement.y;
         transform.z += movement.z;
 
-        if (isGrounded) {
+        // Если персонаж достиг уровня пола или зафиксирован KCC как стоящий на земле
+        if (transform.y <= 0) {
+          transform.y = 0;
+          velocity.vy = 0;
+        } else if (isGrounded) {
           velocity.vy = 0;
         } else if (Math.abs(movement.y - desiredDy) > 0.0001) {
-          // Если фактическое движение по Y отличается от желаемого — мы столкнулись с полом или потолком
-          velocity.vy = 0;
-        }
-
-        // Страховочный сброс при выпадении за пределы мира
-        if (transform.y < -10) {
-          transform.y = 0;
+          // Если фактическое движение по Y отличается от желаемого — коллизия с полом или препятствием
           velocity.vy = 0;
         }
 
         if (phys.rawBody) {
+          // Мгновенная синхронизация положения коллайдера в Rapier для исключения задержек между подшагами
+          phys.rawBody.setTranslation(
+            {
+              x: transform.x,
+              y: transform.y,
+              z: transform.z,
+            },
+            true
+          );
           phys.rawBody.setNextKinematicTranslation({
             x: transform.x,
             y: transform.y,
             z: transform.z,
           });
           if (transform.rotation) {
+            phys.rawBody.setRotation(transform.rotation, true);
             phys.rawBody.setNextKinematicRotation(transform.rotation);
           }
         }

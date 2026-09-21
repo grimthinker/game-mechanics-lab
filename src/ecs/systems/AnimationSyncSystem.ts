@@ -28,13 +28,15 @@ export class AnimationSyncSystem {
             : 'stand';
 
         const suffix =
-          moveMode === 'sprinting' || moveMode === 'jogging'
+          moveMode === 'sprinting'
             ? 'sprint'
-            : moveMode === 'walking'
-              ? 'walk'
-              : 'idle';
+            : moveMode === 'jogging'
+              ? 'jog'
+              : moveMode === 'walking'
+                ? 'walk'
+                : 'idle';
 
-        if (prefix === 'prone' && (suffix === 'walk' || suffix === 'sprint')) {
+        if (prefix === 'prone' && (suffix === 'walk' || suffix === 'sprint' || suffix === 'jog')) {
           targetAnim = 'prone_crawl';
         } else {
           targetAnim = `${prefix}_${suffix}`;

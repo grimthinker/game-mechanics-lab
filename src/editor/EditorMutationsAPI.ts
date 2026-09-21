@@ -45,6 +45,9 @@ export class EditorMutationsAPI {
         phys.rawBody.setRotation(transform.rotation, true);
         phys.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
         phys.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        if (phys.rawBody.isSleeping()) {
+          phys.rawBody.wakeUp();
+        }
       }
     }
 

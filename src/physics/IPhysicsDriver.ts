@@ -14,8 +14,8 @@ export interface IPhysicsDriver {
   /** Шаг фиксированного времени для интеграции (по умолчанию 1/60 с) */
   fixedTimestep: number;
 
-  /** Выполняет шаг физической симуляции с внутренним аккумулятором времени */
-  step(dt: number): void;
+  /** Выполняет один атомарный шаг физической симуляции мира */
+  step(dt?: number): void;
 
   /** Устанавливает 3D-вектор гравитации в метрах на секунду в квадрате */
   setGravity(x: number, y: number, z: number): void;
@@ -92,6 +92,9 @@ export interface IPhysicsDriver {
 
   /** Запрашивает все сущности в радиусе (сферическое перекрытие в 3D) */
   queryEntitiesInSphere(center: Vec3, radius: number): string[];
+
+  /** Принудительно будит спящие динамические тела в заданном радиусе (например, при взрыве или разрушении опоры) */
+  wakeUpDynamicBodiesInRadius(center: Vec3, radius: number): void;
 
   /** Пускает луч и возвращает отсортированный по дальности список всех попаданий */
   castRayMultiple(
