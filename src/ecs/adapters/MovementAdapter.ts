@@ -31,8 +31,7 @@ export class MovementAdapter {
 
   public get angle(): Radians {
     const transform = this.getComponent('transform');
-    if (!transform) return 0 as Radians;
-    return transform.rotation ? quat_getYaw(transform.rotation) : (transform.angle ?? 0);
+    return transform?.angle ?? (0 as Radians);
   }
 
   public get radius(): number {
@@ -106,6 +105,7 @@ export class MovementAdapter {
     if (input) {
       input.turnDirection = 0;
       input.turnRatio = 0;
+      input.targetLookAngle = undefined;
     }
   }
 
@@ -136,6 +136,7 @@ export class MovementAdapter {
       input.isMovingForward = false;
       input.turnDirection = 0;
       input.turnRatio = 0;
+      input.targetLookAngle = undefined;
     }
     return true;
   }

@@ -93,10 +93,14 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
     itemName: string;
   } | null>(null);
 
-  // Реактивное обновление при изменениях в мире ECS
+  // Реактивное обновление при изменениях в мире ECS и инвентаре
   useEffect(() => {
     const unsubWorld = EventBus.on('world:updated', () => setRevision((r) => r + 1));
-    return unsubWorld;
+    const unsubInv = EventBus.on('inventory:updated', () => setRevision((r) => r + 1));
+    return () => {
+      unsubWorld();
+      unsubInv();
+    };
   }, []);
 
   // Закрытие контекстного меню по клавише Escape
@@ -576,7 +580,6 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                       targetCreatureId,
                       contextMenu.globalSlotIndex
                     );
-                    EventBus.emit('world:updated');
                   }
                   setContextMenu(null);
                 }}

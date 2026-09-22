@@ -8,6 +8,7 @@ export class AnimationSyncSystem {
       const health = world.getComponent(id, 'health');
       const isAlive = health ? health.isAlive : true;
       const activeAttacks = world.getComponent(id, 'activeAttacks');
+      const stanceTransition = world.getComponent(id, 'stanceTransition');
 
       let targetAnim = 'stand_idle';
 
@@ -17,6 +18,11 @@ export class AnimationSyncSystem {
         targetAnim = 'attack';
       } else if (meta.actionMode === 'pickup') {
         targetAnim = 'pickup';
+      } else if (meta.actionMode === 'throw') {
+        targetAnim = 'throw';
+      } else if (stanceTransition && stanceTransition.transitionStance) {
+        // Проигрываем анимацию перехода между стойками (например: stand_to_prone, prone_to_stand)
+        targetAnim = stanceTransition.transitionStance;
       } else {
         const stance = meta.stance || 'standing';
         const moveMode = meta.movementMode || 'immobile';

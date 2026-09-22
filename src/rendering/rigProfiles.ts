@@ -3,53 +3,59 @@ import { BodyStructureType } from '../ecs/templates';
 export interface RigProfile {
   rigAsset: string | null;
   animations: Record<string, string>;
+  animationSpeeds?: Record<string, number>;
 }
 
 export const CREATURE_RIG_PROFILES: Record<BodyStructureType, RigProfile> = {
   humanoid: {
-    rigAsset: '3d/creatures/humanoid/rig.glb',
+    rigAsset: 'proc://rig/humanoid',
     animations: {
-      // Стойка: Стоя
-      stand_idle: '3d/creatures/humanoid/anim/StandIdle.glb',
-      stand_walk: '3d/creatures/humanoid/anim/StandWalk.glb',
-      stand_jog: '3d/creatures/humanoid/anim/StandJogging.glb',
-      stand_sprint: '3d/creatures/humanoid/anim/StandSprint.glb',
-
-      // Стойка: Присед
-      crouch_idle: '3d/creatures/humanoid/anim/CrouchIdle.glb',
-      crouch_walk: '3d/creatures/humanoid/anim/CrouchWalk.glb',
-      crouch_jog: '3d/creatures/humanoid/anim/CrouchJogging.glb',
-      crouch_sprint: '3d/creatures/humanoid/anim/CrouchSprint.glb',
-
-      // Стойка: Лёжа
-      prone_idle: '3d/creatures/humanoid/anim/ProneIdle.glb',
-      prone_crawl: '3d/creatures/humanoid/anim/ProneCrawl.glb',
-
-      // Переходы между стойками
-      stand_to_crouch: '3d/creatures/humanoid/anim/CrouchIdle.glb',
-      crouch_to_stand: '3d/creatures/humanoid/anim/StandIdle.glb',
-      stand_to_prone: '3d/creatures/humanoid/anim/StandToProne.glb',
-      prone_to_stand: '3d/creatures/humanoid/anim/ProneToStand.glb',
-      crouch_to_prone: '3d/creatures/humanoid/anim/CrouchToProne.glb',
-      prone_to_crouch: '3d/creatures/humanoid/anim/ProneToCrouch.glb',
-
-      // Действия
-      attack: '3d/creatures/humanoid/anim/Attack.glb',
-      pickup: '3d/creatures/humanoid/anim/Pickup.glb',
-      put_on: '3d/creatures/humanoid/anim/PutOn.glb',
-      take_off: '3d/creatures/humanoid/anim/TakeOff.glb',
-      throw: '3d/creatures/humanoid/anim/ThrowItem.glb',
-      retrieve_inv: '3d/creatures/humanoid/anim/RetrieveFromInventory.glb',
-      store_inv: '3d/creatures/humanoid/anim/StoreInInventory.glb',
-
-      // Смерть
-      dead: '3d/creatures/humanoid/anim/Dead.glb',
-      fall_back: '3d/creatures/humanoid/anim/FallBack.glb',
+      stand_idle: 'proc://anim/humanoid/stand_idle',
+      stand_walk: 'proc://anim/humanoid/stand_walk',
+      stand_jog: 'proc://anim/humanoid/stand_jog',
+      stand_sprint: 'proc://anim/humanoid/stand_sprint',
+      crouch_idle: 'proc://anim/humanoid/crouch_idle',
+      crouch_walk: 'proc://anim/humanoid/crouch_walk',
+      crouch_jog: 'proc://anim/humanoid/crouch_jog',
+      crouch_sprint: 'proc://anim/humanoid/crouch_sprint',
+      prone_idle: 'proc://anim/humanoid/prone_idle',
+      prone_crawl: 'proc://anim/humanoid/prone_crawl',
+      stand_to_crouch: 'proc://anim/humanoid/stand_to_crouch',
+      crouch_to_stand: 'proc://anim/humanoid/crouch_to_stand',
+      stand_to_prone: 'proc://anim/humanoid/stand_to_prone',
+      prone_to_stand: 'proc://anim/humanoid/prone_to_stand',
+      crouch_to_prone: 'proc://anim/humanoid/crouch_to_prone',
+      prone_to_crouch: 'proc://anim/humanoid/prone_to_crouch',
+      attack: 'proc://anim/humanoid/attack',
+      pickup: 'proc://anim/humanoid/pickup',
+      put_on: 'proc://anim/humanoid/put_on',
+      take_off: 'proc://anim/humanoid/take_off',
+      throw: 'proc://anim/humanoid/throw',
+      retrieve_inv: 'proc://anim/humanoid/retrieve_inv',
+      store_inv: 'proc://anim/humanoid/store_inv',
+      dead: 'proc://anim/humanoid/dead',
+      fall_back: 'proc://anim/humanoid/fall_back',
+    },
+    animationSpeeds: {
+      attack: 1.5,
+      pickup: 0.9,
+      stand_sprint: 1.0,
+      crouch_sprint: 1.0,
     },
   },
   quadruped: {
-    rigAsset: null,
-    animations: {},
+    rigAsset: 'proc://rig/quadruped',
+    animations: {
+      stand_idle: 'proc://anim/quadruped/stand_idle',
+      stand_walk: 'proc://anim/quadruped/stand_walk',
+      stand_jog: 'proc://anim/quadruped/stand_jog',
+      stand_sprint: 'proc://anim/quadruped/stand_sprint',
+      attack: 'proc://anim/quadruped/attack',
+      dead: 'proc://anim/quadruped/dead',
+    },
+    animationSpeeds: {
+      stand_sprint: 1.4,
+    },
   },
   arachnid: {
     rigAsset: null,

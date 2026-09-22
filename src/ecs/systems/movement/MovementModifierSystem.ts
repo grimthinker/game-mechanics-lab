@@ -28,7 +28,9 @@ export class MovementModifierSystem {
 
       const interactionAction = world.getComponent(id, 'interactionAction');
       if (interactionAction) {
-        input.isRunning = false;
+        if (interactionAction.type !== 'throw') {
+          input.isRunning = false;
+        }
         input.wantsAttack = false;
       }
 

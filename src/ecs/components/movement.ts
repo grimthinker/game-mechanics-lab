@@ -25,7 +25,8 @@ export type CreatureMovementMode = 'immobile' | 'turning' | 'walking' | 'jogging
 
 export type CreatureDirectionMode = 'forward' | 'strafe' | 'backward' | 'immobile';
 
-export type CreatureActionMode = 'idle' | 'attacking' | 'pickup' | 'equipping' | 'stance_changing';
+export type CreatureActionMode =
+  'idle' | 'attacking' | 'pickup' | 'equipping' | 'stance_changing' | 'throw';
 
 export interface CreatureMetaComponent {
   name: string;
@@ -88,6 +89,8 @@ export interface MovementConfig {
   proneToStandTime?: number;
   crouchToProneTime?: number;
   proneToCrouchTime?: number;
+  throwPrepTime?: number;
+  throwRecoveryTime?: number;
 }
 
 export interface MovementStatsComponent {
@@ -114,6 +117,8 @@ export interface MovementStatsComponent {
   proneToStandTime: StatValue<number>;
   crouchToProneTime: StatValue<number>;
   proneToCrouchTime: StatValue<number>;
+  throwPrepTime: StatValue<number>;
+  throwRecoveryTime: StatValue<number>;
 }
 
 export interface StealthConfig {

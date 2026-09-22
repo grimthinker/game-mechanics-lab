@@ -16,6 +16,7 @@ import {
   canItemBeHeldInSlot,
 } from '../utils/itemValidation';
 import RAPIER from '@dimforge/rapier3d-compat';
+import { EventBus } from '../../core/EventBus';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -228,6 +229,8 @@ export class InteractionSystem {
           }
         }
 
+        EventBus.emit('inventory:updated');
+
         if (targetId && transform) {
           world.removeComponent(targetId, 'ownership');
 
@@ -293,6 +296,18 @@ export class InteractionSystem {
       if (action.phase === 'abort_reach' || action.phase === 'abort_lift') {
         return false;
       }
+    } else if (action.type === 'throw') {
+      if (action.phase === 'throw_prep') {
+        const elapsed = Math.max(0.01, action.totalDuration - action.timer);
+        action.phase = 'abort_throw';
+        action.timer = elapsed;
+        action.totalDuration = elapsed;
+        action.wantsCancel = false;
+        return true;
+      }
+      if (action.phase === 'abort_throw' || action.phase === 'throw_recovery') {
+        return false;
+      }
     }
 
     world.removeComponent(entityId, 'interactionAction');
@@ -318,6 +333,33 @@ export class InteractionSystem {
 
       if (interactionAction.wantsCancel) {
         this.cancelInteraction(world, physics, id);
+        continue;
+      }
+
+      if (interactionAction.type === 'throw') {
+        if (interactionAction.phase === 'throw_prep') {
+          interactionAction.timer -= localDt;
+          if (interactionAction.timer <= 0) {
+            // Переход: отпускаем и спавним предмет физически
+            if (interactionAction.partId) {
+              this.executePhysicalDrop(world, physics, id, interactionAction.partId);
+            }
+            const movementStats = world.getComponent(id, 'movementStats');
+            const recTime = movementStats?.throwRecoveryTime?.current ?? 0.1;
+
+            interactionAction.phase = 'throw_recovery';
+            interactionAction.timer = recTime;
+            interactionAction.totalDuration = recTime;
+          }
+        } else if (
+          interactionAction.phase === 'throw_recovery' ||
+          interactionAction.phase === 'abort_throw'
+        ) {
+          interactionAction.timer -= localDt;
+          if (interactionAction.timer <= 0) {
+            world.removeComponent(id, 'interactionAction');
+          }
+        }
         continue;
       }
 
@@ -427,6 +469,7 @@ export class InteractionSystem {
 
             slot.itemId = targetId;
             world.addComponent(targetId, 'ownership', { ownerId: id, status: 'equipped' });
+            EventBus.emit('inventory:updated');
 
             const physBody = world.getComponent(targetId, 'physicsBody');
             if (physBody && physBody.rawBody) {
@@ -502,6 +545,7 @@ export class InteractionSystem {
                 ownerId: containerId,
                 status: 'equipped',
               });
+              EventBus.emit('inventory:updated');
             }
           }
         } else if (
@@ -534,6 +578,7 @@ export class InteractionSystem {
                   ownerId: id,
                   status: 'equipped',
                 });
+                EventBus.emit('inventory:updated');
               }
             }
           }
@@ -552,16 +597,38 @@ export class InteractionSystem {
   ): void {
     const aggSlots = getAggregatedInteractionSlots(world, entityId);
     const slotInfo = aggSlots[globalSlotIndex];
-    const transform = world.getComponent(entityId, 'transform');
-    if (!slotInfo || !transform) return;
+    if (!slotInfo || !slotInfo.slot.itemId) return;
 
-    const slot = slotInfo.slot;
-    if (slot.itemId === null) return;
+    if (world.getComponent(entityId, 'interactionAction')) return;
+
+    const movementStats = world.getComponent(entityId, 'movementStats');
+    const prepTime = movementStats?.throwPrepTime?.current ?? 0.1;
+
+    world.addComponent(entityId, 'interactionAction', {
+      type: 'throw',
+      phase: 'throw_prep',
+      slotIndex: slotInfo.localSlotIndex,
+      partId: slotInfo.partId,
+      timer: prepTime,
+      totalDuration: prepTime,
+    });
+  }
+
+  private executePhysicalDrop(
+    world: World,
+    physics: PhysicsSystem,
+    entityId: EntityId,
+    partId: EntityId
+  ): void {
+    const slot = world.getComponent(partId, 'interactionSlots');
+    const transform = world.getComponent(entityId, 'transform');
+    if (!slot || !slot.itemId || !transform) return;
 
     const itemId = slot.itemId;
     slot.itemId = null;
 
     world.removeComponent(itemId, 'ownership');
+    EventBus.emit('inventory:updated');
 
     const renderable = world.getComponent(itemId, 'renderable');
     if (renderable) {
@@ -573,31 +640,25 @@ export class InteractionSystem {
 
     if (itemTransform && physStats) {
       const itemRadius = physStats.radius.current ?? 0.3;
-      const dropDist = slot.interactDist;
+      const creatureRadius = world.getComponent(entityId, 'physicsStats')?.radius.current ?? 0.4;
 
-      // Нативный 3D-луч для проверки препятствий при выбрасывании
-      const startPoint = { x: transform.x, y: transform.y + 0.9, z: transform.z };
+      const safeDist = creatureRadius + itemRadius + 0.05;
+
+      const currentStance = world.getComponent(entityId, 'meta')?.stance || 'standing';
+      let creatureHeight = 1.8;
+      if (currentStance.includes('crouch')) creatureHeight = 1.2;
+      else if (currentStance.includes('prone')) creatureHeight = 0.4;
+
+      const comY = transform.y + creatureHeight / 2;
+      const dropY = Math.max(transform.y + itemRadius, comY);
+
       const dir = { x: Math.cos(transform.angle), y: 0, z: Math.sin(transform.angle) };
 
-      let safeDist = dropDist;
-
-      if (physics.driver && physics.driver.isReady) {
-        const hits = physics.driver.castRayMultiple(startPoint, dir, dropDist, true, entityId);
-        for (const hit of hits) {
-          const hitHealth = world.getComponent(hit.entityId, 'health');
-          const hitPhys = world.getComponent(hit.entityId, 'physicsBody');
-          const isDead = hitHealth && !hitHealth.isAlive;
-          if (!isDead && !hitPhys?.isTrigger) {
-            safeDist = Math.max(0, hit.toi - itemRadius - 0.1);
-            break;
-          }
-        }
-      }
-
-      const endX = transform.x + Math.cos(transform.angle) * safeDist;
-      const endZ = transform.z + Math.sin(transform.angle) * safeDist;
+      const endX = transform.x + dir.x * safeDist;
+      const endZ = transform.z + dir.z * safeDist;
 
       itemTransform.x = endX;
+      itemTransform.y = dropY;
       itemTransform.z = endZ;
 
       const mask = physStats.isSolid
@@ -613,21 +674,23 @@ export class InteractionSystem {
       let rawCollider: RAPIER.Collider | undefined;
 
       if (physics.driver && physics.driver.isReady) {
-        rawBody = physics.driver.createDynamicBody(
-          { x: endX, y: transform.y + 0.5, z: endZ },
-          itemId
-        );
+        rawBody = physics.driver.createDynamicBody({ x: endX, y: dropY, z: endZ }, itemId);
         const size = itemRadius * 0.8;
+        const weight = physStats.weight.current ?? 1;
         rawCollider = physics.driver.createCuboidCollider(
           size / 2,
           size / 2,
           size / 2,
           rawBody,
-          physStats.weight.current
+          weight
         );
         rawCollider.setRestitution(0.3);
         rawBody.setLinearDamping(0.95);
         rawBody.setAngularDamping(0.95);
+
+        const targetVelocity = 0.5;
+        const impulseMag = weight * targetVelocity;
+        rawBody.applyImpulse({ x: dir.x * impulseMag, y: 0, z: dir.z * impulseMag }, true);
       }
 
       world.addComponent(itemId, 'physicsBody', {

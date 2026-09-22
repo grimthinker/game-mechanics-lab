@@ -58,6 +58,7 @@ export const en = {
     walk: 'Walk',
     jog: 'Jog',
     exitToEditor: '[ESC] Exit to Editor',
+    goToSimulation: 'Switch to Simulation',
     hintMove: 'Move',
     hintAttack: 'Attack',
     hintSprint: 'Sprint',

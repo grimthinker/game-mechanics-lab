@@ -12,6 +12,7 @@ import {
   computeItemGrip,
   GripTransform,
 } from '../../rendering/gripCalculators';
+import { ProceduralAssetManager } from '../../rendering/procedural/ProceduralAssetManager';
 
 interface AnimatorState {
   mixer: THREE.AnimationMixer;
@@ -302,8 +303,8 @@ export class ThreeSyncSystem {
             // Воспроизведение анимации строго из состояния ECS без обратной мутации
             if (animState.targetClipName !== animatorComp.currentAnimation) {
               animState.targetClipName = animatorComp.currentAnimation;
-              this.playAnimation(id, animatorComp.rigType, animatorComp.currentAnimation).catch(
-                (e) => console.warn(e)
+              this.playAnimation(id, animatorComp, animatorComp.currentAnimation).catch((e) =>
+                console.warn(e)
               );
             }
 
@@ -598,53 +599,80 @@ export class ThreeSyncSystem {
     });
   }
 
-  private async playAnimation(entityId: EntityId, rigType: string, animKey: string) {
+  private async playAnimation(
+    entityId: EntityId,
+    animatorComp: import('../components/rendering').AnimatorComponent,
+    animKey: string
+  ) {
     const state = this.animators.get(entityId);
     if (!state) return;
 
-    const rigProfile = CREATURE_RIG_PROFILES[rigType as BodyStructureType];
+    if (state.currentClipName === animKey && state.currentAction?.isRunning()) {
+      return;
+    }
+
+    const structureType = animatorComp.rigType as BodyStructureType;
+    const rigProfile = CREATURE_RIG_PROFILES[structureType];
     if (!rigProfile) return;
 
-    // Фоллбэк на idle при отсутствии специфичной анимации
-    const animUrl = rigProfile.animations[animKey] || rigProfile.animations['stand_idle'];
-    if (!animUrl) return;
+    let clip: THREE.AnimationClip | null = null;
 
-    try {
-      const gltfAnim = await AssetManager.getInstance().loadGLTF(animUrl);
-
-      // Предотвращение гонки: если за время сети анимация сменилась, отменяем
-      if (state.targetClipName !== animKey) return;
-
-      if (gltfAnim.animations && gltfAnim.animations.length > 0) {
-        const clip = gltfAnim.animations[0];
-        const action = state.mixer.clipAction(clip);
-
-        action.reset();
-        action.setEffectiveTimeScale(1);
-        action.setEffectiveWeight(1);
-
-        const isOneShot = animKey === 'dead' || animKey === 'attack' || animKey === 'pickup';
-        if (isOneShot) {
-          action.setLoop(THREE.LoopOnce, 1);
-          action.clampWhenFinished = true;
-        } else {
-          action.setLoop(THREE.LoopRepeat, Infinity);
-          action.clampWhenFinished = false;
-        }
-
-        action.fadeIn(0.15);
-        action.play();
-
-        if (state.currentAction && state.currentAction !== action) {
-          state.currentAction.fadeOut(0.15);
-        }
-
-        state.currentAction = action;
-        state.currentClipName = animKey;
-      }
-    } catch (e) {
-      console.warn(`[ThreeSyncSystem] Animation failed to load: ${animUrl}`);
+    if (ProceduralAssetManager.getInstance().hasBuilder(structureType)) {
+      clip = ProceduralAssetManager.getInstance().getAnimationClip(structureType, animKey);
     }
+
+    if (!clip) {
+      const animUrl = rigProfile.animations[animKey] || rigProfile.animations['stand_idle'];
+      if (!animUrl || animUrl.startsWith('proc://')) return;
+
+      try {
+        const gltfAnim = await AssetManager.getInstance().loadGLTF(animUrl);
+        if (state.targetClipName !== animKey) return;
+        if (gltfAnim.animations && gltfAnim.animations.length > 0) {
+          clip = gltfAnim.animations[0];
+        }
+      } catch (e) {
+        console.warn(`[ThreeSyncSystem] Animation failed to load: ${animUrl}`);
+        return;
+      }
+    }
+
+    if (!clip) return;
+    if (state.targetClipName !== animKey) return;
+
+    const action = state.mixer.clipAction(clip);
+    action.reset();
+
+    const profileSpeed = rigProfile.animationSpeeds?.[animKey] ?? 1.0;
+    const ecsSpeed = animatorComp.playbackSpeed ?? 1.0;
+
+    action.setEffectiveTimeScale(profileSpeed * ecsSpeed);
+    action.setEffectiveWeight(1);
+
+    const isOneShot =
+      animKey === 'dead' ||
+      animKey === 'attack' ||
+      animKey === 'pickup' ||
+      animKey === 'throw' ||
+      animKey.includes('_to_');
+
+    if (isOneShot) {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    } else {
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.clampWhenFinished = false;
+    }
+
+    action.fadeIn(0.12);
+    action.play();
+
+    if (state.currentAction && state.currentAction !== action) {
+      state.currentAction.fadeOut(0.12);
+    }
+
+    state.currentAction = action;
+    state.currentClipName = animKey;
   }
 
   private createMeshForEntity(
@@ -928,7 +956,7 @@ export class ThreeSyncSystem {
       const visualCorrectionY = -box.min.y; // Автоматически поднимет или опустит меш так, чтобы нижняя точка всегда касалась Y = 0
       rig.position.set(0, visualCorrectionY, 0);
       // Запускаем дефолтную анимацию
-      this.playAnimation(rootId, animator.rigType, 'stand_idle').catch(console.error);
+      this.playAnimation(rootId, animator, 'stand_idle').catch(console.error);
     } catch (err) {
       console.error(`[ThreeSyncSystem] Error assembling rig for ${rootId}:`, err);
     } finally {

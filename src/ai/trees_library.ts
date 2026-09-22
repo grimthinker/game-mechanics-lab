@@ -8,6 +8,7 @@ import {
   BTConditionEngaged,
   BTWait,
   BTActionRotateToPos,
+  BTAlwaysRunning,
 } from './actions';
 import { BTSelector, BTSequence } from './composites';
 import { LOGIC_CONFIG } from './config';
@@ -44,7 +45,7 @@ export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
 };
 
 export function PlayerTree(): BTNode {
-  return new BTServiceInputListener(new BTServiceInputController(new BTWait({ duration: 1 })));
+  return new BTServiceInputListener(new BTServiceInputController(new BTAlwaysRunning()));
 }
 
 export function CombatTree(): BTNode {

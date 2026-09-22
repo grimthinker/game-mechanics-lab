@@ -1,6 +1,6 @@
 import { BTService, BTNode, NodeStatus } from './core';
 import { LOGIC_CONFIG } from './config';
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 import { EntityAdapter } from '../EntityAdapter';
 import { GlobalInput } from '../input/GlobalInput';
 
@@ -104,8 +104,8 @@ export class BTServiceFindNearestTarget extends BTService {
 export class BTServicePathUpdater extends BTService {
   private isRequesting = false;
   private requestTimer = 999;
-  private lastStartPos: Point = { x: 0, y: 0 };
-  private lastTargetPos: Point = { x: 0, y: 0 };
+  private lastStartPos: Vec3 = { x: 0, y: 0, z: 0 };
+  private lastTargetPos: Vec3 = { x: 0, y: 0, z: 0 };
 
   private readonly pushedDistanceSq: number;
 
@@ -115,6 +115,7 @@ export class BTServicePathUpdater extends BTService {
 
   public static readonly defaultParams = {
     ...BTService.defaultParams,
+    interval: 0.1,
     ...LOGIC_CONFIG.pathUpdaterParams,
   };
 
@@ -145,10 +146,9 @@ export class BTServicePathUpdater extends BTService {
       const selfPos = entity.getPos();
       const targetPos = target.getPos();
       const dx = targetPos.x - selfPos.x;
-      const dz =
-        (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
-          ? (targetPos as any).z - (selfPos as any).z
-          : targetPos.y - selfPos.y;
+      const sZ = (selfPos as Vec3).z ?? selfPos.y ?? 0;
+      const tZ = (targetPos as Vec3).z ?? targetPos.y ?? 0;
+      const dz = tZ - sZ;
       const distSq = dx * dx + dz * dz;
 
       this.updatePathingLogic(entity, selfPos, targetPos, distSq);
@@ -157,19 +157,24 @@ export class BTServicePathUpdater extends BTService {
 
   private updatePathingLogic(
     entity: EntityAdapter,
-    selfPos: Point,
-    targetPos: Point,
+    selfPos: Point | Vec3,
+    targetPos: Point | Vec3,
     distSq: number
   ) {
     if (this.isRequesting) return;
 
+    const sZ = (selfPos as Vec3).z ?? selfPos.y ?? 0;
+    const tZ = (targetPos as Vec3).z ?? targetPos.y ?? 0;
+
     let shouldRequest = false;
 
+    const currentPath = entity.brain!.blackboard.get('currentPath');
+    if (!currentPath || currentPath.length === 0) {
+      shouldRequest = true;
+    }
+
     const pdx = selfPos.x - this.lastStartPos.x;
-    const pdz =
-      (selfPos as any).z !== undefined
-        ? (selfPos as any).z - (this.lastStartPos as any).z
-        : selfPos.y - this.lastStartPos.y;
+    const pdz = sZ - this.lastStartPos.z;
 
     if (pdx * pdx + pdz * pdz > this.pushedDistanceSq) {
       shouldRequest = true;
@@ -186,10 +191,7 @@ export class BTServicePathUpdater extends BTService {
         t * (this.params.maxTargetMoveThreshold - this.params.minTargetMoveThreshold);
 
       const tdx = targetPos.x - this.lastTargetPos.x;
-      const tdz =
-        (targetPos as any).z !== undefined
-          ? (targetPos as any).z - (this.lastTargetPos as any).z
-          : targetPos.y - this.lastTargetPos.y;
+      const tdz = tZ - this.lastTargetPos.z;
 
       if (tdx * tdx + tdz * tdz > currentThreshold * currentThreshold) {
         shouldRequest = true;
@@ -199,8 +201,8 @@ export class BTServicePathUpdater extends BTService {
     if (shouldRequest) {
       this.isRequesting = true;
       this.requestTimer = 0;
-      this.lastStartPos = { ...selfPos };
-      this.lastTargetPos = { ...targetPos };
+      this.lastStartPos = { x: selfPos.x, y: (selfPos as Vec3).y ?? 0, z: sZ };
+      this.lastTargetPos = { x: targetPos.x, y: (targetPos as Vec3).y ?? 0, z: tZ };
       const pathPromise = entity.utils.getPath(selfPos, targetPos, entity.radius);
       this.handlePathPromise(entity, pathPromise);
     }

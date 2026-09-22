@@ -262,6 +262,16 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
               key: 'proneToCrouchTime',
               tooltip: 'Время перехода из положения лежа в присед',
             },
+            {
+              label: 'Замах при броске:',
+              key: 'throwPrepTime',
+              tooltip: 'Длительность замаха перед отпусканием предмета',
+            },
+            {
+              label: 'Возврат при броске:',
+              key: 'throwRecoveryTime',
+              tooltip: 'Длительность возврата руки после отпускания предмета',
+            },
           ].map(({ label, key, tooltip }) => (
             <label
               key={key}

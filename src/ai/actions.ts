@@ -99,7 +99,20 @@ export class BTActionPursue extends BTAction {
       return NodeStatus.SUCCESS;
     }
 
-    return this.movementNode.tick(entity);
+    const path = bb.get('currentPath');
+    if (path && path.length > 0) {
+      this.movementNode.tick(entity);
+    } else {
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.001) {
+        entity.setDesiredMoveVector({ x: dx / dist, y: dz / dist });
+        entity.setTargetLookAngle(Math.atan2(dz, dx) as Radians);
+      } else {
+        entity.stop();
+      }
+    }
+
+    return NodeStatus.RUNNING;
   }
 
   protected stopAction(entity: EntityAdapter): void {
@@ -299,7 +312,16 @@ export class BTActionRotateToPos extends BTAction {
 
     if (dx === 0 && dz === 0) return NodeStatus.SUCCESS;
 
-    const targetAngle = Math.atan2(dz, dx);
+    const dist = Math.hypot(dx, dz);
+    // Если цель отдалилась за пределы дистанции боя — прерываем поворот и возвращаем FAILURE,
+    // чтобы Sequence сбросился и селектор перешел к преследованию
+    if (dist > LOGIC_CONFIG.followUpDist) {
+      bb.set('isEngaged', false);
+      this.stopAction(entity);
+      return NodeStatus.FAILURE;
+    }
+
+    const targetAngle = Math.atan2(dz, dx) as Radians;
     const currentAngle = entity.angle;
 
     // Нормализация разницы углов в диапазон [-PI, PI]
@@ -308,24 +330,18 @@ export class BTActionRotateToPos extends BTAction {
 
     // Если угол в пределах погрешности — завершаем поворот
     if (Math.abs(diff) <= this.params.tolerance) {
-      entity.stopTurning();
+      this.stopAction(entity);
       return NodeStatus.SUCCESS;
     }
 
-    const direction: -1 | 1 = diff > 0 ? 1 : -1;
-
-    // Вычисляем ratio (долю скорости) на основе оставшегося угла.
-    // Чем ближе к цели, тем ниже скорость поворота (плавное замедление),
-    // но держим минимальный порог, чтобы бот гарантированно докрутился.
-    let ratio = Math.min(1, Math.abs(diff) / LOGIC_CONFIG.slowDownAngle);
-    ratio = Math.max(LOGIC_CONFIG.minRotationSpeed, ratio);
-
-    entity.startTurning(direction, ratio);
+    // Задаем угол направления взгляда для плавного поворота в VelocitySystem
+    entity.setTargetLookAngle(targetAngle);
 
     return NodeStatus.RUNNING;
   }
 
   protected stopAction(entity: EntityAdapter): void {
+    entity.setTargetLookAngle(undefined);
     entity.stopTurning();
   }
 }
@@ -404,4 +420,14 @@ export class BTActionFollowPathSmooth extends BTAction {
   protected stopAction(entity: EntityAdapter): void {
     entity.stop();
   }
+}
+
+export class BTAlwaysRunning extends BTAction {
+  public static readonly nodeName = 'Постоянное выполнение';
+  public static readonly description = 'Всегда возвращает RUNNING, удерживая сервисы активными';
+
+  protected onTick(_ctx: EntityAdapter): NodeStatus {
+    return NodeStatus.RUNNING;
+  }
+  protected stopAction(_ctx: EntityAdapter): void {}
 }

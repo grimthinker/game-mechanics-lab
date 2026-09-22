@@ -58,6 +58,7 @@ export const ru = {
     walk: 'Шаг',
     jog: 'Бег',
     exitToEditor: '[ESC] Выйти в редактор',
+    goToSimulation: 'Перейти в симуляцию',
     hintMove: 'Движение',
     hintAttack: 'Атака',
     hintSprint: 'Спринт',

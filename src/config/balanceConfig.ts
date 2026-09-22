@@ -46,8 +46,40 @@ export const BALANCE_CONFIG = {
     /** Множитель скорости поворота во время выполнения процесса подбора предмета */
     pickupTurnMultiplier: 1.1,
 
+    /** Тайминги смены стоек и состояний (в секундах) */
+    transitions: {
+      standToCrouch: 0.1,
+      crouchToStand: 0.1,
+      standToProne: 0.9,
+      proneToStand: 1.5,
+      crouchToProne: 0.9,
+      proneToCrouch: 1.5,
+      throwPrep: 0.1,
+      throwRecovery: 0.1,
+    },
+
     /** Базовый показатель скрытности (мощность незаметности агента) */
     stealthPower: 10,
+  },
+  items: {
+    defaultRadius: 0.3,
+    defaultWeight: 1,
+    defaultMaxHp: 50,
+    weapon: {
+      baseDamage: 20,
+      prepTime: 0.2,
+      castTime: 0,
+      recoveryTime: 0.3,
+      prepTurnSlow: 0.5,
+      recoveryTurnSlow: 0.8,
+      prepMoveSlow: 0.5,
+      recoveryMoveSlow: 0.8,
+      castMoveSlow: 0.5,
+    },
+    armor: {
+      defense: 0,
+      flatReduction: 0,
+    },
     /** Множитель скрытности при беге (высокая заметность из-за шума) */
     runStealthMultiplier: 0.5,
     /** Множитель скрытности в присяди (повышенная незаметность) */

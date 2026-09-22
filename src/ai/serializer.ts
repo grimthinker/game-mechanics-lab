@@ -4,7 +4,7 @@ interface NodeWithChild extends BTNode {
   child: BTNode;
 }
 
-export function serializeBTNode(node: BTNode, path: string = 'root'): BTNodeDTO {
+export function serializeBTNode(node: BTNode, path: string = 'root_0'): BTNodeDTO {
   const children: BTNodeDTO[] = [];
 
   if ('children' in node && Array.isArray(node.children)) {
@@ -31,11 +31,10 @@ export function serializeBTNode(node: BTNode, path: string = 'root'): BTNodeDTO 
 
   if (node instanceof BTService) {
     timeToNextTick = node.timeRemains;
-    // console.log(timeToNextTick)
   }
 
   return {
-    id: node.id || path,
+    id: path,
     name: nodeName,
     category: node.category,
     status: status,

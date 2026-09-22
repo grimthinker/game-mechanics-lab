@@ -49,6 +49,19 @@ export class AssetManager {
    * Загружает GLTF-модель и возвращает её глубокую копию с поддержкой скелетных ригов и мешей.
    */
   public async getClonedModel(url: string): Promise<THREE.Object3D | null> {
+    if (url.startsWith('proc://')) {
+      const { ProceduralAssetManager } = await import('./procedural/ProceduralAssetManager');
+      const model = ProceduralAssetManager.getInstance().getClonedAsset(url);
+      if (model) {
+        model.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.userData.isSharedAsset = true;
+          }
+        });
+      }
+      return model;
+    }
+
     const gltf = await this.loadGLTF(url);
     if (!gltf || !gltf.scene) return null;
     const clone = SkeletonUtils.clone(gltf.scene);

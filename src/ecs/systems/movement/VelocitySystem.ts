@@ -92,14 +92,20 @@ export class VelocitySystem {
           transform.angle = input.targetLookAngle;
           velocity.currentTurnSpeed = 0 as Radians;
         } else if (localDt > 0) {
-          const maxTurnStep = movementStats.maxTurnSpeed.current * localDt;
+          const turnRatio = Math.max(
+            LOGIC_CONFIG.minRotationSpeed,
+            Math.min(1, Math.abs(diff) / LOGIC_CONFIG.slowDownAngle)
+          );
+          const effectiveTurnSpeed = movementStats.maxTurnSpeed.current * turnRatio;
+          const maxTurnStep = effectiveTurnSpeed * localDt;
+
           if (Math.abs(diff) <= maxTurnStep) {
             transform.angle = input.targetLookAngle;
             velocity.currentTurnSpeed = (diff / localDt) as Radians;
           } else {
             const sign = Math.sign(diff) as -1 | 1;
             transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
-            velocity.currentTurnSpeed = (sign * movementStats.maxTurnSpeed.current) as Radians;
+            velocity.currentTurnSpeed = (sign * effectiveTurnSpeed) as Radians;
           }
         } else {
           velocity.currentTurnSpeed = 0 as Radians;
@@ -157,8 +163,11 @@ export class VelocitySystem {
 
       // Direction Mode
       let directionMode: CreatureDirectionMode = 'immobile';
-      const ANGLE_THRESHOLD_FORWARD = Math.PI / 4 + 0.001;
-      const ANGLE_THRESHOLD_BACKWARD = (3 * Math.PI) / 4 + 0.001;
+      const prevDirectionMode = meta.directionMode;
+      const forwardThreshold =
+        prevDirectionMode === 'forward' ? Math.PI / 4 + 0.17 : Math.PI / 4 - 0.05;
+      const backwardThreshold =
+        prevDirectionMode === 'backward' ? (3 * Math.PI) / 4 - 0.17 : (3 * Math.PI) / 4;
 
       if (hasMoveInput) {
         const desiredMoveAngle = Math.atan2(moveVecZ, moveVecX);
@@ -169,14 +178,14 @@ export class VelocitySystem {
           )
         );
 
-        if (angleDiff <= ANGLE_THRESHOLD_FORWARD) {
+        if (angleDiff <= forwardThreshold) {
           directionMode = 'forward';
-        } else if (angleDiff <= ANGLE_THRESHOLD_BACKWARD) {
+        } else if (angleDiff <= backwardThreshold) {
           directionMode = 'strafe';
         } else {
           directionMode = 'backward';
         }
-      } else if (velocity.currentSpeed > 1) {
+      } else if (velocity.currentSpeed > 0.1) {
         const actualMoveAngle = Math.atan2(velocity.vz, velocity.vx);
         const angleDiff = Math.abs(
           Math.atan2(
@@ -185,9 +194,9 @@ export class VelocitySystem {
           )
         );
 
-        if (angleDiff <= ANGLE_THRESHOLD_FORWARD) {
+        if (angleDiff <= forwardThreshold) {
           directionMode = 'forward';
-        } else if (angleDiff <= ANGLE_THRESHOLD_BACKWARD) {
+        } else if (angleDiff <= backwardThreshold) {
           directionMode = 'strafe';
         } else {
           directionMode = 'backward';
@@ -204,13 +213,15 @@ export class VelocitySystem {
         actionMode = 'pickup';
       } else if (interactionAction?.type === 'equip' || interactionAction?.type === 'unequip') {
         actionMode = 'equipping';
+      } else if (interactionAction?.type === 'throw') {
+        actionMode = 'throw';
       } else if (world.getComponent(id, 'stanceTransition')) {
         actionMode = 'stance_changing';
       }
 
       // Movement Mode
       let movementMode: CreatureMovementMode = 'immobile';
-      if (hasMoveInput || velocity.currentSpeed > 1) {
+      if (hasMoveInput || velocity.currentSpeed > 0.1) {
         if (meta.stance === 'prone' || meta.stance?.includes('prone')) {
           movementMode = 'walking';
         } else if (

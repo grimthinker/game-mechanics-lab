@@ -8,6 +8,7 @@ import { killEntity } from './health';
 import { evaluateConsciousness, getPartStatus, PartStatus } from './anatomyStatus';
 import { ConsciousnessState } from '../types';
 import { BEHAVIOR_TREES } from '../../ai/trees_library';
+import { EventBus } from '../../core/EventBus';
 
 export function forceDropItemFromPart(
   world: World,
@@ -20,6 +21,7 @@ export function forceDropItemFromPart(
   const itemId = slot.itemId;
   slot.itemId = null;
   world.removeComponent(itemId, 'ownership');
+  EventBus.emit('inventory:updated');
 
   const partTransform = world.getComponent(partId, 'transform');
   const dropX = partTransform ? partTransform.x : 0;

@@ -247,6 +247,8 @@ export const App: React.FC = () => {
     app.isPaused = true;
     setIsPaused(true);
     app.globalTimeScale = globalTimeScale;
+    app.showUIOverlays = showUIOverlays;
+    app.showAIDebug = showAIDebug;
 
     app.start();
 
@@ -638,6 +640,7 @@ export const App: React.FC = () => {
               world={appRef.current?.world}
               selectedEntityId={selectedEntityId}
               onExitToEditor={goToEditor}
+              onGotoSimulation={goToSimulation}
             />
           )}
 

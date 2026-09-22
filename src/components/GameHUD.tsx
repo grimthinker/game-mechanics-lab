@@ -10,6 +10,7 @@ export interface GameHUDProps {
   world: World | null | undefined;
   selectedEntityId?: string | null;
   onExitToEditor: () => void;
+  onGotoSimulation: () => void;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -17,6 +18,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   world,
   selectedEntityId,
   onExitToEditor,
+  onGotoSimulation,
 }) => {
   if (!world) return null;
 
@@ -115,7 +117,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       </div>
 
-      {/* Верхняя правая кнопка выхода */}
+      {/* Верхняя правая панель кнопок */}
       <div
         style={{
           position: 'absolute',
@@ -127,6 +129,26 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           zIndex: 100,
         }}
       >
+        <button
+          onClick={onGotoSimulation}
+          style={{
+            backgroundColor: 'rgba(39, 174, 96, 0.85)',
+            backdropFilter: 'blur(8px)',
+            color: '#fff',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            borderRadius: '6px',
+            padding: '8px 14px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            transition: 'background-color 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#27ae60')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(39, 174, 96, 0.85)')}
+        >
+          {t('hud.goToSimulation')}
+        </button>
         <button
           onClick={onExitToEditor}
           style={{

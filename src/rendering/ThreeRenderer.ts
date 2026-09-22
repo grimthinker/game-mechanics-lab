@@ -8,6 +8,10 @@ import { World } from '../ecs/World';
 import { EventBus } from '../core/EventBus';
 import { GlobalInput } from '../input/GlobalInput';
 import { EDITOR_CONFIG } from '../config/editorConfig';
+import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
+import { getEffectiveLogicBrain } from '../ecs/utils/anatomy';
+import { getRootOwner } from '../ecs/utils/hierarchy';
+import { LOGIC_CONFIG } from '../ai/config';
 
 export class ThreeRenderer implements IRenderer {
   private container: HTMLDivElement;
@@ -261,6 +265,16 @@ export class ThreeRenderer implements IRenderer {
     if (context.editorData.marqueeBox) {
       this.renderScreenMarqueeBox(context.editorData.marqueeBox);
     }
+    if (context.editorData.showAIDebug) {
+      const activeSelectedId =
+        context.editorData.selectedId ??
+        (context.editorData.selectedIds.size > 0
+          ? context.editorData.selectedIds.values().next().value
+          : null);
+      if (activeSelectedId) {
+        this.renderAIDebug(context.world, activeSelectedId);
+      }
+    }
   }
 
   private renderScreenMarqueeBox(box: { start: Point; current: Point }): void {
@@ -404,6 +418,363 @@ export class ThreeRenderer implements IRenderer {
     this.uiCtx.shadowOffsetX = 1;
     this.uiCtx.shadowOffsetY = 1;
     this.uiCtx.fillText(entity.item.name, 0, 0);
+    this.uiCtx.restore();
+  }
+
+  private renderAIDebug(world: World, selectedId: string): void {
+    const entity = world.getEntity(selectedId);
+    if (!entity) return;
+
+    const rootId = getRootOwner(world, selectedId) ?? selectedId;
+    const rootEntity = world.getEntity(rootId) ?? entity;
+
+    const transform = entity.transform ?? rootEntity.transform;
+    if (!transform) return;
+
+    const posX = transform.x;
+    const posY = transform.y;
+    const posZ = transform.z ?? transform.y;
+
+    const brain =
+      getEffectiveLogicBrain(world, selectedId) ?? getEffectiveLogicBrain(world, rootId);
+    const bb = brain?.blackboard;
+
+    const aiStats = rootEntity.aiStats ?? entity.aiStats;
+    const perception = rootEntity.perception ?? entity.perception;
+
+    let detectRadius: number | undefined = bb?.get('detectDist') ?? bb?.get('detect_dist');
+    if (detectRadius === undefined || Number.isNaN(detectRadius)) {
+      if (perception && perception.visionMaxDistance > 0) {
+        detectRadius = Math.max(perception.visionMaxDistance, perception.hearingMaxDistance ?? 0);
+      } else if (aiStats?.stats?.detectDist !== undefined) {
+        detectRadius = aiStats.stats.detectDist;
+      } else {
+        detectRadius = LOGIC_CONFIG.detectDist;
+      }
+    }
+
+    let loseRadius: number | undefined =
+      bb?.get('loseTargetDist') ?? bb?.get('lose_target_dist') ?? bb?.get('loseDist');
+    if (loseRadius === undefined || Number.isNaN(loseRadius)) {
+      if (aiStats?.stats?.loseTargetDist !== undefined) {
+        loseRadius = aiStats.stats.loseTargetDist;
+      } else if (detectRadius !== undefined && detectRadius > 0) {
+        loseRadius = detectRadius * 1.4;
+      } else {
+        loseRadius = LOGIC_CONFIG.loseTargetDist;
+      }
+    }
+
+    const w = this.uiCanvas.width;
+    const h = this.uiCanvas.height;
+
+    // 1. Отрисовка радиуса поиска цели (Detect Radius)
+    if (detectRadius !== undefined && detectRadius > 0) {
+      this.drawProjectedCircle(
+        posX,
+        posY,
+        posZ,
+        detectRadius,
+        AI_DEBUG_CONFIG.colors.detectRadius,
+        AI_DEBUG_CONFIG.dashArrays.radii,
+        `Detect: ${detectRadius.toFixed(1)}m`,
+        0
+      );
+    }
+
+    // 2. Отрисовка радиуса потери цели (Lose Target Radius)
+    if (loseRadius !== undefined && loseRadius > 0) {
+      this.drawProjectedCircle(
+        posX,
+        posY,
+        posZ,
+        loseRadius,
+        AI_DEBUG_CONFIG.colors.loseRadius,
+        AI_DEBUG_CONFIG.dashArrays.radii,
+        `Lose: ${loseRadius.toFixed(1)}m`,
+        Math.PI / 4
+      );
+    }
+
+    const selfPos3D = new THREE.Vector3(posX, posY + 0.8, posZ);
+
+    // 3. Линия к target_pos (если задано в памяти)
+    const targetPosVal =
+      bb?.get('target_pos') ??
+      bb?.get('targetPos') ??
+      bb?.get('target_position') ??
+      bb?.get('targetPosition');
+
+    if (targetPosVal !== undefined && targetPosVal !== null) {
+      let targetPos3D: THREE.Vector3 | null = null;
+      if (typeof targetPosVal === 'object') {
+        if (Array.isArray(targetPosVal)) {
+          if (targetPosVal.length >= 3) {
+            targetPos3D = new THREE.Vector3(
+              Number(targetPosVal[0]) || 0,
+              Number(targetPosVal[1]) || 0,
+              Number(targetPosVal[2]) || 0
+            );
+          } else if (targetPosVal.length >= 2) {
+            targetPos3D = new THREE.Vector3(
+              Number(targetPosVal[0]) || 0,
+              0.1,
+              Number(targetPosVal[1]) || 0
+            );
+          }
+        } else if ('x' in targetPosVal && 'y' in targetPosVal) {
+          const x = Number(targetPosVal.x) || 0;
+          if (targetPosVal.z !== undefined) {
+            targetPos3D = new THREE.Vector3(
+              x,
+              Number(targetPosVal.y) || 0.1,
+              Number(targetPosVal.z) || 0
+            );
+          } else {
+            targetPos3D = new THREE.Vector3(x, 0.1, Number(targetPosVal.y) || 0);
+          }
+        }
+      }
+
+      if (targetPos3D) {
+        this.drawProjectedLine(
+          selfPos3D,
+          targetPos3D,
+          AI_DEBUG_CONFIG.colors.pathLine,
+          AI_DEBUG_CONFIG.dashArrays.path,
+          2
+        );
+
+        // Маркер точки target_pos
+        const proj = targetPos3D.clone().project(this.camera);
+        if (proj.z <= 1.0) {
+          const sx = (proj.x * 0.5 + 0.5) * w;
+          const sy = (-(proj.y * 0.5) + 0.5) * h;
+
+          this.uiCtx.save();
+          this.uiCtx.strokeStyle = AI_DEBUG_CONFIG.colors.pathLine;
+          this.uiCtx.fillStyle = AI_DEBUG_CONFIG.colors.pathLine;
+          this.uiCtx.lineWidth = 2;
+          this.uiCtx.beginPath();
+          this.uiCtx.arc(sx, sy, 4, 0, Math.PI * 2);
+          this.uiCtx.fill();
+          this.uiCtx.stroke();
+          this.uiCtx.restore();
+
+          this.renderBadge('target_pos', sx, sy - 12, AI_DEBUG_CONFIG.colors.pathLine, '#ffffff');
+        }
+      }
+    }
+
+    // 4. Линия к targetId (если задано в памяти)
+    const targetIdVal = bb?.get('targetId') ?? bb?.get('target_id');
+    if (targetIdVal !== undefined && targetIdVal !== null && String(targetIdVal).trim() !== '') {
+      const targetIdStr = String(targetIdVal);
+      const targetEntity = world.getEntity(targetIdStr);
+      const targetOwnerRoot = getRootOwner(world, targetIdStr);
+      const targetTrans =
+        world.getComponent(targetIdStr, 'transform') ??
+        (targetOwnerRoot ? world.getComponent(targetOwnerRoot, 'transform') : undefined);
+
+      if (targetTrans) {
+        const targetPos3D = new THREE.Vector3(
+          targetTrans.x,
+          targetTrans.y + 0.8,
+          targetTrans.z ?? targetTrans.y
+        );
+
+        this.drawProjectedLine(
+          selfPos3D,
+          targetPos3D,
+          AI_DEBUG_CONFIG.colors.targetLine,
+          AI_DEBUG_CONFIG.dashArrays.targetLine,
+          2
+        );
+
+        const proj = targetPos3D.clone().project(this.camera);
+        if (proj.z <= 1.0) {
+          const sx = (proj.x * 0.5 + 0.5) * w;
+          const sy = (-(proj.y * 0.5) + 0.5) * h;
+
+          const targetMeta =
+            targetEntity?.meta ??
+            (targetOwnerRoot ? world.getComponent(targetOwnerRoot, 'meta') : undefined);
+          const targetName = targetMeta?.name ?? targetIdStr;
+
+          this.renderBadge(
+            `Target: ${targetName}`,
+            sx,
+            sy - 16,
+            AI_DEBUG_CONFIG.colors.targetLine,
+            '#ff8a80'
+          );
+        }
+      }
+    }
+  }
+
+  private drawProjectedCircle(
+    centerX: number,
+    centerY: number,
+    centerZ: number,
+    radius: number,
+    strokeColor: string,
+    dashArray: number[],
+    label?: string,
+    labelAngle: number = 0,
+    segments: number = 64
+  ): void {
+    if (radius <= 0) return;
+
+    const w = this.uiCanvas.width;
+    const h = this.uiCanvas.height;
+
+    this.uiCtx.save();
+    this.uiCtx.strokeStyle = strokeColor;
+    this.uiCtx.lineWidth = 1.5;
+    this.uiCtx.setLineDash(dashArray);
+
+    const tempVec = new THREE.Vector3();
+    let pathStarted = false;
+
+    this.uiCtx.beginPath();
+
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      tempVec.set(
+        centerX + Math.cos(angle) * radius,
+        centerY + 0.03,
+        centerZ + Math.sin(angle) * radius
+      );
+      tempVec.project(this.camera);
+
+      if (tempVec.z > 1.0) {
+        pathStarted = false;
+        continue;
+      }
+
+      const screenX = (tempVec.x * 0.5 + 0.5) * w;
+      const screenY = (-(tempVec.y * 0.5) + 0.5) * h;
+
+      if (!pathStarted) {
+        this.uiCtx.moveTo(screenX, screenY);
+        pathStarted = true;
+      } else {
+        this.uiCtx.lineTo(screenX, screenY);
+      }
+    }
+
+    this.uiCtx.stroke();
+    this.uiCtx.restore();
+
+    if (label) {
+      tempVec.set(
+        centerX + Math.cos(labelAngle) * radius,
+        centerY + 0.03,
+        centerZ + Math.sin(labelAngle) * radius
+      );
+      tempVec.project(this.camera);
+      if (tempVec.z <= 1.0) {
+        const screenX = (tempVec.x * 0.5 + 0.5) * w;
+        const screenY = (-(tempVec.y * 0.5) + 0.5) * h;
+        this.renderBadge(label, screenX, screenY - 10, strokeColor);
+      }
+    }
+  }
+
+  private drawProjectedLine(
+    from: THREE.Vector3,
+    to: THREE.Vector3,
+    strokeColor: string,
+    dashArray: number[],
+    lineWidth: number = 2
+  ): void {
+    const w = this.uiCanvas.width;
+    const h = this.uiCanvas.height;
+
+    const v1 = from.clone().project(this.camera);
+    const v2 = to.clone().project(this.camera);
+
+    if (v1.z > 1.0 && v2.z > 1.0) return;
+
+    let pFrom = from.clone();
+    let pTo = to.clone();
+
+    if (v1.z > 1.0 || v2.z > 1.0) {
+      const camPos = new THREE.Vector3();
+      this.camera.getWorldPosition(camPos);
+      const camDir = new THREE.Vector3();
+      this.camera.getWorldDirection(camDir);
+
+      const dist1 = from.clone().sub(camPos).dot(camDir);
+      const dist2 = to.clone().sub(camPos).dot(camDir);
+      const nearPlane = 0.2;
+
+      if (dist1 < nearPlane && dist2 < nearPlane) return;
+
+      if (dist1 < nearPlane) {
+        const t = (nearPlane - dist1) / (dist2 - dist1);
+        pFrom = from.clone().lerp(to, t);
+      } else if (dist2 < nearPlane) {
+        const t = (nearPlane - dist2) / (dist1 - dist2);
+        pTo = to.clone().lerp(from, t);
+      }
+
+      const s1 = pFrom.project(this.camera);
+      const s2 = pTo.project(this.camera);
+      if (s1.z > 1.0 || s2.z > 1.0) return;
+
+      this.uiCtx.save();
+      this.uiCtx.strokeStyle = strokeColor;
+      this.uiCtx.lineWidth = lineWidth;
+      this.uiCtx.setLineDash(dashArray);
+      this.uiCtx.beginPath();
+      this.uiCtx.moveTo((s1.x * 0.5 + 0.5) * w, (-(s1.y * 0.5) + 0.5) * h);
+      this.uiCtx.lineTo((s2.x * 0.5 + 0.5) * w, (-(s2.y * 0.5) + 0.5) * h);
+      this.uiCtx.stroke();
+      this.uiCtx.restore();
+      return;
+    }
+
+    this.uiCtx.save();
+    this.uiCtx.strokeStyle = strokeColor;
+    this.uiCtx.lineWidth = lineWidth;
+    this.uiCtx.setLineDash(dashArray);
+    this.uiCtx.beginPath();
+    this.uiCtx.moveTo((v1.x * 0.5 + 0.5) * w, (-(v1.y * 0.5) + 0.5) * h);
+    this.uiCtx.lineTo((v2.x * 0.5 + 0.5) * w, (-(v2.y * 0.5) + 0.5) * h);
+    this.uiCtx.stroke();
+    this.uiCtx.restore();
+  }
+
+  private renderBadge(
+    text: string,
+    screenX: number,
+    screenY: number,
+    borderColor: string,
+    textColor: string = AI_DEBUG_CONFIG.colors.badgeText
+  ): void {
+    this.uiCtx.save();
+    this.uiCtx.font = 'bold 10px sans-serif';
+    const textWidth = this.uiCtx.measureText(text).width;
+    const paddingX = 6;
+    const boxW = textWidth + paddingX * 2;
+    const boxH = 16;
+    const boxX = screenX - boxW / 2;
+    const boxY = screenY - boxH / 2;
+
+    this.uiCtx.fillStyle = AI_DEBUG_CONFIG.colors.badgeBg;
+    this.uiCtx.fillRect(boxX, boxY, boxW, boxH);
+
+    this.uiCtx.strokeStyle = borderColor;
+    this.uiCtx.lineWidth = 1;
+    this.uiCtx.setLineDash([]);
+    this.uiCtx.strokeRect(boxX, boxY, boxW, boxH);
+
+    this.uiCtx.fillStyle = textColor;
+    this.uiCtx.textAlign = 'center';
+    this.uiCtx.textBaseline = 'middle';
+    this.uiCtx.fillText(text, screenX, screenY);
     this.uiCtx.restore();
   }
 }

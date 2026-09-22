@@ -61,12 +61,30 @@ export function assembleCreature(
     backwardTurnMultiplier: config.movement?.backwardTurnMultiplier ?? 0.6,
     pickupSpeedMultiplier: config.movement?.pickupSpeedMultiplier ?? 0.5,
     pickupTurnMultiplier: config.movement?.pickupTurnMultiplier ?? 1.1,
-    standToCrouchTime: createStat(config.movement?.standToCrouchTime ?? 0.1),
-    crouchToStandTime: createStat(config.movement?.crouchToStandTime ?? 0.1),
-    standToProneTime: createStat(config.movement?.standToProneTime ?? 0.5),
-    proneToStandTime: createStat(config.movement?.proneToStandTime ?? 1.0),
-    crouchToProneTime: createStat(config.movement?.crouchToProneTime ?? 0.5),
-    proneToCrouchTime: createStat(config.movement?.proneToCrouchTime ?? 1.0),
+    standToCrouchTime: createStat(
+      config.movement?.standToCrouchTime ?? BALANCE_CONFIG.creature.transitions.standToCrouch
+    ),
+    crouchToStandTime: createStat(
+      config.movement?.crouchToStandTime ?? BALANCE_CONFIG.creature.transitions.crouchToStand
+    ),
+    standToProneTime: createStat(
+      config.movement?.standToProneTime ?? BALANCE_CONFIG.creature.transitions.standToProne
+    ),
+    proneToStandTime: createStat(
+      config.movement?.proneToStandTime ?? BALANCE_CONFIG.creature.transitions.proneToStand
+    ),
+    crouchToProneTime: createStat(
+      config.movement?.crouchToProneTime ?? BALANCE_CONFIG.creature.transitions.crouchToProne
+    ),
+    proneToCrouchTime: createStat(
+      config.movement?.proneToCrouchTime ?? BALANCE_CONFIG.creature.transitions.proneToCrouch
+    ),
+    throwPrepTime: createStat(
+      config.movement?.throwPrepTime ?? BALANCE_CONFIG.creature.transitions.throwPrep
+    ),
+    throwRecoveryTime: createStat(
+      config.movement?.throwRecoveryTime ?? BALANCE_CONFIG.creature.transitions.throwRecovery
+    ),
   });
 
   world.addComponent(id, 'velocity', {

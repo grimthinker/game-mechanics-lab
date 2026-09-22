@@ -4,11 +4,11 @@ import { deg2Rad } from '../../utils';
 export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'humanoid',
   name: 'Гуманоид',
-  rigAsset: '3d/creatures/humanoid/rig.glb',
+  rigAsset: 'proc://rig/humanoid',
   parts: [
     {
       key: 'torso',
-      meshAsset: '3d/creatures/humanoid/mesh/torso.glb',
+      meshAsset: 'proc://mesh/humanoid/torso',
       rigNodeName: 'Torso',
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
@@ -33,7 +33,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'head',
-      meshAsset: '3d/creatures/humanoid/mesh/head.glb',
+      meshAsset: 'proc://mesh/humanoid/head',
       rigNodeName: 'HeadPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'head' },
@@ -61,7 +61,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'arm_l',
-      meshAsset: '3d/creatures/humanoid/mesh/leftarm.glb',
+      meshAsset: 'proc://mesh/humanoid/arm_l',
       rigNodeName: 'LeftArmPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
@@ -89,7 +89,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'arm_r',
-      meshAsset: '3d/creatures/humanoid/mesh/rightarm.glb',
+      meshAsset: 'proc://mesh/humanoid/arm_r',
       rigNodeName: 'RightArmPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'arm' },
@@ -117,7 +117,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'leg_l',
-      meshAsset: '3d/creatures/humanoid/mesh/leftleg.glb',
+      meshAsset: 'proc://mesh/humanoid/leg_l',
       rigNodeName: 'LeftLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
@@ -138,7 +138,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'leg_r',
-      meshAsset: '3d/creatures/humanoid/mesh/rightleg.glb',
+      meshAsset: 'proc://mesh/humanoid/leg_r',
       rigNodeName: 'RightLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
@@ -191,9 +191,12 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
 export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'quadruped',
   name: 'Четвероногий',
+  rigAsset: 'proc://rig/quadruped',
   parts: [
     {
       key: 'torso',
+      meshAsset: 'proc://mesh/quadruped/torso',
+      rigNodeName: 'Torso',
       config: {
         tag: { archetype: 'bodyPart', subType: 'torso' },
         meta: { name: 'Туловище' },
@@ -218,6 +221,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'head',
+      meshAsset: 'proc://mesh/quadruped/head',
+      rigNodeName: 'HeadPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'head' },
         meta: { name: 'Голова' },
@@ -243,6 +248,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
           interactDist: 1.2,
           strength: 20,
           itemId: null,
+          rigSocketName: 'JawsSocket',
         },
         equip: {
           equipmentAreas: [
@@ -253,6 +259,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'front_leg_l',
+      meshAsset: 'proc://mesh/quadruped/front_leg_l',
+      rigNodeName: 'FrontLeftLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Передняя левая лапа' },
@@ -267,6 +275,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'front_leg_r',
+      meshAsset: 'proc://mesh/quadruped/front_leg_r',
+      rigNodeName: 'FrontRightLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Передняя правая лапа' },
@@ -281,6 +291,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'rear_leg_l',
+      meshAsset: 'proc://mesh/quadruped/rear_leg_l',
+      rigNodeName: 'BackLeftLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Задняя левая лапа' },
@@ -295,6 +307,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'rear_leg_r',
+      meshAsset: 'proc://mesh/quadruped/rear_leg_r',
+      rigNodeName: 'BackRightLegPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'leg' },
         meta: { name: 'Задняя правая лапа' },
@@ -309,6 +323,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
     },
     {
       key: 'tail',
+      meshAsset: 'proc://mesh/quadruped/tail',
+      rigNodeName: 'TailPivot',
       config: {
         tag: { archetype: 'bodyPart', subType: 'tail' },
         meta: { name: 'Хвост' },

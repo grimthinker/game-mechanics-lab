@@ -232,6 +232,8 @@ export class WorldSerializer {
         normalizeStat(comps.movementStats.proneToStandTime);
         normalizeStat(comps.movementStats.crouchToProneTime);
         normalizeStat(comps.movementStats.proneToCrouchTime);
+        normalizeStat(comps.movementStats.throwPrepTime);
+        normalizeStat(comps.movementStats.throwRecoveryTime);
         comps.movementStats.proneSpeedMultiplier = comps.movementStats.proneSpeedMultiplier ?? 0.2;
         comps.movementStats.proneTurnMultiplier = comps.movementStats.proneTurnMultiplier ?? 0.3;
         comps.movementStats.strafeSpeedMultiplier =

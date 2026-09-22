@@ -118,10 +118,11 @@ export interface EquipmentComponent {
   equipmentAreas: EquipmentArea[];
 }
 
-export type InteractionPhase = 'reach' | 'lift' | 'abort_reach' | 'abort_lift';
+export type InteractionPhase =
+  'reach' | 'lift' | 'abort_reach' | 'abort_lift' | 'throw_prep' | 'throw_recovery' | 'abort_throw';
 
 export interface InteractionActionComponent {
-  type: 'pickup' | 'equip' | 'unequip';
+  type: 'pickup' | 'equip' | 'unequip' | 'throw';
   targetId?: string;
   slotIndex?: number;
   partId?: string;

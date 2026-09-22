@@ -14,6 +14,7 @@ import {
 import { Point, Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
+import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
 export function assembleItem(
   world: World,
@@ -33,8 +34,8 @@ export function assembleItem(
     equippable: config.item?.equippable ?? false,
     equipTimeMultiplier: config.item?.equipTimeMultiplier ?? 1.0,
   };
-  const radius = config.physics?.radius ?? 0.3;
-  const weight = config.physics?.weight ?? 1;
+  const radius = config.physics?.radius ?? BALANCE_CONFIG.items.defaultRadius;
+  const weight = config.physics?.weight ?? BALANCE_CONFIG.items.defaultWeight;
   const isSolid = config.physics?.isSolid ?? true;
 
   // 1. Тег архетипа
@@ -62,7 +63,7 @@ export function assembleItem(
   }
 
   // 4.6. Здоровье (Структурная прочность)
-  const maxHp = config.health?.maxHp ?? 50;
+  const maxHp = config.health?.maxHp ?? BALANCE_CONFIG.items.defaultMaxHp;
   world.addComponent(id, 'health', {
     current: config.health?.hp ?? maxHp,
     max: createStat(maxHp),
@@ -77,16 +78,17 @@ export function assembleItem(
   // 5. Специфические компоненты экипировки
   if (itemData.type === 'weapon') {
     const ws = config.weaponStats ?? {};
+    const wd = BALANCE_CONFIG.items.weapon;
     world.addComponent(id, 'weaponStats', {
-      baseDamage: createStat(ws.baseDamage ?? 20),
-      prepTime: createStat(ws.prepTime ?? 0.2),
-      castTime: createStat(ws.castTime ?? 0),
-      recoveryTime: createStat(ws.recoveryTime ?? 0.3),
-      prepTurnSlow: ws.prepTurnSlow ?? 0.5,
-      recoveryTurnSlow: ws.recoveryTurnSlow ?? 0.8,
-      prepMoveSlow: ws.prepMoveSlow ?? 0.5,
-      recoveryMoveSlow: ws.recoveryMoveSlow ?? 0.8,
-      castMoveSlow: ws.castMoveSlow ?? 0.5,
+      baseDamage: createStat(ws.baseDamage ?? wd.baseDamage),
+      prepTime: createStat(ws.prepTime ?? wd.prepTime),
+      castTime: createStat(ws.castTime ?? wd.castTime),
+      recoveryTime: createStat(ws.recoveryTime ?? wd.recoveryTime),
+      prepTurnSlow: ws.prepTurnSlow ?? wd.prepTurnSlow,
+      recoveryTurnSlow: ws.recoveryTurnSlow ?? wd.recoveryTurnSlow,
+      prepMoveSlow: ws.prepMoveSlow ?? wd.prepMoveSlow,
+      recoveryMoveSlow: ws.recoveryMoveSlow ?? wd.recoveryMoveSlow,
+      castMoveSlow: ws.castMoveSlow ?? wd.castMoveSlow,
       minMultiplier: ws.minMultiplier ?? 0.8,
       maxMultiplier: ws.maxMultiplier ?? 1.2,
       critChance: ws.critChance ?? 0.1,

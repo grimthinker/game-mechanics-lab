@@ -6,6 +6,7 @@ export interface EventMap {
     selectedEntityIds: string[];
   };
   'world:updated': void;
+  'inventory:updated': void;
   'bt:updated': {
     btData: BTNodeDTO | null;
     btBlackboard: Record<string, any> | null;

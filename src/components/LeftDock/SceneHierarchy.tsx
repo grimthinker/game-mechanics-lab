@@ -325,7 +325,13 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
     const unsub = EventBus.on('world:updated', () => {
       setWorldRevision((prev) => prev + 1);
     });
-    return unsub;
+    const unsubInv = EventBus.on('inventory:updated', () => {
+      setWorldRevision((prev) => prev + 1);
+    });
+    return () => {
+      unsub();
+      unsubInv();
+    };
   }, []);
 
   const { tree, matchedIds } = useMemo(() => {
