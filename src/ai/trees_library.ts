@@ -25,6 +25,7 @@ import { t } from '../locales';
 export const BEHAVIOR_TREES: Record<string, () => BTNode> = {
   PlayerTree: () => PlayerTree(),
   AttackerTree: () => AttackerTree(),
+  FollowerTree: () => FollowerTree(),
   CombatTree: () => CombatTree(),
   IdleTree: () => new BTWait({ duration: 1 }),
 };
@@ -35,6 +36,9 @@ export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
   },
   get AttackerTree() {
     return t('trees.AttackerTree');
+  },
+  get FollowerTree() {
+    return t('trees.FollowerTree');
   },
   get CombatTree() {
     return t('trees.CombatTree');
@@ -73,6 +77,27 @@ export function AttackerTree(): BTNode {
         ]),
 
         new BTSequence([new BTActionPatrol(), new BTWait({ duration: 1 })]),
+      ]),
+      { interval: 1.2 }
+    ),
+    { interval: 0.5 }
+  );
+}
+
+export function FollowerTree(): BTNode {
+  return new BTServiceSyncStats(
+    new BTServiceFindNearestTarget(
+      new BTSelector([
+        new BTSequence([
+          new BTSelector([new BTConditionValidTarget(), new BTCommandAcceptCandidate()]),
+          new BTServicePathUpdater(
+            new BTSelector([
+              new BTSequence([new BTConditionEngaged(), new BTActionRotateToPos()]),
+              new BTActionPursue(),
+            ])
+          ),
+        ]),
+        new BTWait({ duration: 1 }),
       ]),
       { interval: 1.2 }
     ),

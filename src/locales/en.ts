@@ -307,6 +307,7 @@ export const en = {
   trees: {
     PlayerTree: 'Player (WASD)',
     AttackerTree: 'Attacker Bot',
+    FollowerTree: 'Follower Bot',
     CombatTree: 'Combat Mode',
     IdleTree: 'Idle',
   },

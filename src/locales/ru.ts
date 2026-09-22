@@ -308,6 +308,7 @@ export const ru = {
   trees: {
     PlayerTree: 'Игрок (WASD)',
     AttackerTree: 'Атакующий бот',
+    FollowerTree: 'Бот-спутник',
     CombatTree: 'Боевой режим',
     IdleTree: 'Бездействие',
   },

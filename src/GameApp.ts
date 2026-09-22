@@ -22,6 +22,7 @@ import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
+import { CREATURE_BLUEPRINTS } from './ecs/templates';
 import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
 import { EventBus } from './core/EventBus';
 import { BTLogicComponent } from './ai/core';
@@ -647,6 +648,16 @@ export class GameApp {
       { x: bx, y: by, z: bz } as any,
       'PlayerTree',
       'Игрок'
+    );
+
+    this.entityFactory.spawnModularCreature(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      { x: bx + 1.5, y: by, z: bz + 1.5 } as any,
+      CREATURE_BLUEPRINTS.quadruped,
+      'FollowerTree',
+      'Собака'
     );
 
     this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz } as any);
