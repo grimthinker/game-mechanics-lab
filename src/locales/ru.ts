@@ -149,6 +149,8 @@ export const ru = {
     crateDesc: 'Разрушаемый объект, 100 HP, 1.5x1.5м',
     zoneFire: 'Зона огня (Урон)',
     zoneFireDesc: 'Наносит 15 урона в секунду',
+    zoneJointDamage: 'Зона разрыва связей',
+    zoneJointDamageDesc: 'Наносит 25 урона в секунду только по суставам',
     zoneHeal: 'Зона лечения',
     zoneHealDesc: 'Восстанавливает 15 HP в секунду',
     zoneRepel: 'Силовое поле',
@@ -324,6 +326,7 @@ export const ru = {
   },
   zones: {
     defaultNameDamage: 'Зона урона',
+    defaultNameJointDamage: 'Зона разрыва суставов',
     defaultNameHeal: 'Зона лечения',
     defaultNameRepel: 'Силовое поле (Отталкивание)',
     defaultNameAttract: 'Воронка (Притягивание)',

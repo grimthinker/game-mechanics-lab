@@ -3,7 +3,7 @@ import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, ModifierType } from '../types';
 import { applyDamage, applyHeal } from '../utils/health';
 import { addModifier } from '../stats/StatEvaluator';
-import { applyZoneDamageToCreature } from '../utils/anatomyDamage';
+import { applyZoneDamageToCreature, applyZoneJointDamageToCreature } from '../utils/anatomyDamage';
 import { EFFECTOR_CONFIG } from '../../config/effectorConfig';
 
 export class AreaEffectorSystem {
@@ -42,14 +42,18 @@ export class AreaEffectorSystem {
 
         const targetRadius = physicsStats.radius.current ?? 0.4;
 
-        // Математическое вычисление дистанции между центрами сфер в 3D пространстве
+        // Цилиндрический расчет: горизонтальная дистанция в плоскости XZ + высота Y
         const dx = targetTransform.x - zoneTransform.x;
-        const dy = targetTransform.y - zoneTransform.y;
+        const dy = Math.abs(targetTransform.y - zoneTransform.y);
         const dz = targetTransform.z - zoneTransform.z;
-        const dist = Math.hypot(dx, dy, dz);
+        const distXZ = Math.hypot(dx, dz);
+
+        // Высота цилиндра зоны 2 метра (от -0.2м до +2.2м с запасом)
+        if (dy > 2.5) continue;
 
         const effectiveRadius = areaEffector.radius + targetRadius;
-        if (dist > effectiveRadius) continue; // Объект вне зоны
+        if (distXZ > effectiveRadius) continue; // Объект вне зоны
+        const dist = distXZ;
 
         const targetTs = world.getComponent(targetId, 'timeScale')?.multiplier.current ?? 1.0;
         const localDt = dt * targetTs;
@@ -95,6 +99,18 @@ export class AreaEffectorSystem {
             applyZoneDamageToCreature(world, physics, targetId, deltaValue);
           } else {
             applyDamage(world, targetId, deltaValue, isPulseTick);
+          }
+        }
+        // 1.1. Урон только по соединениям (суставам) существ
+        else if (areaEffector.effect === 'joint_damage') {
+          const tag = world.getComponent(targetId, 'tag');
+          const hasAnatomy =
+            world.getComponent(targetId, 'assemblyRoot') ||
+            world.getComponent(targetId, 'socketDef') ||
+            tag?.archetype === 'creature';
+
+          if (hasAnatomy) {
+            applyZoneJointDamageToCreature(world, physics, targetId, deltaValue);
           }
         }
         // 2. Лечение

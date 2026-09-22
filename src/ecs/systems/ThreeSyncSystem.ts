@@ -7,6 +7,11 @@ import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { BodyStructureType } from '../templates';
 import { getAggregatedInteractionSlots } from '../utils/hierarchy';
 import { EventBus } from '../../core/EventBus';
+import {
+  computeDetachedLimbGrip,
+  computeItemGrip,
+  GripTransform,
+} from '../../rendering/gripCalculators';
 
 interface AnimatorState {
   mixer: THREE.AnimationMixer;
@@ -14,6 +19,7 @@ interface AnimatorState {
   targetClipName: string;
   currentAction: THREE.AnimationAction | null;
   rig: THREE.Object3D;
+  socketBones: Map<string, THREE.Object3D>;
 }
 
 interface AttackVisualState {
@@ -50,6 +56,12 @@ export class ThreeSyncSystem {
     opacity: 0.3,
     side: THREE.DoubleSide,
   });
+  private matZoneJoint = new THREE.MeshBasicMaterial({
+    color: 0xe67e22,
+    transparent: true,
+    opacity: 0.3,
+    side: THREE.DoubleSide,
+  });
   private matZoneHeal = new THREE.MeshBasicMaterial({
     color: 0x2ecc71,
     transparent: true,
@@ -74,8 +86,23 @@ export class ThreeSyncSystem {
     opacity: 0.3,
     side: THREE.DoubleSide,
   });
-
   private matSelection = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+  private matSilhouetteOutline = new THREE.MeshBasicMaterial({
+    color: 0x2ecc71, // Ярко-зеленый цвет контура выделения
+    side: THREE.BackSide,
+  });
+
+  public static attachOutlines(object: THREE.Object3D, material: THREE.Material): void {
+    object.traverse((child) => {
+      if (child instanceof THREE.Mesh && !child.userData.isSelectionOutline) {
+        const outline = new THREE.Mesh(child.geometry, material);
+        outline.scale.set(1.06, 1.06, 1.06);
+        outline.userData.isSelectionOutline = true;
+        outline.visible = false;
+        child.add(outline);
+      }
+    });
+  }
 
   // Материалы для визуализации атак
   private matAttackPrepMesh = new THREE.MeshBasicMaterial({
@@ -156,11 +183,13 @@ export class ThreeSyncSystem {
     this.matArmor.dispose();
     this.matBag.dispose();
     this.matZoneDmg.dispose();
+    this.matZoneJoint.dispose();
     this.matZoneHeal.dispose();
     this.matZoneNeutral.dispose();
     this.matZoneSlow.dispose();
     this.matZoneFast.dispose();
     this.matSelection.dispose();
+    this.matSilhouetteOutline.dispose();
 
     // Очищаем материалы атак
     this.matAttackPrepMesh.dispose();
@@ -180,7 +209,11 @@ export class ThreeSyncSystem {
     }
 
     for (const [id, { transform, renderable }] of renderables) {
-      if (!renderable.isVisible) continue;
+      const ownership = world.getComponent(id, 'ownership');
+      const isEquippedInHand = ownership && ownership.status === 'equipped';
+
+      // Экипированные в руки предметы не отбрасываются из рендера, даже если скрыты на полу
+      if (!renderable.isVisible && !isEquippedInHand) continue;
 
       activeIds.add(id);
 
@@ -229,13 +262,27 @@ export class ThreeSyncSystem {
             const baseRadius = 0.4;
             const scaleFactor = radius / baseRadius;
             obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
+          } else if (obj.userData.isDetachedLimb) {
+            // Сохраняем анатомический масштаб гуманоида (0.3 / 0.4 = 0.75) для отсоединенных частей
+            obj.scale.set(0.75, 0.75, 0.75);
+          } else if (archetype === 'zone') {
+            const effector = world.getComponent(id, 'areaEffector');
+            const physStats = world.getComponent(id, 'physicsStats');
+            const r = effector?.radius ?? physStats?.radius.current ?? 2.5;
+            obj.scale.set(r, 1, r);
           } else {
             obj.scale.set(1, 1, 1);
           }
         } else {
-          // Сброс локальных трансформаций внутри сустава
-          obj.position.set(0, 0, 0);
-          obj.rotation.set(0, 0, 0);
+          // Применяем рассчитанную точку хвата (Grip Transform)
+          const grip = obj.userData.gripTransform as GripTransform | undefined;
+          if (grip) {
+            obj.position.copy(grip.position);
+            obj.quaternion.copy(grip.quaternion);
+          } else {
+            obj.position.set(0, 0, 0);
+            obj.rotation.set(0, 0, 0);
+          }
           obj.scale.set(1, 1, 1);
         }
 
@@ -271,17 +318,26 @@ export class ThreeSyncSystem {
               });
             }
 
-            // Прикрепление экипированного оружия/предметов в кости рук
+            // Прикрепление экипированного оружия/предметов в кости рук (через защищенный кэш сокетов)
             const aggSlots = getAggregatedInteractionSlots(world, id);
             for (const info of aggSlots) {
               if (info.slot.itemId && info.slot.rigSocketName) {
                 const itemObj = this.meshes.get(info.slot.itemId);
                 if (itemObj) {
-                  const socketBone = animState.rig.getObjectByName(info.slot.rigSocketName);
+                  const socketBone =
+                    animState.socketBones.get(info.slot.rigSocketName) ||
+                    animState.rig.getObjectByName(info.slot.rigSocketName);
+
                   if (socketBone && itemObj.parent !== socketBone) {
                     socketBone.add(itemObj);
-                    itemObj.position.set(0, 0, 0);
-                    itemObj.rotation.set(0, 0, 0);
+                    const grip = itemObj.userData.gripTransform as GripTransform | undefined;
+                    if (grip) {
+                      itemObj.position.copy(grip.position);
+                      itemObj.quaternion.copy(grip.quaternion);
+                    } else {
+                      itemObj.position.set(0, 0, 0);
+                      itemObj.rotation.set(0, 0, 0);
+                    }
                   }
                 }
               }
@@ -325,6 +381,7 @@ export class ThreeSyncSystem {
             if (effector) {
               let mat = this.matZoneNeutral;
               if (effector.effect === 'damage') mat = this.matZoneDmg;
+              else if (effector.effect === 'joint_damage') mat = this.matZoneJoint;
               else if (effector.effect === 'heal') mat = this.matZoneHeal;
               else if (effector.effect === 'time_dilation') {
                 mat = effector.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
@@ -610,6 +667,17 @@ export class ThreeSyncSystem {
       return group;
     }
 
+    // Сборка оторванной составной части тела (предмет с иерархией assemblyRoot)
+    const assembly = world.getComponent(id, 'assemblyRoot');
+    if (assembly && (archetype === 'item' || archetype === 'bodyPart')) {
+      this.loadingMeshes.add(id);
+      const group = new THREE.Group();
+      group.userData.entityId = id;
+      group.userData.isDetachedLimb = true;
+      this.assembleDetachedLimbAsync(id, group, world).catch(console.error);
+      return group;
+    }
+
     // Загрузка реального 3D меша для оторванных конечностей и предметов на полу
     const visual = world.getComponent(id, 'visualModel');
     if (visual && visual.modelId && (archetype === 'item' || archetype === 'bodyPart')) {
@@ -637,6 +705,10 @@ export class ThreeSyncSystem {
             } else {
               group.add(mesh);
             }
+
+            // Рассчитываем и кэшируем точку хвата предмета
+            const itemComp = world.getComponent(id, 'item');
+            group.userData.gripTransform = computeItemGrip(group, itemComp?.type);
 
             // Добавляем невидимый куб для возможности клика и выделения
             const physStats = world.getComponent(id, 'physicsStats');
@@ -718,13 +790,17 @@ export class ThreeSyncSystem {
       const effector = world.getComponent(id, 'areaEffector');
       let mat = this.matZoneNeutral;
       if (effector?.effect === 'damage') mat = this.matZoneDmg;
+      else if (effector?.effect === 'joint_damage') mat = this.matZoneJoint;
       else if (effector?.effect === 'heal') mat = this.matZoneHeal;
       else if (effector?.effect === 'time_dilation') {
         mat = (effector.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
       }
-      const geo = new THREE.CylinderGeometry(radius, radius, 2, 32);
+      // Создаем базовый цилиндр радиусом 1 метр, который динамически масштабируется в update
+      const geo = new THREE.CylinderGeometry(1, 1, 2, 32);
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = 1;
+      const r = effector?.radius ?? radius;
+      group.scale.set(r, 1, r);
     }
 
     if (mainMesh) {
@@ -733,14 +809,12 @@ export class ThreeSyncSystem {
       mainMesh.userData.isSharedMaterial = true; // Защищаем кэшированный материал
       group.add(mainMesh);
 
-      const outlineGeo = mainMesh.geometry.clone();
-      const outline = new THREE.Mesh(outlineGeo, this.matSelection);
-      outline.scale.set(1.05, 1.05, 1.05);
-      outline.position.copy(mainMesh.position);
-      outline.userData.isSelectionOutline = true;
-      outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
-      outline.visible = false;
-      group.add(outline);
+      if (archetype === 'item' || archetype === 'bodyPart') {
+        const itemComp = world.getComponent(id, 'item');
+        group.userData.gripTransform = computeItemGrip(group, itemComp?.type);
+      }
+
+      ThreeSyncSystem.attachOutlines(group, this.matSilhouetteOutline);
 
       return group;
     }
@@ -793,6 +867,14 @@ export class ThreeSyncSystem {
 
       parentGroup.add(rig);
 
+      // Кэшируем оригинальные кости сокетов персонажа ДО прикрепления оружия и конечностей
+      const socketBones = new Map<string, THREE.Object3D>();
+      rig.traverse((child) => {
+        if (child.name.includes('Socket')) {
+          socketBones.set(child.name, child);
+        }
+      });
+
       const mixer = new THREE.AnimationMixer(rig);
       this.animators.set(rootId, {
         mixer,
@@ -800,6 +882,7 @@ export class ThreeSyncSystem {
         targetClipName: '',
         currentAction: null,
         rig,
+        socketBones,
       });
 
       // Итерируемся по частям тела и собираем меши
@@ -839,16 +922,7 @@ export class ThreeSyncSystem {
         }
       }
 
-      // Цилиндр выделения в метрическом масштабе
-      const physStats = world.getComponent(rootId, 'physicsStats');
-      const r = physStats ? physStats.radius.current : 0.4;
-      const outlineGeo = new THREE.CylinderGeometry(r * 1.1, r * 1.1, 1.8, 16);
-      const outline = new THREE.Mesh(outlineGeo, this.matSelection);
-      outline.position.y = 0.9;
-      outline.userData.isSelectionOutline = true;
-      outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
-      outline.visible = false;
-      parentGroup.add(outline);
+      ThreeSyncSystem.attachOutlines(parentGroup, this.matSilhouetteOutline);
 
       const box = new THREE.Box3().setFromObject(rig);
       const visualCorrectionY = -box.min.y; // Автоматически поднимет или опустит меш так, чтобы нижняя точка всегда касалась Y = 0
@@ -857,6 +931,136 @@ export class ThreeSyncSystem {
       this.playAnimation(rootId, animator.rigType, 'stand_idle').catch(console.error);
     } catch (err) {
       console.error(`[ThreeSyncSystem] Error assembling rig for ${rootId}:`, err);
+    } finally {
+      if (this.loadingGenerations.get(rootId) === currentGen) {
+        this.loadingMeshes.delete(rootId);
+      }
+    }
+  }
+
+  private async assembleDetachedLimbAsync(
+    rootId: EntityId,
+    parentGroup: THREE.Group,
+    world: World
+  ): Promise<void> {
+    const assembly = world.getComponent(rootId, 'assemblyRoot');
+    const visual = world.getComponent(rootId, 'visualModel');
+    if (!assembly || !assembly.partIds || assembly.partIds.length === 0) {
+      this.loadingMeshes.delete(rootId);
+      return;
+    }
+
+    const currentGen = (this.loadingGenerations.get(rootId) ?? 0) + 1;
+    this.loadingGenerations.set(rootId, currentGen);
+
+    const isAborted = () =>
+      this.loadingGenerations.get(rootId) !== currentGen || !world.getEntity(rootId);
+
+    try {
+      const assetManager = AssetManager.getInstance();
+      const rigStructure = (visual?.rigType as BodyStructureType) || 'humanoid';
+      const rigProfile = CREATURE_RIG_PROFILES[rigStructure] || CREATURE_RIG_PROFILES.humanoid;
+      const rigAsset = rigProfile?.rigAsset;
+
+      if (!rigAsset) {
+        throw new Error(`Rig asset not found for structure: ${rigStructure}`);
+      }
+
+      // Клонируем риг (в исходной T-позе без анимаций)
+      const rig = await assetManager.getClonedModel(rigAsset);
+      if (!rig) throw new Error(`Rig ${rigAsset} failed to load for detached limb`);
+
+      if (isAborted()) {
+        ThreeSyncSystem.disposeObject(rig);
+        ThreeSyncSystem.disposeObject(parentGroup);
+        this.scene.remove(parentGroup);
+        return;
+      }
+
+      // Масштаб 1:1, компенсация ориентации рига (GLTF смотрит в +Z, физика в +X)
+      rig.scale.set(1, 1, 1);
+      rig.rotation.y = Math.PI / 2;
+
+      // Скрываем все встроенные базовые меши рига
+      rig.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.visible = false;
+        }
+      });
+
+      // Прикрепляем меши только для тех частей тела, которые входят в отделившийся фрагмент
+      for (const partId of assembly.partIds) {
+        const partVisual = world.getComponent(partId, 'visualModel');
+        if (partVisual && partVisual.modelId && partVisual.rigNodeName) {
+          const targetNode = rig.getObjectByName(partVisual.rigNodeName);
+          if (targetNode) {
+            const meshClone = await assetManager.getClonedModel(partVisual.modelId);
+
+            if (isAborted()) {
+              if (meshClone) ThreeSyncSystem.disposeObject(meshClone);
+              ThreeSyncSystem.disposeObject(rig);
+              ThreeSyncSystem.disposeObject(parentGroup);
+              this.scene.remove(parentGroup);
+              return;
+            }
+
+            if (meshClone) {
+              // Для отсоединенного предмета привязываем клик строго к rootId (предмету), а не к скрытой части
+              meshClone.userData.entityId = rootId;
+              delete meshClone.userData.partId;
+
+              meshClone.traverse((c) => {
+                c.userData.entityId = rootId;
+                delete c.userData.partId;
+              });
+
+              // Безопасный перенос дочерних объектов с сохранением ссылок
+              const childrenToAttach = [...meshClone.children];
+              if (childrenToAttach.length > 0) {
+                for (const child of childrenToAttach) {
+                  targetNode.add(child);
+                }
+              } else {
+                targetNode.add(meshClone);
+              }
+            }
+          } else {
+            console.warn(
+              `[ThreeSync] Rig node ${partVisual.rigNodeName} not found in detached limb rig!`
+            );
+          }
+        }
+      }
+
+      // Обновляем мировую матрицу скелета для точного расчета видимой геометрии
+      rig.updateMatrixWorld(true);
+
+      // setFromObject автоматически учитывает только видимые меши (скрытые кости рига игнорируются)
+      const limbBox = new THREE.Box3().setFromObject(rig);
+
+      const boxCenter = new THREE.Vector3();
+      const boxSize = new THREE.Vector3(0.4, 0.4, 0.4);
+
+      if (!limbBox.isEmpty()) {
+        limbBox.getCenter(boxCenter);
+        limbBox.getSize(boxSize);
+        // Смещаем скелет так, чтобы геометрический центр видимой части совпал с (0, 0, 0) коллайдера
+        rig.position.sub(boxCenter);
+      }
+
+      parentGroup.add(rig);
+
+      // Получаем анатомический подтип части тела (torso, arm, leg, head)
+      const anchorPartId = assembly.rootPartId;
+      const anchorTag = world.getComponent(anchorPartId, 'tag');
+      const subType = anchorTag?.subType;
+
+      // Автоматический расчет точки хвата строго по локальным координатам меша
+      parentGroup.userData.gripTransform = computeDetachedLimbGrip(parentGroup, subType);
+
+      ThreeSyncSystem.attachOutlines(parentGroup, this.matSilhouetteOutline);
+    } catch (err) {
+      console.error(`[ThreeSyncSystem] Ошибка сборки отсоединенной конечности ${rootId}:`, err);
     } finally {
       if (this.loadingGenerations.get(rootId) === currentGen) {
         this.loadingMeshes.delete(rootId);

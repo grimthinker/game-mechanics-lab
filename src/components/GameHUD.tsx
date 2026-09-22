@@ -2,13 +2,22 @@ import React from 'react';
 import { World } from '../ecs/World';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 import { t } from '../locales';
+import { RetroSlotsHUD } from './gameHud/RetroSlotsHUD';
+import { GameApp } from '../GameApp';
 
 export interface GameHUDProps {
+  app?: GameApp | null;
   world: World | null | undefined;
+  selectedEntityId?: string | null;
   onExitToEditor: () => void;
 }
 
-export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
+export const GameHUD: React.FC<GameHUDProps> = ({
+  app,
+  world,
+  selectedEntityId,
+  onExitToEditor,
+}) => {
   if (!world) return null;
 
   // Поиск сущности игрока (PlayerTree)
@@ -179,6 +188,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({ world, onExitToEditor }) => {
           <strong style={{ color: '#fff' }}>V</strong> {t('hud.hintProne')}
         </span>
       </div>
+
+      {/* Ретро-интерфейс слотов взаимодействия и экипировки */}
+      <RetroSlotsHUD app={app} world={world} selectedEntityId={selectedEntityId ?? null} />
     </>
   );
 };

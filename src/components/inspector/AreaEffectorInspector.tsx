@@ -49,6 +49,7 @@ export const AreaEffectorInspector: React.FC<AreaEffectorInspectorProps> = ({
           onChange={(e) => handleChange({ effect: e.target.value as ZoneEffectType })}
         >
           <option value="damage">Урон (Лава / Огонь / Яд)</option>
+          <option value="joint_damage">Разрыв связей (Урон по суставам)</option>
           <option value="heal">Лечение (Источник жизни)</option>
           <option value="repel">Отталкивание (Силовое поле)</option>
           <option value="attract">Притягивание (Воронка / Гравитация)</option>
@@ -56,11 +57,16 @@ export const AreaEffectorInspector: React.FC<AreaEffectorInspectorProps> = ({
         </select>
       </label>
 
-      {(!values.distanceAttenuation || values.effect === 'damage' || values.effect === 'heal') && (
+      {(!values.distanceAttenuation ||
+        values.effect === 'damage' ||
+        values.effect === 'joint_damage' ||
+        values.effect === 'heal') && (
         <label>
           {values.effect === 'time_dilation'
             ? 'Множитель времени (0.5 = 50%):'
-            : values.effect === 'damage' || values.effect === 'heal'
+            : values.effect === 'damage' ||
+                values.effect === 'heal' ||
+                values.effect === 'joint_damage'
               ? 'Сила эффекта (HP / сек):'
               : 'Базовая сила импульса:'}
           <input

@@ -416,3 +416,40 @@ export function applyZoneDamageToCreature(
   }
   checkCreatureDeath(world, creatureRootId);
 }
+
+export function applyZoneJointDamageToCreature(
+  world: World,
+  physics: PhysicsSystem,
+  creatureRootId: EntityId,
+  damageAmount: number
+): void {
+  const parts = getAnatomyParts(world, creatureRootId);
+  const visitedEdges = new Set<string>();
+
+  for (const partId of parts) {
+    const socketLink = world.getComponent(partId, 'socketLink');
+    if (!socketLink || !socketLink.links) continue;
+
+    for (const [socketIdA, link] of Object.entries(socketLink.links)) {
+      const targetPartId = link.targetEntityId;
+      const socketIdB = link.targetSocketId;
+      const edgeKey = [partId, targetPartId].sort().join(':') + `_${socketIdA}_${socketIdB}`;
+
+      if (visitedEdges.has(edgeKey)) continue;
+      visitedEdges.add(edgeKey);
+
+      applyDamageToConnection(
+        world,
+        physics,
+        partId,
+        socketIdA,
+        targetPartId,
+        socketIdB,
+        damageAmount,
+        new Set<string>()
+      );
+    }
+  }
+
+  checkCreatureDeath(world, creatureRootId);
+}

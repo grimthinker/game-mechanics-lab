@@ -14,6 +14,8 @@ import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { useDragDrop } from '../dnd/DragDropContext';
 import { CREATURE_BLUEPRINTS } from '../ecs/templates';
+import { getRootOwner } from '../ecs/utils/hierarchy';
+import { EventBus } from '../core/EventBus';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -97,13 +99,26 @@ export const useCanvasInteraction = ({
 
       // В режиме игры: подбор предмета через Ctrl+ЛКМ
       if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
-        const targetEntityId = app.selection.pickNearestEntity(
+        let targetEntityId = app.selection.pickNearestEntity(
           point,
           undefined,
           e.clientX,
           e.clientY
         );
         if (targetEntityId) {
+          // Если кликнули по части тела, находим родительскую сборку предмета на полу
+          if (!app.world.getComponent(targetEntityId, 'item')) {
+            const assemblyRoots = app.world.getEntitiesWith('assemblyRoot', 'tag');
+            const parentItem = assemblyRoots.find(
+              ([, comp]) =>
+                comp.tag.archetype === 'item' &&
+                comp.assemblyRoot.partIds?.includes(targetEntityId!)
+            );
+            if (parentItem) {
+              targetEntityId = parentItem[0];
+            }
+          }
+
           const itemComp = app.world.getComponent(targetEntityId, 'item');
           const tagComp = app.world.getComponent(targetEntityId, 'tag');
           const ownershipComp = app.world.getComponent(targetEntityId, 'ownership');
@@ -146,6 +161,35 @@ export const useCanvasInteraction = ({
         if (comp?.item && !comp.ownership && mode === GameMode.EDITOR) {
           dragCandidateRef.current = { id: entityId, startX: e.clientX, startY: e.clientY };
           return; // Откладываем выделение до отпускания или сдвига мыши
+        }
+
+        const isBodyPart =
+          comp?.tag?.archetype === 'bodyPart' || !!app.world.getComponent(entityId, 'socketDef');
+        if (isBodyPart) {
+          const rootId = getRootOwner(app.world, entityId);
+          if (rootId && rootId !== entityId) {
+            const rootTag = app.world.getComponent(rootId, 'tag');
+            if (rootTag?.archetype === 'creature') {
+              const creatureName = app.world.getComponent(rootId, 'meta')?.name || 'Существо';
+              const partName = comp?.meta?.name || 'Часть тела';
+
+              if (e.shiftKey && app.selection.selectedEntityIds.has(rootId)) {
+                app.selection.deselectEntity(rootId);
+              } else {
+                app.selection.selectEntity(rootId, !e.shiftKey);
+                EventBus.emit('inspector:navigate', {
+                  rootEntityId: rootId,
+                  path: [
+                    { id: rootId, label: creatureName },
+                    { id: entityId, label: partName },
+                  ],
+                });
+              }
+              syncPlayerControls();
+              updateStats();
+              return;
+            }
+          }
         }
 
         if (e.shiftKey && app.selection.selectedEntityIds.has(entityId)) {
@@ -372,10 +416,21 @@ export const useCanvasInteraction = ({
     const entityId = app.selection.pickEntityAt(point, e.clientX, e.clientY);
 
     if (entityId) {
-      if (app.selection.selectedEntityIds.has(entityId)) {
-        app.selection.selectEntity(entityId, false);
+      let targetId = entityId;
+      const comp = app.world.getEntity(entityId);
+      const isBodyPart =
+        comp?.tag?.archetype === 'bodyPart' || !!app.world.getComponent(entityId, 'socketDef');
+      if (isBodyPart) {
+        const rootId = getRootOwner(app.world, entityId);
+        if (rootId && app.world.getComponent(rootId, 'tag')?.archetype === 'creature') {
+          targetId = rootId;
+        }
+      }
+
+      if (app.selection.selectedEntityIds.has(targetId)) {
+        app.selection.selectEntity(targetId, false);
       } else {
-        app.selection.selectEntity(entityId, true);
+        app.selection.selectEntity(targetId, true);
       }
       syncPlayerControls();
       updateStats();
@@ -383,7 +438,7 @@ export const useCanvasInteraction = ({
       onOpenPieMenu({
         screenPos,
         worldPos: point,
-        targetEntityId: entityId,
+        targetEntityId: targetId,
         targetEntityIds: Array.from(app.selection.selectedEntityIds),
       });
     } else {

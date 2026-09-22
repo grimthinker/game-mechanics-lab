@@ -17,6 +17,8 @@ import { ARCHETYPE_ASSEMBLERS } from '../archetypes';
 import { setBaseStat, createStat } from '../stats/StatEvaluator';
 import { evaluateConsciousness, getLocomotionState, getSensoryStats } from '../utils/anatomyStatus';
 import { ConsciousnessState } from '../types';
+import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
+import { BodyStructureType } from '../templates';
 
 export class AnatomySystem {
   public update(_dt: number, world: World, physics: PhysicsSystem): void {
@@ -64,6 +66,8 @@ export class AnatomySystem {
       totalWeight: number;
       maxRadius: number;
       calculatedSize: number;
+      rigType?: string;
+      partName?: string;
     }
 
     const viablePlans: ViableCreaturePlan[] = [];
@@ -160,11 +164,30 @@ export class AnatomySystem {
         }
         const calculatedSize = Math.max(1, Math.round(Math.sqrt(sumSqSize)));
 
+        let rigType = 'humanoid';
+        for (const [rootId, comp] of existingCreatureRoots) {
+          if (comp.assemblyRoot.partIds?.some((pId) => graph.includes(pId))) {
+            const oldAnimator = world.getComponent(rootId, 'animator');
+            if (oldAnimator) {
+              rigType = oldAnimator.rigType;
+              break;
+            }
+          }
+        }
+
+        const firstPartMeta = world.getComponent(graph[0], 'meta');
+        const partName =
+          graph.length === 1
+            ? firstPartMeta?.name || 'Часть тела'
+            : `${firstPartMeta?.name || 'Останки'} (Сборка)`;
+
         itemPlans.push({
           graph,
           totalWeight,
           maxRadius,
           calculatedSize,
+          rigType,
+          partName,
         });
       }
     }
@@ -353,6 +376,8 @@ export class AnatomySystem {
       totalWeight: number;
       maxRadius: number;
       calculatedSize: number;
+      rigType?: string;
+      partName?: string;
     }
   ): void {
     let anchorPartId = plan.graph[0];
@@ -398,17 +423,35 @@ export class AnatomySystem {
       });
     }
 
+    const anchorMeta = world.getComponent(anchorPartId, 'meta');
+    const displayName =
+      plan.partName ||
+      (plan.graph.length === 1
+        ? anchorMeta?.name || 'Часть тела'
+        : `${anchorMeta?.name || 'Останки'} (Сборка)`);
+
     world.addComponent(rootItemId, 'tag', { archetype: 'item', subType: 'bodyPart' });
-    world.addComponent(rootItemId, 'meta', { name: 'Часть тела', entityType: 'item' });
+    world.addComponent(rootItemId, 'meta', { name: displayName, entityType: 'item' });
     world.addComponent(rootItemId, 'assemblyRoot', {
       rootPartId: anchorPartId,
       partIds: plan.graph,
     });
 
+    const anchorVisual = world.getComponent(anchorPartId, 'visualModel');
+    const rigStructure = (plan.rigType as BodyStructureType) || 'humanoid';
+    const rigProfile = CREATURE_RIG_PROFILES[rigStructure] || CREATURE_RIG_PROFILES.humanoid;
+    const rigAsset = rigProfile?.rigAsset ?? '3d/creatures/humanoid/rig.glb';
+
+    world.addComponent(rootItemId, 'visualModel', {
+      modelId: plan.graph.length === 1 && anchorVisual?.modelId ? anchorVisual.modelId : rigAsset,
+      rigType: rigStructure,
+      rigNodeName: plan.graph.length === 1 ? anchorVisual?.rigNodeName : undefined,
+    });
+
     let itemComp = world.getComponent(rootItemId, 'item');
     if (!itemComp) {
       world.addComponent(rootItemId, 'item', {
-        name: 'Часть тела',
+        name: displayName,
         type: 'bodyPart',
         maxStack: 1,
         count: 1,
@@ -418,6 +461,7 @@ export class AnatomySystem {
         equipTimeMultiplier: 1.0,
       });
     } else {
+      itemComp.name = displayName;
       itemComp.size = plan.calculatedSize;
     }
 

@@ -19,6 +19,8 @@ export function getDefaultZoneName(effect: ZoneEffectType, valuePerSec?: number)
   switch (effect) {
     case 'damage':
       return t('zones.defaultNameDamage');
+    case 'joint_damage':
+      return t('zones.defaultNameJointDamage');
     case 'heal':
       return t('zones.defaultNameHeal');
     case 'repel':
@@ -43,6 +45,8 @@ export function getZoneVisuals(
   switch (effect) {
     case 'damage':
       return { fillColor: 'rgba(231, 76, 60, 0.2)', strokeColor: '#e74c3c', icon: '☠️' };
+    case 'joint_damage':
+      return { fillColor: 'rgba(230, 126, 34, 0.25)', strokeColor: '#e67e22', icon: '⛓️‍💥' };
     case 'heal':
       return { fillColor: 'rgba(46, 204, 113, 0.2)', strokeColor: '#2ecc71', icon: '❤️' };
     case 'repel':

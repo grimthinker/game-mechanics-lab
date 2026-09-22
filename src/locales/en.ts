@@ -148,6 +148,8 @@ export const en = {
     crateDesc: 'Destructible crate, 100 HP, 1.5x1.5m',
     zoneFire: 'Fire Zone (Damage)',
     zoneFireDesc: 'Deals 15 damage per second',
+    zoneJointDamage: 'Joint Disruption Zone',
+    zoneJointDamageDesc: 'Deals 25 damage per second only to body joints',
     zoneHeal: 'Healing Zone',
     zoneHealDesc: 'Restores 15 HP per second',
     zoneRepel: 'Force Field',
@@ -323,6 +325,7 @@ export const en = {
   },
   zones: {
     defaultNameDamage: 'Damage Zone',
+    defaultNameJointDamage: 'Joint Disruption Zone',
     defaultNameHeal: 'Healing Zone',
     defaultNameRepel: 'Force Field (Repel)',
     defaultNameAttract: 'Vortex (Attract)',

@@ -330,6 +330,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           createConfig: () => createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
         },
         {
+          id: 'zone_joint_damage',
+          name: t('palette.zoneJointDamage'),
+          description: t('palette.zoneJointDamageDesc'),
+          icon: '⛓️‍💥',
+          createConfig: () =>
+            createZoneConfig('joint_damage', 2.5, 25, t('palette.zoneJointDamage')),
+        },
+        {
           id: 'zone_heal',
           name: t('palette.zoneHeal'),
           description: t('palette.zoneHealDesc'),

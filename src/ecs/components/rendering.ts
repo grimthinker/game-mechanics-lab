@@ -24,7 +24,8 @@ export interface RenderableComponent {
   syncWithTransform?: boolean;
 }
 
-export type ZoneEffectType = 'damage' | 'heal' | 'repel' | 'attract' | 'time_dilation';
+export type ZoneEffectType =
+  'damage' | 'heal' | 'repel' | 'attract' | 'time_dilation' | 'joint_damage';
 
 export interface AreaEffectorComponent {
   effect: ZoneEffectType;
@@ -53,6 +54,7 @@ export interface GizmoComponent {
 
 export interface VisualModelComponent {
   modelId: string;
+  rigType?: string;
   rigNodeName?: string;
   materialId?: string;
   castShadow?: boolean;

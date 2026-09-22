@@ -84,6 +84,11 @@ export class EditorMutationsAPI {
 
     if (patch.radius !== undefined && physStats.radius.base !== patch.radius) {
       setBaseStat(physStats.radius, patch.radius);
+      // Если это зона — синхронизируем радиус эффектора
+      const effector = this.world.getComponent(id, 'areaEffector');
+      if (effector && effector.radius !== patch.radius) {
+        effector.radius = patch.radius;
+      }
       changed = true;
     }
     if (patch.weight !== undefined && physStats.weight.base !== patch.weight) {

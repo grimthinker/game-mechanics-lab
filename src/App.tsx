@@ -633,7 +633,12 @@ export const App: React.FC = () => {
 
           {/* Внутриигровой интерфейс HUD */}
           {mode === GameMode.GAME && (
-            <GameHUD world={appRef.current?.world} onExitToEditor={goToEditor} />
+            <GameHUD
+              app={appRef.current}
+              world={appRef.current?.world}
+              selectedEntityId={selectedEntityId}
+              onExitToEditor={goToEditor}
+            />
           )}
 
           {/* Нижняя панель группового выделения (Drawer) */}
