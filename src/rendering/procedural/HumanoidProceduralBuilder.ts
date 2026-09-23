@@ -571,6 +571,123 @@ export class HumanoidProceduralBuilder implements IProceduralBuilder {
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', dropItemTimes, dropItemLegQ),
     ]);
 
+    // --- Анимация сильного броска вдаль (throw_item) ---
+    const throwItemTimes = [0.0, 0.14, 0.26, 0.38, 0.55];
+    const throwItemTorsoP = [0, 1.1, 0, 0, 1.09, -0.02, 0, 1.13, 0.03, 0, 1.11, 0.01, 0, 1.1, 0];
+
+    const throwItemTorsoQLeft = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.12, -0.15, 0.04), // Замах назад с поворотом корпуса
+      ...getQuat(0.2, 0.16, -0.05), // Мощный бросок вперед с доворотом
+      ...getQuat(0.06, 0.04, -0.01),
+      ...getQuat(0, 0, 0),
+    ];
+    const throwItemTorsoQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.12, 0.15, -0.04),
+      ...getQuat(0.2, -0.16, 0.05),
+      ...getQuat(0.06, -0.04, 0.01),
+      ...getQuat(0, 0, 0),
+    ];
+
+    const throwItemHeadQLeft = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.1, 0.1, 0),
+      ...getQuat(0.16, -0.08, 0),
+      ...getQuat(0.05, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+    const throwItemHeadQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.1, -0.1, 0),
+      ...getQuat(0.16, 0.08, 0),
+      ...getQuat(0.05, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+
+    // Активная рука отводится далеко назад (+0.75) и выбрасывается далеко вперед (-1.85)
+    const throwItemActiveArmQLeft = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.75, -0.12, -0.25),
+      ...getQuat(-1.85, -0.15, 0.22),
+      ...getQuat(-0.7, -0.05, 0.08),
+      ...getQuat(0, 0, 0),
+    ];
+    const throwItemPassiveArmQLeft = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.5, 0.1, 0.15), // Противовес для баланса
+      ...getQuat(0.35, -0.05, -0.1),
+      ...getQuat(0.1, 0, -0.02),
+      ...getQuat(0, 0, 0),
+    ];
+
+    const throwItemActiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.75, 0.12, 0.25),
+      ...getQuat(-1.85, 0.15, -0.22),
+      ...getQuat(-0.7, 0.05, -0.08),
+      ...getQuat(0, 0, 0),
+    ];
+    const throwItemPassiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.5, -0.1, -0.15),
+      ...getQuat(0.35, 0.05, 0.1),
+      ...getQuat(0.1, 0, 0.02),
+      ...getQuat(0, 0, 0),
+    ];
+
+    const throwItemLLegP = [
+      -0.15, 0.65, 0, -0.15, 0.65, -0.02, -0.15, 0.67, 0.04, -0.15, 0.65, 0.01, -0.15, 0.65, 0,
+    ];
+    const throwItemRLegP = [
+      0.15, 0.65, 0, 0.15, 0.65, -0.02, 0.15, 0.67, 0.04, 0.15, 0.65, 0.01, 0.15, 0.65, 0,
+    ];
+    const throwItemLegQ = [...idQ, ...idQ, ...idQ, ...idQ, ...idQ];
+
+    const throwItemLeftClip = new THREE.AnimationClip('throw_item_left_hand', 0.55, [
+      new THREE.VectorKeyframeTrack('Torso.position', throwItemTimes, throwItemTorsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', throwItemTimes, throwItemTorsoQLeft),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', throwItemTimes, throwItemHeadQLeft),
+      new THREE.QuaternionKeyframeTrack(
+        'LeftArmPivot.quaternion',
+        throwItemTimes,
+        throwItemActiveArmQLeft
+      ),
+      new THREE.QuaternionKeyframeTrack(
+        'RightArmPivot.quaternion',
+        throwItemTimes,
+        throwItemPassiveArmQLeft
+      ),
+      new THREE.VectorKeyframeTrack('LeftLegPivot.position', throwItemTimes, throwItemLLegP),
+      new THREE.VectorKeyframeTrack('RightLegPivot.position', throwItemTimes, throwItemRLegP),
+      new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', throwItemTimes, throwItemLegQ),
+      new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', throwItemTimes, throwItemLegQ),
+    ]);
+
+    const throwItemRightClip = new THREE.AnimationClip('throw_item_right_hand', 0.55, [
+      new THREE.VectorKeyframeTrack('Torso.position', throwItemTimes, throwItemTorsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', throwItemTimes, throwItemTorsoQRight),
+      new THREE.QuaternionKeyframeTrack(
+        'HeadPivot.quaternion',
+        throwItemTimes,
+        throwItemHeadQRight
+      ),
+      new THREE.QuaternionKeyframeTrack(
+        'RightArmPivot.quaternion',
+        throwItemTimes,
+        throwItemActiveArmQRight
+      ),
+      new THREE.QuaternionKeyframeTrack(
+        'LeftArmPivot.quaternion',
+        throwItemTimes,
+        throwItemPassiveArmQRight
+      ),
+      new THREE.VectorKeyframeTrack('LeftLegPivot.position', throwItemTimes, throwItemLLegP),
+      new THREE.VectorKeyframeTrack('RightLegPivot.position', throwItemTimes, throwItemRLegP),
+      new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', throwItemTimes, throwItemLegQ),
+      new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', throwItemTimes, throwItemLegQ),
+    ]);
+
     const storeTimes = [0.0, 0.15, 0.32, 0.45, 0.58, 0.75];
     const storeTorsoP = [0, 1.1, 0, 0, 1.1, 0, 0, 1.1, -0.01, 0, 1.1, -0.01, 0, 1.1, 0, 0, 1.1, 0];
     const storeTorsoQ = [
@@ -1481,6 +1598,9 @@ export class HumanoidProceduralBuilder implements IProceduralBuilder {
     map.set('drop_item', dropItemLeftClip);
     map.set('drop_item_left_hand', dropItemLeftClip);
     map.set('drop_item_right_hand', dropItemRightClip);
+    map.set('throw_item', throwItemLeftClip);
+    map.set('throw_item_left_hand', throwItemLeftClip);
+    map.set('throw_item_right_hand', throwItemRightClip);
     map.set('throw', dropItemLeftClip);
     map.set('store_inv', storeClip);
     map.set('retrieve_inv', retrieveClip);

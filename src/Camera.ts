@@ -57,7 +57,7 @@ export class Camera {
     const dx = clientX - this.rotStartX;
     const dy = clientY - this.rotStartY;
 
-    this.yaw += dx * CAMERA_CONFIG.rotationSensitivity * this.rotateSpeed;
+    this.yaw -= dx * CAMERA_CONFIG.rotationSensitivity * this.rotateSpeed;
     this.pitch = Math.max(
       CAMERA_CONFIG.minPitch,
       Math.min(

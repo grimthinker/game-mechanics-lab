@@ -654,6 +654,7 @@ export class ThreeSyncSystem {
       animKey.startsWith('attack') ||
       animKey.startsWith('pickup') ||
       animKey.startsWith('drop_item') ||
+      animKey.startsWith('throw_item') ||
       animKey === 'throw' ||
       animKey.includes('_to_');
 

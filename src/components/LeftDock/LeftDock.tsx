@@ -6,12 +6,13 @@ import { BTNodeDTO } from '../../ai/core';
 import { SceneHierarchy } from './SceneHierarchy';
 import { SpawnPalette } from './SpawnPalette';
 import { BTGraph } from '../BTGraph';
+import { AnimationsTab } from './AnimationsTab';
 import { useResizable } from '../../hooks/useResizable';
 import { t } from '../../locales';
 import { BodyStructureType } from '../../ecs/templates';
 import { BBKeyType } from '../../ai/schema';
 
-export type DockTab = 'hierarchy' | 'palette' | 'bt';
+export type DockTab = 'hierarchy' | 'palette' | 'bt' | 'animations';
 
 export interface LeftDockProps {
   app?: GameApp | null;
@@ -559,6 +560,22 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         >
           {t('dock.bt')}
         </button>
+        <button
+          onClick={() => setActiveTab('animations')}
+          style={{
+            flex: 1,
+            backgroundColor: activeTab === 'animations' ? '#252525' : 'transparent',
+            color: activeTab === 'animations' ? '#fff' : '#888',
+            border: activeTab === 'animations' ? '1px solid #3a3a3a' : '1px solid transparent',
+            borderRadius: '4px',
+            padding: '6px 4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+          }}
+        >
+          {t('dock.animations')}
+        </button>
       </div>
 
       {/* Тело вкладки */}
@@ -570,6 +587,10 @@ export const LeftDock: React.FC<LeftDockProps> = ({
             onSelectEntity={onSelectEntity}
             onFocusEntity={onFocusEntity}
           />
+        )}
+
+        {activeTab === 'animations' && (
+          <AnimationsTab world={world} selectedEntityId={selectedEntityId} />
         )}
 
         {activeTab === 'palette' && (
