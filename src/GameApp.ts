@@ -1230,7 +1230,7 @@ export class GameApp {
 
   public updateEntityInteractionSlot(
     partOrCreatureId: string,
-    patch: { name?: string; interactDist?: number; strength?: number }
+    patch: { name?: string; interactDist?: number; strength?: number; slotKind?: string }
   ): boolean {
     return this.mutations.updateEntityInteractionSlot(partOrCreatureId, patch);
   }
@@ -1238,10 +1238,17 @@ export class GameApp {
   public addEntityInteractionSlot(
     partId: string,
     defaultName: string = 'Новая рука',
-    interactDist: number = 25,
-    strength: number = 15
+    interactDist: number = 1.5,
+    strength: number = 15,
+    slotKind: string = 'left_hand'
   ): boolean {
-    return this.mutations.addEntityInteractionSlot(partId, defaultName, interactDist, strength);
+    return this.mutations.addEntityInteractionSlot(
+      partId,
+      defaultName,
+      interactDist,
+      strength,
+      slotKind
+    );
   }
 
   public removeEntityInteractionSlot(partId: string): boolean {

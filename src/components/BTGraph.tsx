@@ -46,8 +46,31 @@ function getTreeTopologyKey(node: BTNodeDTO, path: string = 'root'): string {
   return `${nodeSignature}(${childrenKeys.join(',')})`;
 }
 
-// Глобальный кэш раскладки для предотвращения повторных расчетов Dagre
+// Bounded LRU-кэш раскладки для предотвращения утечек памяти при переключении сущностей и редактировании деревьев
+const MAX_LAYOUT_CACHE_ENTRIES = 30;
 const LAYOUT_CACHE = new Map<string, StaticGraphLayout>();
+
+function getFromLayoutCache(key: string): StaticGraphLayout | undefined {
+  const item = LAYOUT_CACHE.get(key);
+  if (item) {
+    // Обновляем порядок использования (LRU)
+    LAYOUT_CACHE.delete(key);
+    LAYOUT_CACHE.set(key, item);
+  }
+  return item;
+}
+
+function setToLayoutCache(key: string, layout: StaticGraphLayout): void {
+  if (LAYOUT_CACHE.has(key)) {
+    LAYOUT_CACHE.delete(key);
+  } else if (LAYOUT_CACHE.size >= MAX_LAYOUT_CACHE_ENTRIES) {
+    const oldestKey = LAYOUT_CACHE.keys().next().value;
+    if (oldestKey !== undefined) {
+      LAYOUT_CACHE.delete(oldestKey);
+    }
+  }
+  LAYOUT_CACHE.set(key, layout);
+}
 
 function computeStaticGraphLayout(tree: BTNodeDTO): StaticGraphLayout {
   const g = new dagre.graphlib.Graph();
@@ -141,24 +164,26 @@ export const BTGraph: React.FC<BTGraphProps> = ({
 
   // Быстрый доступ к кэшированной раскладке либо инициализация без зависания UI
   const [staticLayout, setStaticLayout] = useState<StaticGraphLayout>(() => {
-    if (LAYOUT_CACHE.has(topologyKey)) {
-      return LAYOUT_CACHE.get(topologyKey)!;
+    const cached = getFromLayoutCache(topologyKey);
+    if (cached) {
+      return cached;
     }
     const calculated = computeStaticGraphLayout(tree);
-    LAYOUT_CACHE.set(topologyKey, calculated);
+    setToLayoutCache(topologyKey, calculated);
     return calculated;
   });
 
   useEffect(() => {
-    if (LAYOUT_CACHE.has(topologyKey)) {
-      setStaticLayout(LAYOUT_CACHE.get(topologyKey)!);
+    const cached = getFromLayoutCache(topologyKey);
+    if (cached) {
+      setStaticLayout(cached);
       return;
     }
 
     // Отложенный неблокирующий расчет для новых деревьев
     const timer = setTimeout(() => {
       const calculated = computeStaticGraphLayout(tree);
-      LAYOUT_CACHE.set(topologyKey, calculated);
+      setToLayoutCache(topologyKey, calculated);
       setStaticLayout(calculated);
     }, 0);
 

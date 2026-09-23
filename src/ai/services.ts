@@ -359,24 +359,37 @@ export class BTServiceInputController extends BTService {
   }
 
   protected override onAbort(entity: EntityAdapter): void {
-    entity.setDesiredMoveVector(null);
-    entity.stop();
-    entity.stopRunning();
-    entity.stopWalking();
-    entity.setDesiredStance('standing');
+    const input = entity.input;
+    if (input) {
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
+      input.isRunning = false;
+      input.isSlowWalking = false;
+      input.desiredStance = 'standing';
+    }
     super.onAbort(entity);
   }
 
   protected override onClose(entity: EntityAdapter): void {
-    entity.setDesiredMoveVector(null);
-    entity.stop();
-    entity.stopRunning();
-    entity.stopWalking();
-    entity.setDesiredStance('standing');
+    const input = entity.input;
+    if (input) {
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
+      input.isRunning = false;
+      input.isSlowWalking = false;
+      input.desiredStance = 'standing';
+    }
     super.onClose(entity);
   }
 
   protected tickService(entity: EntityAdapter): void {
+    const input = entity.input;
+    if (!input || !entity.isAlive) return;
+
     const bb = entity.brain?.blackboard;
     const keys = bb?.get('pressedKeys') || [];
     const keysSet = new Set(keys);
@@ -403,33 +416,33 @@ export class BTServiceInputController extends BTService {
       const dirY = forwardIntent * sinA + strafeIntent * cosA;
       const len = Math.hypot(dirX, dirY);
 
-      entity.setDesiredMoveVector({ x: dirX / len, y: dirY / len });
+      input.desiredMoveVector = { x: dirX / len, y: dirY / len };
+      input.moveForward = forwardIntent !== 0 ? (Math.sign(forwardIntent) as -1 | 1) : 0;
+      input.moveStrafe = strafeIntent !== 0 ? (Math.sign(strafeIntent) as -1 | 1) : 0;
+      input.isMovingForward = forwardIntent > 0;
     } else {
-      entity.setDesiredMoveVector(null);
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
     }
 
-    if (keysSet.has('shift')) {
-      entity.startRunning();
-    } else {
-      entity.stopRunning();
-    }
-
-    if (keysSet.has('x')) {
-      entity.startWalking();
-    } else {
-      entity.stopWalking();
-    }
+    input.isRunning = keysSet.has('shift');
+    input.isSlowWalking = keysSet.has('x');
 
     if (keysSet.has('v')) {
-      entity.setDesiredStance('prone');
+      input.desiredStance = 'prone';
+      input.isCrouching = false;
     } else if (keysSet.has('c')) {
-      entity.setDesiredStance('crouching');
+      input.desiredStance = 'crouching';
+      input.isCrouching = true;
     } else {
-      entity.setDesiredStance('standing');
+      input.desiredStance = 'standing';
+      input.isCrouching = false;
     }
 
     if (keysSet.has(' ')) {
-      entity.attack();
+      input.wantsAttack = true;
     }
   }
 }

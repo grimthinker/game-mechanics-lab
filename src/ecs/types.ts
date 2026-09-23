@@ -203,9 +203,3 @@ export interface EntityConfig {
   hearing?: HearingConfig;
   perception?: PerceptionComponent;
 }
-
-export interface EntityController {
-  stop: () => boolean;
-  attack: (targetId?: string) => boolean;
-  getPos: () => Point;
-}

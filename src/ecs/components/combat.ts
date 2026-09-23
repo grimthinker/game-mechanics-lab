@@ -91,6 +91,7 @@ export interface ActiveAttack {
   phase: 'prep' | 'cast' | 'recovery';
   timer: number;
   totalDuration: number;
+  slotKind?: string;
 }
 
 export interface ActiveAttackComponent {

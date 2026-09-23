@@ -79,6 +79,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
           strength: 15,
           itemId: null,
           rigSocketName: 'LeftHandSocket',
+          slotKind: 'left_hand',
         },
         equip: {
           equipmentAreas: [
@@ -107,6 +108,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
           strength: 15,
           itemId: null,
           rigSocketName: 'RightHandSocket',
+          slotKind: 'right_hand',
         },
         equip: {
           equipmentAreas: [
@@ -249,6 +251,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
           strength: 20,
           itemId: null,
           rigSocketName: 'JawsSocket',
+          slotKind: 'jaws',
         },
         equip: {
           equipmentAreas: [
@@ -430,6 +433,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
           interactDist: 1.2,
           strength: 12,
           itemId: null,
+          slotKind: 'left_hand',
         },
       },
     },
@@ -450,6 +454,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
           interactDist: 1.2,
           strength: 12,
           itemId: null,
+          slotKind: 'right_hand',
         },
       },
     },

@@ -514,7 +514,7 @@ export class EditorMutationsAPI {
 
   public updateEntityInteractionSlot(
     partOrCreatureId: string,
-    patch: { name?: string; interactDist?: number; strength?: number }
+    patch: { name?: string; interactDist?: number; strength?: number; slotKind?: string }
   ): boolean {
     const slot = this.world.getComponent(partOrCreatureId, 'interactionSlots');
     if (!slot) return false;
@@ -529,6 +529,10 @@ export class EditorMutationsAPI {
     }
     if (patch.strength !== undefined && slot.strength !== patch.strength) {
       slot.strength = patch.strength;
+      changed = true;
+    }
+    if (patch.slotKind !== undefined && slot.slotKind !== patch.slotKind) {
+      slot.slotKind = patch.slotKind;
       changed = true;
     }
     return changed;
@@ -615,7 +619,8 @@ export class EditorMutationsAPI {
     partId: string,
     defaultName: string = 'Новая рука',
     interactDist: number = 1.5,
-    strength: number = 15
+    strength: number = 15,
+    slotKind: string = 'left_hand'
   ): boolean {
     if (this.world.getComponent(partId, 'interactionSlots')) return false;
 
@@ -626,6 +631,7 @@ export class EditorMutationsAPI {
       interactDist,
       strength,
       itemId: null,
+      slotKind,
     });
     return true;
   }

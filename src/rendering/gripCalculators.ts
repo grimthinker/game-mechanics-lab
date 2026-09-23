@@ -106,7 +106,7 @@ export function computeDetachedLimbGrip(limbGroup: THREE.Group, subType?: string
 /**
  * Рассчитывает точку хвата для обычных предметов, оружия и примитивов
  */
-export function computeItemGrip(itemObj: THREE.Object3D, itemType?: string): GripTransform {
+export function computeItemGrip(itemObj: THREE.Object3D, _itemType?: string): GripTransform {
   // 1. Поиск явной ноды рукояти в 3D-модели (GripPoint / Handle)
   const explicitGrip =
     itemObj.getObjectByName('GripPoint') ||
@@ -130,27 +130,8 @@ export function computeItemGrip(itemObj: THREE.Object3D, itemType?: string): Gri
   const quat = new THREE.Quaternion();
   const gripPos = center.clone();
 
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const minDim = Math.min(size.x, size.y, size.z);
-  const isElongated = maxDim > minDim * 1.6;
-
-  if (itemType === 'weapon' && isElongated) {
-    // Для длинного оружия хват на 28% от заднего конца
-    if (size.x >= size.y && size.x >= size.z) {
-      gripPos.x = box.min.x + size.x * 0.28;
-      gripPos.y = box.min.y + size.y * 0.45;
-    } else if (size.y >= size.x && size.y >= size.z) {
-      gripPos.y = box.min.y + size.y * 0.28;
-      gripPos.z = box.min.z + size.z * 0.45;
-      quat.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2);
-    } else {
-      gripPos.z = box.min.z + size.z * 0.28;
-      gripPos.y = box.min.y + size.y * 0.45;
-    }
-  } else {
-    // Для ящиков, брони, шлемов прижимаем нижнюю плоскость к ладони
-    gripPos.y = box.min.y + Math.min(0.04, size.y * 0.2);
-  }
+  // Смещаем точку хвата к верхней грани куба (box.max.y), чтобы предмет свисал из ладони вниз за край
+  gripPos.y = box.max.y - Math.min(0.04, size.y * 0.15);
 
   const finalPos = gripPos.clone().negate().applyQuaternion(quat);
 

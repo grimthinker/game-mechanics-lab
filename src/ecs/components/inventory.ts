@@ -39,6 +39,8 @@ export interface InventorySetup {
   slots?: InventorySlot[][];
 }
 
+export type InteractionSlotKind = 'left_hand' | 'right_hand' | 'jaws' | string;
+
 export interface InteractionSlot {
   id: string;
   name: string;
@@ -46,6 +48,7 @@ export interface InteractionSlot {
   strength: number;
   itemId: EntityId | null;
   rigSocketName?: string;
+  slotKind?: InteractionSlotKind;
 }
 
 export type InteractionSlotsComponent = InteractionSlot;
@@ -137,6 +140,7 @@ export interface InteractionActionComponent {
   relativeDist?: number;
   relativeAngle?: Radians;
   abortStartProgress?: number;
+  slotKind?: InteractionSlotKind;
 }
 
 export interface PickupIntentComponent {

@@ -12,14 +12,19 @@ export class AnimationSyncSystem {
 
       let targetAnim = 'stand_idle';
 
+      const interactionAction = world.getComponent(id, 'interactionAction');
+
       if (!isAlive) {
         targetAnim = 'dead';
       } else if (activeAttacks && activeAttacks.attacks.length > 0) {
-        targetAnim = 'attack';
+        const slotKind = activeAttacks.attacks[0]?.slotKind || 'left_hand';
+        targetAnim = `attack_${slotKind}`;
       } else if (meta.actionMode === 'pickup') {
-        targetAnim = 'pickup';
+        const slotKind = interactionAction?.slotKind || 'left_hand';
+        targetAnim = `pickup_${slotKind}`;
       } else if (meta.actionMode === 'throw') {
-        targetAnim = 'throw';
+        const slotKind = interactionAction?.slotKind || 'left_hand';
+        targetAnim = `drop_item_${slotKind}`;
       } else if (stanceTransition && stanceTransition.transitionStance) {
         // Проигрываем анимацию перехода между стойками (например: stand_to_prone, prone_to_stand)
         targetAnim = stanceTransition.transitionStance;

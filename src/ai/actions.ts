@@ -93,9 +93,18 @@ export class BTActionPursue extends BTAction {
         ? (targetPos as any).z - (selfPos as any).z
         : targetPos.y - selfPos.y;
 
+    const input = entity.input;
+
     if (dx * dx + dz * dz <= this.stopDistSq) {
-      entity.stop();
-      entity.stopTurning();
+      if (input) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
+        input.turnDirection = 0;
+        input.turnRatio = 0;
+        input.targetLookAngle = undefined;
+      }
       return NodeStatus.SUCCESS;
     }
 
@@ -104,11 +113,14 @@ export class BTActionPursue extends BTAction {
       this.movementNode.tick(entity);
     } else {
       const dist = Math.hypot(dx, dz);
-      if (dist > 0.001) {
-        entity.setDesiredMoveVector({ x: dx / dist, y: dz / dist });
-        entity.setTargetLookAngle(Math.atan2(dz, dx) as Radians);
-      } else {
-        entity.stop();
+      if (dist > 0.001 && input && entity.isAlive) {
+        input.desiredMoveVector = { x: dx / dist, y: dz / dist };
+        input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+      } else if (input) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
       }
     }
 
@@ -174,9 +186,15 @@ export class BTActionAttack extends BTAction {
   }
 
   protected onOpen(entity: EntityAdapter): void {
-    const targetId = entity.brain!.blackboard.get('targetId');
-    entity.stop();
-    entity.attack(targetId, this.params.slotIndex);
+    const input = entity.input;
+    if (input && entity.isAlive) {
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
+      input.wantsAttack = true;
+      input.attackSlotIndex = this.params.slotIndex;
+    }
     this.hasStarted = false;
   }
 
@@ -207,7 +225,21 @@ export class BTActionAttack extends BTAction {
   }
 
   protected stopAction(entity: EntityAdapter): void {
-    entity.cancelAttack(this.params.slotIndex);
+    const input = entity.input;
+    if (input) {
+      input.wantsAttack = false;
+      input.attackSlotIndex = undefined;
+    }
+    const activeAttacks = entity.activeAttacks;
+    if (activeAttacks) {
+      if (this.params.slotIndex !== undefined) {
+        activeAttacks.attacks = activeAttacks.attacks.filter(
+          (a) => a.slotIndex !== this.params.slotIndex
+        );
+      } else {
+        activeAttacks.attacks = [];
+      }
+    }
     this.hasStarted = false;
   }
 }
@@ -221,7 +253,16 @@ export class BTCommandForgetTarget extends BTSimpleAction {
     bb.remove('targetId');
     bb.remove('isEngaged');
     bb.remove('currentPath');
-    entity.stop();
+    const input = entity.input;
+    if (input) {
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
+      input.turnDirection = 0;
+      input.turnRatio = 0;
+      input.targetLookAngle = undefined;
+    }
     return NodeStatus.SUCCESS;
   }
 }
@@ -313,8 +354,7 @@ export class BTActionRotateToPos extends BTAction {
     if (dx === 0 && dz === 0) return NodeStatus.SUCCESS;
 
     const dist = Math.hypot(dx, dz);
-    // Если цель отдалилась за пределы дистанции боя — прерываем поворот и возвращаем FAILURE,
-    // чтобы Sequence сбросился и селектор перешел к преследованию
+    // Если цель отдалилась за пределы дистанции боя — прерываем поворот и возвращаем FAILURE
     if (dist > LOGIC_CONFIG.followUpDist) {
       bb.set('isEngaged', false);
       this.stopAction(entity);
@@ -334,15 +374,20 @@ export class BTActionRotateToPos extends BTAction {
       return NodeStatus.SUCCESS;
     }
 
-    // Задаем угол направления взгляда для плавного поворота в VelocitySystem
-    entity.setTargetLookAngle(targetAngle);
+    // Задаем угол направления взгляда напрямую в InputComponent для VelocitySystem
+    if (entity.input && entity.isAlive) {
+      entity.input.targetLookAngle = targetAngle;
+    }
 
     return NodeStatus.RUNNING;
   }
 
   protected stopAction(entity: EntityAdapter): void {
-    entity.setTargetLookAngle(undefined);
-    entity.stopTurning();
+    if (entity.input) {
+      entity.input.targetLookAngle = undefined;
+      entity.input.turnDirection = 0;
+      entity.input.turnRatio = 0;
+    }
   }
 }
 
@@ -351,7 +396,11 @@ export class BTActionStopTurn extends BTSimpleAction {
   public static readonly description = 'Останавливает вращение бота';
 
   protected onTick(entity: EntityAdapter): NodeStatus {
-    entity.stopTurning();
+    if (entity.input) {
+      entity.input.turnDirection = 0;
+      entity.input.turnRatio = 0;
+      entity.input.targetLookAngle = undefined;
+    }
     return NodeStatus.SUCCESS;
   }
 
@@ -370,9 +419,15 @@ export class BTActionFollowPathSmooth extends BTAction {
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
     const path = bb.get(this.pathKey) || [];
+    const input = entity.input;
 
     if (path.length === 0) {
-      entity.stop();
+      if (input) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
+      }
       return NodeStatus.SUCCESS;
     }
 
@@ -382,7 +437,12 @@ export class BTActionFollowPathSmooth extends BTAction {
     }
 
     if (path.length === 0) {
-      entity.stop();
+      if (input) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
+      }
       bb.remove(this.pathKey);
       return NodeStatus.SUCCESS;
     }
@@ -396,13 +456,14 @@ export class BTActionFollowPathSmooth extends BTAction {
         : target.y - selfPos.y;
     const dist = Math.hypot(dx, dz);
 
-    if (dist > 0.001) {
-      // Передаем Z-компоненту в Y вектора направления (особенность InputController)
-      entity.setDesiredMoveVector({ x: dx / dist, y: dz / dist });
-      const targetAngle = Math.atan2(dz, dx) as Radians;
-      entity.setTargetLookAngle(targetAngle);
-    } else {
-      entity.stop();
+    if (dist > 0.001 && input && entity.isAlive) {
+      input.desiredMoveVector = { x: dx / dist, y: dz / dist };
+      input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+    } else if (input) {
+      input.desiredMoveVector = null;
+      input.moveForward = 0;
+      input.moveStrafe = 0;
+      input.isMovingForward = false;
     }
 
     return NodeStatus.RUNNING;
@@ -418,8 +479,17 @@ export class BTActionFollowPathSmooth extends BTAction {
   }
 
   protected stopAction(entity: EntityAdapter): void {
-    entity.stop();
+    if (entity.input) {
+      entity.input.desiredMoveVector = null;
+      entity.input.moveForward = 0;
+      inputMoveStrafe(entity.input);
+    }
   }
+}
+
+function inputMoveStrafe(input: import('../ecs/types').InputComponent) {
+  input.moveStrafe = 0;
+  input.isMovingForward = false;
 }
 
 export class BTAlwaysRunning extends BTAction {

@@ -651,8 +651,9 @@ export class ThreeSyncSystem {
 
     const isOneShot =
       animKey === 'dead' ||
-      animKey === 'attack' ||
-      animKey === 'pickup' ||
+      animKey.startsWith('attack') ||
+      animKey.startsWith('pickup') ||
+      animKey.startsWith('drop_item') ||
       animKey === 'throw' ||
       animKey.includes('_to_');
 

@@ -48,7 +48,10 @@ export class ProceduralAssetManager {
     const builder = this.builders.get(type);
     if (!builder) return null;
     const clips = builder.createAnimationClips();
-    return clips.get(animKey) || clips.get('stand_idle') || null;
+    if (clips.has(animKey)) return clips.get(animKey)!;
+    const baseAction = animKey.replace(/_(left_hand|right_hand|jaws)$/, '');
+    if (clips.has(baseAction)) return clips.get(baseAction)!;
+    return clips.get('stand_idle') || null;
   }
 
   public getClonedAsset(virtualUri: string): THREE.Object3D | null {

@@ -55,6 +55,7 @@ export class AttackSystem {
               weaponId,
               slotIndex: chosenGlobalIndex,
               partId: weaponSlotInfo.partId,
+              slotKind: weaponSlotInfo.slot.slotKind ?? 'left_hand',
               phase: 'prep',
               timer: prepTime,
               totalDuration: prepTime,

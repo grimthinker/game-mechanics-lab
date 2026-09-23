@@ -190,6 +190,7 @@ export class InteractionSystem {
         targetId: targetItemId,
         slotIndex: bestSlotInfo.localSlotIndex,
         partId: bestSlotInfo.partId,
+        slotKind: bestSlotInfo.slot.slotKind ?? 'left_hand',
         targetItemPos: { x: targetTransform.x, y: targetTransform.y, z: targetTransform.z },
         timer: GAMEPLAY_CONFIG.pickupReachDuration,
         totalDuration: GAMEPLAY_CONFIG.pickupReachDuration,
@@ -609,6 +610,7 @@ export class InteractionSystem {
       phase: 'throw_prep',
       slotIndex: slotInfo.localSlotIndex,
       partId: slotInfo.partId,
+      slotKind: slotInfo.slot.slotKind ?? 'left_hand',
       timer: prepTime,
       totalDuration: prepTime,
     });
@@ -642,7 +644,7 @@ export class InteractionSystem {
       const itemRadius = physStats.radius.current ?? 0.3;
       const creatureRadius = world.getComponent(entityId, 'physicsStats')?.radius.current ?? 0.4;
 
-      const safeDist = creatureRadius + itemRadius + 0.05;
+      const defaultDropOffset = creatureRadius + itemRadius + 0.05;
 
       const currentStance = world.getComponent(entityId, 'meta')?.stance || 'standing';
       let creatureHeight = 1.8;
@@ -654,8 +656,38 @@ export class InteractionSystem {
 
       const dir = { x: Math.cos(transform.angle), y: 0, z: Math.sin(transform.angle) };
 
-      const endX = transform.x + dir.x * safeDist;
-      const endZ = transform.z + dir.z * safeDist;
+      let dropOffset = defaultDropOffset;
+      let isConstrainedByObstacle = false;
+
+      // Трассировка луча: проверка наличия препятствий на пути броска
+      if (physics.driver && physics.driver.isReady) {
+        const rayStart = { x: transform.x, y: dropY, z: transform.z ?? 0 };
+        const hits = physics.driver.castRayMultiple(
+          rayStart,
+          dir,
+          defaultDropOffset,
+          true,
+          entityId
+        );
+
+        for (const hit of hits) {
+          const hitTag = world.getComponent(hit.entityId, 'tag');
+          const hitMeta = world.getComponent(hit.entityId, 'meta');
+          const hitArch = hitTag?.archetype ?? hitMeta?.entityType;
+          const hitPhysStats = world.getComponent(hit.entityId, 'physicsStats');
+
+          if (hitArch === 'obstacle' && hitPhysStats?.isSolid !== false) {
+            // Препятствие обнаружено ближе стандартной дистанции выноса
+            const L = hit.toi;
+            dropOffset = L - (itemRadius + 0.05);
+            isConstrainedByObstacle = true;
+            break;
+          }
+        }
+      }
+
+      const endX = transform.x + dir.x * dropOffset;
+      const endZ = transform.z + dir.z * dropOffset;
 
       itemTransform.x = endX;
       itemTransform.y = dropY;
@@ -688,9 +720,12 @@ export class InteractionSystem {
         rawBody.setLinearDamping(0.95);
         rawBody.setAngularDamping(0.95);
 
-        const targetVelocity = 0.5;
-        const impulseMag = weight * targetVelocity;
-        rawBody.applyImpulse({ x: dir.x * impulseMag, y: 0, z: dir.z * impulseMag }, true);
+        // Прикладываем горизонтальный импульс броска только в свободном пространстве
+        if (!isConstrainedByObstacle) {
+          const targetVelocity = 0.5;
+          const impulseMag = weight * targetVelocity;
+          rawBody.applyImpulse({ x: dir.x * impulseMag, y: 0, z: dir.z * impulseMag }, true);
+        }
       }
 
       world.addComponent(itemId, 'physicsBody', {

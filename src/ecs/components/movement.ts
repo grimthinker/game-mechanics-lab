@@ -140,14 +140,3 @@ export interface StealthStatsComponent {
   turnInPlaceStealthMultiplier: number;
   immobileStealthMultiplier: number;
 }
-
-export interface IMovable {
-  startMovingForward(): void;
-  stopMovingForward(): void;
-  startTurning(direction: -1 | 1, amount: number): void;
-  stopTurning(): void;
-  startRunning(): void;
-  stopRunning(): void;
-  startCrouching(): void;
-  stopCrouching(): void;
-}

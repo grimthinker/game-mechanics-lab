@@ -233,6 +233,41 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     }}
                   />
                 </label>
+                <label
+                  style={{
+                    fontSize: '11px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginTop: '4px',
+                  }}
+                >
+                  Анимация (slotKind):
+                  <select
+                    disabled={isReadOnly}
+                    key={`slot_kind_${info.partId}_${slot.id}`}
+                    defaultValue={slot.slotKind ?? 'left_hand'}
+                    style={{
+                      width: '110px',
+                      padding: '2px',
+                      backgroundColor: '#111',
+                      color: '#fff',
+                      border: '1px solid #444',
+                      borderRadius: '3px',
+                    }}
+                    onChange={(e) => {
+                      if (app) {
+                        app.updateEntityInteractionSlot(info.partId, {
+                          slotKind: e.target.value,
+                        });
+                        onCommit(t('history.slotConfigure'));
+                      }
+                    }}
+                  >
+                    <option value="left_hand">Левая рука</option>
+                    <option value="right_hand">Правая рука</option>
+                    <option value="jaws">Пасть (Челюсти)</option>
+                  </select>
+                </label>
                 <div
                   style={{
                     marginTop: '8px',
@@ -454,6 +489,41 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
             }
           }}
         />
+      </label>
+      <label
+        style={{
+          fontSize: '11px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginTop: '4px',
+        }}
+      >
+        Анимация (slotKind):
+        <select
+          disabled={isReadOnly}
+          key={`single_slot_kind_${targetId}_${slot.id}`}
+          defaultValue={slot.slotKind ?? 'left_hand'}
+          style={{
+            width: '110px',
+            padding: '2px',
+            backgroundColor: '#111',
+            color: '#fff',
+            border: '1px solid #444',
+            borderRadius: '3px',
+          }}
+          onChange={(e) => {
+            if (app) {
+              app.updateEntityInteractionSlot(targetId, {
+                slotKind: e.target.value,
+              });
+              onCommit(t('history.slotConfigure'));
+            }
+          }}
+        >
+          <option value="left_hand">Левая рука</option>
+          <option value="right_hand">Правая рука</option>
+          <option value="jaws">Пасть (Челюсти)</option>
+        </select>
       </label>
       <div
         style={{
