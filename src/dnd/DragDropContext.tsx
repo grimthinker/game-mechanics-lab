@@ -171,10 +171,15 @@ export const DragDropProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (dragItem && hoverTarget && isValidTarget && app) {
         let finalTarget = hoverTarget;
 
-        // Если бросаем на пол, нужно конвертировать экранные координаты в мировые
+        // Если бросаем на пол, нужно конвертировать экранные координаты в мировые с учётом физической высоты
         if (finalTarget.type === 'ground') {
-          const point = app.getCanvasPoint(e.clientX, e.clientY);
-          finalTarget = { ...finalTarget, position: point };
+          const hit = app.raycastPhysics(e.clientX, e.clientY);
+          const dropPos = hit ? { ...hit.point } : app.getCanvasPoint(e.clientX, e.clientY);
+          if (hit && hit.normal.y > 0.7) {
+            const r = app.world.getComponent(dragItem.id, 'physicsStats')?.radius.current ?? 0.3;
+            dropPos.y += r + 0.02;
+          }
+          finalTarget = { ...finalTarget, position: dropPos };
         }
 
         success = app.itemTransfer.transferItem(dragItem.id, finalTarget);

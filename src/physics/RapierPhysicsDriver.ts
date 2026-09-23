@@ -1,5 +1,5 @@
 import RAPIER from '@dimforge/rapier3d-compat';
-import { IPhysicsDriver, PhysicsDriverStats } from './IPhysicsDriver';
+import { IPhysicsDriver, PhysicsDriverStats, PhysicalRaycastResult } from './IPhysicsDriver';
 import { Vec3 } from '../types';
 
 export class RapierPhysicsDriver implements IPhysicsDriver {
@@ -7,6 +7,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
   private eventQueue: RAPIER.EventQueue | null = null;
   private stepCount: number = 0;
   public fixedTimestep: number = 1 / 60;
+  private isBroadPhaseDirty: boolean = true;
 
   // Маппинг связей дескрипторов тел и сущностей ECS
   private bodyHandleToEntityMap: Map<number, string> = new Map();
@@ -53,6 +54,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     }
     this.world.step(this.eventQueue || undefined);
     this.stepCount++;
+    this.isBroadPhaseDirty = false;
   }
 
   public setGravity(x: number, y: number, z: number): void {
@@ -72,6 +74,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
       this.entityToBodyMap.set(entityId, body);
       (body as any).userData = { entityId };
     }
+    this.isBroadPhaseDirty = true;
     return body;
   }
 
@@ -81,12 +84,15 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
         '[RapierPhysicsDriver] Невозможно создать коллайдер: мир Rapier не инициализирован.'
       );
     }
-    return this.world.createCollider(desc, parent);
+    const collider = this.world.createCollider(desc, parent);
+    this.isBroadPhaseDirty = true;
+    return collider;
   }
 
   public removeCollider(collider: RAPIER.Collider, wakeUp: boolean = true): void {
     if (!this.world) return;
     this.world.removeCollider(collider, wakeUp);
+    this.isBroadPhaseDirty = true;
   }
 
   public removeRigidBody(body: RAPIER.RigidBody): void {
@@ -97,6 +103,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
       this.bodyHandleToEntityMap.delete(body.handle);
     }
     this.world.removeRigidBody(body);
+    this.isBroadPhaseDirty = true;
   }
 
   public createDynamicBody(pos: Vec3, entityId?: string): RAPIER.RigidBody {
@@ -154,6 +161,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     const newShape = new RAPIER.Capsule(Math.max(0.01, halfHeight), Math.max(0.01, radius));
     collider.setShape(newShape);
     collider.setTranslationWrtParent({ x: 0, y: offsetY, z: 0 });
+    this.isBroadPhaseDirty = true;
   }
 
   public computeCharacterMovement(
@@ -288,6 +296,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
 
     this.groundBody = body;
     this.groundCollider = collider;
+    this.isBroadPhaseDirty = true;
 
     return { body, collider };
   }
@@ -318,6 +327,11 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     ignoreEntityId?: string
   ): Array<{ entityId: string; toi: number }> {
     if (!this.world) return [];
+
+    if (this.isBroadPhaseDirty) {
+      this.updateSceneQueries();
+    }
+
     const hits: Array<{ entityId: string; toi: number }> = [];
     const ray = new RAPIER.Ray(
       new RAPIER.Vector3(start.x, start.y, start.z),
@@ -354,6 +368,116 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     }
 
     return uniqueHits;
+  }
+
+  public updateSceneQueries(): void {
+    if (!this.world) return;
+
+    // 1. Проталкиваем координаты тел в коллайдеры
+    this.world.propagateModifiedBodyPositionsToColliders();
+
+    // 2. Выполняем шаг с нулевым dt, чтобы обновить BroadPhase без движения динамических тел
+    const prevTimestep = this.world.timestep;
+    try {
+      this.world.timestep = 0;
+      this.world.step();
+    } finally {
+      this.world.timestep = prevTimestep;
+    }
+
+    this.isBroadPhaseDirty = false;
+  }
+
+  public castRay(
+    start: Vec3,
+    direction: Vec3,
+    maxToi: number = 1000,
+    solid: boolean = true,
+    filterExcludeEntityId?: string
+  ): PhysicalRaycastResult | null {
+    if (!this.world) return null;
+
+    if (this.isBroadPhaseDirty) {
+      this.updateSceneQueries();
+    }
+
+    const len = Math.hypot(direction.x, direction.y, direction.z);
+    if (len === 0) return null;
+    const dirX = direction.x / len;
+    const dirY = direction.y / len;
+    const dirZ = direction.z / len;
+
+    const ray = new RAPIER.Ray(
+      new RAPIER.Vector3(start.x, start.y, start.z),
+      new RAPIER.Vector3(dirX, dirY, dirZ)
+    );
+
+    const excludeBody = filterExcludeEntityId
+      ? this.getBodyByEntityId(filterExcludeEntityId)
+      : undefined;
+
+    // Исключаем сенсоры (зоны-триггеры урона/лечения), опрашиваем только материальные коллайдеры
+    const hit = this.world.castRayAndGetNormal(
+      ray,
+      maxToi,
+      solid,
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS,
+      undefined,
+      undefined,
+      excludeBody
+    );
+
+    if (hit) {
+      const toi = hit.timeOfImpact;
+      const hitPoint: Vec3 = {
+        x: start.x + dirX * toi,
+        y: start.y + dirY * toi,
+        z: start.z + dirZ * toi,
+      };
+
+      const normal: Vec3 = {
+        x: hit.normal.x,
+        y: hit.normal.y,
+        z: hit.normal.z,
+      };
+
+      const parentBody = hit.collider.parent();
+      const isGround =
+        (this.groundCollider !== null && hit.collider.handle === this.groundCollider.handle) ||
+        (this.groundBody !== null &&
+          parentBody !== null &&
+          parentBody.handle === this.groundBody.handle);
+
+      const entityId = parentBody ? this.getEntityIdByBody(parentBody) : undefined;
+
+      return {
+        point: hitPoint,
+        normal,
+        toi,
+        entityId,
+        isGround: Boolean(isGround),
+        collider: hit.collider,
+      };
+    }
+
+    // Фоллбэк: если луч не пересек ни один коллайдер сцены, пересекаем с горизонтальной плоскостью Y = 0
+    if (Math.abs(dirY) > 1e-5) {
+      const t = -start.y / dirY;
+      if (t > 0 && t <= maxToi) {
+        return {
+          point: {
+            x: start.x + dirX * t,
+            y: 0,
+            z: start.z + dirZ * t,
+          },
+          normal: { x: 0, y: 1, z: 0 },
+          toi: t,
+          isGround: true,
+        };
+      }
+    }
+
+    return null;
   }
 
   public getEntityIdByBody(body: RAPIER.RigidBody): string | undefined {

@@ -223,9 +223,8 @@ export const useCanvasInteraction = ({
     } else {
       app.setMouseScreenPos(null, null);
     }
-
     const point = app.getCanvasPoint(e.clientX, e.clientY);
-    setCursorWorldPos({ x: Math.round(point.x), y: Math.round(point.y), z: Math.round(point.z) });
+    setCursorWorldPos({ x: point.x, y: point.y, z: point.z });
 
     if (isDragging) {
       setHoverTarget({ type: 'ground' });
@@ -342,9 +341,29 @@ export const useCanvasInteraction = ({
 
     // Спавн сущности
     if (placementMode && mode === GameMode.EDITOR) {
+      const physHit = app.raycastPhysics(e.clientX, e.clientY);
+      const spawnPos: Vec3 = physHit ? { ...physHit.point } : { ...point };
+
+      // Если кликнули на горизонтальную грань коллайдера (крыша стены, ящик, пол)
+      if (physHit && physHit.normal.y > 0.7) {
+        if (placementMode.kind === 'entity') {
+          const isItem =
+            !!placementMode.config.item || placementMode.config.tag?.archetype === 'item';
+          if (isItem) {
+            // Для предметов смещаем центр вверх на радиус, чтобы тело не утопало в поверхности
+            const r = placementMode.config.physics?.radius ?? 0.3;
+            spawnPos.y += r;
+          }
+          // Препятствия (стены, ящики) и зоны опираются основанием на точку клика, подъем не требуется
+        } else if (placementMode.kind === 'modular') {
+          // Основание капсулы существа опирается на Y, добавляем небольшой технологический зазор
+          spawnPos.y += 0.02;
+        }
+      }
+
       if (placementMode.kind === 'entity') {
         app.executeTransaction('Спавн объекта', () => {
-          const spawnedId = app.spawnEntity(placementMode.config, point);
+          const spawnedId = app.spawnEntity(placementMode.config, spawnPos);
           app.selection.selectEntity(spawnedId, true);
           return spawnedId;
         });
@@ -355,7 +374,7 @@ export const useCanvasInteraction = ({
             app.world,
             app.physics,
             app.aiSystem,
-            point,
+            spawnPos,
             blueprint,
             placementMode.options.behavior,
             placementMode.options.name

@@ -121,6 +121,21 @@ export class ThreeRenderer implements IRenderer {
     return { x: 0, y: 0, z: 0 };
   }
 
+  public getScreenRay(clientX: number, clientY: number): { origin: Vec3; direction: Vec3 } {
+    const rect = this.canvas.getBoundingClientRect();
+    this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouseNDC, this.camera);
+    const origin = this.raycaster.ray.origin;
+    const direction = this.raycaster.ray.direction;
+
+    return {
+      origin: { x: origin.x, y: origin.y, z: origin.z },
+      direction: { x: direction.x, y: direction.y, z: direction.z },
+    };
+  }
+
   public projectToScreen(pos: import('../types').Vec3): import('../types').Vec3 | null {
     const vector = new THREE.Vector3(pos.x, pos.y, pos.z);
     vector.project(this.camera);

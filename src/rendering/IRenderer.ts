@@ -29,6 +29,7 @@ export interface IRenderer {
   destroy?(): void;
   getCanvas(): HTMLCanvasElement;
   screenToWorld(clientX: number, clientY: number, camera: Camera): Vec3;
+  getScreenRay?(clientX: number, clientY: number): { origin: Vec3; direction: Vec3 };
   pickEntity?(clientX: number, clientY: number): EntityId | null;
   projectToScreen?(pos: Vec3): Vec3 | null;
 }

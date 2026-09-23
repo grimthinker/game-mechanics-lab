@@ -42,8 +42,8 @@ export class EntitySnapshotCommand implements ICommand {
     this.app.selection.selectedEntityIds = new Set(selection.ids);
     this.app.selection.selectEntity(selection.id, false);
 
-    // 4. Синхронизация вторичных систем (привязки, ауры)
-    this.app.attachmentSystem.update(this.app.world, this.app.physics);
+    // 4. Синхронизация вторичных систем и физических структур
+    this.app.syncPhysicsStructures();
     this.app.selection.emitSelectionChanged();
   }
 }

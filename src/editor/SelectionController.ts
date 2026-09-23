@@ -159,9 +159,20 @@ export class SelectionController {
   }
 
   public pickEntityAt(worldPoint: Point, clientX?: number, clientY?: number): string | null {
-    // 3D Raycasting через Three.js: клик проверяется строго по геометрии
-    if (clientX !== undefined && clientY !== undefined && this.app.renderer.pickEntity) {
-      return this.app.renderer.pickEntity(clientX, clientY);
+    if (clientX !== undefined && clientY !== undefined) {
+      // 1. Приоритетный клик по мешам Three.js (позволяет выбирать конкретные части тела partId)
+      if (this.app.renderer.pickEntity) {
+        const picked = this.app.renderer.pickEntity(clientX, clientY);
+        if (picked) return picked;
+      }
+
+      // 2. Физический рейкаст Rapier3D (страховка при промахе сквозь меш или клике по коллайдерам)
+      if (this.app.raycastPhysics) {
+        const hit = this.app.raycastPhysics(clientX, clientY);
+        if (hit && hit.entityId) {
+          return hit.entityId;
+        }
+      }
     }
     return null;
   }
@@ -172,9 +183,15 @@ export class SelectionController {
     clientX?: number,
     clientY?: number
   ): string | null {
-    if (clientX !== undefined && clientY !== undefined && this.app.renderer.pickEntity) {
-      const picked = this.app.renderer.pickEntity(clientX, clientY);
-      if (picked) return picked;
+    if (clientX !== undefined && clientY !== undefined) {
+      if (this.app.renderer.pickEntity) {
+        const picked = this.app.renderer.pickEntity(clientX, clientY);
+        if (picked) return picked;
+      }
+      if (this.app.raycastPhysics) {
+        const hit = this.app.raycastPhysics(clientX, clientY);
+        if (hit && hit.entityId) return hit.entityId;
+      }
     }
 
     // Фолбэк по дистанции 3D (если кликнули в пределах допуска рядом с предметом)

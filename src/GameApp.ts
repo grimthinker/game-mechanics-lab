@@ -45,7 +45,7 @@ import { EntitySnapshotCommand } from './history/commands/EntitySnapshotCommand'
 import { ItemTransferService } from './editor/ItemTransferService';
 
 // Физический драйвер 3D
-import { IPhysicsDriver } from './physics/IPhysicsDriver';
+import { IPhysicsDriver, PhysicalRaycastResult } from './physics/IPhysicsDriver';
 import { RapierPhysicsDriver } from './physics/RapierPhysicsDriver';
 
 export { EntityAdapter } from './EntityAdapter';
@@ -178,8 +178,23 @@ export class GameApp {
     this.renderer.resize(w, h);
   }
 
+  private isPhysicsStructureDirty: boolean = false;
+
+  public markPhysicsStructureDirty(): void {
+    this.isPhysicsStructureDirty = true;
+  }
+
+  public syncPhysicsStructures(): void {
+    if (!this.physicsDriver || !this.physicsDriver.isReady) return;
+    this.anatomySystem.update(0, this.world, this.physics);
+    this.attachmentSystem.update(this.world, this.physics);
+    this.physics.syncDirtyTransforms(this.world);
+    this.physicsDriver.updateSceneQueries();
+    this.isPhysicsStructureDirty = false;
+  }
+
   public spawnEntity(config: EntityConfig, position?: Point | Vec3, forcedId?: string): string {
-    return this.entityFactory.spawnEntity(
+    const id = this.entityFactory.spawnEntity(
       this.world,
       this.physics,
       this.aiSystem,
@@ -187,6 +202,8 @@ export class GameApp {
       position,
       forcedId
     );
+    this.syncPhysicsStructures();
+    return id;
   }
 
   /**
@@ -512,6 +529,7 @@ export class GameApp {
       this.selection.selectEntities(newIds);
     }
 
+    this.syncPhysicsStructures();
     tx.includeAdded(newIds);
     tx.commit();
     this.captureBaseState();
@@ -550,6 +568,7 @@ export class GameApp {
       if (this.selection.hoveredEntityId === id) this.selection.hoverEntity(null);
     }
 
+    this.syncPhysicsStructures();
     this.selection.clear();
     tx.commit();
     this.captureBaseState();
@@ -838,7 +857,6 @@ export class GameApp {
       },
       { x: itemsX, y: by + 0.2, z: bz + 1.0 } as any
     );
-
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'armor' },
@@ -857,6 +875,8 @@ export class GameApp {
       },
       { x: bx, y: by + 1.5, z: bz + 4.0 } as any
     );
+
+    this.syncPhysicsStructures();
   }
 
   public serializeWorld(): any {
@@ -865,6 +885,7 @@ export class GameApp {
 
   public deserializeWorld(data: any): void {
     this.serializer.deserializeWorld(data);
+    this.syncPhysicsStructures();
   }
 
   private baseStateForCommit: any[] = [];
@@ -917,8 +938,8 @@ export class GameApp {
       this.baseSelectionForCommit,
       { id: this.selection.selectedEntityId, ids: currentIds }
     );
-
     this.commandHistory.push(command);
+    this.syncPhysicsStructures();
     this.captureBaseState();
   }
 
@@ -1000,7 +1021,12 @@ export class GameApp {
 
   private updateSystems(dt: number): void {
     if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
-      const worldPoint = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
+      const playerId = this.getPlayerEntityId() ?? undefined;
+      const worldPoint = this.getCanvasPoint(
+        this.mouseScreenPos.x,
+        this.mouseScreenPos.y,
+        playerId
+      );
       this.updatePlayerAim(worldPoint);
     }
 
@@ -1055,6 +1081,10 @@ export class GameApp {
       this.physicsAccumulator = 0;
       // В режиме паузы передаем реальное время, чтобы Idle-анимации в редакторе продолжали дышать
       consumedTimeForRender = realDt;
+
+      if (this.isPhysicsStructureDirty) {
+        this.syncPhysicsStructures();
+      }
     }
 
     this.updateBTData(false);
@@ -1062,10 +1092,10 @@ export class GameApp {
     // Синхронизация ручных изменений трансформаций (из UI/Gizmo) с физическим движком (даже на паузе)
     this.physics.syncDirtyTransforms(this.world);
 
-    // Постоянная синхронизация Three.js сцены с миром ECS.
-    // Передаем строго потребленное физикой время (Lockstep) для устранения проскальзывания.
+    // Плавная синхронизация Three.js сцены и миксеров анимаций по честному времени кадра рендера
+    const renderDt = this.isPaused ? realDt : realDt * this.globalTimeScale;
     this.threeSyncSystem.update(
-      consumedTimeForRender,
+      renderDt,
       this.world,
       this.gameMode,
       this.selection.selectedEntityIds
@@ -1187,7 +1217,24 @@ export class GameApp {
   public zoomAt(clientX: number, clientY: number, deltaY: number): void {
     this.camera.zoomAt(clientX, clientY, deltaY, this.canvas);
   }
-  public getCanvasPoint(clientX: number, clientY: number): Vec3 {
+
+  public raycastPhysics(
+    clientX: number,
+    clientY: number,
+    filterExcludeEntityId?: string
+  ): PhysicalRaycastResult | null {
+    if (!this.physicsDriver || !this.physicsDriver.isReady) return null;
+    const ray = this.renderer.getScreenRay ? this.renderer.getScreenRay(clientX, clientY) : null;
+    if (!ray) return null;
+
+    return this.physicsDriver.castRay(ray.origin, ray.direction, 1000, true, filterExcludeEntityId);
+  }
+
+  public getCanvasPoint(clientX: number, clientY: number, excludeEntityId?: string): Vec3 {
+    const hit = this.raycastPhysics(clientX, clientY, excludeEntityId);
+    if (hit) {
+      return hit.point;
+    }
     return this.renderer.screenToWorld(clientX, clientY, this.camera);
   }
 

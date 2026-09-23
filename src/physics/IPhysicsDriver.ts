@@ -7,6 +7,21 @@ export interface PhysicsDriverStats {
   colliderCount: number;
 }
 
+export interface PhysicalRaycastResult {
+  /** Точка на поверхности коллайдера в мировых координатах */
+  point: Vec3;
+  /** Вектор нормали к поверхности в точке удара */
+  normal: Vec3;
+  /** Дистанция вдоль луча от начала до точки пересечения */
+  toi: number;
+  /** ID сущности ECS, если луч попал в тело сущности */
+  entityId?: string;
+  /** Признак попадания в статический пол мира */
+  isGround: boolean;
+  /** Пораженный коллайдер Rapier */
+  collider?: RAPIER.Collider;
+}
+
 export interface IPhysicsDriver {
   /** Флаг готовности физического мира к симуляции */
   readonly isReady: boolean;
@@ -104,6 +119,18 @@ export interface IPhysicsDriver {
     solid: boolean,
     ignoreEntityId?: string
   ): Array<{ entityId: string; toi: number }>;
+
+  /** Физический рейкаст поверхности для точного определения 3D точки на коллайдерах */
+  castRay(
+    start: Vec3,
+    direction: Vec3,
+    maxToi?: number,
+    solid?: boolean,
+    filterExcludeEntityId?: string
+  ): PhysicalRaycastResult | null;
+
+  /** Принудительно обновляет структуры ускорения пространственных запросов (BroadPhase) */
+  updateSceneQueries(): void;
 
   /** Возвращает EntityId, привязанный к указанному телу */
   getEntityIdByBody(body: RAPIER.RigidBody): string | undefined;

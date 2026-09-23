@@ -198,8 +198,17 @@ export class ThreeSyncSystem {
     const activeIds = new Set<EntityId>();
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
-    // Обновляем миксеры с учетом локального масштаба времени (timeScale) сущности
+    // Обновляем миксеры с учетом динамической скорости (playbackSpeed) и локального масштаба времени (timeScale) сущности
     for (const [id, state] of this.animators.entries()) {
+      const animatorComp = world.getComponent(id, 'animator');
+      if (state.currentAction && animatorComp) {
+        const structureType = animatorComp.rigType as BodyStructureType;
+        const rigProfile = CREATURE_RIG_PROFILES[structureType];
+        const profileSpeed = rigProfile?.animationSpeeds?.[state.currentClipName] ?? 1.0;
+        const ecsSpeed = animatorComp.playbackSpeed ?? 1.0;
+        state.currentAction.setEffectiveTimeScale(profileSpeed * ecsSpeed);
+      }
+
       const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
       state.mixer.timeScale = ts;
       state.mixer.update(dt);

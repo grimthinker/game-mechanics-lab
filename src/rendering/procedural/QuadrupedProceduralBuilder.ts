@@ -317,8 +317,46 @@ export class QuadrupedProceduralBuilder implements IProceduralBuilder {
       ),
     ]);
 
+    const dogFallAirClip = new THREE.AnimationClip('fall_air', duration, [
+      new THREE.VectorKeyframeTrack('Torso.position', times, torsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', times, torsoQ),
+      new THREE.VectorKeyframeTrack(
+        'HeadPivot.position',
+        [0.0, duration],
+        [0, 0.18, 0.3, 0, 0.18, 0.3]
+      ),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', times, headQ),
+      new THREE.QuaternionKeyframeTrack('TailPivot.quaternion', times, tailQ),
+      new THREE.VectorKeyframeTrack(
+        'FrontLeftLegPivot.position',
+        [0.0, duration],
+        [-0.2, 0.42, 0.22, -0.2, 0.42, 0.22]
+      ),
+      new THREE.QuaternionKeyframeTrack('FrontLeftLegPivot.quaternion', legTrackTimes, legTrackQ),
+      new THREE.VectorKeyframeTrack(
+        'FrontRightLegPivot.position',
+        [0.0, duration],
+        [0.2, 0.42, 0.22, 0.2, 0.42, 0.22]
+      ),
+      new THREE.QuaternionKeyframeTrack('FrontRightLegPivot.quaternion', legTrackTimes, legTrackQ),
+      new THREE.VectorKeyframeTrack(
+        'BackLeftLegPivot.position',
+        [0.0, duration],
+        [-0.2, 0.42, -0.22, -0.2, 0.42, -0.22]
+      ),
+      new THREE.QuaternionKeyframeTrack('BackLeftLegPivot.quaternion', legTrackTimes, legTrackQ),
+      new THREE.VectorKeyframeTrack(
+        'BackRightLegPivot.position',
+        [0.0, duration],
+        [0.2, 0.42, -0.22, 0.2, 0.42, -0.22]
+      ),
+      new THREE.QuaternionKeyframeTrack('BackRightLegPivot.quaternion', legTrackTimes, legTrackQ),
+    ]);
+
     const map = new Map<string, THREE.AnimationClip>();
     map.set('stand_idle', dogIdleClip);
+    map.set('fall_air', dogFallAirClip);
+    map.set('stand_walk', dogWalkClip);
     map.set('stand_walk', dogWalkClip);
     map.set('stand_jog', dogJoggingClip);
     map.set('stand_sprint', dogSprintClip);

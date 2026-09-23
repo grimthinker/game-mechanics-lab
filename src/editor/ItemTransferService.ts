@@ -68,7 +68,7 @@ export class ItemTransferService {
       this.app.selection.deselectEntity(validation.swapItemId);
     }
 
-    this.app.attachmentSystem.update(world, this.app.physics);
+    this.app.syncPhysicsStructures();
     tx.commit();
     this.app.captureBaseState();
     return true;

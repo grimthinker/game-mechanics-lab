@@ -94,8 +94,9 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           <span style={{ color: '#888' }}>{t('hud.cursor')} </span>
           {cursorWorldPos ? (
             <span style={{ color: '#2ecc71' }}>
-              X:{cursorWorldPos.x.toFixed(1)}m Z:
-              {((cursorWorldPos as any).z ?? cursorWorldPos.y).toFixed(1)}m
+              X:{cursorWorldPos.x.toFixed(1)}m Y:
+              {('z' in cursorWorldPos ? cursorWorldPos.y : 0).toFixed(1)}m Z:
+              {('z' in cursorWorldPos ? (cursorWorldPos as any).z : cursorWorldPos.y).toFixed(1)}m
             </span>
           ) : (
             <span style={{ color: '#666' }}>—</span>

@@ -74,24 +74,30 @@ export class AnimationSyncSystem {
         const actualSpd = velocity.actualSpeed ?? velocity.currentSpeed ?? 0;
         const targetSpd = movementStats.maxSpeed.current ?? 1;
 
-        // Учитываем вращение корпуса, чтобы ноги реалистично перебирали при повороте на месте
-        let turnContribution = 0;
-        if (Math.abs(velocity.currentTurnSpeed) > 0.01) {
-          turnContribution = Math.abs(velocity.currentTurnSpeed) * 1.2;
+        let scale = 1.0;
+
+        if (meta.movementMode === 'turning') {
+          // При повороте на месте скорость шага пропорциональна угловой скорости, без взлета до 2.5x
+          const maxTurn = movementStats.maxTurnSpeed.current ?? 1;
+          const turnRatio = Math.min(
+            1.0,
+            Math.abs(velocity.currentTurnSpeed) / Math.max(0.1, maxTurn)
+          );
+          scale = Math.max(0.5, turnRatio);
+        } else {
+          // При линейном движении соотносим фактическую скорость с ожидаемой для данного режима
+          if (actualSpd < 0.05) {
+            scale = 0; // Полная остановка анимации, если персонаж уперся в стену
+          } else if (targetSpd > 0.1) {
+            scale = actualSpd / targetSpd;
+          }
         }
 
-        const effectiveSpeed = Math.max(actualSpd, turnContribution);
-
-        if (targetSpd > 0.1) {
-          const scale = effectiveSpeed / targetSpd;
-
-          // Полная остановка анимации, если мы уперлись в стену (скорость = 0)
-          if (effectiveSpeed < 0.05 && meta.movementMode !== 'turning') {
-            animator.playbackSpeed = 0;
-          } else {
-            // Ограничение множителя во избежание визуальных глитчей и дерганий
-            animator.playbackSpeed = Math.max(0.1, Math.min(2.5, scale));
-          }
+        if (actualSpd < 0.05 && meta.movementMode !== 'turning') {
+          animator.playbackSpeed = 0;
+        } else {
+          // Ограничиваем диапазон разумными пределами (0.2x - 1.5x) во избежание резких рывков
+          animator.playbackSpeed = Math.max(0.2, Math.min(1.5, scale));
         }
       } else {
         // Сброс на базовую нормальную скорость для атак, бездействия (idle), подборов и бросков

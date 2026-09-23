@@ -8,8 +8,11 @@ import { assembleBodyPart } from './archetypes/BodyPartArchetype';
 import { createStat } from './stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../config/balanceConfig';
 import { CreatureBodyBlueprint, CREATURE_BLUEPRINTS } from './templates';
+import { AnatomySystem } from './systems/AnatomySystem';
 
 export class EntityFactory {
+  private anatomySystem = new AnatomySystem();
+
   public generateId(prefix: string = 'ent'): EntityId {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   }
@@ -197,6 +200,9 @@ export class EntityFactory {
         }
       }
     }
+
+    // Мгновенная синхронизация анатомической сборки и создание капсульного коллайдера в Rapier
+    this.anatomySystem.update(0, world, physics);
 
     return rootId;
   }

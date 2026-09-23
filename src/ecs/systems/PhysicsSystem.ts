@@ -26,10 +26,12 @@ export class PhysicsSystem {
   public syncDirtyTransforms(world: World): void {
     if (!this.driver || !this.driver.isReady) return;
 
+    let anyDirty = false;
     const entities = world.getEntitiesWith('transform', 'physicsBody');
     for (const [id, { transform, physicsBody }] of entities) {
       if (transform.isDirty) {
         transform.isDirty = false;
+        anyDirty = true;
 
         if (physicsBody.rawBody) {
           const pos = { x: transform.x, y: transform.y, z: transform.z };
@@ -60,6 +62,10 @@ export class PhysicsSystem {
           }
         }
       }
+    }
+
+    if (anyDirty) {
+      this.driver.updateSceneQueries();
     }
   }
 
