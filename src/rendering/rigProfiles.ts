@@ -11,7 +11,7 @@ export const CREATURE_RIG_PROFILES: Record<BodyStructureType, RigProfile> = {
     rigAsset: 'proc://rig/humanoid',
     animations: {
       stand_idle: 'proc://anim/humanoid/stand_idle',
-      fall_air: 'proc://anim/humanoid/fall_air',
+      airborne: 'proc://anim/humanoid/airborne',
       stand_walk: 'proc://anim/humanoid/stand_walk',
       stand_jog: 'proc://anim/humanoid/stand_jog',
       stand_sprint: 'proc://anim/humanoid/stand_sprint',
@@ -69,7 +69,7 @@ export const CREATURE_RIG_PROFILES: Record<BodyStructureType, RigProfile> = {
     rigAsset: 'proc://rig/quadruped',
     animations: {
       stand_idle: 'proc://anim/quadruped/stand_idle',
-      fall_air: 'proc://anim/quadruped/fall_air',
+      airborne: 'proc://anim/quadruped/airborne',
       stand_walk: 'proc://anim/quadruped/stand_walk',
       stand_jog: 'proc://anim/quadruped/stand_jog',
       stand_sprint: 'proc://anim/quadruped/stand_sprint',

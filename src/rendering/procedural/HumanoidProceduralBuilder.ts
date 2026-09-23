@@ -1572,88 +1572,82 @@ export class HumanoidProceduralBuilder implements IProceduralBuilder {
     const standToCrouchClip = createStanceTransitionClip('stand_to_crouch', false);
     const crouchToStandClip = createStanceTransitionClip('crouch_to_stand', true);
 
-    const createFallAirClip = (name: string) => {
-      const duration = 0.6;
-      const frames = Math.max(2, Math.round(fps * duration));
-      const times: number[] = [];
-      const torsoP: number[] = [];
-      const torsoQ: number[] = [];
-      const headQ: number[] = [];
-      const lArmQ: number[] = [];
-      const rArmQ: number[] = [];
-      const lLegQ: number[] = [];
-      const rLegQ: number[] = [];
-      const lLegP: number[] = [];
-      const rLegP: number[] = [];
+    // --- Анимация невесомости / падения в воздухе (airborne) ---
+    const durationAirborne = 1.0;
+    const airborneFrames = fps * durationAirborne;
+    const airborneTimes: number[] = [];
+    const airborneTorsoP: number[] = [];
+    const airborneTorsoQ: number[] = [];
+    const airborneHeadQ: number[] = [];
+    const airborneLArmQ: number[] = [];
+    const airborneRArmQ: number[] = [];
+    const airborneLLegP: number[] = [];
+    const airborneRLegP: number[] = [];
+    const airborneLLegQ: number[] = [];
+    const airborneRLegQ: number[] = [];
 
-      const legBaseY = 0.65;
-      const torsoXRot = 0.2; // ~11.5 градусов наклона туловища вперед
-      const baseTorsoY = torsoBaseBottomY + torsoHalfHeight * Math.cos(torsoXRot);
-      const fixedTorsoZ = torsoHalfHeight * Math.sin(torsoXRot);
+    const torsoPitchBase = 0.08; // Легкий наклон корпуса вперед (~4.5°)
 
-      euler.set(torsoXRot, 0, 0);
+    for (let i = 0; i <= airborneFrames; i++) {
+      const time = (i / airborneFrames) * durationAirborne;
+      airborneTimes.push(time);
+      const cycle = (i / airborneFrames) * Math.PI * 2;
+
+      // Плавное парение корпуса по высоте
+      const floatY = Math.sin(cycle) * 0.015;
+      const torsoSwayPitch = torsoPitchBase + Math.sin(cycle) * 0.02;
+      const torsoRoll = Math.sin(cycle) * 0.015;
+
+      airborneTorsoP.push(0, 1.1 + floatY, 0);
+
+      euler.set(torsoSwayPitch, 0, torsoRoll);
       quat.setFromEuler(euler);
-      const tQ = [quat.x, quat.y, quat.z, quat.w];
+      airborneTorsoQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      // Голова держится прямо (компенсируем наклон туловища)
-      euler.set(-torsoXRot, 0, 0);
+      // Голова держится строго прямо по горизонту (полная компенсация наклона корпуса)
+      euler.set(-torsoSwayPitch, 0, -torsoRoll);
       quat.setFromEuler(euler);
-      const hQ = [quat.x, quat.y, quat.z, quat.w];
+      airborneHeadQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      for (let i = 0; i <= frames; i++) {
-        const progress = i / frames;
-        const time = progress * duration;
-        const cycle = progress * Math.PI * 2;
-        times.push(time);
+      // Руки разведены в стороны (Z) и слегка вперед (X) для удержания баланса
+      const armWave = Math.sin(cycle) * 0.06;
+      euler.set(-0.28 + Math.cos(cycle) * 0.05, 0.1, -0.55 - armWave);
+      quat.setFromEuler(euler);
+      airborneLArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
-        // Плавное парение / колебание в воздухе
-        const float = Math.sin(cycle) * 0.02;
-        torsoP.push(0, baseTorsoY + float, fixedTorsoZ);
-        torsoQ.push(...tQ);
-        headQ.push(...hQ);
+      euler.set(-0.28 + Math.cos(cycle) * 0.05, -0.1, 0.55 + armWave);
+      quat.setFromEuler(euler);
+      airborneRArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
-        // Руки разведены в стороны и вперед для баланса с легким покачиванием
-        const armSway = Math.sin(cycle) * 0.08;
-        euler.set(-0.5 + armSway, -0.2, 0.45);
-        quat.setFromEuler(euler);
-        lArmQ.push(quat.x, quat.y, quat.z, quat.w);
+      // Ноги не подгибаются к корпусу: суставы на базовой высоте 0.65
+      airborneLLegP.push(-0.15, 0.65, 0);
+      airborneRLegP.push(0.15, 0.65, 0);
 
-        euler.set(-0.5 - armSway, 0.2, -0.45);
-        quat.setFromEuler(euler);
-        rArmQ.push(quat.x, quat.y, quat.z, quat.w);
+      // Ноги слегка разведены в стороны (отведение ~7°) с плавным покачиванием вперед-назад в противофазе
+      const legDrift = Math.sin(cycle) * 0.07;
+      euler.set(legDrift, 0.04, -0.12);
+      quat.setFromEuler(euler);
+      airborneLLegQ.push(quat.x, quat.y, quat.z, quat.w);
 
-        // Ноги НЕ подгибаются к корпусу, слегка разведены в стороны с плавной балансировкой
-        const legSway = Math.cos(cycle) * 0.05;
-        lLegP.push(-0.18 - legSway * 0.5, legBaseY + float * 0.5, 0);
-        rLegP.push(0.18 + legSway * 0.5, legBaseY + float * 0.5, 0);
+      euler.set(-legDrift, -0.04, 0.12);
+      quat.setFromEuler(euler);
+      airborneRLegQ.push(quat.x, quat.y, quat.z, quat.w);
+    }
 
-        euler.set(0.1, 0, -0.1 + legSway);
-        quat.setFromEuler(euler);
-        lLegQ.push(quat.x, quat.y, quat.z, quat.w);
-
-        euler.set(0.1, 0, 0.1 - legSway);
-        quat.setFromEuler(euler);
-        rLegQ.push(quat.x, quat.y, quat.z, quat.w);
-      }
-
-      return new THREE.AnimationClip(name, duration, [
-        new THREE.VectorKeyframeTrack('LeftLegPivot.position', times, lLegP),
-        new THREE.VectorKeyframeTrack('RightLegPivot.position', times, rLegP),
-        new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', times, lLegQ),
-        new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', times, rLegQ),
-        new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', times, lArmQ),
-        new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', times, rArmQ),
-        new THREE.VectorKeyframeTrack('Torso.position', times, torsoP),
-        new THREE.QuaternionKeyframeTrack('Torso.quaternion', times, torsoQ),
-        new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', times, headQ),
-      ]);
-    };
-
-    const fallAirClip = createFallAirClip('fall_air');
+    const airborneClip = new THREE.AnimationClip('airborne', durationAirborne, [
+      new THREE.VectorKeyframeTrack('Torso.position', airborneTimes, airborneTorsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', airborneTimes, airborneTorsoQ),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', airborneTimes, airborneHeadQ),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', airborneTimes, airborneLArmQ),
+      new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', airborneTimes, airborneRArmQ),
+      new THREE.VectorKeyframeTrack('LeftLegPivot.position', airborneTimes, airborneLLegP),
+      new THREE.VectorKeyframeTrack('RightLegPivot.position', airborneTimes, airborneRLegP),
+      new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', airborneTimes, airborneLLegQ),
+      new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', airborneTimes, airborneRLegQ),
+    ]);
 
     const map = new Map<string, THREE.AnimationClip>();
     map.set('stand_idle', idleClip);
-    map.set('fall_air', fallAirClip);
     map.set('stand_walk', walkClip);
     map.set('stand_jog', joggingClip);
     map.set('stand_sprint', sprintClip);
@@ -1688,6 +1682,7 @@ export class HumanoidProceduralBuilder implements IProceduralBuilder {
     map.set('take_off', takeOffClip);
     map.set('dead', deadClip);
     map.set('fall_back', fallBackClip);
+    map.set('airborne', airborneClip);
 
     this.clipsCache = map;
     return map;

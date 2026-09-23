@@ -317,51 +317,91 @@ export class QuadrupedProceduralBuilder implements IProceduralBuilder {
       ),
     ]);
 
-    const dogFallAirClip = new THREE.AnimationClip('fall_air', duration, [
-      new THREE.VectorKeyframeTrack('Torso.position', times, torsoP),
-      new THREE.QuaternionKeyframeTrack('Torso.quaternion', times, torsoQ),
+    // --- Анимация нахождения в воздухе для четвероногого (airborne) ---
+    const durationDogAirborne = 0.8;
+    const dogAirFrames = fps * durationDogAirborne;
+    const dogAirTimes: number[] = [];
+    const dogAirTorsoP: number[] = [];
+    const dogAirTorsoQ: number[] = [];
+    const dogAirHeadQ: number[] = [];
+    const dogAirTailQ: number[] = [];
+    const dogAirFllP: number[] = [];
+    const dogAirFrlP: number[] = [];
+    const dogAirBllP: number[] = [];
+    const dogAirBrlP: number[] = [];
+    const dogAirFllQ: number[] = [];
+    const dogAirFrlQ: number[] = [];
+    const dogAirBllQ: number[] = [];
+    const dogAirBrlQ: number[] = [];
+
+    for (let i = 0; i <= dogAirFrames; i++) {
+      const time = (i / dogAirFrames) * durationDogAirborne;
+      dogAirTimes.push(time);
+      const cycle = (i / dogAirFrames) * Math.PI * 2;
+
+      const floatY = Math.sin(cycle) * 0.01;
+      dogAirTorsoP.push(0, 0.48 + floatY, 0);
+      dogAirTorsoQ.push(...idQ);
+
+      // Голова держится прямо вперед
+      dogAirHeadQ.push(...idQ);
+
+      // Хвост приподнят и мягко покачивается для баланса
+      euler.set(-0.5 + Math.sin(cycle) * 0.1, 0, 0);
+      quat.setFromEuler(euler);
+      dogAirTailQ.push(quat.x, quat.y, quat.z, quat.w);
+
+      dogAirFllP.push(-0.16, 0.4, 0.22);
+      dogAirFrlP.push(0.16, 0.4, 0.22);
+      dogAirBllP.push(-0.16, 0.4, -0.22);
+      dogAirBrlP.push(0.16, 0.4, -0.22);
+
+      const drift = Math.sin(cycle) * 0.05;
+      euler.set(drift, 0, -0.1);
+      quat.setFromEuler(euler);
+      dogAirFllQ.push(quat.x, quat.y, quat.z, quat.w);
+
+      euler.set(-drift, 0, 0.1);
+      quat.setFromEuler(euler);
+      dogAirFrlQ.push(quat.x, quat.y, quat.z, quat.w);
+
+      euler.set(-drift, 0, -0.1);
+      quat.setFromEuler(euler);
+      dogAirBllQ.push(quat.x, quat.y, quat.z, quat.w);
+
+      euler.set(drift, 0, 0.1);
+      quat.setFromEuler(euler);
+      dogAirBrlQ.push(quat.x, quat.y, quat.z, quat.w);
+    }
+
+    const dogAirborneClip = new THREE.AnimationClip('airborne', durationDogAirborne, [
+      new THREE.VectorKeyframeTrack('Torso.position', dogAirTimes, dogAirTorsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', dogAirTimes, dogAirTorsoQ),
       new THREE.VectorKeyframeTrack(
         'HeadPivot.position',
-        [0.0, duration],
+        [0.0, durationDogAirborne],
         [0, 0.18, 0.3, 0, 0.18, 0.3]
       ),
-      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', times, headQ),
-      new THREE.QuaternionKeyframeTrack('TailPivot.quaternion', times, tailQ),
-      new THREE.VectorKeyframeTrack(
-        'FrontLeftLegPivot.position',
-        [0.0, duration],
-        [-0.2, 0.42, 0.22, -0.2, 0.42, 0.22]
-      ),
-      new THREE.QuaternionKeyframeTrack('FrontLeftLegPivot.quaternion', legTrackTimes, legTrackQ),
-      new THREE.VectorKeyframeTrack(
-        'FrontRightLegPivot.position',
-        [0.0, duration],
-        [0.2, 0.42, 0.22, 0.2, 0.42, 0.22]
-      ),
-      new THREE.QuaternionKeyframeTrack('FrontRightLegPivot.quaternion', legTrackTimes, legTrackQ),
-      new THREE.VectorKeyframeTrack(
-        'BackLeftLegPivot.position',
-        [0.0, duration],
-        [-0.2, 0.42, -0.22, -0.2, 0.42, -0.22]
-      ),
-      new THREE.QuaternionKeyframeTrack('BackLeftLegPivot.quaternion', legTrackTimes, legTrackQ),
-      new THREE.VectorKeyframeTrack(
-        'BackRightLegPivot.position',
-        [0.0, duration],
-        [0.2, 0.42, -0.22, 0.2, 0.42, -0.22]
-      ),
-      new THREE.QuaternionKeyframeTrack('BackRightLegPivot.quaternion', legTrackTimes, legTrackQ),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', dogAirTimes, dogAirHeadQ),
+      new THREE.QuaternionKeyframeTrack('TailPivot.quaternion', dogAirTimes, dogAirTailQ),
+      new THREE.VectorKeyframeTrack('FrontLeftLegPivot.position', dogAirTimes, dogAirFllP),
+      new THREE.QuaternionKeyframeTrack('FrontLeftLegPivot.quaternion', dogAirTimes, dogAirFllQ),
+      new THREE.VectorKeyframeTrack('FrontRightLegPivot.position', dogAirTimes, dogAirFrlP),
+      new THREE.QuaternionKeyframeTrack('FrontRightLegPivot.quaternion', dogAirTimes, dogAirFrlQ),
+      new THREE.VectorKeyframeTrack('BackLeftLegPivot.position', dogAirTimes, dogAirBllP),
+      new THREE.QuaternionKeyframeTrack('BackLeftLegPivot.quaternion', dogAirTimes, dogAirBllQ),
+      new THREE.VectorKeyframeTrack('BackRightLegPivot.position', dogAirTimes, dogAirBrlP),
+      new THREE.QuaternionKeyframeTrack('BackRightLegPivot.quaternion', dogAirTimes, dogAirBrlQ),
     ]);
 
     const map = new Map<string, THREE.AnimationClip>();
     map.set('stand_idle', dogIdleClip);
-    map.set('fall_air', dogFallAirClip);
-    map.set('stand_walk', dogWalkClip);
     map.set('stand_walk', dogWalkClip);
     map.set('stand_jog', dogJoggingClip);
     map.set('stand_sprint', dogSprintClip);
     map.set('attack', attackClip);
     map.set('dead', deadClip);
+    map.set('airborne', dogAirborneClip);
 
     this.clipsCache = map;
     return map;
