@@ -22,7 +22,7 @@ export class AnimationSyncSystem {
       } else if (meta.actionMode === 'pickup') {
         const slotKind = interactionAction?.slotKind || 'left_hand';
         targetAnim = `pickup_${slotKind}`;
-      } else if (meta.actionMode === 'throw') {
+      } else if (meta.actionMode === 'drop') {
         const slotKind = interactionAction?.slotKind || 'left_hand';
         targetAnim = `drop_item_${slotKind}`;
       } else if (stanceTransition && stanceTransition.transitionStance) {
@@ -43,7 +43,7 @@ export class AnimationSyncSystem {
             ? 'sprint'
             : moveMode === 'jogging'
               ? 'jog'
-              : moveMode === 'walking'
+              : moveMode === 'walking' || moveMode === 'turning'
                 ? 'walk'
                 : 'idle';
 
@@ -56,6 +56,46 @@ export class AnimationSyncSystem {
 
       if (animator.currentAnimation !== targetAnim) {
         animator.currentAnimation = targetAnim;
+      }
+
+      // Динамическое скалирование скорости анимации (Kinematic Animation Scaling)
+      // Предотвращает эффект проскальзывания ног, жестко синхронизируя анимацию с реальным перемещением тела.
+      const movementStats = world.getComponent(id, 'movementStats');
+      const velocity = world.getComponent(id, 'velocity');
+
+      if (
+        (targetAnim.includes('walk') ||
+          targetAnim.includes('jog') ||
+          targetAnim.includes('sprint') ||
+          targetAnim.includes('crawl')) &&
+        movementStats &&
+        velocity
+      ) {
+        const actualSpd = velocity.actualSpeed ?? velocity.currentSpeed ?? 0;
+        const targetSpd = movementStats.maxSpeed.current ?? 1;
+
+        // Учитываем вращение корпуса, чтобы ноги реалистично перебирали при повороте на месте
+        let turnContribution = 0;
+        if (Math.abs(velocity.currentTurnSpeed) > 0.01) {
+          turnContribution = Math.abs(velocity.currentTurnSpeed) * 1.2;
+        }
+
+        const effectiveSpeed = Math.max(actualSpd, turnContribution);
+
+        if (targetSpd > 0.1) {
+          const scale = effectiveSpeed / targetSpd;
+
+          // Полная остановка анимации, если мы уперлись в стену (скорость = 0)
+          if (effectiveSpeed < 0.05 && meta.movementMode !== 'turning') {
+            animator.playbackSpeed = 0;
+          } else {
+            // Ограничение множителя во избежание визуальных глитчей и дерганий
+            animator.playbackSpeed = Math.max(0.1, Math.min(2.5, scale));
+          }
+        }
+      } else {
+        // Сброс на базовую нормальную скорость для атак, бездействия (idle), подборов и бросков
+        animator.playbackSpeed = 1.0;
       }
     }
   }

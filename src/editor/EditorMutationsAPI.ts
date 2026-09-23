@@ -192,8 +192,8 @@ export class EditorMutationsAPI {
       'proneToStandTime',
       'crouchToProneTime',
       'proneToCrouchTime',
-      'throwPrepTime',
-      'throwRecoveryTime',
+      'dropPrepTime',
+      'dropRecoveryTime',
     ] as const;
 
     for (const t of transitionTimes) {

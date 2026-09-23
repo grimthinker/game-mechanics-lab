@@ -143,6 +143,9 @@ export class PhysicsSystem {
         transform.y += movement.y;
         transform.z += movement.z;
 
+        // Фиксируем реальную скорость (фактическое перемещение) для синхронизации анимаций
+        velocity.actualSpeed = localDt > 0 ? Math.hypot(movement.x, movement.z) / localDt : 0;
+
         // Если персонаж достиг уровня пола или зафиксирован KCC как стоящий на земле
         if (transform.y <= 0) {
           transform.y = 0;
@@ -153,7 +156,6 @@ export class PhysicsSystem {
           // Если фактическое движение по Y отличается от желаемого — коллизия с полом или препятствием
           velocity.vy = 0;
         }
-
         if (phys.rawBody) {
           // Мгновенная синхронизация положения коллайдера в Rapier для исключения задержек между подшагами
           phys.rawBody.setTranslation(
@@ -177,6 +179,7 @@ export class PhysicsSystem {
       } else {
         transform.x += desiredDx;
         transform.z += desiredDz;
+        velocity.actualSpeed = localDt > 0 ? Math.hypot(desiredDx, desiredDz) / localDt : 0;
       }
 
       // Затухание внешнего импульса (трение / инерция)

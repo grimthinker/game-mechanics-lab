@@ -122,10 +122,10 @@ export interface EquipmentComponent {
 }
 
 export type InteractionPhase =
-  'reach' | 'lift' | 'abort_reach' | 'abort_lift' | 'throw_prep' | 'throw_recovery' | 'abort_throw';
+  'reach' | 'lift' | 'abort_reach' | 'abort_lift' | 'drop_prep' | 'drop_recovery' | 'abort_drop';
 
 export interface InteractionActionComponent {
-  type: 'pickup' | 'equip' | 'unequip' | 'throw';
+  type: 'pickup' | 'equip' | 'unequip' | 'drop';
   targetId?: string;
   slotIndex?: number;
   partId?: string;

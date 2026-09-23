@@ -297,16 +297,16 @@ export class InteractionSystem {
       if (action.phase === 'abort_reach' || action.phase === 'abort_lift') {
         return false;
       }
-    } else if (action.type === 'throw') {
-      if (action.phase === 'throw_prep') {
+    } else if (action.type === 'drop') {
+      if (action.phase === 'drop_prep') {
         const elapsed = Math.max(0.01, action.totalDuration - action.timer);
-        action.phase = 'abort_throw';
+        action.phase = 'abort_drop';
         action.timer = elapsed;
         action.totalDuration = elapsed;
         action.wantsCancel = false;
         return true;
       }
-      if (action.phase === 'abort_throw' || action.phase === 'throw_recovery') {
+      if (action.phase === 'abort_drop' || action.phase === 'drop_recovery') {
         return false;
       }
     }
@@ -349,8 +349,8 @@ export class InteractionSystem {
         continue;
       }
 
-      if (interactionAction.type === 'throw') {
-        if (interactionAction.phase === 'throw_prep') {
+      if (interactionAction.type === 'drop') {
+        if (interactionAction.phase === 'drop_prep') {
           interactionAction.timer -= localDt;
           if (interactionAction.timer <= 0) {
             // Переход: отпускаем и спавним предмет физически
@@ -358,15 +358,15 @@ export class InteractionSystem {
               this.executePhysicalDrop(world, physics, id, interactionAction.partId);
             }
             const movementStats = world.getComponent(id, 'movementStats');
-            const recTime = movementStats?.throwRecoveryTime?.current ?? 0.1;
+            const recTime = movementStats?.dropRecoveryTime?.current ?? 0.1;
 
-            interactionAction.phase = 'throw_recovery';
+            interactionAction.phase = 'drop_recovery';
             interactionAction.timer = recTime;
             interactionAction.totalDuration = recTime;
           }
         } else if (
-          interactionAction.phase === 'throw_recovery' ||
-          interactionAction.phase === 'abort_throw'
+          interactionAction.phase === 'drop_recovery' ||
+          interactionAction.phase === 'abort_drop'
         ) {
           interactionAction.timer -= localDt;
           if (interactionAction.timer <= 0) {
@@ -375,7 +375,6 @@ export class InteractionSystem {
         }
         continue;
       }
-
       if (interactionAction.type === 'pickup') {
         if (interactionAction.phase === 'reach') {
           interactionAction.elapsedInReach = (interactionAction.elapsedInReach ?? 0) + localDt;
@@ -615,11 +614,11 @@ export class InteractionSystem {
     if (world.getComponent(entityId, 'interactionAction')) return;
 
     const movementStats = world.getComponent(entityId, 'movementStats');
-    const prepTime = movementStats?.throwPrepTime?.current ?? 0.1;
+    const prepTime = movementStats?.dropPrepTime?.current ?? 0.1;
 
     world.addComponent(entityId, 'interactionAction', {
-      type: 'throw',
-      phase: 'throw_prep',
+      type: 'drop',
+      phase: 'drop_prep',
       slotIndex: slotInfo.localSlotIndex,
       partId: slotInfo.partId,
       slotKind: slotInfo.slot.slotKind ?? 'left_hand',

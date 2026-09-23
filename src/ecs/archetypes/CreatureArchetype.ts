@@ -79,11 +79,11 @@ export function assembleCreature(
     proneToCrouchTime: createStat(
       config.movement?.proneToCrouchTime ?? BALANCE_CONFIG.creature.transitions.proneToCrouch
     ),
-    throwPrepTime: createStat(
-      config.movement?.throwPrepTime ?? BALANCE_CONFIG.creature.transitions.throwPrep
+    dropPrepTime: createStat(
+      config.movement?.dropPrepTime ?? BALANCE_CONFIG.creature.transitions.dropPrep
     ),
-    throwRecoveryTime: createStat(
-      config.movement?.throwRecoveryTime ?? BALANCE_CONFIG.creature.transitions.throwRecovery
+    dropRecoveryTime: createStat(
+      config.movement?.dropRecoveryTime ?? BALANCE_CONFIG.creature.transitions.dropRecovery
     ),
   });
 

@@ -1023,6 +1023,8 @@ export class GameApp {
     const realDt = Math.min(this.MAX_ACCUMULATOR_DT, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
+    let consumedTimeForRender = 0;
+
     if (!this.isPaused) {
       const simulatedDt = realDt * this.globalTimeScale;
       this.physicsAccumulator += simulatedDt;
@@ -1032,6 +1034,7 @@ export class GameApp {
         this.updateSystems(this.FIXED_DT);
         this.physicsDriver.step(this.FIXED_DT);
         this.physicsAccumulator -= this.FIXED_DT;
+        consumedTimeForRender += this.FIXED_DT;
       }
 
       // Синхронизируем позиции динамических тел из Rapier в ECS
@@ -1049,6 +1052,8 @@ export class GameApp {
       }
     } else {
       this.physicsAccumulator = 0;
+      // В режиме паузы передаем реальное время, чтобы Idle-анимации в редакторе продолжали дышать
+      consumedTimeForRender = realDt;
     }
 
     this.updateBTData(false);
@@ -1056,9 +1061,10 @@ export class GameApp {
     // Синхронизация ручных изменений трансформаций (из UI/Gizmo) с физическим движком (даже на паузе)
     this.physics.syncDirtyTransforms(this.world);
 
-    // Постоянная синхронизация Three.js сцены с миром ECS
+    // Постоянная синхронизация Three.js сцены с миром ECS.
+    // Передаем строго потребленное физикой время (Lockstep) для устранения проскальзывания.
     this.threeSyncSystem.update(
-      realDt,
+      consumedTimeForRender,
       this.world,
       this.gameMode,
       this.selection.selectedEntityIds
