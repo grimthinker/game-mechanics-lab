@@ -25,6 +25,8 @@ export class AnimationSyncSystem {
       } else if (meta.actionMode === 'drop') {
         const slotKind = interactionAction?.slotKind || 'left_hand';
         targetAnim = `drop_item_${slotKind}`;
+      } else if (meta.stance === 'airborne') {
+        targetAnim = 'airborne';
       } else if (stanceTransition && stanceTransition.transitionStance) {
         // Проигрываем анимацию перехода между стойками (например: stand_to_prone, prone_to_stand)
         targetAnim = stanceTransition.transitionStance;
@@ -63,7 +65,9 @@ export class AnimationSyncSystem {
       const movementStats = world.getComponent(id, 'movementStats');
       const velocity = world.getComponent(id, 'velocity');
 
-      if (
+      if (targetAnim === 'airborne') {
+        animator.playbackSpeed = 1.0;
+      } else if (
         (targetAnim.includes('walk') ||
           targetAnim.includes('jog') ||
           targetAnim.includes('sprint') ||

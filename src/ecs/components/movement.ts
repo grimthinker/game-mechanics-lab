@@ -11,7 +11,7 @@ export type TransitionCreatureStance =
   | 'stand_to_prone'
   | 'prone_to_stand';
 
-export type CreatureStance = BaseCreatureStance | TransitionCreatureStance;
+export type CreatureStance = BaseCreatureStance | TransitionCreatureStance | 'airborne';
 
 export interface StanceTransitionComponent {
   fromStance: BaseCreatureStance;
@@ -31,6 +31,7 @@ export type CreatureActionMode =
 export interface CreatureMetaComponent {
   name: string;
   stance?: CreatureStance;
+  previousGroundedStance?: BaseCreatureStance;
   movementMode?: CreatureMovementMode;
   directionMode?: CreatureDirectionMode;
   actionMode?: CreatureActionMode;
@@ -49,6 +50,9 @@ export interface VelocityComponent {
   externalVz?: number;
   angvel?: { x: number; y: number; z: number };
   actualSpeed?: number;
+  isGrounded?: boolean;
+  airborneLockedVx?: number;
+  airborneLockedVz?: number;
 }
 
 export interface InputComponent {
@@ -63,6 +67,7 @@ export interface InputComponent {
   isCrouching: boolean;
   isSlowWalking: boolean;
   wantsAttack: boolean;
+  wantsJump?: boolean;
   attackSlotIndex?: number;
   desiredStance?: BaseCreatureStance;
 }
@@ -93,6 +98,8 @@ export interface MovementConfig {
   proneToCrouchTime?: number;
   dropPrepTime?: number;
   dropRecoveryTime?: number;
+  airborneTurnMultiplier?: number;
+  jumpVelocity?: number;
 }
 
 export interface MovementStatsComponent {
@@ -121,6 +128,8 @@ export interface MovementStatsComponent {
   proneToCrouchTime: StatValue<number>;
   dropPrepTime: StatValue<number>;
   dropRecoveryTime: StatValue<number>;
+  airborneTurnMultiplier: number;
+  jumpVelocity: StatValue<number>;
 }
 
 export interface StealthConfig {

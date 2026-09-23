@@ -56,6 +56,66 @@ export class StanceSystem {
         continue;
       }
 
+      const velocity = world.getComponent(id, 'velocity');
+      const isGrounded = velocity?.isGrounded ?? true;
+
+      // 1. Нахождение в воздухе (Airborne)
+      if (!isGrounded) {
+        if (meta.stance !== 'airborne') {
+          world.removeComponent(id, 'stanceTransition');
+
+          let baseStance: BaseCreatureStance = 'standing';
+          if (meta.stance === 'crouching' || meta.stance?.includes('crouch'))
+            baseStance = 'crouching';
+          else if (meta.stance === 'prone' || meta.stance?.includes('prone')) baseStance = 'prone';
+
+          meta.previousGroundedStance = meta.previousGroundedStance ?? baseStance;
+
+          if (velocity) {
+            velocity.airborneLockedVx = velocity.vx;
+            velocity.airborneLockedVz = velocity.vz;
+          }
+
+          meta.stance = 'airborne';
+
+          if (physics) {
+            const physStats = world.getComponent(id, 'physicsStats');
+            const radius = physStats?.radius.current ?? 0.4;
+            physics.updateCreatureColliderStance(world, id, 'airborne', radius);
+          }
+        }
+
+        // В воздухе скорость поворота снижается до 0.5x
+        const airTurnMult = movementStats.airborneTurnMultiplier ?? 0.5;
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'stance_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: airTurnMult,
+        });
+        removeModifier(movementStats.maxSpeed, 'stance_speed');
+
+        continue;
+      }
+
+      // 2. Момент приземления на землю (выход из Airborne)
+      if (meta.stance === 'airborne') {
+        if (velocity) {
+          velocity.airborneLockedVx = undefined;
+          velocity.airborneLockedVz = undefined;
+        }
+
+        const landStance: BaseCreatureStance =
+          input.desiredStance ?? meta.previousGroundedStance ?? 'standing';
+        meta.previousGroundedStance = undefined;
+        meta.stance = landStance;
+
+        if (physics) {
+          const physStats = world.getComponent(id, 'physicsStats');
+          const radius = physStats?.radius.current ?? 0.4;
+          physics.updateCreatureColliderStance(world, id, landStance, radius);
+        }
+      }
+
       const locomotion = world.getComponent(id, 'locomotionState') || {
         speedMult: 1.0,
         turnMult: 1.0,

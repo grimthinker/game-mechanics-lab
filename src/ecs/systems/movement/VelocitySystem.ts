@@ -83,6 +83,18 @@ export class VelocitySystem {
         }
       }
 
+      // Обработка прыжка
+      if (input.wantsJump) {
+        input.wantsJump = false;
+        const isGrounded = velocity.isGrounded ?? transform.y <= 0;
+        if (isGrounded && meta.stance !== 'airborne') {
+          const jumpImpulse = movementStats.jumpVelocity?.current ?? 5.0;
+          velocity.vy = jumpImpulse;
+          velocity.isGrounded = false;
+          input.desiredStance = 'standing';
+        }
+      }
+
       // Вращение / Угол взгляда
       if (input.targetLookAngle !== undefined) {
         let diff = input.targetLookAngle - transform.angle;
@@ -229,14 +241,17 @@ export class VelocitySystem {
           directionMode === 'forward' &&
           (meta.stance === 'standing' ||
             meta.stance === 'crouching' ||
+            meta.stance === 'airborne' ||
             meta.stance === 'stand_to_crouch' ||
             meta.stance === 'crouch_to_stand')
         ) {
           movementMode = 'sprinting';
         } else if (input.isSlowWalking) {
           movementMode = 'walking';
-        } else {
+        } else if (hasMoveInput) {
           movementMode = 'jogging';
+        } else {
+          movementMode = 'immobile';
         }
       } else if (
         input.turnDirection !== 0 ||
@@ -247,49 +262,57 @@ export class VelocitySystem {
         movementMode = 'immobile';
       }
 
-      // Интерполяция скорости (разгон / торможение)
-      let targetVx = 0;
-      let targetVz = 0;
+      // В воздухе скорость перемещения зафиксирована и не зависит от нажатия WASD
+      if (meta.stance === 'airborne') {
+        if (velocity.airborneLockedVx !== undefined && velocity.airborneLockedVz !== undefined) {
+          velocity.vx = velocity.airborneLockedVx;
+          velocity.vz = velocity.airborneLockedVz;
+        }
+        velocity.currentSpeed = Math.hypot(velocity.vx, velocity.vz);
+      } else {
+        // Наземная интерполяция скорости (разгон / торможение)
+        let targetVx = 0;
+        let targetVz = 0;
 
-      if (hasMoveInput) {
-        const targetSpeed = movementStats.maxSpeed.current;
-        targetVx = moveVecX * targetSpeed;
-        targetVz = moveVecZ * targetSpeed;
-      }
+        if (hasMoveInput) {
+          const targetSpeed = movementStats.maxSpeed.current;
+          targetVx = moveVecX * targetSpeed;
+          targetVz = moveVecZ * targetSpeed;
+        }
 
-      const deltaVx = targetVx - velocity.vx;
-      const deltaVz = targetVz - velocity.vz;
-      const distToTargetVel = Math.hypot(deltaVx, deltaVz);
+        const deltaVx = targetVx - velocity.vx;
+        const deltaVz = targetVz - velocity.vz;
+        const distToTargetVel = Math.hypot(deltaVx, deltaVz);
 
-      if (distToTargetVel > 0.001) {
-        const isDecelerating = velocity.vx * deltaVx + velocity.vz * deltaVz < 0;
-        const timeConstant = isDecelerating
-          ? GAMEPLAY_CONFIG.decelerationTime
-          : GAMEPLAY_CONFIG.accelerationTime;
+        if (distToTargetVel > 0.001) {
+          const isDecelerating = velocity.vx * deltaVx + velocity.vz * deltaVz < 0;
+          const timeConstant = isDecelerating
+            ? GAMEPLAY_CONFIG.decelerationTime
+            : GAMEPLAY_CONFIG.accelerationTime;
 
-        const maxSpd = movementStats.maxSpeed.current > 0 ? movementStats.maxSpeed.current : 1;
-        const changeRate = maxSpd / timeConstant;
-        const step = changeRate * localDt;
+          const maxSpd = movementStats.maxSpeed.current > 0 ? movementStats.maxSpeed.current : 1;
+          const changeRate = maxSpd / timeConstant;
+          const step = changeRate * localDt;
 
-        if (distToTargetVel <= step) {
+          if (distToTargetVel <= step) {
+            velocity.vx = targetVx;
+            velocity.vz = targetVz;
+          } else {
+            velocity.vx += (deltaVx / distToTargetVel) * step;
+            velocity.vz += (deltaVz / distToTargetVel) * step;
+          }
+        } else {
           velocity.vx = targetVx;
           velocity.vz = targetVz;
-        } else {
-          velocity.vx += (deltaVx / distToTargetVel) * step;
-          velocity.vz += (deltaVz / distToTargetVel) * step;
         }
-      } else {
-        velocity.vx = targetVx;
-        velocity.vz = targetVz;
-      }
 
-      velocity.currentSpeed = Math.hypot(velocity.vx, velocity.vz);
-      if (velocity.currentSpeed < 0.001) {
-        velocity.vx = 0;
-        velocity.vz = 0;
-        velocity.currentSpeed = 0;
+        velocity.currentSpeed = Math.hypot(velocity.vx, velocity.vz);
+        if (velocity.currentSpeed < 0.001) {
+          velocity.vx = 0;
+          velocity.vz = 0;
+          velocity.currentSpeed = 0;
+        }
       }
-
       meta.movementMode = movementMode;
       meta.directionMode = directionMode;
       meta.actionMode = actionMode;

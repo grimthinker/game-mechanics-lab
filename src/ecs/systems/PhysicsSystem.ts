@@ -90,6 +90,9 @@ export class PhysicsSystem {
     } else if (stance === 'prone' || stance.includes('prone')) {
       targetHeight = 0.4;
       capRadius = Math.min(radius, 0.2);
+    } else if (stance === 'airborne') {
+      targetHeight = 1.8;
+      capRadius = radius;
     }
 
     const halfHeight = Math.max(0.01, (targetHeight - 2 * capRadius) / 2);
@@ -163,15 +166,22 @@ export class PhysicsSystem {
         velocity.actualSpeed = localDt > 0 ? Math.hypot(movement.x, movement.z) / localDt : 0;
 
         // Если персонаж достиг уровня пола или зафиксирован KCC как стоящий на земле
+        let grounded = isGrounded;
         if (transform.y <= 0) {
           transform.y = 0;
           velocity.vy = 0;
+          grounded = true;
         } else if (isGrounded) {
           velocity.vy = 0;
-        } else if (Math.abs(movement.y - desiredDy) > 0.0001) {
-          // Если фактическое движение по Y отличается от желаемого — коллизия с полом или препятствием
+          grounded = true;
+        } else if (Math.abs(movement.y - desiredDy) > 0.0001 && desiredDy < 0) {
+          // Если движение по Y вниз ограничено коллизией с препятствием — уперлись в поверхность
           velocity.vy = 0;
+          grounded = true;
         }
+
+        velocity.isGrounded = grounded;
+
         if (phys.rawBody) {
           // Мгновенная синхронизация положения коллайдера в Rapier для исключения задержек между подшагами
           phys.rawBody.setTranslation(
@@ -196,6 +206,7 @@ export class PhysicsSystem {
         transform.x += desiredDx;
         transform.z += desiredDz;
         velocity.actualSpeed = localDt > 0 ? Math.hypot(desiredDx, desiredDz) / localDt : 0;
+        velocity.isGrounded = transform.y <= 0;
       }
 
       // Затухание внешнего импульса (трение / инерция)

@@ -82,7 +82,10 @@ export const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) =
               <kbd>Mouse</kbd> {t('hotkeys.mouseAim')}
             </li>
             <li>
-              <kbd>Space</kbd> {t('hotkeys.spaceAttack')}
+              <kbd>Space</kbd> {t('hotkeys.spaceJump')}
+            </li>
+            <li>
+              <kbd>F</kbd> {t('hotkeys.fAttack')}
             </li>
             <li>
               <kbd>LCtrl + LMB</kbd> {t('hotkeys.ctrlLmbPickup')}

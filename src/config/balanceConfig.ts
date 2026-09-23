@@ -31,6 +31,10 @@ export const BALANCE_CONFIG = {
     runTurnMultiplier: 0.8,
     /** Множитель скорости поворота корпуса в режиме присяда */
     crouchTurnMultiplier: 0.8,
+    /** Множитель скорости поворота корпуса при нахождении в воздухе (airborne) */
+    airborneTurnMultiplier: 0.5,
+    /** Базовая вертикальная скорость прыжка (м/с) */
+    jumpVelocity: 5.0,
 
     /** Множитель скорости при движении вбок (стрейфе) */
     strafeSpeedMultiplier: 0.8,

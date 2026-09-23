@@ -53,13 +53,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const meta = playerId ? world.getComponent(playerId, 'meta') : null;
   const currentStance = meta?.stance;
   const stance =
-    currentStance === 'prone'
-      ? t('hud.prone')
-      : currentStance === 'crouching'
-        ? t('hud.crouching')
-        : currentStance && currentStance.includes('_to_')
-          ? t('hud.transition')
-          : t('hud.standing');
+    currentStance === 'airborne'
+      ? t('hud.airborne')
+      : currentStance === 'prone'
+        ? t('hud.prone')
+        : currentStance === 'crouching'
+          ? t('hud.crouching')
+          : currentStance && currentStance.includes('_to_')
+            ? t('hud.transition')
+            : t('hud.standing');
   const moveMode =
     meta?.movementMode === 'sprinting'
       ? t('hud.sprint')
@@ -195,7 +197,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <strong style={{ color: '#fff' }}>WASD</strong> {t('hud.hintMove')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>Space</strong> {t('hud.hintAttack')}
+          <strong style={{ color: '#fff' }}>Space</strong> {t('hud.hintJump')}
+        </span>
+        <span>
+          <strong style={{ color: '#fff' }}>F</strong> {t('hud.hintAttack')}
         </span>
         <span>
           <strong style={{ color: '#fff' }}>Shift</strong> {t('hud.hintSprint')}

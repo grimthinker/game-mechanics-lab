@@ -85,6 +85,9 @@ export function assembleCreature(
     dropRecoveryTime: createStat(
       config.movement?.dropRecoveryTime ?? BALANCE_CONFIG.creature.transitions.dropRecovery
     ),
+    airborneTurnMultiplier:
+      config.movement?.airborneTurnMultiplier ?? BALANCE_CONFIG.creature.airborneTurnMultiplier,
+    jumpVelocity: createStat(config.movement?.jumpVelocity ?? BALANCE_CONFIG.creature.jumpVelocity),
   });
 
   world.addComponent(id, 'velocity', {
@@ -96,6 +99,7 @@ export function assembleCreature(
     externalVx: 0,
     externalVy: 0,
     externalVz: 0,
+    isGrounded: true,
   });
 
   world.addComponent(id, 'input', {
@@ -110,6 +114,7 @@ export function assembleCreature(
     isCrouching: false,
     isSlowWalking: false,
     wantsAttack: false,
+    wantsJump: false,
     attackSlotIndex: undefined,
     desiredStance: 'standing',
   });
