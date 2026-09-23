@@ -45,10 +45,10 @@ export class ModifierSystem {
         this.tickStatModifiers(comp.movementStats.proneToStandTime, localDt);
         this.tickStatModifiers(comp.movementStats.crouchToProneTime, localDt);
         this.tickStatModifiers(comp.movementStats.proneToCrouchTime, localDt);
-        if (comp.movementStats.throwPrepTime)
-          this.tickStatModifiers(comp.movementStats.throwPrepTime, localDt);
-        if (comp.movementStats.throwRecoveryTime)
-          this.tickStatModifiers(comp.movementStats.throwRecoveryTime, localDt);
+        if (comp.movementStats.dropPrepTime)
+          this.tickStatModifiers(comp.movementStats.dropPrepTime, localDt);
+        if (comp.movementStats.dropRecoveryTime)
+          this.tickStatModifiers(comp.movementStats.dropRecoveryTime, localDt);
       }
       if (comp.stealthStats) {
         this.tickStatModifiers(comp.stealthStats.stealthPower, localDt);

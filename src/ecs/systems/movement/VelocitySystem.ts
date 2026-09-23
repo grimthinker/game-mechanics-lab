@@ -213,8 +213,8 @@ export class VelocitySystem {
         actionMode = 'pickup';
       } else if (interactionAction?.type === 'equip' || interactionAction?.type === 'unequip') {
         actionMode = 'equipping';
-      } else if (interactionAction?.type === 'throw') {
-        actionMode = 'throw';
+      } else if (interactionAction?.type === 'drop') {
+        actionMode = 'drop';
       } else if (world.getComponent(id, 'stanceTransition')) {
         actionMode = 'stance_changing';
       }
