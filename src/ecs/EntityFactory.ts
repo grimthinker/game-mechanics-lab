@@ -209,7 +209,7 @@ export class EntityFactory {
     behavior: string = 'IdleTree',
     name: string = 'Существо'
   ): EntityId {
-    return this.spawnModularCreature(
+    const rootId = this.spawnModularCreature(
       world,
       physics,
       aiSystem,
@@ -218,5 +218,12 @@ export class EntityFactory {
       behavior,
       name
     );
+    if (behavior === 'PlayerTree') {
+      const app = (window as any).appRef;
+      if (app && 'playerEntityId' in app) {
+        app.playerEntityId = rootId;
+      }
+    }
+    return rootId;
   }
 }

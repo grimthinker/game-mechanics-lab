@@ -197,11 +197,13 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     disabled={isReadOnly}
                     key={`slot_dist_${info.partId}_${slot.id}`}
                     defaultValue={slot.interactDist}
-                    style={{ width: '60px', padding: '2px' }}
+                    min={0}
+                    step={0.01}
+                    style={{ width: '70px', padding: '2px' }}
                     onChange={(e) => {
                       if (app) {
                         app.updateEntityInteractionSlot(info.partId, {
-                          interactDist: Math.max(1, +e.target.value),
+                          interactDist: Math.max(0, +e.target.value),
                         });
                         onCommit(t('history.slotConfigure'));
                       }
@@ -222,11 +224,13 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     disabled={isReadOnly}
                     key={`slot_str_${info.partId}_${slot.id}`}
                     defaultValue={slot.strength}
-                    style={{ width: '60px', padding: '2px' }}
+                    min={0}
+                    step={0.01}
+                    style={{ width: '70px', padding: '2px' }}
                     onChange={(e) => {
                       if (app) {
                         app.updateEntityInteractionSlot(info.partId, {
-                          strength: Math.max(1, +e.target.value),
+                          strength: Math.max(0, +e.target.value),
                         });
                         onCommit(t('history.slotConfigure'));
                       }
@@ -454,11 +458,13 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           disabled={isReadOnly}
           key={`single_slot_dist_${targetId}_${slot.id}`}
           defaultValue={slot.interactDist}
-          style={{ width: '60px', padding: '2px' }}
+          min={0}
+          step={0.01}
+          style={{ width: '70px', padding: '2px' }}
           onChange={(e) => {
             if (app) {
               app.updateEntityInteractionSlot(targetId, {
-                interactDist: Math.max(1, +e.target.value),
+                interactDist: Math.max(0, +e.target.value),
               });
               onCommit(t('history.slotConfigure'));
             }
@@ -479,11 +485,13 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           disabled={isReadOnly}
           key={`single_slot_str_${targetId}_${slot.id}`}
           defaultValue={slot.strength}
-          style={{ width: '60px', padding: '2px' }}
+          min={0}
+          step={0.01}
+          style={{ width: '70px', padding: '2px' }}
           onChange={(e) => {
             if (app) {
               app.updateEntityInteractionSlot(targetId, {
-                strength: Math.max(1, +e.target.value),
+                strength: Math.max(0, +e.target.value),
               });
               onCommit(t('history.slotConfigure'));
             }

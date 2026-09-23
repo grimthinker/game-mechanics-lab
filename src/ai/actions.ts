@@ -501,3 +501,63 @@ export class BTAlwaysRunning extends BTAction {
   }
   protected stopAction(_ctx: EntityAdapter): void {}
 }
+
+export class BTActionDropItem extends BTSimpleAction {
+  public static readonly nodeName = 'Сброс предмета (Интент)';
+  public static readonly description =
+    'Проверяет наличие requestedDropSlot в памяти и вешает dropItemIntent на сущность';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain?.blackboard;
+    if (!bb) return NodeStatus.FAILURE;
+
+    const slotIndex = bb.get('requestedDropSlot');
+    if (slotIndex === undefined || slotIndex === null) {
+      return NodeStatus.FAILURE;
+    }
+
+    if (!entity.isAlive) {
+      bb.remove('requestedDropSlot');
+      return NodeStatus.FAILURE;
+    }
+
+    // Если персонаж уже занят другим взаимодействием — ждем завершения, не стирая команду
+    if (entity.getComponent('interactionAction')) {
+      return NodeStatus.FAILURE;
+    }
+
+    bb.remove('requestedDropSlot');
+    entity.world.addComponent(entity.id, 'dropItemIntent', { slotIndex });
+    return NodeStatus.SUCCESS;
+  }
+}
+
+export class BTActionPickupItem extends BTSimpleAction {
+  public static readonly nodeName = 'Подбор предмета (Интент)';
+  public static readonly description =
+    'Проверяет наличие requestedPickupId в памяти и вешает pickupIntent на сущность';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain?.blackboard;
+    if (!bb) return NodeStatus.FAILURE;
+
+    const targetItemId = bb.get('requestedPickupId');
+    if (!targetItemId) {
+      return NodeStatus.FAILURE;
+    }
+
+    if (!entity.isAlive) {
+      bb.remove('requestedPickupId');
+      return NodeStatus.FAILURE;
+    }
+
+    // Если персонаж уже занят другим взаимодействием — ждем завершения, не стирая команду
+    if (entity.getComponent('interactionAction')) {
+      return NodeStatus.FAILURE;
+    }
+
+    bb.remove('requestedPickupId');
+    entity.world.addComponent(entity.id, 'pickupIntent', { targetItemId });
+    return NodeStatus.SUCCESS;
+  }
+}

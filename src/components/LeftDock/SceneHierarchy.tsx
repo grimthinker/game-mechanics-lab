@@ -322,15 +322,26 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
   const [worldRevision, setWorldRevision] = useState(0);
 
   useEffect(() => {
-    const unsub = EventBus.on('world:updated', () => {
-      setWorldRevision((prev) => prev + 1);
-    });
-    const unsubInv = EventBus.on('inventory:updated', () => {
-      setWorldRevision((prev) => prev + 1);
-    });
+    let isDirty = false;
+    const markDirty = () => {
+      isDirty = true;
+    };
+
+    const unsub = EventBus.on('world:updated', markDirty);
+    const unsubInv = EventBus.on('inventory:updated', markDirty);
+
+    // Оптимизация: ограничиваем ререндер тяжелого дерева до 5 раз в секунду
+    const interval = setInterval(() => {
+      if (isDirty) {
+        setWorldRevision((prev) => prev + 1);
+        isDirty = false;
+      }
+    }, 200);
+
     return () => {
       unsub();
       unsubInv();
+      clearInterval(interval);
     };
   }, []);
 

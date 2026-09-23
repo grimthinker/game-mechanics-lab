@@ -47,7 +47,7 @@ export class BTSelector extends BTComposite {
   private currentChildIndex: number = 0;
   public static readonly nodeName = 'Селектор';
   public static readonly description =
-    'Перебирает дочерние узлы слева направо до первого успешного выполнения; возвращает FAILURE, только если все дочерние узлы потерпели неудачу';
+    'Перебирает дочерние узлы слева направо с запоминанием активного узла; возвращает FAILURE, если все узлы потерпели неудачу';
 
   constructor(children: BTNode[]) {
     super(children);
@@ -66,9 +66,11 @@ export class BTSelector extends BTComposite {
         return NodeStatus.RUNNING;
       }
       if (status === NodeStatus.SUCCESS) {
+        this.currentChildIndex = 0;
         return NodeStatus.SUCCESS;
       }
     }
+    this.currentChildIndex = 0;
     return NodeStatus.FAILURE;
   }
 
@@ -77,9 +79,68 @@ export class BTSelector extends BTComposite {
     if (activeChild && activeChild.isRunning()) {
       activeChild.abort(ctx);
     }
+    this.currentChildIndex = 0;
   }
 
   protected onClose(ctx: EntityAdapter): void {
+    this.currentChildIndex = 0;
+  }
+}
+
+export class BTReactiveSelector extends BTComposite {
+  private currentChildIndex: number = 0;
+  public static readonly nodeName = 'Реактивный селектор';
+  public static readonly description =
+    'Каждый тик проверяет узлы с начала. Мгновенно прерывает текущий узел, если более приоритетный вернул SUCCESS/RUNNING.';
+
+  constructor(children: BTNode[]) {
+    super(children);
+  }
+
+  protected onOpen(_ctx: EntityAdapter): void {
+    this.currentChildIndex = 0;
+  }
+
+  protected onTick(ctx: EntityAdapter): NodeStatus {
+    for (let i = 0; i < this.children.length; i++) {
+      const status = this.children[i].tick(ctx);
+
+      if (status === NodeStatus.RUNNING) {
+        if (this.currentChildIndex !== i) {
+          const prevChild = this.children[this.currentChildIndex];
+          if (prevChild && prevChild.isRunning()) {
+            prevChild.abort(ctx);
+          }
+          this.currentChildIndex = i;
+        }
+        return NodeStatus.RUNNING;
+      }
+
+      if (status === NodeStatus.SUCCESS) {
+        if (this.currentChildIndex !== i) {
+          const prevChild = this.children[this.currentChildIndex];
+          if (prevChild && prevChild.isRunning()) {
+            prevChild.abort(ctx);
+          }
+          this.currentChildIndex = 0;
+        }
+        return NodeStatus.SUCCESS;
+      }
+    }
+
+    this.currentChildIndex = 0;
+    return NodeStatus.FAILURE;
+  }
+
+  protected onAbort(ctx: EntityAdapter): void {
+    const activeChild = this.children[this.currentChildIndex];
+    if (activeChild && activeChild.isRunning()) {
+      activeChild.abort(ctx);
+    }
+    this.currentChildIndex = 0;
+  }
+
+  protected onClose(_ctx: EntityAdapter): void {
     this.currentChildIndex = 0;
   }
 }

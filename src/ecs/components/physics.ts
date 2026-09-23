@@ -11,6 +11,8 @@ export interface TransformComponent {
   rotation: Quat;
   /** Вспомогательное поле рыскания (Yaw) для обратной совместимости систем */
   angle: Radians;
+  /** Флаг ручного изменения (например, из редактора) для безопасной синхронизации с физическим движком */
+  isDirty?: boolean;
 }
 
 export interface PhysicsBodyComponent {

@@ -127,11 +127,8 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
       }
     }
 
-    const playerEnt = world
-      .getEntitiesWith('aiStats', 'health')
-      .find(([, comp]) => comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive);
-    return playerEnt ? playerEnt[0] : null;
-  }, [world, selectedEntityId, revision]);
+    return app ? app.getPlayerEntityId() : null;
+  }, [world, selectedEntityId, revision, app]);
 
   // Запрос слотов взаимодействия (руки)
   const slots: AggregatedSlot[] = useMemo(() => {
@@ -574,12 +571,20 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                 type="button"
                 onClick={() => {
                   if (app && targetCreatureId) {
-                    app.interactionSystem.dropItem(
-                      app.world,
-                      app.physics,
-                      targetCreatureId,
-                      contextMenu.globalSlotIndex
-                    );
+                    const brain =
+                      app.world.getComponent(targetCreatureId, 'brain') ||
+                      (app.world.getComponent(targetCreatureId, 'assemblyRoot') ? true : false);
+                    if (brain) {
+                      app.updateEntityBlackboard(
+                        targetCreatureId,
+                        'requestedDropSlot',
+                        contextMenu.globalSlotIndex
+                      );
+                    } else {
+                      app.world.addComponent(targetCreatureId, 'dropItemIntent', {
+                        slotIndex: contextMenu.globalSlotIndex,
+                      });
+                    }
                   }
                   setContextMenu(null);
                 }}

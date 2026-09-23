@@ -68,7 +68,6 @@ export class GizmoController {
 
       for (const [entId, initData] of this.initialTransforms.entries()) {
         const t = this.app.world.getComponent(entId, 'transform');
-        const phys = this.app.world.getComponent(entId, 'physicsBody');
         if (!t) continue;
 
         let newPos = new THREE.Vector3().copy(initData.pos);
@@ -92,20 +91,7 @@ export class GizmoController {
         const cosy_cosp = 1 - 2 * (newRot.y * newRot.y + newRot.z * newRot.z);
         t.angle = Math.atan2(siny_cosp, cosy_cosp) as Radians;
 
-        if (phys && phys.rawBody) {
-          if (phys.bodyType === 'kinematicPositionBased') {
-            phys.rawBody.setNextKinematicTranslation(newPos);
-            phys.rawBody.setNextKinematicRotation(newRot);
-          } else {
-            phys.rawBody.setTranslation(newPos, true);
-            phys.rawBody.setRotation(newRot, true);
-            phys.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-            phys.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-            if (phys.rawBody.isSleeping()) {
-              phys.rawBody.wakeUp();
-            }
-          }
-        }
+        t.isDirty = true; // Маркируем для безопасного применения в PhysicsSystem
       }
       this.app.attachmentSystem.update(this.app.world, this.app.physics);
     });
@@ -123,7 +109,6 @@ export class GizmoController {
     if (revert && this._isDragging) {
       for (const [entId, initData] of this.initialTransforms.entries()) {
         const t = this.app.world.getComponent(entId, 'transform');
-        const phys = this.app.world.getComponent(entId, 'physicsBody');
         if (t) {
           t.x = initData.pos.x;
           t.y = initData.pos.y;
@@ -135,17 +120,7 @@ export class GizmoController {
             w: initData.rot.w,
           };
           t.angle = initData.angle as Radians;
-        }
-        if (phys && phys.rawBody) {
-          if (phys.bodyType === 'kinematicPositionBased') {
-            phys.rawBody.setNextKinematicTranslation(initData.pos);
-            phys.rawBody.setNextKinematicRotation(initData.rot);
-          } else {
-            phys.rawBody.setTranslation(initData.pos, true);
-            phys.rawBody.setRotation(initData.rot, true);
-            phys.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-            phys.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-          }
+          t.isDirty = true;
         }
       }
       this.app.attachmentSystem.update(this.app.world, this.app.physics);

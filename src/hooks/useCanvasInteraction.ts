@@ -125,15 +125,9 @@ export const useCanvasInteraction = ({
           const isItem = (tagComp?.archetype === 'item' || !!itemComp) && !ownershipComp;
 
           if (isItem) {
-            const entities = app.world.getEntitiesWith('aiStats', 'health');
-            const playerEnt = entities.find(
-              ([, comp]) => comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive
-            );
-
-            if (playerEnt) {
-              app.world.addComponent(playerEnt[0], 'pickupIntent', {
-                targetItemId: targetEntityId,
-              });
+            const playerId = app.getPlayerEntityId();
+            if (playerId) {
+              app.updateEntityBlackboard(playerId, 'requestedPickupId', targetEntityId);
             }
           }
         }

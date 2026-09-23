@@ -147,6 +147,10 @@ export interface PickupIntentComponent {
   targetItemId: EntityId;
 }
 
+export interface DropItemIntentComponent {
+  slotIndex: number;
+}
+
 export interface OwnershipComponent {
   ownerId: EntityId;
   status: 'equipped' | 'inventory';

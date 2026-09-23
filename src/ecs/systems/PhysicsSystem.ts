@@ -19,6 +19,40 @@ export class PhysicsSystem {
     this.obstaclesEnabled = enabled;
   }
 
+  /**
+   * Применяет ручные трансформации (из редактора/UI), помеченные флагом isDirty,
+   * напрямую к телам Rapier3D. Гарантирует отсутствие гонок данных.
+   */
+  public syncDirtyTransforms(world: World): void {
+    if (!this.driver || !this.driver.isReady) return;
+
+    const entities = world.getEntitiesWith('transform', 'physicsBody');
+    for (const [, { transform, physicsBody }] of entities) {
+      if (transform.isDirty) {
+        transform.isDirty = false;
+
+        if (physicsBody.rawBody) {
+          const pos = { x: transform.x, y: transform.y, z: transform.z };
+          const rot = transform.rotation;
+
+          if (physicsBody.bodyType === 'kinematicPositionBased') {
+            physicsBody.rawBody.setNextKinematicTranslation(pos);
+            physicsBody.rawBody.setNextKinematicRotation(rot);
+          } else {
+            physicsBody.rawBody.setTranslation(pos, true);
+            physicsBody.rawBody.setRotation(rot, true);
+            // При ручном перемещении гасим текущий импульс (останавливаем полет/падение)
+            physicsBody.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            physicsBody.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+            if (physicsBody.rawBody.isSleeping()) {
+              physicsBody.rawBody.wakeUp();
+            }
+          }
+        }
+      }
+    }
+  }
+
   public updateCreatureColliderStance(
     world: World,
     id: EntityId,

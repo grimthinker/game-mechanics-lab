@@ -37,18 +37,9 @@ export class EditorMutationsAPI {
       changed = true;
     }
 
-    // Синхронизация позиции тела в Rapier3D при ручной правке из инспектора
+    // Делегируем синхронизацию физическому движку через Data-Oriented подход
     if (changed) {
-      const phys = this.world.getComponent(id, 'physicsBody');
-      if (phys?.rawBody) {
-        phys.rawBody.setTranslation({ x: transform.x, y: transform.y, z: transform.z }, true);
-        phys.rawBody.setRotation(transform.rotation, true);
-        phys.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-        phys.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
-        if (phys.rawBody.isSleeping()) {
-          phys.rawBody.wakeUp();
-        }
-      }
+      transform.isDirty = true;
     }
 
     return changed;

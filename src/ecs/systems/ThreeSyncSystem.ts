@@ -211,7 +211,15 @@ export class ThreeSyncSystem {
 
     for (const [id, { transform, renderable }] of renderables) {
       const ownership = world.getComponent(id, 'ownership');
-      const isEquippedInHand = ownership && ownership.status === 'equipped';
+
+      // Предмет находится в руке только если его владелец держит его в ячейке взаимодействия (interactionSlots)
+      let isEquippedInHand = false;
+      if (ownership && ownership.status === 'equipped') {
+        const ownerSlot = world.getComponent(ownership.ownerId, 'interactionSlots');
+        if (ownerSlot && ownerSlot.itemId === id) {
+          isEquippedInHand = true;
+        }
+      }
 
       // Экипированные в руки предметы не отбрасываются из рендера, даже если скрыты на полу
       if (!renderable.isVisible && !isEquippedInHand) continue;
@@ -238,11 +246,8 @@ export class ThreeSyncSystem {
 
       // 2. Обновление состояния меша
       if (obj) {
-        const ownership = world.getComponent(id, 'ownership');
-        const isEquipped = ownership && ownership.status === 'equipped';
-
-        // Если предмет не экипирован, гарантируем его нахождение в корне сцены
-        if (!isEquipped) {
+        // Если предмет не находится в руке, гарантируем его нахождение в корне сцены
+        if (!isEquippedInHand) {
           if (obj.parent !== this.scene) {
             this.scene.add(obj);
           }
@@ -346,7 +351,7 @@ export class ThreeSyncSystem {
           }
         }
         // 4. Фоллбэк-визуализация примитивов
-        else if (!isEquipped) {
+        else if (!isEquippedInHand) {
           const health = world.getComponent(id, 'health');
           // В блинчик сплющиваются только погибшие существа (трупы), но не предметы!
           if (health && !health.isAlive && archetype === 'creature') {

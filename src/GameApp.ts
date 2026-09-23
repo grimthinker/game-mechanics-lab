@@ -77,11 +77,28 @@ export class GameApp {
   public attachmentSystem: AttachmentSystem;
   public camera: Camera;
 
+  public playerEntityId: string | null = null;
   public showUIOverlays: boolean = true;
   public showAIDebug: boolean = false;
   public globalTimeScale: number = 1.0;
   public entityFactory: EntityFactory;
   public serializer: WorldSerializer;
+
+  public getPlayerEntityId(): string | null {
+    if (this.playerEntityId && this.world.hasEntity(this.playerEntityId)) {
+      const health = this.world.getComponent(this.playerEntityId, 'health');
+      if (health?.isAlive) return this.playerEntityId;
+    }
+
+    const entities = this.world.getEntitiesWith('aiStats', 'health');
+    for (const [id, comp] of entities) {
+      if (comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive) {
+        this.playerEntityId = id;
+        return id;
+      }
+    }
+    return null;
+  }
 
   // Контроллеры редактора
   public selection: SelectionController;
@@ -567,6 +584,7 @@ export class GameApp {
 
   public deleteEntityRecursive(id: string): void {
     if (!this.world.getEntity(id)) return;
+    if (this.playerEntityId === id) this.playerEntityId = null;
 
     const tag = this.world.getComponent(id, 'tag');
     const isAssembly = this.world.getComponent(id, 'assemblyRoot');
@@ -617,6 +635,7 @@ export class GameApp {
   }
 
   public clearWorld(): void {
+    this.playerEntityId = null;
     const entities = this.world.getAllEntities();
     for (const [id, comp] of entities) {
       if (comp.physicsBody) {
@@ -1034,6 +1053,9 @@ export class GameApp {
 
     this.updateBTData(false);
 
+    // Синхронизация ручных изменений трансформаций (из UI/Gizmo) с физическим движком (даже на паузе)
+    this.physics.syncDirtyTransforms(this.world);
+
     // Постоянная синхронизация Three.js сцены с миром ECS
     this.threeSyncSystem.update(
       realDt,
@@ -1099,7 +1121,7 @@ export class GameApp {
    */
   private syncDynamicBodiesToTransforms(): void {
     const dynamicEntities = this.world.getEntitiesWith('transform', 'physicsBody');
-    for (const [, { transform, physicsBody }] of dynamicEntities) {
+    for (const [id, { transform, physicsBody }] of dynamicEntities) {
       if (physicsBody.rawBody && physicsBody.bodyType === 'dynamic') {
         // Если тело спит — его координаты гарантированно не изменились, пропускаем такт
         if (physicsBody.rawBody.isSleeping()) {
@@ -1108,6 +1130,8 @@ export class GameApp {
 
         const translation = physicsBody.rawBody.translation();
         const rotation = physicsBody.rawBody.rotation();
+        const linvel = physicsBody.rawBody.linvel();
+        const angvel = physicsBody.rawBody.angvel();
 
         transform.x = translation.x;
         transform.y = translation.y;
@@ -1121,11 +1145,25 @@ export class GameApp {
         // Вычисляем угол рыскания Yaw вокруг вертикальной оси Y
         const siny_cosp = 2 * (rotation.w * rotation.y + rotation.x * rotation.z);
         const cosy_cosp = 1 - 2 * (rotation.y * rotation.y + rotation.z * rotation.z);
-        transform.angle = Math.atan2(siny_cosp, cosy_cosp);
+        transform.angle = Math.atan2(siny_cosp, cosy_cosp) as Radians;
 
-        // if (physicsBody.body) {
-        //   physicsBody.body.setPosition(translation.x, translation.z);
-        // }
+        // Синхронизируем физическую скорость в ECS для сериализации при сохранении/Undo
+        let vel = this.world.getComponent(id, 'velocity');
+        if (!vel) {
+          this.world.addComponent(id, 'velocity', {
+            vx: linvel.x,
+            vy: linvel.y,
+            vz: linvel.z,
+            currentSpeed: Math.hypot(linvel.x, linvel.z),
+            currentTurnSpeed: 0 as Radians,
+            angvel: { x: angvel.x, y: angvel.y, z: angvel.z },
+          });
+        } else {
+          vel.vx = linvel.x;
+          vel.vy = linvel.y;
+          vel.vz = linvel.z;
+          vel.angvel = { x: angvel.x, y: angvel.y, z: angvel.z };
+        }
       }
     }
   }

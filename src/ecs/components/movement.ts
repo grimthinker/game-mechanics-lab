@@ -47,6 +47,7 @@ export interface VelocityComponent {
   externalVx?: number;
   externalVy?: number;
   externalVz?: number;
+  angvel?: { x: number; y: number; z: number };
 }
 
 export interface InputComponent {

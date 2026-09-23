@@ -172,12 +172,12 @@ export class SelectionController {
     clientX?: number,
     clientY?: number
   ): string | null {
-    // При наведении мыши используем точный 3D Raycaster
     if (clientX !== undefined && clientY !== undefined && this.app.renderer.pickEntity) {
-      return this.app.renderer.pickEntity(clientX, clientY);
+      const picked = this.app.renderer.pickEntity(clientX, clientY);
+      if (picked) return picked;
     }
 
-    // Фолбэк по дистанции 3D (если Raycaster недоступен)
+    // Фолбэк по дистанции 3D (если кликнули в пределах допуска рядом с предметом)
     const isEditor = this.app.gameMode === GameMode.EDITOR;
     const maxWorldDist = 2.0; // 2 метра
 

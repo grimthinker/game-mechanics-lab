@@ -9,8 +9,10 @@ import {
   BTWait,
   BTActionRotateToPos,
   BTAlwaysRunning,
+  BTActionDropItem,
+  BTActionPickupItem,
 } from './actions';
-import { BTSelector, BTSequence } from './composites';
+import { BTSelector, BTReactiveSelector, BTSequence } from './composites';
 import { LOGIC_CONFIG } from './config';
 import { BTNode, BTService } from './core';
 import {
@@ -49,7 +51,15 @@ export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
 };
 
 export function PlayerTree(): BTNode {
-  return new BTServiceInputListener(new BTServiceInputController(new BTAlwaysRunning()));
+  return new BTServiceInputListener(
+    new BTServiceInputController(
+      new BTReactiveSelector([
+        new BTActionDropItem(),
+        new BTActionPickupItem(),
+        new BTAlwaysRunning(),
+      ])
+    )
+  );
 }
 
 export function CombatTree(): BTNode {

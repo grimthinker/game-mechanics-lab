@@ -315,8 +315,20 @@ export class InteractionSystem {
     return true;
   }
 
+  private processDropIntents(world: World, physics: PhysicsSystem): void {
+    const intents = world.getEntitiesWith('dropItemIntent', 'health');
+
+    for (const [id, { dropItemIntent, health }] of intents) {
+      world.removeComponent(id, 'dropItemIntent');
+
+      if (!health.isAlive) continue;
+      this.dropItem(world, physics, id, dropItemIntent.slotIndex);
+    }
+  }
+
   public update(dt: number, world: World, physics: PhysicsSystem): void {
     this.processPickupIntents(world);
+    this.processDropIntents(world, physics);
 
     const entities = world.getEntitiesWith('interactionAction', 'transform', 'health');
 

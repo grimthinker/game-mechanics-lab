@@ -62,6 +62,7 @@ import {
   InteractionSlotsComponent,
   InteractionActionComponent,
   PickupIntentComponent,
+  DropItemIntentComponent,
   ItemComponent,
   OwnershipComponent,
   ItemConfig,
@@ -103,6 +104,7 @@ export interface EntityComponents {
   interactionAction?: InteractionActionComponent;
   stanceTransition?: StanceTransitionComponent;
   pickupIntent?: PickupIntentComponent;
+  dropItemIntent?: DropItemIntentComponent;
   activeAttacks?: ActiveAttackComponent;
   item?: ItemComponent;
   meta?: import('./components/movement').CreatureMetaComponent;
