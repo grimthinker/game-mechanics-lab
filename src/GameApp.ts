@@ -647,6 +647,7 @@ export class GameApp {
     }
     this.aiSystem.clear();
     this.selection.clear();
+    this.threeSyncSystem.clearMeshes();
     EventBus.emit('world:updated');
   }
 

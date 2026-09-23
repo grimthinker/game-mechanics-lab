@@ -10,6 +10,7 @@ import { EventBus } from '../../core/EventBus';
 import {
   computeDetachedLimbGrip,
   computeItemGrip,
+  computeLocalBox,
   GripTransform,
 } from '../../rendering/gripCalculators';
 import { ProceduralAssetManager } from '../../rendering/procedural/ProceduralAssetManager';
@@ -34,7 +35,6 @@ export class ThreeSyncSystem {
   private meshes: Map<EntityId, THREE.Object3D> = new Map();
   private loadingMeshes: Set<EntityId> = new Set();
   private loadingGenerations: Map<EntityId, number> = new Map();
-  private unsubWorldUpdated: () => void;
 
   // Кэш для аниматоров (Стейт-машина)
   private animators: Map<EntityId, AnimatorState> = new Map();
@@ -133,9 +133,6 @@ export class ThreeSyncSystem {
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-    this.unsubWorldUpdated = EventBus.on('world:updated', () => {
-      this.clearMeshes();
-    });
   }
 
   public static disposeObject(obj: THREE.Object3D): void {
@@ -172,7 +169,6 @@ export class ThreeSyncSystem {
   }
 
   public destroy(): void {
-    this.unsubWorldUpdated();
     this.clearMeshes();
 
     // Очищаем кэшированные фоллбэк-материалы
@@ -959,8 +955,8 @@ export class ThreeSyncSystem {
 
       ThreeSyncSystem.attachOutlines(parentGroup, this.matSilhouetteOutline);
 
-      const box = new THREE.Box3().setFromObject(rig);
-      const visualCorrectionY = -box.min.y; // Автоматически поднимет или опустит меш так, чтобы нижняя точка всегда касалась Y = 0
+      const box = computeLocalBox(rig);
+      const visualCorrectionY = -box.min.y; // Автоматически поднимет или опустит меш так, чтобы нижняя точка всегда касалась Y = 0 в локальных координатах
       rig.position.set(0, visualCorrectionY, 0);
       // Запускаем дефолтную анимацию
       this.playAnimation(rootId, animator, 'stand_idle').catch(console.error);
@@ -1067,11 +1063,8 @@ export class ThreeSyncSystem {
         }
       }
 
-      // Обновляем мировую матрицу скелета для точного расчета видимой геометрии
-      rig.updateMatrixWorld(true);
-
-      // setFromObject автоматически учитывает только видимые меши (скрытые кости рига игнорируются)
-      const limbBox = new THREE.Box3().setFromObject(rig);
+      // Вычисляем локальный Bounding Box видимой геометрии части тела
+      const limbBox = computeLocalBox(rig);
 
       const boxCenter = new THREE.Vector3();
       const boxSize = new THREE.Vector3(0.4, 0.4, 0.4);

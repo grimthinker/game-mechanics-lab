@@ -27,7 +27,7 @@ export class PhysicsSystem {
     if (!this.driver || !this.driver.isReady) return;
 
     const entities = world.getEntitiesWith('transform', 'physicsBody');
-    for (const [, { transform, physicsBody }] of entities) {
+    for (const [id, { transform, physicsBody }] of entities) {
       if (transform.isDirty) {
         transform.isDirty = false;
 
@@ -36,8 +36,18 @@ export class PhysicsSystem {
           const rot = transform.rotation;
 
           if (physicsBody.bodyType === 'kinematicPositionBased') {
+            physicsBody.rawBody.setTranslation(pos, true);
             physicsBody.rawBody.setNextKinematicTranslation(pos);
-            physicsBody.rawBody.setNextKinematicRotation(rot);
+            if (rot) {
+              physicsBody.rawBody.setRotation(rot, true);
+              physicsBody.rawBody.setNextKinematicRotation(rot);
+            }
+            const vel = world.getComponent(id, 'velocity');
+            if (vel) {
+              vel.vx = 0;
+              vel.vy = 0;
+              vel.vz = 0;
+            }
           } else {
             physicsBody.rawBody.setTranslation(pos, true);
             physicsBody.rawBody.setRotation(rot, true);

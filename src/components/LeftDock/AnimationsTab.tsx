@@ -7,6 +7,7 @@ import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { ProceduralAssetManager } from '../../rendering/procedural/ProceduralAssetManager';
 import { AssetManager } from '../../rendering/AssetManager';
 import { ThreeSyncSystem } from '../../ecs/systems/ThreeSyncSystem';
+import { computeLocalBox } from '../../rendering/gripCalculators';
 import { useResizable } from '../../hooks/useResizable';
 import { t } from '../../locales';
 
@@ -169,7 +170,7 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ world, selectedEnt
         }
 
         // Выравнивание основания модели на платформу Y = 0
-        const box = new THREE.Box3().setFromObject(rig);
+        const box = computeLocalBox(rig);
         const visualCorrectionY = -box.min.y;
         rig.position.set(0, visualCorrectionY, 0);
 
