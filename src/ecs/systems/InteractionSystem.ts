@@ -250,6 +250,7 @@ export class InteractionSystem {
             itTransform.x = dropX;
             itTransform.y = dropY;
             itTransform.z = dropZ;
+            itTransform.isDirty = true;
           }
 
           const renderable = world.getComponent(targetId, 'renderable');
@@ -480,7 +481,8 @@ export class InteractionSystem {
             }
 
             slot.itemId = targetId;
-            world.addComponent(targetId, 'ownership', { ownerId: id, status: 'equipped' });
+            const ownerPartId = interactionAction.partId || id;
+            world.addComponent(targetId, 'ownership', { ownerId: ownerPartId, status: 'equipped' });
             EventBus.emit('inventory:updated');
 
             const physBody = world.getComponent(targetId, 'physicsBody');
@@ -586,8 +588,9 @@ export class InteractionSystem {
               if (holdCheck.valid) {
                 area.itemIds.splice(itemIdx, 1);
                 slot.itemId = interactionAction.targetId;
+                const ownerPartId = interactionAction.partId || id;
                 world.addComponent(interactionAction.targetId, 'ownership', {
-                  ownerId: id,
+                  ownerId: ownerPartId,
                   status: 'equipped',
                 });
                 EventBus.emit('inventory:updated');
@@ -703,6 +706,7 @@ export class InteractionSystem {
       itemTransform.x = endX;
       itemTransform.y = dropY;
       itemTransform.z = endZ;
+      itemTransform.isDirty = true;
 
       const mask = physStats.isSolid
         ? CollisionCategory.OBSTACLE |

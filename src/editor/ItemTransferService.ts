@@ -217,6 +217,7 @@ export class ItemTransferService {
         transform.x = posX;
         transform.y = posY;
         transform.z = posZ;
+        transform.isDirty = true;
       } else {
         world.addComponent(itemId, 'transform', {
           x: posX,

@@ -12,7 +12,7 @@ import {
   calculateSystemWeightAndRadius,
   findActiveBrain,
 } from '../utils/anatomy';
-import { destroyPartRecursive } from '../utils/anatomyDamage';
+import { destroyPartRecursive, forceDropItemFromPart } from '../utils/anatomyDamage';
 import { ARCHETYPE_ASSEMBLERS } from '../archetypes';
 import { setBaseStat, createStat } from '../stats/StatEvaluator';
 import { evaluateConsciousness, getLocomotionState, getSensoryStats } from '../utils/anatomyStatus';
@@ -544,6 +544,10 @@ export class AnatomySystem {
     }
 
     for (const partId of plan.graph) {
+      // Принудительно выкидываем предметы из рук отрубленной конечности,
+      // так как она становится физическим пропом (Item Assembly) и теряет анимационный риг
+      forceDropItemFromPart(world, physics, partId);
+
       const partTransform = world.getComponent(partId, 'transform');
       if (partTransform) {
         partTransform.x = rootItemTransform.x;

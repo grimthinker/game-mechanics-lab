@@ -33,6 +33,7 @@ export function forceDropItemFromPart(
     itemTransform.x = dropX;
     itemTransform.y = dropY;
     itemTransform.z = dropZ;
+    itemTransform.isDirty = true;
   }
 
   const renderable = world.getComponent(itemId, 'renderable');

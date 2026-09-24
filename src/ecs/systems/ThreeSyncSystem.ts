@@ -5,7 +5,7 @@ import { GameMode } from '../../config/gameConfig';
 import { AssetManager } from '../../rendering/AssetManager';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { BodyStructureType } from '../templates';
-import { getAggregatedInteractionSlots } from '../utils/hierarchy';
+import { getAggregatedInteractionSlots, getRootOwner } from '../utils/hierarchy';
 import { EventBus } from '../../core/EventBus';
 import {
   computeDetachedLimbGrip,
@@ -155,11 +155,15 @@ export class ThreeSyncSystem {
   public clearMeshes(): void {
     for (const [, mesh] of this.meshes.entries()) {
       ThreeSyncSystem.disposeObject(mesh);
-      this.scene.remove(mesh);
+      if (mesh.parent) {
+        mesh.parent.remove(mesh);
+      }
     }
     for (const [, visual] of this.attackVisuals.entries()) {
       this.disposeAttackObject(visual.object);
-      this.scene.remove(visual.object);
+      if (visual.object.parent) {
+        visual.object.parent.remove(visual.object);
+      }
     }
     this.meshes.clear();
     this.animators.clear();
@@ -217,12 +221,25 @@ export class ThreeSyncSystem {
     for (const [id, { transform, renderable }] of renderables) {
       const ownership = world.getComponent(id, 'ownership');
 
-      // Предмет находится в руке только если его владелец держит его в ячейке взаимодействия (interactionSlots)
+      // Предмет находится в руке, если его держит ячейка взаимодействия части тела или существа
       let isEquippedInHand = false;
       if (ownership && ownership.status === 'equipped') {
-        const ownerSlot = world.getComponent(ownership.ownerId, 'interactionSlots');
-        if (ownerSlot && ownerSlot.itemId === id) {
+        const directSlot = world.getComponent(ownership.ownerId, 'interactionSlots');
+        if (directSlot && directSlot.itemId === id) {
           isEquippedInHand = true;
+        } else {
+          const aggSlots = getAggregatedInteractionSlots(world, ownership.ownerId);
+          if (aggSlots.some((s) => s.slot.itemId === id)) {
+            isEquippedInHand = true;
+          } else {
+            const rootOwner = getRootOwner(world, ownership.ownerId);
+            if (rootOwner && rootOwner !== ownership.ownerId) {
+              const rootSlots = getAggregatedInteractionSlots(world, rootOwner);
+              if (rootSlots.some((s) => s.slot.itemId === id)) {
+                isEquippedInHand = true;
+              }
+            }
+          }
         }
       }
 
@@ -329,26 +346,52 @@ export class ThreeSyncSystem {
               });
             }
 
-            // Прикрепление экипированного оружия/предметов в кости рук (через защищенный кэш сокетов)
+            // Прикрепление экипированного оружия/предметов в кости рук и своевременное освобождение сокетов
             const aggSlots = getAggregatedInteractionSlots(world, id);
             for (const info of aggSlots) {
-              if (info.slot.itemId && info.slot.rigSocketName) {
-                const itemObj = this.meshes.get(info.slot.itemId);
-                if (itemObj) {
-                  const socketBone =
-                    animState.socketBones.get(info.slot.rigSocketName) ||
-                    animState.rig.getObjectByName(info.slot.rigSocketName);
+              if (!info.slot.rigSocketName) continue;
+              const socketBone =
+                animState.socketBones.get(info.slot.rigSocketName) ||
+                animState.rig.getObjectByName(info.slot.rigSocketName);
 
-                  if (socketBone && itemObj.parent !== socketBone) {
-                    socketBone.add(itemObj);
-                    const grip = itemObj.userData.gripTransform as GripTransform | undefined;
-                    if (grip) {
-                      itemObj.position.copy(grip.position);
-                      itemObj.quaternion.copy(grip.quaternion);
+              if (!socketBone) continue;
+
+              if (info.slot.itemId) {
+                const itemObj = this.meshes.get(info.slot.itemId);
+                // Удаляем из сокета любые посторонние объекты, если в слоте сменился предмет
+                for (let c = socketBone.children.length - 1; c >= 0; c--) {
+                  const child = socketBone.children[c];
+                  if (child !== itemObj) {
+                    socketBone.remove(child);
+                    const entId = child.userData.entityId;
+                    if (entId && world.hasEntity(entId)) {
+                      this.scene.add(child);
                     } else {
-                      itemObj.position.set(0, 0, 0);
-                      itemObj.rotation.set(0, 0, 0);
+                      ThreeSyncSystem.disposeObject(child);
                     }
+                  }
+                }
+                if (itemObj && itemObj.parent !== socketBone) {
+                  socketBone.add(itemObj);
+                  const grip = itemObj.userData.gripTransform as GripTransform | undefined;
+                  if (grip) {
+                    itemObj.position.copy(grip.position);
+                    itemObj.quaternion.copy(grip.quaternion);
+                  } else {
+                    itemObj.position.set(0, 0, 0);
+                    itemObj.rotation.set(0, 0, 0);
+                  }
+                }
+              } else {
+                // Если слот пуст (предмет выброшен/снят), гарантированно очищаем сокет кости руки
+                while (socketBone.children.length > 0) {
+                  const child = socketBone.children[0];
+                  socketBone.remove(child);
+                  const entId = child.userData.entityId;
+                  if (entId && world.hasEntity(entId)) {
+                    this.scene.add(child);
+                  } else {
+                    ThreeSyncSystem.disposeObject(child);
                   }
                 }
               }
@@ -413,7 +456,9 @@ export class ThreeSyncSystem {
         // Инвалидируем все фоновые загрузки для этого ID
         this.loadingGenerations.set(id, (this.loadingGenerations.get(id) ?? 0) + 1);
         ThreeSyncSystem.disposeObject(mesh);
-        this.scene.remove(mesh);
+        if (mesh.parent) {
+          mesh.parent.remove(mesh);
+        }
         this.meshes.delete(id);
         this.animators.delete(id);
       }
