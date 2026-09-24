@@ -89,6 +89,7 @@ export class GameSimulation {
     this.movementSystem.update(dt, this.world, this.physics);
     this.stealthSystem.update(dt, this.world);
     this.physics.update(dt, this.world);
+    this.syncDynamicBodiesToTransforms();
     this.attachmentSystem.update(this.world, this.physics);
     this.areaEffectorSystem.update(dt, this.world, this.physics);
     this.damageSystem.update(dt, this.world);
@@ -169,6 +170,14 @@ export class GameSimulation {
           vel.vy = linvel.y;
           vel.vz = linvel.z;
           vel.angvel = { x: angvel.x, y: angvel.y, z: angvel.z };
+        }
+
+        const thrownObj = this.world.getComponent(id, 'thrownObject');
+        if (thrownObj && thrownObj.isAirborne) {
+          const speed = Math.hypot(linvel.x, linvel.y, linvel.z);
+          if (speed < 0.1) {
+            thrownObj.isAirborne = false;
+          }
         }
       }
     }
@@ -325,7 +334,7 @@ export class GameSimulation {
 
     this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
 
-    this.entityFactory.spawnModularHumanoid(
+    const playerId = this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
       this.aiSystem,
@@ -334,13 +343,48 @@ export class GameSimulation {
       'Игрок'
     );
 
+    // Выдаем игроку палку в правую руку для игры с собакой
+    const playerParts = getAnatomyParts(this.world, playerId);
+    const rightHandPartId = playerParts.find((pId) => {
+      const slot = this.world.getComponent(pId, 'interactionSlots');
+      return slot && slot.slotKind === 'right_hand';
+    });
+
+    if (rightHandPartId) {
+      const stickId = this.spawnEntity(
+        {
+          tag: { archetype: 'item', subType: 'weapon' },
+          meta: { name: 'Палка для апорта', entityType: 'item' },
+          item: {
+            name: 'Палка для апорта',
+            type: 'weapon',
+            maxStack: 1,
+            count: 1,
+            size: 4,
+            equipTypes: [],
+            equippable: false,
+            equipTimeMultiplier: 1.0,
+          },
+          physics: { radius: 0.15, weight: 0.5, isSolid: true },
+          weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
+          weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
+          ownership: { ownerId: rightHandPartId, status: 'equipped' },
+        },
+        { x: bx, y: by, z: bz }
+      );
+      const slot = this.world.getComponent(rightHandPartId, 'interactionSlots');
+      if (slot) {
+        slot.itemId = stickId;
+      }
+    }
+
     this.entityFactory.spawnModularCreature(
       this.world,
       this.physics,
       this.aiSystem,
       { x: bx + 1.5, y: by, z: bz + 1.5 },
       CREATURE_BLUEPRINTS.quadruped,
-      'FollowerTree',
+      'DogFetchTree',
       'Собака'
     );
 

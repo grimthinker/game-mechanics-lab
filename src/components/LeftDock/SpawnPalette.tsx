@@ -74,6 +74,28 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
       title: t('palette.categoryWeapons'),
       items: [
         {
+          id: 'weapon_stick',
+          name: 'Палка для апорта',
+          description: 'Легкая деревянная палка',
+          icon: '🪵',
+          createConfig: () => ({
+            tag: { archetype: 'item', subType: 'weapon' },
+            meta: { name: 'Палка для апорта', entityType: 'item' },
+            item: {
+              name: 'Палка для апорта',
+              type: 'weapon',
+              maxStack: 1,
+              size: 4,
+              equipTypes: [],
+              equippable: false,
+              equipTimeMultiplier: 1.0,
+            },
+            physics: { radius: 0.15, weight: 0.5, isSolid: true },
+            weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
+            weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
+          }),
+        },
+        {
           id: 'weapon_spear',
           name: t('palette.spear'),
           description: t('palette.spearDesc'),

@@ -394,12 +394,163 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.QuaternionKeyframeTrack('BackRightLegPivot.quaternion', dogAirTimes, dogAirBrlQ),
     ]);
 
+    const getQuat = (x: number, y = 0, z = 0) => {
+      euler.set(x, y, z);
+      quat.setFromEuler(euler);
+      return [quat.x, quat.y, quat.z, quat.w];
+    };
+
+    // --- Анимация подбора предмета челюстями с земли (pickup_jaws) ---
+    const pickupTimes = [0.0, 0.18, 0.35, 0.48, 0.65];
+    const pickupTorsoP = [0, 0.48, 0, 0, 0.44, 0.03, 0, 0.4, 0.05, 0, 0.45, 0.02, 0, 0.48, 0];
+    const pickupTorsoQ = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.12, 0, 0),
+      ...getQuat(0.22, 0, 0),
+      ...getQuat(0.1, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+    const pickupHeadP = [0, 0.18, 0.3, 0, 0.1, 0.34, 0, 0.02, 0.38, 0, 0.14, 0.33, 0, 0.18, 0.3];
+    const pickupHeadQ = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.35, 0, 0),
+      ...getQuat(0.68, 0, 0),
+      ...getQuat(0.22, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+    const pickupTailQ = [
+      ...getQuat(-0.7, 0, 0),
+      ...getQuat(-0.4, 0.18, 0),
+      ...getQuat(-0.3, -0.18, 0),
+      ...getQuat(-0.5, 0.12, 0),
+      ...getQuat(-0.7, 0, 0),
+    ];
+    const pickupFllP = [
+      -0.16, 0.4, 0.22, -0.16, 0.38, 0.23, -0.16, 0.35, 0.25, -0.16, 0.38, 0.23, -0.16, 0.4, 0.22,
+    ];
+    const pickupFrlP = [
+      0.16, 0.4, 0.22, 0.16, 0.38, 0.23, 0.16, 0.35, 0.25, 0.16, 0.38, 0.23, 0.16, 0.4, 0.22,
+    ];
+    const pickupFrontLegQ = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.12, 0, 0),
+      ...getQuat(-0.25, 0, 0),
+      ...getQuat(-0.1, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+    const pickupRearLegP = [
+      -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22,
+    ];
+    const pickupRearLegPr = [
+      0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22,
+    ];
+    const pickupRearLegQ = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.08, 0, 0),
+      ...getQuat(0.15, 0, 0),
+      ...getQuat(0.06, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+
+    const dogPickupClip = new THREE.AnimationClip('pickup_jaws', 0.65, [
+      new THREE.VectorKeyframeTrack('Torso.position', pickupTimes, pickupTorsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', pickupTimes, pickupTorsoQ),
+      new THREE.VectorKeyframeTrack('HeadPivot.position', pickupTimes, pickupHeadP),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', pickupTimes, pickupHeadQ),
+      new THREE.QuaternionKeyframeTrack('TailPivot.quaternion', pickupTimes, pickupTailQ),
+      new THREE.VectorKeyframeTrack('FrontLeftLegPivot.position', pickupTimes, pickupFllP),
+      new THREE.QuaternionKeyframeTrack(
+        'FrontLeftLegPivot.quaternion',
+        pickupTimes,
+        pickupFrontLegQ
+      ),
+      new THREE.VectorKeyframeTrack('FrontRightLegPivot.position', pickupTimes, pickupFrlP),
+      new THREE.QuaternionKeyframeTrack(
+        'FrontRightLegPivot.quaternion',
+        pickupTimes,
+        pickupFrontLegQ
+      ),
+      new THREE.VectorKeyframeTrack('BackLeftLegPivot.position', pickupTimes, pickupRearLegP),
+      new THREE.QuaternionKeyframeTrack('BackLeftLegPivot.quaternion', pickupTimes, pickupRearLegQ),
+      new THREE.VectorKeyframeTrack('BackRightLegPivot.position', pickupTimes, pickupRearLegPr),
+      new THREE.QuaternionKeyframeTrack(
+        'BackRightLegPivot.quaternion',
+        pickupTimes,
+        pickupRearLegQ
+      ),
+    ]);
+
+    // --- Анимация сброса предмета из пасти под ноги (drop_item_jaws) ---
+    const dropTimes = [0.0, 0.12, 0.24, 0.38];
+    const dropTorsoP = [0, 0.48, 0, 0, 0.46, 0.02, 0, 0.44, 0.03, 0, 0.48, 0];
+    const dropTorsoQ = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.08, 0, 0),
+      ...getQuat(0.14, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+    const dropHeadP = [0, 0.18, 0.3, 0, 0.11, 0.33, 0, 0.06, 0.36, 0, 0.18, 0.3];
+    const dropHeadQ = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.28, 0, 0),
+      ...getQuat(0.52, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
+    const dropTailQ = [
+      ...getQuat(-0.7, 0, 0),
+      ...getQuat(-0.55, 0.1, 0),
+      ...getQuat(-0.5, -0.1, 0),
+      ...getQuat(-0.7, 0, 0),
+    ];
+    const dropLegTrackTimes = [0.0, 0.38];
+    const dropLegTrackQ = [...idQ, ...idQ];
+    const dropFllP = [-0.16, 0.4, 0.22, -0.16, 0.4, 0.22];
+    const dropFrlP = [0.16, 0.4, 0.22, 0.16, 0.4, 0.22];
+    const dropBllP = [-0.16, 0.4, -0.22, -0.16, 0.4, -0.22];
+    const dropBrlP = [0.16, 0.4, -0.22, 0.16, 0.4, -0.22];
+
+    const dogDropClip = new THREE.AnimationClip('drop_item_jaws', 0.38, [
+      new THREE.VectorKeyframeTrack('Torso.position', dropTimes, dropTorsoP),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', dropTimes, dropTorsoQ),
+      new THREE.VectorKeyframeTrack('HeadPivot.position', dropTimes, dropHeadP),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', dropTimes, dropHeadQ),
+      new THREE.QuaternionKeyframeTrack('TailPivot.quaternion', dropTimes, dropTailQ),
+      new THREE.VectorKeyframeTrack('FrontLeftLegPivot.position', dropLegTrackTimes, dropFllP),
+      new THREE.QuaternionKeyframeTrack(
+        'FrontLeftLegPivot.quaternion',
+        dropLegTrackTimes,
+        dropLegTrackQ
+      ),
+      new THREE.VectorKeyframeTrack('FrontRightLegPivot.position', dropLegTrackTimes, dropFrlP),
+      new THREE.QuaternionKeyframeTrack(
+        'FrontRightLegPivot.quaternion',
+        dropLegTrackTimes,
+        dropLegTrackQ
+      ),
+      new THREE.VectorKeyframeTrack('BackLeftLegPivot.position', dropLegTrackTimes, dropBllP),
+      new THREE.QuaternionKeyframeTrack(
+        'BackLeftLegPivot.quaternion',
+        dropLegTrackTimes,
+        dropLegTrackQ
+      ),
+      new THREE.VectorKeyframeTrack('BackRightLegPivot.position', dropLegTrackTimes, dropBrlP),
+      new THREE.QuaternionKeyframeTrack(
+        'BackRightLegPivot.quaternion',
+        dropLegTrackTimes,
+        dropLegTrackQ
+      ),
+    ]);
+
     const map = new Map<string, THREE.AnimationClip>();
     map.set('stand_idle', dogIdleClip);
     map.set('stand_walk', dogWalkClip);
     map.set('stand_jog', dogJoggingClip);
     map.set('stand_sprint', dogSprintClip);
     map.set('attack', attackClip);
+    map.set('pickup', dogPickupClip);
+    map.set('pickup_jaws', dogPickupClip);
+    map.set('drop_item', dogDropClip);
+    map.set('drop_item_jaws', dogDropClip);
     map.set('dead', deadClip);
     map.set('airborne', dogAirborneClip);
 

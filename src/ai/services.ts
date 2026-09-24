@@ -438,3 +438,79 @@ export class BTServiceInputController extends BTService {
     input.wantsJump = keysSet.has(' ');
   }
 }
+
+export class BTServiceFetchWatcher extends BTService {
+  public static readonly nodeName = 'Наблюдение за апортом';
+  public static readonly description = 'Следит за палками, брошенными хозяином';
+
+  public static readonly bbSchema: NodeBBSchema = {
+    reads: {
+      masterEntityId: { type: 'entityId', description: 'ID хозяина' },
+      fetchState: { type: 'string', description: 'Состояние апорта' },
+    },
+    writes: {
+      masterEntityId: { type: 'entityId' },
+      fetchTargetId: { type: 'entityId', description: 'ID брошенной палки' },
+      fetchState: { type: 'string' },
+    },
+  };
+
+  public static readonly defaultParams = {
+    ...BTService.defaultParams,
+    interval: 0.2,
+  };
+
+  protected override params: typeof BTServiceFetchWatcher.defaultParams;
+
+  constructor(child: BTNode, params?: Partial<typeof BTServiceFetchWatcher.defaultParams>) {
+    super(child, params);
+    this.params = { ...BTServiceFetchWatcher.defaultParams, ...params };
+  }
+
+  protected override onOpen(entity: EntityAdapter): void {
+    super.onOpen(entity);
+    this.tickService(entity);
+  }
+
+  protected tickService(entity: EntityAdapter): void {
+    const bb = entity.brain!.blackboard;
+    let masterId = bb.get<string>('masterEntityId');
+
+    // Ищем хозяина (игрока) напрямую в ECS, если еще не найден
+    if (!masterId) {
+      const playerEntry = entity.world
+        .getEntitiesWith('aiStats', 'health')
+        .find(([, comp]) => comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive);
+
+      if (playerEntry) {
+        masterId = playerEntry[0];
+        bb.set('masterEntityId', masterId);
+      } else {
+        return; // Хозяина нет, апорт не работает
+      }
+    }
+
+    const fetchState = bb.get<string>('fetchState') || 'idle';
+
+    // Ищем брошенную палку напрямую в ECS среди предметов, если собака свободна
+    if (fetchState === 'idle') {
+      const thrownEntities = entity.world.getEntitiesWith('thrownObject', 'item');
+      for (const [itemId, comps] of thrownEntities) {
+        const thrownObj = comps.thrownObject;
+
+        // Если предмет брошен хозяином и еще не взят на прицел
+        if (thrownObj && thrownObj.throwerId === masterId && !(thrownObj as any).isFetchTarget) {
+          const physStats = entity.world.getComponent(itemId, 'physicsStats');
+          const weight = physStats?.weight.current ?? 1;
+
+          if (weight <= 5) {
+            (thrownObj as any).isFetchTarget = true;
+            bb.set('fetchTargetId', itemId);
+            bb.set('fetchState', 'chasing_item');
+            break;
+          }
+        }
+      }
+    }
+  }
+}

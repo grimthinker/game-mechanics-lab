@@ -590,6 +590,7 @@ export class InteractionSystem {
             slot.itemId = targetId;
             const ownerPartId = interactionAction.partId || id;
             world.addComponent(targetId, 'ownership', { ownerId: ownerPartId, status: 'equipped' });
+            world.removeComponent(targetId, 'thrownObject');
             EventBus.emit('inventory:updated');
 
             const physBody = world.getComponent(targetId, 'physicsBody');
@@ -992,6 +993,12 @@ export class InteractionSystem {
         isStatic: false,
         category: CollisionCategory.ITEM,
         mask,
+      });
+
+      world.addComponent(itemId, 'thrownObject', {
+        throwerId: entityId,
+        timestamp: Date.now(),
+        isAirborne: true,
       });
     }
   }

@@ -171,3 +171,9 @@ export interface ThrowItemIntentComponent {
   partId: string;
   targetPos: Vec3;
 }
+
+export interface ThrownObjectComponent {
+  throwerId: string;
+  timestamp: number;
+  isAirborne: boolean;
+}

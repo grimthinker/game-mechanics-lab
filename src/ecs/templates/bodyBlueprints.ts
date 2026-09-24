@@ -75,7 +75,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'hand_left',
           name: 'Левая рука',
-          interactDist: 1.5,
+          interactDist: 0.4,
           strength: 15,
           itemId: null,
           rigSocketName: 'LeftHandSocket',
@@ -104,7 +104,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'hand_right',
           name: 'Правая рука',
-          interactDist: 1.5,
+          interactDist: 0.4,
           strength: 15,
           itemId: null,
           rigSocketName: 'RightHandSocket',
@@ -247,7 +247,7 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'jaw',
           name: 'Пасть',
-          interactDist: 1.2,
+          interactDist: 0.4,
           strength: 20,
           itemId: null,
           rigSocketName: 'JawsSocket',

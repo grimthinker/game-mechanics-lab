@@ -4,9 +4,9 @@ export const GAMEPLAY_CONFIG = {
   /** Время торможения существа до полной остановки (в секундах) */
   decelerationTime: 0.15,
   /** Время вытягивания рук/тяги к предмету (Этап 1 подбора, в секундах) */
-  pickupReachDuration: 1,
+  pickupReachDuration: 0.4,
   /** Мин. время взаимодействия с предметами */
-  minInteractionTime: 1,
+  minInteractionTime: 0.4,
   /** Макс. время взаимодействия с предметами */
-  maxInteractionTime: 2.0,
+  maxInteractionTime: 1.5,
 };

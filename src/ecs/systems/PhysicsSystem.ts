@@ -259,21 +259,12 @@ export class PhysicsSystem {
         }
 
         if (phys.rawBody) {
-          phys.rawBody.setTranslation(
-            {
-              x: transform.x,
-              y: transform.y,
-              z: transform.z,
-            },
-            true
-          );
           phys.rawBody.setNextKinematicTranslation({
             x: transform.x,
             y: transform.y,
             z: transform.z,
           });
           if (transform.rotation) {
-            phys.rawBody.setRotation(transform.rotation, true);
             phys.rawBody.setNextKinematicRotation(transform.rotation);
           }
         }
@@ -363,6 +354,11 @@ export class PhysicsSystem {
           }
         }
       }
+    }
+
+    // 3. Шаг физической симуляции Rapier3D
+    if (this.driver && this.driver.isReady) {
+      this.driver.step(dt);
     }
   }
 

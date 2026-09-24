@@ -71,6 +71,7 @@ import {
   OwnershipComponent,
   ItemConfig,
   InventorySetup,
+  ThrownObjectComponent,
 } from './components/inventory';
 import { TimeScaleComponent } from './components/stats';
 import {
@@ -131,6 +132,7 @@ export interface EntityComponents {
   consciousness?: ConsciousnessComponent;
   locomotionState?: LocomotionStateComponent;
   terrain?: TerrainComponent;
+  thrownObject?: ThrownObjectComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -176,6 +178,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'consciousness',
   'locomotionState',
   'terrain',
+  'thrownObject',
 ] as const;
 
 export interface EntityConfig {
@@ -213,4 +216,5 @@ export interface EntityConfig {
   hearing?: HearingConfig;
   perception?: PerceptionComponent;
   terrain?: TerrainComponent;
+  thrownObject?: ThrownObjectComponent;
 }

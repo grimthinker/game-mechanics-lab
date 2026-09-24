@@ -74,10 +74,18 @@ export const CREATURE_RIG_PROFILES: Record<BodyStructureType, RigProfile> = {
       stand_jog: 'proc://anim/quadruped/stand_jog',
       stand_sprint: 'proc://anim/quadruped/stand_sprint',
       attack: 'proc://anim/quadruped/attack',
+      pickup: 'proc://anim/quadruped/pickup_jaws',
+      pickup_jaws: 'proc://anim/quadruped/pickup_jaws',
+      drop_item: 'proc://anim/quadruped/drop_item_jaws',
+      drop_item_jaws: 'proc://anim/quadruped/drop_item_jaws',
       dead: 'proc://anim/quadruped/dead',
     },
     animationSpeeds: {
       stand_sprint: 1.4,
+      pickup: 1.0,
+      pickup_jaws: 1.0,
+      drop_item: 1.0,
+      drop_item_jaws: 1.0,
     },
   },
   arachnid: {
