@@ -26,7 +26,7 @@ export function forceDropItemFromPart(
   const partTransform = world.getComponent(partId, 'transform');
   const dropX = partTransform ? partTransform.x : 0;
   const dropY = partTransform ? partTransform.y : 0;
-  const dropZ = partTransform ? (partTransform.z ?? 0) : 0;
+  const dropZ = partTransform ? partTransform.z : 0;
 
   const itemTransform = world.getComponent(itemId, 'transform');
   if (itemTransform) {

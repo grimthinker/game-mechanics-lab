@@ -7,7 +7,7 @@ export type TransferTarget =
   | { type: 'slot'; partId: string }
   | { type: 'area'; containerId: string; areaId: string }
   | { type: 'inventory'; containerId: string; row?: number; col?: number }
-  | { type: 'ground'; position?: Point | Vec3; parentEntityId?: string };
+  | { type: 'ground'; position?: Vec3; parentEntityId?: string };
 
 /**
  * Проверяет, может ли предмет быть поднят с земли/карты.

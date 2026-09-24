@@ -11,7 +11,7 @@ import {
   RENDER_Z_INDEX,
   RenderableComponent,
 } from '../types';
-import { Point, Vec3 } from '../../types';
+import { Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
@@ -22,7 +22,7 @@ export function assembleItem(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point | Vec3
+  position?: Vec3
 ): void {
   const itemData: ItemData = {
     name: config.item?.name ?? 'Предмет',
@@ -130,9 +130,8 @@ export function assembleItem(
 
   // 6. Трансформация и физическое тело на карте в 3D
   const posX = position?.x ?? 0;
-  const hasZ = position && 'z' in position;
-  const posY = hasZ ? (position as Vec3).y : 0.2;
-  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  const posY = position?.y ?? 0.2;
+  const posZ = position?.z ?? 0;
   world.addComponent(id, 'transform', {
     x: posX,
     y: posY,

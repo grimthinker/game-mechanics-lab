@@ -2,7 +2,7 @@ import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
 import { EntityId, EntityConfig, CollisionCategory, COLLISION_MASK_ALL } from '../types';
-import { Point, Vec3 } from '../../types';
+import { Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
@@ -13,7 +13,7 @@ export function assembleCreature(
   aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point | Vec3
+  position?: Vec3
 ): void {
   const behavior = config.ai?.behavior ?? 'IdleTree';
 
@@ -159,9 +159,8 @@ export function assembleCreature(
 
   // 8. Трансформация (Базовая координата всего существа в 3D)
   const posX = position?.x ?? 0;
-  const hasZ = position && 'z' in position;
-  const posY = hasZ ? (position as Vec3).y : 0;
-  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  const posY = position?.y ?? 0;
+  const posZ = position?.z ?? 0;
   world.addComponent(id, 'transform', {
     x: posX,
     y: posY,

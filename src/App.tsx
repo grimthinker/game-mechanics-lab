@@ -14,7 +14,7 @@ import { HotkeysModal } from './components/HotkeysModal';
 import { CreatureWizardModal } from './components/modals/CreatureWizardModal';
 import { GameHUD } from './components/GameHUD';
 import { BodyStructureType } from './ecs/templates';
-import { ModularPlacementOptions } from './types';
+import { ModularPlacementOptions, Vec3 } from './types';
 import { CanvasHUD } from './components/CanvasHUD';
 import { useDragDrop } from './dnd/DragDropContext';
 import { DragGhostOverlay } from './dnd/DragGhostOverlay';
@@ -422,7 +422,7 @@ export const App: React.FC = () => {
     if (!app || !app.canvas) return;
     const transform = app.world.getComponent(id, 'transform');
     if (transform) {
-      app.camera.lookAt(transform.x, transform.z ?? transform.y, app.canvas);
+      app.camera.lookAt(transform.x, transform.z, app.canvas);
     }
   }, []);
 
@@ -826,9 +826,10 @@ export const App: React.FC = () => {
                           const app = appRef.current;
                           if (!app) return;
                           app.executeTransaction(t('history.spawnPlayer'), () => {
-                            const spawnPos = {
-                              ...pieMenuState.worldPos,
-                              y: (pieMenuState.worldPos as any).y + 0.15,
+                            const spawnPos: Vec3 = {
+                              x: pieMenuState.worldPos.x,
+                              y: pieMenuState.worldPos.y + 0.15,
+                              z: pieMenuState.worldPos.z,
                             };
                             const id = app.entityFactory.spawnModularHumanoid(
                               app.world,
@@ -852,9 +853,10 @@ export const App: React.FC = () => {
                           const app = appRef.current;
                           if (!app) return;
                           app.executeTransaction(t('history.spawnAttacker'), () => {
-                            const spawnPos = {
-                              ...pieMenuState.worldPos,
-                              y: (pieMenuState.worldPos as any).y + 0.15,
+                            const spawnPos: Vec3 = {
+                              x: pieMenuState.worldPos.x,
+                              y: pieMenuState.worldPos.y + 0.15,
+                              z: pieMenuState.worldPos.z,
                             };
                             const id = app.entityFactory.spawnModularHumanoid(
                               app.world,

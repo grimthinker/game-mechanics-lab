@@ -48,10 +48,7 @@ export class BTServiceFindNearestTarget extends BTService {
         const selfPos = entity.getPos();
         const targetPos = target.getPos();
         const dx = targetPos.x - selfPos.x;
-        const dz =
-          (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
-            ? (targetPos as any).z - (selfPos as any).z
-            : targetPos.y - selfPos.y;
+        const dz = targetPos.z - selfPos.z;
         const distSq = dx * dx + dz * dz;
 
         if (distSq > loseDistSq) {
@@ -81,10 +78,7 @@ export class BTServiceFindNearestTarget extends BTService {
       const dx = targetPos.x - selfPos.x;
       if (dx > range || dx < -range) continue;
 
-      const dz =
-        (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
-          ? (targetPos as any).z - (selfPos as any).z
-          : targetPos.y - selfPos.y;
+      const dz = targetPos.z - selfPos.z;
       if (dz > range || dz < -range) continue;
 
       const distSq = dx * dx + dz * dz;
@@ -146,9 +140,7 @@ export class BTServicePathUpdater extends BTService {
       const selfPos = entity.getPos();
       const targetPos = target.getPos();
       const dx = targetPos.x - selfPos.x;
-      const sZ = (selfPos as Vec3).z ?? selfPos.y ?? 0;
-      const tZ = (targetPos as Vec3).z ?? targetPos.y ?? 0;
-      const dz = tZ - sZ;
+      const dz = targetPos.z - selfPos.z;
       const distSq = dx * dx + dz * dz;
 
       this.updatePathingLogic(entity, selfPos, targetPos, distSq);
@@ -157,14 +149,11 @@ export class BTServicePathUpdater extends BTService {
 
   private updatePathingLogic(
     entity: EntityAdapter,
-    selfPos: Point | Vec3,
-    targetPos: Point | Vec3,
+    selfPos: Vec3,
+    targetPos: Vec3,
     distSq: number
   ) {
     if (this.isRequesting) return;
-
-    const sZ = (selfPos as Vec3).z ?? selfPos.y ?? 0;
-    const tZ = (targetPos as Vec3).z ?? targetPos.y ?? 0;
 
     let shouldRequest = false;
 
@@ -174,7 +163,7 @@ export class BTServicePathUpdater extends BTService {
     }
 
     const pdx = selfPos.x - this.lastStartPos.x;
-    const pdz = sZ - this.lastStartPos.z;
+    const pdz = selfPos.z - this.lastStartPos.z;
 
     if (pdx * pdx + pdz * pdz > this.pushedDistanceSq) {
       shouldRequest = true;
@@ -191,7 +180,7 @@ export class BTServicePathUpdater extends BTService {
         t * (this.params.maxTargetMoveThreshold - this.params.minTargetMoveThreshold);
 
       const tdx = targetPos.x - this.lastTargetPos.x;
-      const tdz = tZ - this.lastTargetPos.z;
+      const tdz = targetPos.z - this.lastTargetPos.z;
 
       if (tdx * tdx + tdz * tdz > currentThreshold * currentThreshold) {
         shouldRequest = true;
@@ -201,14 +190,14 @@ export class BTServicePathUpdater extends BTService {
     if (shouldRequest) {
       this.isRequesting = true;
       this.requestTimer = 0;
-      this.lastStartPos = { x: selfPos.x, y: (selfPos as Vec3).y ?? 0, z: sZ };
-      this.lastTargetPos = { x: targetPos.x, y: (targetPos as Vec3).y ?? 0, z: tZ };
+      this.lastStartPos = { x: selfPos.x, y: selfPos.y, z: selfPos.z };
+      this.lastTargetPos = { x: targetPos.x, y: targetPos.y, z: targetPos.z };
       const pathPromise = entity.utils.getPath(selfPos, targetPos, entity.radius);
       this.handlePathPromise(entity, pathPromise);
     }
   }
 
-  private handlePathPromise(entity: EntityAdapter, promise: Promise<Point[]>) {
+  private handlePathPromise(entity: EntityAdapter, promise: Promise<Vec3[]>) {
     promise
       .then((newPath) => {
         this.isRequesting = false;
@@ -291,7 +280,7 @@ export class BTServiceSyncStats extends BTService {
     bb.set('maxHealth', entity.maxHp);
 
     const selfPos = entity.getPos();
-    bb.set('pos', { x: selfPos.x, y: selfPos.y, z: (selfPos as any).z ?? selfPos.y });
+    bb.set('pos', { x: selfPos.x, y: selfPos.y, z: selfPos.z });
 
     const stopDist = stats.followStopDist ?? 2.0;
 
@@ -413,14 +402,14 @@ export class BTServiceInputController extends BTService {
       const cosA = Math.cos(aimAngle);
       const sinA = Math.sin(aimAngle);
 
-      // Проекция намерения движения относительно направления курсора:
+      // Проекция намерения движения относительно направления курсора в плоскости XZ:
       // W/S — вдоль линии прицеливания (cosA, sinA)
       // D/A — перпендикулярно вправо (-sinA, cosA)
       const dirX = forwardIntent * cosA - strafeIntent * sinA;
-      const dirY = forwardIntent * sinA + strafeIntent * cosA;
-      const len = Math.hypot(dirX, dirY);
+      const dirZ = forwardIntent * sinA + strafeIntent * cosA;
+      const len = Math.hypot(dirX, dirZ);
 
-      input.desiredMoveVector = { x: dirX / len, y: dirY / len };
+      input.desiredMoveVector = { x: dirX / len, z: dirZ / len };
       input.moveForward = forwardIntent !== 0 ? (Math.sign(forwardIntent) as -1 | 1) : 0;
       input.moveStrafe = strafeIntent !== 0 ? (Math.sign(strafeIntent) as -1 | 1) : 0;
       input.isMovingForward = forwardIntent > 0;

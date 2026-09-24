@@ -33,14 +33,16 @@ export class AttachmentSystem {
       // 3. Синхронизация координат с родителем
       const targetX = parent.transform.x + (attachment.offsetX ?? 0);
       const targetY = parent.transform.y + (attachment.offsetY ?? 0);
+      const targetZ = parent.transform.z + (attachment.offsetZ ?? 0);
 
       transform.x = targetX;
       transform.y = targetY;
+      transform.z = targetZ;
 
       // 4. Синхронизация физического тела-сенсора
       const phys = world.getComponent(id, 'physicsBody');
       if (phys && phys.rawBody) {
-        phys.rawBody.setTranslation({ x: targetX, y: transform.y, z: targetY }, true);
+        phys.rawBody.setTranslation({ x: targetX, y: targetY, z: targetZ }, true);
       }
     }
   }

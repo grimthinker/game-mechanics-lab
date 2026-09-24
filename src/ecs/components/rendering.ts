@@ -43,6 +43,7 @@ export interface AttachmentComponent {
   parentId: string;
   offsetX?: number;
   offsetY?: number;
+  offsetZ?: number;
 }
 
 export interface GizmoComponent {

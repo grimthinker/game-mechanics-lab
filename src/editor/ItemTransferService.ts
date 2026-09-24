@@ -6,6 +6,7 @@ import {
   validateItemTransfer,
 } from '../ecs/utils/itemValidation';
 import { CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../ecs/types';
+import { Vec3 } from '../types';
 import RAPIER from '@dimforge/rapier3d-compat';
 
 export class ItemTransferService {
@@ -176,31 +177,31 @@ export class ItemTransferService {
       const transform = world.getComponent(itemId, 'transform');
       let posX = location.position?.x ?? transform?.x;
       let posY = location.position?.y ?? transform?.y;
-      let posZ = (location.position as any)?.z ?? transform?.z;
+      let posZ = location.position?.z ?? transform?.z;
 
       if (location.parentEntityId) {
         const parentTrans = world.getComponent(location.parentEntityId, 'transform');
         if (parentTrans) {
           posX = parentTrans.x;
           posY = parentTrans.y;
-          posZ = parentTrans.z ?? 0;
+          posZ = parentTrans.z;
         }
       }
 
-      if ((posX === undefined || posY === undefined) && source) {
+      if ((posX === undefined || posY === undefined || posZ === undefined) && source) {
         if (source.type === 'slot') {
           const sTrans = world.getComponent(source.partId, 'transform');
           if (sTrans) {
             posX = sTrans.x;
             posY = sTrans.y;
-            posZ = sTrans.z ?? 0;
+            posZ = sTrans.z;
           }
         } else if (source.type === 'area' || source.type === 'inventory') {
           const sTrans = world.getComponent(source.containerId, 'transform');
           if (sTrans) {
             posX = sTrans.x;
             posY = sTrans.y;
-            posZ = sTrans.z ?? 0;
+            posZ = sTrans.z;
           }
         }
       }

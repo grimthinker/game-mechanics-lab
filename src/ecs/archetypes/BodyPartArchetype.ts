@@ -2,7 +2,7 @@ import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
 import { EntityId, EntityConfig } from '../types';
-import { Point, Vec3 } from '../../types';
+import { Vec3 } from '../../types';
 import { createStat } from '../stats/StatEvaluator';
 
 export function assembleBodyPart(
@@ -11,7 +11,7 @@ export function assembleBodyPart(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point | Vec3
+  position?: Vec3
 ): void {
   // 1. Тег
   world.addComponent(id, 'tag', { archetype: 'bodyPart', subType: config.tag?.subType });
@@ -57,9 +57,8 @@ export function assembleBodyPart(
 
   // 9. Трансформация в 3D
   const posX = position?.x ?? 0;
-  const hasZ = position && 'z' in position;
-  const posY = hasZ ? (position as Vec3).y : 0;
-  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  const posY = position?.y ?? 0;
+  const posZ = position?.z ?? 0;
   world.addComponent(id, 'transform', {
     x: posX,
     y: posY,

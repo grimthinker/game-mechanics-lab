@@ -107,7 +107,7 @@ export function assembleZone(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point | Vec3
+  position?: Vec3
 ): void {
   const effector = config.areaEffector ??
     (config as any).zoneTrigger ?? {
@@ -144,12 +144,10 @@ export function assembleZone(
     weight: createStat(1),
     isSolid: false,
   });
-
   // 6. Трансформация и тело-сенсор в 3D
   const posX = position?.x ?? 0;
-  const hasZ = position && 'z' in position;
-  const posY = hasZ ? (position as Vec3).y : 0;
-  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  const posY = position?.y ?? 0;
+  const posZ = position?.z ?? 0;
   world.addComponent(id, 'transform', {
     x: posX,
     y: posY,

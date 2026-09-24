@@ -88,10 +88,7 @@ export class BTActionPursue extends BTAction {
 
     const selfPos = entity.getPos();
     const dx = targetPos.x - selfPos.x;
-    const dz =
-      (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
-        ? (targetPos as any).z - (selfPos as any).z
-        : targetPos.y - selfPos.y;
+    const dz = targetPos.z - selfPos.z;
 
     const input = entity.input;
 
@@ -114,7 +111,7 @@ export class BTActionPursue extends BTAction {
     } else {
       const dist = Math.hypot(dx, dz);
       if (dist > 0.001 && input && entity.isAlive) {
-        input.desiredMoveVector = { x: dx / dist, y: dz / dist };
+        input.desiredMoveVector = { x: dx / dist, z: dz / dist };
         input.targetLookAngle = Math.atan2(dz, dx) as Radians;
       } else if (input) {
         input.desiredMoveVector = null;
@@ -346,10 +343,7 @@ export class BTActionRotateToPos extends BTAction {
 
     const selfPos = entity.getPos();
     const dx = targetPos.x - selfPos.x;
-    const dz =
-      (targetPos as any).z !== undefined && (selfPos as any).z !== undefined
-        ? (targetPos as any).z - (selfPos as any).z
-        : targetPos.y - selfPos.y;
+    const dz = targetPos.z - selfPos.z;
 
     if (dx === 0 && dz === 0) return NodeStatus.SUCCESS;
 
@@ -450,14 +444,11 @@ export class BTActionFollowPathSmooth extends BTAction {
     // Расчет вектора и угла к следующей путевой точке по плоскости XZ
     const target = path[0];
     const dx = target.x - selfPos.x;
-    const dz =
-      (target as any).z !== undefined && (selfPos as any).z !== undefined
-        ? (target as any).z - (selfPos as any).z
-        : target.y - selfPos.y;
+    const dz = target.z - selfPos.z;
     const dist = Math.hypot(dx, dz);
 
     if (dist > 0.001 && input && entity.isAlive) {
-      input.desiredMoveVector = { x: dx / dist, y: dz / dist };
+      input.desiredMoveVector = { x: dx / dist, z: dz / dist };
       input.targetLookAngle = Math.atan2(dz, dx) as Radians;
     } else if (input) {
       input.desiredMoveVector = null;
@@ -469,12 +460,9 @@ export class BTActionFollowPathSmooth extends BTAction {
     return NodeStatus.RUNNING;
   }
 
-  private getDist(
-    p1: { x: number; y: number; z?: number },
-    p2: { x: number; y: number; z?: number }
-  ): number {
+  private getDist(p1: { x: number; z: number }, p2: { x: number; z: number }): number {
     const dx = p2.x - p1.x;
-    const dz = p2.z !== undefined && p1.z !== undefined ? p2.z - p1.z : p2.y - p1.y;
+    const dz = p2.z - p1.z;
     return Math.hypot(dx, dz);
   }
 

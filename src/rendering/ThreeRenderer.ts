@@ -410,11 +410,7 @@ export class ThreeRenderer implements IRenderer {
       else if (archetype === 'creature') meshHeight = 1.8;
 
       // Проекция 3D точки (верхушка меша) на 2D экран
-      const pos3D = new THREE.Vector3(
-        transform.x,
-        transform.y + meshHeight + 0.3,
-        transform.z ?? transform.y
-      );
+      const pos3D = new THREE.Vector3(transform.x, transform.y + meshHeight + 0.3, transform.z);
       pos3D.project(this.camera);
 
       // Отбрасываем объекты за спиной камеры
@@ -463,11 +459,7 @@ export class ThreeRenderer implements IRenderer {
     const meshHeight = Math.max(0.3, radius * 1.5);
 
     // Корректные 3D координаты в метрах (высота Y + сдвиг, глубина Z)
-    const pos3D = new THREE.Vector3(
-      transform.x,
-      transform.y + meshHeight + 0.2,
-      transform.z ?? transform.y
-    );
+    const pos3D = new THREE.Vector3(transform.x, transform.y + meshHeight + 0.2, transform.z);
     pos3D.project(this.camera);
 
     if (pos3D.z > 1) return;
@@ -503,7 +495,7 @@ export class ThreeRenderer implements IRenderer {
 
     const posX = transform.x;
     const posY = transform.y;
-    const posZ = transform.z ?? transform.y;
+    const posZ = transform.z;
 
     const brain =
       getEffectiveLogicBrain(world, selectedId) ?? getEffectiveLogicBrain(world, rootId);
@@ -647,11 +639,7 @@ export class ThreeRenderer implements IRenderer {
         (targetOwnerRoot ? world.getComponent(targetOwnerRoot, 'transform') : undefined);
 
       if (targetTrans) {
-        const targetPos3D = new THREE.Vector3(
-          targetTrans.x,
-          targetTrans.y + 0.8,
-          targetTrans.z ?? targetTrans.y
-        );
+        const targetPos3D = new THREE.Vector3(targetTrans.x, targetTrans.y + 0.8, targetTrans.z);
 
         this.drawProjectedLine(
           selfPos3D,

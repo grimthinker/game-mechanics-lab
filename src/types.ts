@@ -4,11 +4,13 @@ import { BodyStructureType } from './ecs/templates';
 export type Radians = number;
 export type Degrees = number;
 
+/** 2D-координаты для экранных операций, рамки выделения и курсора в UI */
 export interface Point {
   x: number;
   y: number;
 }
 
+/** 3D-вектор в мировом пространстве (X, Z — горизонтальная плоскость, Y — высота) */
 export interface Vec3 {
   x: number;
   y: number;

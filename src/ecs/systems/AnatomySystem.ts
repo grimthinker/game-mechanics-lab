@@ -243,6 +243,7 @@ export class AnatomySystem {
       ARCHETYPE_ASSEMBLERS.creature(world, physics, null as any, rootId, rootConfig, {
         x: anchorTransform.x,
         y: anchorTransform.y,
+        z: anchorTransform.z,
       });
     }
 

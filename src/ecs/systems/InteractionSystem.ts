@@ -155,10 +155,7 @@ export class InteractionSystem {
       }
       if (isTargetAlreadyTargeted) continue;
 
-      const dist = Math.hypot(
-        targetTransform.x - transform.x,
-        (targetTransform.z ?? targetTransform.y) - (transform.z ?? transform.y)
-      );
+      const dist = Math.hypot(targetTransform.x - transform.x, targetTransform.z - transform.z);
       const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 0.4;
       const targetRadius = targetPhysStats.radius.current;
       const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
@@ -237,12 +234,12 @@ export class InteractionSystem {
 
           let dropX = action.targetItemPos?.x ?? transform.x;
           let dropY = action.targetItemPos?.y ?? transform.y;
-          let dropZ = action.targetItemPos?.z ?? transform.z ?? transform.y;
+          let dropZ = action.targetItemPos?.z ?? transform.z;
 
           if (action.relativeDist !== undefined && action.relativeAngle !== undefined) {
             const currentAngle = transform.angle + action.relativeAngle;
             dropX = transform.x + Math.cos(currentAngle) * action.relativeDist;
-            dropZ = (transform.z ?? transform.y) + Math.sin(currentAngle) * action.relativeDist;
+            dropZ = transform.z + Math.sin(currentAngle) * action.relativeDist;
           }
 
           const itTransform = world.getComponent(targetId, 'transform');
@@ -432,7 +429,7 @@ export class InteractionSystem {
             if (targetTransform) {
               const currentDist = Math.hypot(
                 targetTransform.x - transform.x,
-                (targetTransform.z ?? targetTransform.y) - (transform.z ?? transform.y)
+                targetTransform.z - transform.z
               );
               const distBetweenBorders = Math.max(0, currentDist - myRadius - targetRadius);
               if (distBetweenBorders > slot.interactDist) {
@@ -470,9 +467,7 @@ export class InteractionSystem {
             let relativeAngle = 0 as Radians;
             if (targetTransformEntity && selfTransform) {
               const dx = targetTransformEntity.x - selfTransform.x;
-              const dz =
-                (targetTransformEntity.z ?? targetTransformEntity.y) -
-                (selfTransform.z ?? selfTransform.y);
+              const dz = targetTransformEntity.z - selfTransform.z;
               relativeDist = Math.hypot(dx, dz);
               const worldAngle = Math.atan2(dz, dx);
               let relAngle = worldAngle - selfTransform.angle;
@@ -675,7 +670,7 @@ export class InteractionSystem {
 
       // Трассировка луча: проверка наличия препятствий на пути броска
       if (physics.driver && physics.driver.isReady) {
-        const rayStart = { x: transform.x, y: dropY, z: transform.z ?? 0 };
+        const rayStart = { x: transform.x, y: dropY, z: transform.z };
         const hits = physics.driver.castRayMultiple(
           rayStart,
           dir,

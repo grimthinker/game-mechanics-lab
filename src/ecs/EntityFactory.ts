@@ -22,7 +22,7 @@ export class EntityFactory {
     physics: PhysicsSystem,
     aiSystem: AISystem,
     config: EntityConfig,
-    position?: Point | Vec3,
+    position?: Vec3,
     forcedId?: string
   ): EntityId {
     const id = forcedId || this.generateId('ent');
@@ -39,7 +39,7 @@ export class EntityFactory {
     world: World,
     physics: PhysicsSystem,
     aiSystem: AISystem,
-    position: Point | Vec3,
+    position: Vec3,
     blueprint: CreatureBodyBlueprint,
     behavior: string = 'IdleTree',
     name?: string
@@ -211,7 +211,7 @@ export class EntityFactory {
     world: World,
     physics: PhysicsSystem,
     aiSystem: AISystem,
-    position: Point | Vec3,
+    position: Vec3,
     behavior: string = 'IdleTree',
     name: string = 'Существо'
   ): EntityId {

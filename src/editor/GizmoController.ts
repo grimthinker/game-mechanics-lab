@@ -32,7 +32,7 @@ export class GizmoController {
           for (const id of selectedIds) {
             const t = this.app.world.getComponent(id, 'transform');
             if (t) {
-              const pos = new THREE.Vector3(t.x, t.y, t.z ?? 0);
+              const pos = new THREE.Vector3(t.x, t.y, t.z);
               const rot = new THREE.Quaternion(
                 t.rotation.x,
                 t.rotation.y,

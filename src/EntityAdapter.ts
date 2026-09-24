@@ -242,7 +242,7 @@ export class EntityAdapter {
     return freeSlots;
   }
 
-  public getPos(): Point {
+  public getPos(): Vec3 {
     return this.pos;
   }
 }

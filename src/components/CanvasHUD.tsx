@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Camera } from '../Camera';
-import { Point, GizmoTool } from '../types';
+import { Vec3, GizmoTool } from '../types';
 import { t } from '../locales';
 import { CAMERA_CONFIG } from '../config/cameraConfig';
 
 export interface CanvasHUDProps {
   camera: Camera | null | undefined;
-  cursorWorldPos: Point | { x: number; y: number; z?: number } | null;
+  cursorWorldPos: Vec3 | null;
   onResetCamera: () => void;
   gizmoTool?: GizmoTool;
   onSelectGizmoTool?: (tool: GizmoTool) => void;
@@ -94,9 +94,8 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           <span style={{ color: '#888' }}>{t('hud.cursor')} </span>
           {cursorWorldPos ? (
             <span style={{ color: '#2ecc71' }}>
-              X:{cursorWorldPos.x.toFixed(1)}m Y:
-              {('z' in cursorWorldPos ? cursorWorldPos.y : 0).toFixed(1)}m Z:
-              {('z' in cursorWorldPos ? (cursorWorldPos as any).z : cursorWorldPos.y).toFixed(1)}m
+              X:{cursorWorldPos.x.toFixed(1)}m Y:{cursorWorldPos.y.toFixed(1)}m Z:
+              {cursorWorldPos.z.toFixed(1)}m
             </span>
           ) : (
             <span style={{ color: '#666' }}>—</span>

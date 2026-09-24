@@ -58,7 +58,7 @@ export interface VelocityComponent {
 }
 
 export interface InputComponent {
-  desiredMoveVector: { x: number; y: number } | null;
+  desiredMoveVector: { x: number; z: number } | null;
   moveForward?: -1 | 0 | 1;
   moveStrafe?: -1 | 0 | 1;
   targetLookAngle?: Radians;

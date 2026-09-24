@@ -203,7 +203,7 @@ export class GameApp {
     this.isPhysicsStructureDirty = false;
   }
 
-  public spawnEntity(config: EntityConfig, position?: Point | Vec3, forcedId?: string): string {
+  public spawnEntity(config: EntityConfig, position?: Vec3, forcedId?: string): string {
     const id = this.entityFactory.spawnEntity(
       this.world,
       this.physics,
@@ -238,7 +238,7 @@ export class GameApp {
     return Array.from(resultSet);
   }
 
-  private cloneHierarchy(rootId: string, offset: Point): string {
+  private cloneHierarchy(rootId: string, offset: { x: number; z: number; y?: number }): string {
     const parts = getAnatomyParts(this.world, rootId).filter((p) => p !== rootId);
     const containedItems = getAllContainedItems(this.world, rootId);
     const allClusterIds = Array.from(new Set([rootId, ...parts, ...containedItems]));
@@ -266,7 +266,9 @@ export class GameApp {
       const trans = this.world.getComponent(newId, 'transform');
       if (trans) {
         trans.x += offset.x;
-        trans.y += offset.y;
+        trans.y += offset.y ?? 0;
+        trans.z += offset.z;
+        trans.isDirty = true;
       }
 
       const meta = this.world.getComponent(newId, 'meta');
@@ -349,7 +351,10 @@ export class GameApp {
     return idMap.get(rootId)!;
   }
 
-  public duplicateEntities(ids: string[], offset: Point = EDITOR_CONFIG.cloneOffset): string[] {
+  public duplicateEntities(
+    ids: string[],
+    offset: { x: number; z: number; y?: number } = EDITOR_CONFIG.cloneOffset
+  ): string[] {
     const validIds = ids.filter((id) => this.world.getEntity(id));
     if (validIds.length === 0) return [];
 
@@ -382,9 +387,10 @@ export class GameApp {
         continue;
       }
 
-      const targetPos: Point = {
+      const targetPos: Vec3 = {
         x: comp.transform.x + offset.x,
-        y: comp.transform.y + offset.y,
+        y: comp.transform.y + (offset.y ?? 0),
+        z: comp.transform.z + offset.z,
       };
 
       const config: EntityConfig = {};
@@ -512,8 +518,8 @@ export class GameApp {
       }
       config.transform = {
         x: targetPos.x,
-        y: comp.transform.y ?? 0,
-        z: comp.transform.z ?? targetPos.y,
+        y: targetPos.y,
+        z: targetPos.z,
         rotation: comp.transform.rotation
           ? { ...comp.transform.rotation }
           : {
@@ -680,15 +686,11 @@ export class GameApp {
     EventBus.emit('world:updated');
   }
 
-  public initDefaultWorld(center?: Point | Vec3): void {
+  public initDefaultWorld(center?: Vec3): void {
     this.clearWorld();
     this.commandHistory.clear();
 
-    const p = center ?? { x: 0, y: 0, z: 0 };
-    const hasZ = 'z' in p;
-    const bx = p.x;
-    const by = hasZ ? (p as Vec3).y : 0;
-    const bz = hasZ ? (p as Vec3).z : (p.y ?? 0);
+    const { x: bx, y: by, z: bz } = center ?? { x: 0, y: 0, z: 0 };
 
     // Создаем базовый процедурный ландшафт 100x100 метров со Splatmap-текстурами
     this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
@@ -697,7 +699,7 @@ export class GameApp {
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx, y: by, z: bz } as any,
+      { x: bx, y: by, z: bz },
       'PlayerTree',
       'Игрок'
     );
@@ -706,21 +708,21 @@ export class GameApp {
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx + 1.5, y: by, z: bz + 1.5 } as any,
+      { x: bx + 1.5, y: by, z: bz + 1.5 },
       CREATURE_BLUEPRINTS.quadruped,
       'FollowerTree',
       'Собака'
     );
 
-    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz } as any);
-    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx - 4.5, y: by, z: bz } as any);
+    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz });
+    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx - 4.5, y: by, z: bz });
     this.spawnEntity(
       createZoneConfig('repel', 2.5, 20, 'Зона отталкивания', false, false, false, true, 50, 0),
-      { x: bx - 4.5, y: by, z: bz - 4.5 } as any
+      { x: bx - 4.5, y: by, z: bz - 4.5 }
     );
     this.spawnEntity(
       createZoneConfig('attract', 2.5, 20, 'Зона притягивания', false, false, false, true, 50, 0),
-      { x: bx + 4.5, y: by, z: bz - 4.5 } as any
+      { x: bx + 4.5, y: by, z: bz - 4.5 }
     );
     this.spawnEntity(
       createZoneConfig(
@@ -733,7 +735,7 @@ export class GameApp {
         false,
         false
       ),
-      { x: bx - 4.5, y: by, z: bz + 4.5 } as any
+      { x: bx - 4.5, y: by, z: bz + 4.5 }
     );
     this.spawnEntity(
       createZoneConfig(
@@ -746,7 +748,7 @@ export class GameApp {
         false,
         false
       ),
-      { x: bx + 4.5, y: by, z: bz + 4.5 } as any
+      { x: bx + 4.5, y: by, z: bz + 4.5 }
     );
 
     this.spawnEntity(
@@ -766,7 +768,7 @@ export class GameApp {
           ],
         },
       },
-      { x: bx, y: by, z: bz + 4.0 } as any
+      { x: bx, y: by, z: bz + 4.0 }
     );
 
     const itemsX = bx - 1.5;
@@ -795,7 +797,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: by + 1.0, z: bz - 2.0 } as any
+      { x: itemsX, y: by + 1.0, z: bz - 2.0 }
     );
 
     this.spawnEntity(
@@ -823,7 +825,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: by + 0.5, z: bz - 1.0 } as any
+      { x: itemsX, y: by + 0.5, z: bz - 1.0 }
     );
 
     this.spawnEntity(
@@ -849,7 +851,7 @@ export class GameApp {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: by + 1.5, z: bz + 0.0 } as any
+      { x: itemsX, y: by + 1.5, z: bz + 0.0 }
     );
 
     this.spawnEntity(
@@ -868,7 +870,7 @@ export class GameApp {
         physics: { radius: 0.4, weight: 20, isSolid: true },
         armorStats: { defense: 25, flatReduction: 5 },
       },
-      { x: itemsX, y: by + 0.2, z: bz + 1.0 } as any
+      { x: itemsX, y: by + 0.2, z: bz + 1.0 }
     );
     this.spawnEntity(
       {
@@ -886,7 +888,7 @@ export class GameApp {
         physics: { radius: 0.3, weight: 10, isSolid: true },
         armorStats: { defense: 15, flatReduction: 2 },
       },
-      { x: bx, y: by + 1.5, z: bz + 4.0 } as any
+      { x: bx, y: by + 1.5, z: bz + 4.0 }
     );
 
     this.syncPhysicsStructures();
@@ -1150,15 +1152,12 @@ export class GameApp {
     }
   }
 
-  public updatePlayerAim(worldPoint: Point | Vec3): void {
+  public updatePlayerAim(worldPoint: Vec3): void {
     const entities = this.world.getEntitiesWith('transform', 'input', 'health', 'aiStats');
     for (const [, { transform, input, health, aiStats }] of entities) {
       if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
         const dx = worldPoint.x - transform.x;
-        const dz =
-          (worldPoint as Vec3).z !== undefined
-            ? (worldPoint as Vec3).z - transform.z
-            : worldPoint.y - transform.z;
+        const dz = worldPoint.z - transform.z;
 
         const dist = Math.hypot(dx, dz);
         if (dist > 0.05) {

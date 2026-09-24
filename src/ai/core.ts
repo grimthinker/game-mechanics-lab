@@ -1,4 +1,4 @@
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 import { BehaviorTreeId, MobTypeId } from './config';
 import type { EntityAdapter } from '../EntityAdapter'; // Import EntityAdapter as Context
 import { StandardRadius } from '../ecs/types';
@@ -36,7 +36,7 @@ export interface BTNodeDTO {
 export interface EntityUtils {
   getAllEntities: () => EntityAdapter[];
   getEntity: (id: string) => EntityAdapter | undefined;
-  getPath: (start: Point, end: Point, navmesh_radius_type?: number) => Promise<Point[]>;
+  getPath: (start: Vec3, end: Vec3, navmesh_radius_type?: number) => Promise<Vec3[]>;
 }
 
 export type AttackStatus = 'idle' | 'attacking' | 'cooldown';
@@ -222,7 +222,7 @@ export class Blackboard {
 }
 
 export type PathKeys = {
-  [K in keyof BBData]-?: BBData[K] extends Point[] ? K : never;
+  [K in keyof BBData]-?: BBData[K] extends Vec3[] ? K : never;
 }[keyof BBData];
 
 type SquaredStats = {
@@ -235,13 +235,13 @@ export interface BBData extends BehaviorStatsConfig, SquaredStats {
   targetId: string;
   bestCandidateId: string | undefined;
   isEngaged: boolean;
-  currentPath: Point[];
-  patrolPoints: Point[];
+  currentPath: Vec3[];
+  patrolPoints: Vec3[];
   currentPatrolIndex: number;
-  patrolRouteTmp: Point[];
+  patrolRouteTmp: Vec3[];
   health: number;
   maxHealth: number;
-  pos: Point;
+  pos: Vec3;
   visionFovAngle?: number;
   visionClarity?: number;
   visionMaxDist?: number;

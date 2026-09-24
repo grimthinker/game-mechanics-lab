@@ -1,5 +1,5 @@
 import { EntityId } from './base';
-import { Point, Vec3 } from '../../types';
+import { Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { t } from '../../locales';
 

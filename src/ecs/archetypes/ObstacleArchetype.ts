@@ -25,7 +25,7 @@ export function assembleObstacle(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  position?: Point | Vec3
+  position?: Vec3
 ): void {
   const points = config.physics?.points ?? createRectanglePoints(100, 40);
 
@@ -77,9 +77,8 @@ export function assembleObstacle(
 
   // 5. Трансформация в 3D
   const posX = position?.x ?? 0;
-  const hasZ = position && 'z' in position;
-  const posY = hasZ ? (position as Vec3).y : 0;
-  const posZ = hasZ ? (position as Vec3).z : (position?.y ?? 0);
+  const posY = position?.y ?? 0;
+  const posZ = position?.z ?? 0;
   world.addComponent(id, 'transform', {
     x: posX,
     y: posY,

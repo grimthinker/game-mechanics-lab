@@ -73,9 +73,7 @@ export class VelocitySystem {
         ) {
           const dx = interactionAction.targetItemPos.x - transform.x;
           // Проецируем на плоскость пола для прицеливания при подборе
-          const dz =
-            (interactionAction.targetItemPos.z ?? interactionAction.targetItemPos.y) -
-            (transform.z ?? transform.y);
+          const dz = interactionAction.targetItemPos.z - transform.z;
           if (Math.hypot(dx, dz) > 0.001) {
             input.targetLookAngle = Math.atan2(dz, dx) as Radians;
             input.turnDirection = 0;
@@ -153,7 +151,7 @@ export class VelocitySystem {
 
       // Расчет вектора движения
       let moveVecX = input.desiredMoveVector ? input.desiredMoveVector.x : 0;
-      let moveVecZ = input.desiredMoveVector ? input.desiredMoveVector.y : 0;
+      let moveVecZ = input.desiredMoveVector ? input.desiredMoveVector.z : 0;
 
       if (!input.desiredMoveVector) {
         let fwd = input.moveForward ?? 0;

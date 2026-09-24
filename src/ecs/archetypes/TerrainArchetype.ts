@@ -108,7 +108,7 @@ export function assembleTerrain(
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
-  _position?: Point | Vec3
+  _position?: Vec3
 ): void {
   world.addComponent(id, 'tag', { archetype: 'terrain' });
   world.addComponent(id, 'meta', { name: config.meta?.name || 'Террейн', entityType: 'terrain' });

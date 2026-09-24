@@ -1,4 +1,4 @@
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 import { EventBus } from '../core/EventBus';
 import { EntityAdapter } from '../EntityAdapter';
 import { GameMode } from '../config/gameConfig';
@@ -158,7 +158,7 @@ export class SelectionController {
     this.hoveredEntityId = id;
   }
 
-  public pickEntityAt(worldPoint: Point, clientX?: number, clientY?: number): string | null {
+  public pickEntityAt(worldPoint: Vec3, clientX?: number, clientY?: number): string | null {
     if (clientX !== undefined && clientY !== undefined) {
       // 1. Приоритетный клик по мешам Three.js (позволяет выбирать конкретные части тела partId)
       if (this.app.renderer.pickEntity) {
@@ -178,7 +178,7 @@ export class SelectionController {
   }
 
   public pickNearestEntity(
-    worldPoint: Point,
+    worldPoint: Vec3,
     maxDistanceRatio: number = VISUAL_CONFIG.creatureHoverScreenRatio ?? 0.02,
     clientX?: number,
     clientY?: number
@@ -210,11 +210,9 @@ export class SelectionController {
       const physStats = this.app.world.getComponent(entityId, 'physicsStats');
       if (!isEditor && !physicsBody && !physStats) continue;
 
-      const targetZ = transform.z ?? transform.y;
-      const wZ = (worldPoint as any).z ?? worldPoint.y;
       const dx = transform.x - worldPoint.x;
-      const dy = transform.y - 0;
-      const dz = targetZ - wZ;
+      const dy = transform.y - worldPoint.y;
+      const dz = transform.z - worldPoint.z;
       const dist = Math.hypot(dx, dy, dz);
 
       const radius = physStats?.radius.current ?? 0.4;

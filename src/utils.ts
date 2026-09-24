@@ -11,14 +11,30 @@ export function rad2Deg(rad: Radians | number): Degrees {
   return ((rad * 180) / Math.PI) as Degrees;
 }
 
+/** Вычисляет расстояние на горизонтальной плоскости пола XZ между двумя 3D-точками */
+export function distanceXZ(start: { x: number; z: number }, end: { x: number; z: number }): number {
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  return Math.hypot(dx, dz);
+}
+
+/** Сохраняем имя для обратной совместимости, фиксируя расчет строго на плоскости XZ */
 export function vec2_distance_to(
-  start: { x: number; y: number; z?: number },
-  end: { x: number; y: number; z?: number }
+  start: { x: number; z: number },
+  end: { x: number; z: number }
+): number {
+  return distanceXZ(start, end);
+}
+
+/** Вычисляет полное 3D евклидово расстояние в пространстве */
+export function distance3D(
+  start: { x: number; y: number; z: number },
+  end: { x: number; y: number; z: number }
 ): number {
   const dx = end.x - start.x;
-  // Если у точек есть координата z (3D мир), горизонтальная дистанция вычисляется на плоскости XZ
-  const dz = end.z !== undefined && start.z !== undefined ? end.z - start.z : end.y - start.y;
-  return Math.sqrt(dx * dx + dz * dz);
+  const dy = end.y - start.y;
+  const dz = end.z - start.z;
+  return Math.hypot(dx, dy, dz);
 }
 
 export function nowInSeconds(): number {
