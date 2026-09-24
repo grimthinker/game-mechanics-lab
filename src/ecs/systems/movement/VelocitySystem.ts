@@ -79,6 +79,18 @@ export class VelocitySystem {
             input.turnDirection = 0;
             input.turnRatio = 0;
           }
+        } else if (
+          interactionAction.type === 'throw' &&
+          (interactionAction.phase === 'throw_turn' || interactionAction.phase === 'throw_prep') &&
+          interactionAction.targetItemPos
+        ) {
+          const dx = interactionAction.targetItemPos.x - transform.x;
+          const dz = interactionAction.targetItemPos.z - transform.z;
+          if (Math.hypot(dx, dz) > 0.001) {
+            input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+            input.turnDirection = 0;
+            input.turnRatio = 0;
+          }
         }
       }
 
@@ -168,6 +180,15 @@ export class VelocitySystem {
         }
       }
 
+      // Во время прицеливания и замаха броска линейное движение блокируется
+      if (
+        interactionAction?.type === 'throw' &&
+        (interactionAction.phase === 'throw_turn' || interactionAction.phase === 'throw_prep')
+      ) {
+        moveVecX = 0;
+        moveVecZ = 0;
+      }
+
       const inputMag = Math.hypot(moveVecX, moveVecZ);
       const hasMoveInput = inputMag > 0.001;
       if (hasMoveInput && inputMag > 1) {
@@ -229,6 +250,8 @@ export class VelocitySystem {
         actionMode = 'equipping';
       } else if (interactionAction?.type === 'drop') {
         actionMode = 'drop';
+      } else if (interactionAction?.type === 'throw') {
+        actionMode = 'throw';
       } else if (world.getComponent(id, 'stanceTransition')) {
         actionMode = 'stance_changing';
       }

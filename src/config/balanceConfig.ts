@@ -66,6 +66,8 @@ export const BALANCE_CONFIG = {
       proneToCrouch: 1.5,
       dropPrep: 0.1,
       dropRecovery: 0.1,
+      throwPrep: 0.25,
+      throwRecovery: 0.2,
     },
 
     /** Базовый показатель скрытности (мощность незаметности агента) */

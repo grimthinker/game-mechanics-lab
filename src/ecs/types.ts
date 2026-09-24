@@ -66,6 +66,7 @@ import {
   InteractionActionComponent,
   PickupIntentComponent,
   DropItemIntentComponent,
+  ThrowItemIntentComponent,
   ItemComponent,
   OwnershipComponent,
   ItemConfig,
@@ -108,6 +109,7 @@ export interface EntityComponents {
   stanceTransition?: StanceTransitionComponent;
   pickupIntent?: PickupIntentComponent;
   dropItemIntent?: DropItemIntentComponent;
+  throwItemIntent?: ThrowItemIntentComponent;
   activeAttacks?: ActiveAttackComponent;
   item?: ItemComponent;
   meta?: import('./components/movement').CreatureMetaComponent;
@@ -151,6 +153,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'interactionSlots',
   'interactionAction',
   'stanceTransition',
+  'throwItemIntent',
   'meta',
   'ownership',
   'gizmo',

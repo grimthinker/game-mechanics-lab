@@ -5,7 +5,6 @@ import { EntityId } from '../ecs/types';
 import { Point, Vec3 } from '../types';
 
 import { TerrainBrushState } from '../types';
-
 export interface EditorRenderData {
   selectedId: EntityId | null;
   selectedIds: Set<EntityId>;
@@ -15,6 +14,7 @@ export interface EditorRenderData {
   gizmoTool?: 'select' | 'translate' | 'rotate';
   terrainBrush?: TerrainBrushState;
   cursorWorldPos?: Vec3 | null;
+  throwTrajectory?: { start: Vec3; v0: Vec3 } | null;
 }
 
 export interface RenderContext {

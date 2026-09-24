@@ -596,6 +596,42 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                   textAlign: 'left',
                   cursor: 'pointer',
                   fontWeight: 'bold',
+                  color: '#111',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  marginBottom: '2px',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cfcfcf')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dcdcdc')}
+              >
+                Выбросить под ноги
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (app && targetCreatureId) {
+                    // Активируем режим прицеливания (HUD закроется, курсор станет прицелом)
+                    const aggSlots = getAggregatedInteractionSlots(app.world, targetCreatureId);
+                    const slotInfo = aggSlots[contextMenu.globalSlotIndex];
+                    if (slotInfo && slotInfo.slot.itemId) {
+                      app.throwTargeting = {
+                        slotIndex: contextMenu.globalSlotIndex,
+                        partId: slotInfo.partId,
+                        itemId: slotInfo.slot.itemId,
+                      };
+                    }
+                  }
+                  setContextMenu(null);
+                }}
+                style={{
+                  backgroundColor: '#dcdcdc',
+                  border: '1px solid #777',
+                  padding: '4px 6px',
+                  fontSize: '11px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
                   color: '#c0392b',
                   width: '100%',
                   boxSizing: 'border-box',
@@ -604,7 +640,7 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cfcfcf')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dcdcdc')}
               >
-                Выбросить
+                Кинуть (Прицел)
               </button>
 
               <button

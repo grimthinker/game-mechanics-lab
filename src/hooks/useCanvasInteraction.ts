@@ -67,7 +67,8 @@ export const useCanvasInteraction = ({
     const container = containerRef.current;
     if (!container) return;
 
-    container.style.cursor = placementMode || bbPicking ? 'crosshair' : 'default';
+    const isTargeting = appRef.current?.throwTargeting != null;
+    container.style.cursor = placementMode || bbPicking || isTargeting ? 'crosshair' : 'default';
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -86,6 +87,29 @@ export const useCanvasInteraction = ({
     if (!app) return;
 
     if (onClosePieMenu) onClosePieMenu();
+
+    // Отмена прицеливания броска на ПКМ
+    if (e.button === 2 && app.throwTargeting) {
+      app.throwTargeting = null;
+      syncPlayerControls();
+      return;
+    }
+
+    // Совершение броска (ЛКМ) в режиме прицеливания
+    if (e.button === 0 && app.throwTargeting && mode === GameMode.GAME) {
+      const point = app.getCanvasPoint(e.clientX, e.clientY);
+      const playerId = app.getPlayerEntityId();
+      if (playerId) {
+        app.world.addComponent(playerId, 'throwItemIntent', {
+          slotIndex: app.throwTargeting.slotIndex,
+          partId: app.throwTargeting.partId,
+          targetPos: point,
+        });
+      }
+      app.throwTargeting = null;
+      syncPlayerControls();
+      return;
+    }
 
     // Вращение камеры (LAlt + ЛКМ)
     if (e.button === 0 && e.altKey) {

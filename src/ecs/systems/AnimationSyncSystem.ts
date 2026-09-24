@@ -25,6 +25,14 @@ export class AnimationSyncSystem {
       } else if (meta.actionMode === 'drop') {
         const slotKind = interactionAction?.slotKind || 'left_hand';
         targetAnim = `drop_item_${slotKind}`;
+      } else if (meta.actionMode === 'throw') {
+        if (interactionAction?.phase === 'throw_turn') {
+          const stance = meta.stance || 'standing';
+          targetAnim = stance.includes('crouch') ? 'crouch_idle' : 'stand_idle';
+        } else {
+          const slotKind = interactionAction?.slotKind || 'left_hand';
+          targetAnim = `throw_item_${slotKind}`;
+        }
       } else if (meta.stance === 'airborne') {
         targetAnim = 'airborne';
       } else if (meta.stance === 'sliding') {

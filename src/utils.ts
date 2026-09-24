@@ -1,4 +1,4 @@
-import { Point } from './types';
+import { Point, Vec3 } from './types';
 
 export type Radians = number;
 export type Degrees = number;
@@ -87,4 +87,49 @@ export function calculateBoundingRadius(points: Point[]): number {
     if (distSq > maxSq) maxSq = distSq;
   }
   return Math.sqrt(maxSq);
+}
+
+/**
+ * Вычисляет баллистический вектор скорости для броска в цель.
+ * Использует аналитическую формулу угла минимальной энергии.
+ * Если требуемая скорость превышает физический предел силы, предмет кидается изо всех сил, но не долетает.
+ */
+export function calculateThrowVelocity(
+  start: Vec3,
+  target: Vec3,
+  strength: number,
+  mass: number
+): Vec3 {
+  const g = 9.81;
+  const Vcap = 25.0; // Максимальная физиологическая скорость руки (м/с)
+  const karm = 2.0; // Коэффициент сопротивления массы
+
+  const dx = target.x - start.x;
+  const dy = target.y - start.y;
+  const dz = target.z - start.z;
+
+  const d = Math.max(0.001, Math.hypot(dx, dz));
+  const h = dy;
+
+  // Ограничение скорости на основе силы слота и веса предмета
+  const Vmax = Vcap * Math.sqrt(strength / (strength + karm * mass));
+
+  // Оптимальный угол броска для минимальных усилий (настильная/навесная дуга)
+  const theta = Math.atan((h + Math.sqrt(d * d + h * h)) / d);
+  const Vreq = Math.sqrt(g * (h + Math.sqrt(d * d + h * h)));
+
+  // Если цель слишком далеко, кидаем с максимальной доступной скоростью
+  const V0 = Math.min(Vreq, Vmax);
+
+  const Vh = V0 * Math.cos(theta);
+  const Vy = V0 * Math.sin(theta);
+
+  const dirX = dx / d;
+  const dirZ = dz / d;
+
+  return {
+    x: dirX * Vh,
+    y: Vy,
+    z: dirZ * Vh,
+  };
 }

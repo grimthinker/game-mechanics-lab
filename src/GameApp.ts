@@ -23,6 +23,7 @@ import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { createDefaultTerrainConfig } from './ecs/archetypes/TerrainArchetype';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
+import { calculateThrowVelocity } from './utils';
 import { CREATURE_BLUEPRINTS } from './ecs/templates';
 import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
 import { EventBus } from './core/EventBus';
@@ -84,6 +85,7 @@ export class GameApp {
   public entityFactory: EntityFactory;
   public serializer: WorldSerializer;
   public editorSnapshot: SerializedWorldData | null = null;
+  public throwTargeting: { slotIndex: number; partId: string; itemId: string } | null = null;
 
   private _showUIOverlays: boolean = true;
   public get showUIOverlays() {
@@ -638,7 +640,26 @@ export class GameApp {
         physics: { radius: 0.3, weight: 10, isSolid: true },
         armorStats: { defense: 15, flatReduction: 2 },
       },
-      { x: bx, y: by + 1.5, z: bz + 4.0 }
+      { x: bx, y: by + 1.5, z: bz + 4.0 } as any
+    );
+
+    // Легкий предмет "Камень" для тестирования бросков
+    this.spawnEntity(
+      {
+        tag: { archetype: 'item', subType: 'resource' },
+        item: {
+          name: 'Камень',
+          type: 'resource',
+          maxStack: 10,
+          count: 1,
+          size: 2,
+          equipTypes: [],
+          equippable: false,
+          equipTimeMultiplier: 1.0,
+        },
+        physics: { radius: 0.2, weight: 0.8, isSolid: true },
+      },
+      { x: bx + 1.0, y: by + 0.2, z: bz + 1.0 }
     );
 
     this.syncPhysicsStructures();
@@ -867,9 +888,26 @@ export class GameApp {
     );
 
     let cursorWorldPos: Vec3 | null = null;
+    let throwTrajectory: { start: Vec3; v0: Vec3 } | null = null;
+
     if (this.mouseScreenPos) {
       const pt = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
       cursorWorldPos = { x: pt.x, y: pt.y, z: pt.z };
+
+      if (this.throwTargeting && this.gameMode === GameMode.GAME) {
+        const slot = this.world.getComponent(this.throwTargeting.partId, 'interactionSlots');
+        const physStats = this.world.getComponent(this.throwTargeting.itemId, 'physicsStats');
+        const transform =
+          this.world.getComponent(this.throwTargeting.partId, 'transform') ??
+          this.world.getComponent(this.getPlayerEntityId() ?? '', 'transform');
+
+        if (slot && physStats && transform) {
+          // Вынос точки броска (рука/грудь)
+          const startPos = { x: transform.x, y: transform.y + 1.2, z: transform.z };
+          const v0 = calculateThrowVelocity(startPos, pt, slot.strength, physStats.weight.current);
+          throwTrajectory = { start: startPos, v0 };
+        }
+      }
     }
 
     this.renderer.render({
@@ -886,6 +924,7 @@ export class GameApp {
         gizmoTool: this.gizmo.tool,
         terrainBrush: this.terrainBrush,
         cursorWorldPos,
+        throwTrajectory,
       },
       showUIOverlays: this.showUIOverlays,
     });

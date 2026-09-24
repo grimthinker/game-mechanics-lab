@@ -353,6 +353,45 @@ export class ThreeRenderer implements IRenderer {
         this.renderAIDebug(context.world, activeSelectedId);
       }
     }
+    if (context.editorData.throwTrajectory) {
+      this.renderThrowTrajectory(context.editorData.throwTrajectory);
+    }
+  }
+
+  private renderThrowTrajectory(trajectory: { start: Vec3; v0: Vec3 }): void {
+    const g = 9.81;
+    const dt = 0.05;
+    const maxTime = 3.0; // Защита от бесконечного цикла
+
+    let prevX = trajectory.start.x;
+    let prevY = trajectory.start.y;
+    let prevZ = trajectory.start.z;
+
+    for (let t = dt; t <= maxTime; t += dt) {
+      const currX = trajectory.start.x + trajectory.v0.x * t;
+      const currY = trajectory.start.y + trajectory.v0.y * t - (g * t * t) / 2;
+      const currZ = trajectory.start.z + trajectory.v0.z * t;
+
+      this.drawProjectedLine(
+        prevX,
+        prevY,
+        prevZ,
+        currX,
+        currY,
+        currZ,
+        'rgba(231, 76, 60, 0.8)',
+        [5, 5],
+        2
+      );
+
+      prevX = currX;
+      prevY = currY;
+      prevZ = currZ;
+
+      if (currY < 0) break; // Упрощенное пересечение с нулевым полом
+    }
+
+    this.drawProjectedCircle(prevX, prevY, prevZ, 0.4, '#e74c3c', [], 'Прицел', 0, 16);
   }
 
   private renderScreenMarqueeBox(box: { start: Point; current: Point }): void {

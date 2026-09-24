@@ -26,7 +26,7 @@ export type CreatureMovementMode = 'immobile' | 'turning' | 'walking' | 'jogging
 export type CreatureDirectionMode = 'forward' | 'strafe' | 'backward' | 'immobile';
 
 export type CreatureActionMode =
-  'idle' | 'attacking' | 'pickup' | 'equipping' | 'stance_changing' | 'drop';
+  'idle' | 'attacking' | 'pickup' | 'equipping' | 'stance_changing' | 'drop' | 'throw';
 
 export interface CreatureMetaComponent {
   name: string;
@@ -100,6 +100,8 @@ export interface MovementConfig {
   proneToCrouchTime?: number;
   dropPrepTime?: number;
   dropRecoveryTime?: number;
+  throwPrepTime?: number;
+  throwRecoveryTime?: number;
   airborneTurnMultiplier?: number;
   jumpVelocity?: number;
   maxJumpSlopeAngle?: number;
@@ -133,6 +135,8 @@ export interface MovementStatsComponent {
   proneToCrouchTime: StatValue<number>;
   dropPrepTime: StatValue<number>;
   dropRecoveryTime: StatValue<number>;
+  throwPrepTime: StatValue<number>;
+  throwRecoveryTime: StatValue<number>;
   airborneTurnMultiplier: number;
   jumpVelocity: StatValue<number>;
   maxJumpSlopeAngle: StatValue<number>;

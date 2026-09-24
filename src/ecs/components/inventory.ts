@@ -122,10 +122,20 @@ export interface EquipmentComponent {
 }
 
 export type InteractionPhase =
-  'reach' | 'lift' | 'abort_reach' | 'abort_lift' | 'drop_prep' | 'drop_recovery' | 'abort_drop';
+  | 'reach'
+  | 'lift'
+  | 'abort_reach'
+  | 'abort_lift'
+  | 'drop_prep'
+  | 'drop_recovery'
+  | 'abort_drop'
+  | 'throw_turn'
+  | 'throw_prep'
+  | 'throw_recovery'
+  | 'abort_throw';
 
 export interface InteractionActionComponent {
-  type: 'pickup' | 'equip' | 'unequip' | 'drop';
+  type: 'pickup' | 'equip' | 'unequip' | 'drop' | 'throw';
   targetId?: string;
   slotIndex?: number;
   partId?: string;
@@ -154,4 +164,10 @@ export interface DropItemIntentComponent {
 export interface OwnershipComponent {
   ownerId: EntityId;
   status: 'equipped' | 'inventory';
+}
+
+export interface ThrowItemIntentComponent {
+  slotIndex: number;
+  partId: string;
+  targetPos: Vec3;
 }

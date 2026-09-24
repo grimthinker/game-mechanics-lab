@@ -86,6 +86,12 @@ export function assembleCreature(
     dropRecoveryTime: createStat(
       config.movement?.dropRecoveryTime ?? BALANCE_CONFIG.creature.transitions.dropRecovery
     ),
+    throwPrepTime: createStat(
+      config.movement?.throwPrepTime ?? BALANCE_CONFIG.creature.transitions.throwPrep
+    ),
+    throwRecoveryTime: createStat(
+      config.movement?.throwRecoveryTime ?? BALANCE_CONFIG.creature.transitions.throwRecovery
+    ),
     airborneTurnMultiplier:
       config.movement?.airborneTurnMultiplier ?? BALANCE_CONFIG.creature.airborneTurnMultiplier,
     jumpVelocity: createStat(config.movement?.jumpVelocity ?? BALANCE_CONFIG.creature.jumpVelocity),

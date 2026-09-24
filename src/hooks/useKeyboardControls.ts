@@ -67,6 +67,11 @@ export const useKeyboardControls = ({
         GlobalInput.keys.clear();
         return;
       }
+      if (e.key === 'Escape') {
+        if ((window as any).appRef && (window as any).appRef.throwTargeting) {
+          (window as any).appRef.throwTargeting = null;
+        }
+      }
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
       const key = getKeyName(e);
       if (key === ' ' || e.code === 'Space') {
