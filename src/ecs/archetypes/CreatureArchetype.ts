@@ -6,6 +6,7 @@ import { Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
+import { fastClone } from '../utils/clone';
 
 export function assembleCreature(
   world: World,
@@ -150,11 +151,11 @@ export function assembleCreature(
   world.addComponent(id, 'activeAttacks', { attacks: [] });
 
   if (config.visualModel) {
-    world.addComponent(id, 'visualModel', JSON.parse(JSON.stringify(config.visualModel)));
+    world.addComponent(id, 'visualModel', fastClone(config.visualModel));
   }
 
   if (config.animator) {
-    world.addComponent(id, 'animator', JSON.parse(JSON.stringify(config.animator)));
+    world.addComponent(id, 'animator', fastClone(config.animator));
   }
 
   // 8. Трансформация (Базовая координата всего существа в 3D)
@@ -198,7 +199,7 @@ export function assembleCreature(
 
   // 11. Органы чувств
   if (config.perception) {
-    world.addComponent(id, 'perception', JSON.parse(JSON.stringify(config.perception)));
+    world.addComponent(id, 'perception', fastClone(config.perception));
   }
 
   // 12. Инициализация логического мозга ИИ

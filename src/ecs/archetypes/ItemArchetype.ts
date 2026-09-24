@@ -15,6 +15,7 @@ import { Vec3 } from '../../types';
 import { Radians } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
+import { fastClone } from '../utils/clone';
 
 export function assembleItem(
   world: World,
@@ -96,7 +97,7 @@ export function assembleItem(
     });
 
     if (config.weaponZone) {
-      world.addComponent(id, 'weaponZone', JSON.parse(JSON.stringify(config.weaponZone)));
+      world.addComponent(id, 'weaponZone', fastClone(config.weaponZone));
     }
   } else if (itemData.type === 'armor') {
     const as = config.armorStats ?? {};
@@ -124,7 +125,7 @@ export function assembleItem(
   // 5.2. Наличие собственных областей экипировки у предмета (пояс, разгрузка, подвес)
   if (config.equip && config.equip.equipmentAreas && config.equip.equipmentAreas.length > 0) {
     world.addComponent(id, 'equip', {
-      equipmentAreas: JSON.parse(JSON.stringify(config.equip.equipmentAreas)),
+      equipmentAreas: fastClone(config.equip.equipmentAreas),
     });
   }
 

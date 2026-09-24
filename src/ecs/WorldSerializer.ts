@@ -8,6 +8,7 @@ import {
 } from './types';
 import { deg2Rad, Radians } from '../utils';
 import { evaluateStat } from './stats/StatEvaluator';
+import { fastClone } from './utils/clone';
 
 export class WorldSerializer {
   constructor(private app: GameApp) {}
@@ -31,12 +32,11 @@ export class WorldSerializer {
               resolution: t.resolution,
               splatResolution: t.splatResolution || 512,
               textureTiling: t.textureTiling,
-              // Сохраняем как обычные массивы (JSON.stringify безопасно преобразует NaN в null, а при загрузке null станет 0)
               heights: Array.from(t.heights),
               splatData: Array.from(t.splatData),
             };
           } else {
-            data.components[key] = JSON.parse(JSON.stringify(componentValue));
+            data.components[key] = fastClone(componentValue);
           }
         }
       }
@@ -46,7 +46,7 @@ export class WorldSerializer {
         delete bbData.pressedKeys;
         delete (bbData as any).pressed_keys;
         data.components.brain = {
-          blackboardData: JSON.parse(JSON.stringify(bbData)),
+          blackboardData: fastClone(bbData),
         };
       }
 

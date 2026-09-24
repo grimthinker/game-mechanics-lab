@@ -18,6 +18,7 @@ import {
   createRectanglePoints,
 } from '../../utils';
 import { createStat } from '../stats/StatEvaluator';
+import { fastClone } from '../utils/clone';
 
 export function assembleObstacle(
   world: World,
@@ -61,7 +62,7 @@ export function assembleObstacle(
     radius: createStat(boundingRadius),
     weight: createStat(1000),
     isSolid,
-    points: JSON.parse(JSON.stringify(points)),
+    points: fastClone(points),
   });
 
   // 4. Здоровье (обязательный компонент)

@@ -1,37 +1,25 @@
 import * as THREE from 'three';
 import { World } from '../World';
-import { EntityId } from '../types';
+import { EntityId, AnimatorComponent } from '../types';
 import { GameMode } from '../../config/gameConfig';
 import { AssetManager } from '../../rendering/AssetManager';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { BodyStructureType } from '../templates';
 import { getAggregatedInteractionSlots, getRootOwner } from '../utils/hierarchy';
-import { EventBus } from '../../core/EventBus';
-import {
-  computeDetachedLimbGrip,
-  computeItemGrip,
-  computeLocalBox,
-  GripTransform,
-} from '../../rendering/gripCalculators';
-import { createTerrainMaterial } from '../../rendering/terrain/TerrainMaterial';
+import { computeItemGrip, GripTransform } from '../../rendering/gripCalculators';
 import { ProceduralCreatureAssetManager } from '../../rendering/creatures/ProceduralAssetManager';
-
-interface AnimatorState {
-  mixer: THREE.AnimationMixer;
-  currentClipName: string;
-  targetClipName: string;
-  currentAction: THREE.AnimationAction | null;
-  rig: THREE.Object3D;
-  socketBones: Map<string, THREE.Object3D>;
-}
-
-interface AttackVisualState {
-  object: THREE.Object3D;
-  key: string;
-  phase: 'prep' | 'cast';
-}
+import { TerrainSyncSystem } from '../../rendering/terrain/TerrainSyncSystem';
+import {
+  CreatureMeshAssembler,
+  RigAnimatorState as AnimatorState,
+} from '../../rendering/creatures/CreatureMeshAssembler';
+import { disposeObject, attachOutlines } from '../../rendering/renderUtils';
+import { AttackVisualsManager } from '../../rendering/attacks/AttackVisualsManager';
 
 export class ThreeSyncSystem {
+  public static disposeObject = disposeObject;
+  public static attachOutlines = attachOutlines;
+
   private scene: THREE.Scene;
   private meshes: Map<EntityId, THREE.Object3D> = new Map();
   private loadingMeshes: Set<EntityId> = new Set();
@@ -40,8 +28,10 @@ export class ThreeSyncSystem {
   // Кэш для аниматоров (Стейт-машина)
   private animators: Map<EntityId, AnimatorState> = new Map();
 
-  // Визуализаторы зон атак
-  private attackVisuals: Map<EntityId, AttackVisualState> = new Map();
+  // Делегированные подсистемы
+  private attackVisualsManager: AttackVisualsManager;
+  private terrainSync: TerrainSyncSystem;
+  private creatureAssembler: CreatureMeshAssembler;
 
   // Кэшированные материалы для производительности (фоллбэк)
   private matPlayer = new THREE.MeshLambertMaterial({ color: 0x2980b9 });
@@ -90,67 +80,22 @@ export class ThreeSyncSystem {
   });
   private matSelection = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
   private matSilhouetteOutline = new THREE.MeshBasicMaterial({
-    color: 0x2ecc71, // Ярко-зеленый цвет контура выделения
+    color: 0x2ecc71,
     side: THREE.BackSide,
-  });
-
-  public static attachOutlines(object: THREE.Object3D, material: THREE.Material): void {
-    object.traverse((child) => {
-      if (child instanceof THREE.Mesh && !child.userData.isSelectionOutline) {
-        const outline = new THREE.Mesh(child.geometry, material);
-        outline.scale.set(1.06, 1.06, 1.06);
-        outline.userData.isSelectionOutline = true;
-        outline.visible = false;
-        child.add(outline);
-      }
-    });
-  }
-
-  // Материалы для визуализации атак
-  private matAttackPrepMesh = new THREE.MeshBasicMaterial({
-    color: 0xf39c12,
-    transparent: true,
-    opacity: 0.35,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  private matAttackCastMesh = new THREE.MeshBasicMaterial({
-    color: 0xe74c3c,
-    transparent: true,
-    opacity: 0.65,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  });
-  private matAttackPrepLine = new THREE.LineBasicMaterial({
-    color: 0xf39c12,
-    transparent: true,
-    opacity: 0.75,
-  });
-  private matAttackCastLine = new THREE.LineBasicMaterial({
-    color: 0xe74c3c,
-    transparent: true,
-    opacity: 0.95,
   });
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
-  }
-
-  public static disposeObject(obj: THREE.Object3D): void {
-    obj.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        if (!child.userData.isSharedAsset) {
-          child.geometry?.dispose();
-        }
-        if (!child.userData.isSharedAsset && !child.userData.isSharedMaterial) {
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) => m.dispose());
-          } else if (child.material) {
-            child.material.dispose();
-          }
-        }
-      }
-    });
+    this.attackVisualsManager = new AttackVisualsManager(scene);
+    this.terrainSync = new TerrainSyncSystem();
+    this.creatureAssembler = new CreatureMeshAssembler(
+      scene,
+      this.matSilhouetteOutline,
+      this.loadingMeshes,
+      this.loadingGenerations,
+      (id, state) => this.animators.set(id, state),
+      (id, animator, anim) => this.playAnimation(id, animator, anim)
+    );
   }
 
   public clearMeshes(): void {
@@ -160,21 +105,16 @@ export class ThreeSyncSystem {
         mesh.parent.remove(mesh);
       }
     }
-    for (const [, visual] of this.attackVisuals.entries()) {
-      this.disposeAttackObject(visual.object);
-      if (visual.object.parent) {
-        visual.object.parent.remove(visual.object);
-      }
-    }
+    this.attackVisualsManager.clear();
     this.meshes.clear();
     this.animators.clear();
-    this.attackVisuals.clear();
     this.loadingMeshes.clear();
     this.loadingGenerations.clear();
   }
 
   public destroy(): void {
     this.clearMeshes();
+    this.attackVisualsManager.destroy();
 
     // Очищаем кэшированные фоллбэк-материалы
     this.matPlayer.dispose();
@@ -192,13 +132,8 @@ export class ThreeSyncSystem {
     this.matZoneFast.dispose();
     this.matSelection.dispose();
     this.matSilhouetteOutline.dispose();
-
-    // Очищаем материалы атак
-    this.matAttackPrepMesh.dispose();
-    this.matAttackCastMesh.dispose();
-    this.matAttackPrepLine.dispose();
-    this.matAttackCastLine.dispose();
   }
+
   public update(dt: number, world: World, _gameMode: GameMode, selectedIds: Set<EntityId>): void {
     const activeIds = new Set<EntityId>();
     const renderables = world.getEntitiesWith('transform', 'renderable');
@@ -319,24 +254,7 @@ export class ThreeSyncSystem {
         if (archetype === 'terrain') {
           const terrainComp = world.getComponent(id, 'terrain');
           if (terrainComp) {
-            const terrainMesh = obj.children.find((c) => c.userData.isTerrainMesh) as THREE.Mesh;
-            if (terrainMesh && terrainMesh.geometry) {
-              if (terrainComp.isGeometryDirty) {
-                const posAttr = terrainMesh.geometry.attributes.position;
-                const heights = terrainComp.heights;
-                for (let i = 0; i < posAttr.count; i++) {
-                  posAttr.setY(i, heights[i]);
-                }
-                posAttr.needsUpdate = true;
-                terrainMesh.geometry.computeVertexNormals();
-                terrainComp.isGeometryDirty = false;
-              }
-
-              if (terrainComp.isSplatDirty && terrainMesh.userData.splatTexture) {
-                terrainMesh.userData.splatTexture.needsUpdate = true;
-                terrainComp.isSplatDirty = false;
-              }
-            }
+            this.terrainSync.syncTerrain(obj, terrainComp);
           }
         }
 
@@ -490,199 +408,13 @@ export class ThreeSyncSystem {
       }
     }
 
-    // Синхронизация 3D зон атак в активных фазах prep и cast
-    this.updateAttackVisuals(world);
-  }
-
-  private updateAttackVisuals(world: World): void {
-    const activeAttackEntities = world.getEntitiesWith('activeAttacks', 'transform', 'health');
-    const currentAttackingIds = new Set<EntityId>();
-
-    for (const [id, { activeAttacks, transform, health }] of activeAttackEntities) {
-      if (!health.isAlive) continue;
-
-      const currentAttack = activeAttacks.attacks[0];
-      if (!currentAttack) continue;
-      if (currentAttack.phase !== 'prep' && currentAttack.phase !== 'cast') continue;
-
-      const weaponZone = world.getComponent(currentAttack.weaponId, 'weaponZone');
-      if (!weaponZone) continue;
-
-      currentAttackingIds.add(id);
-      this.syncAttackVisual(id, currentAttack.phase, weaponZone, transform);
-    }
-
-    // Удаляем визуализаторы завершившихся атак
-    for (const [id, visual] of this.attackVisuals.entries()) {
-      if (!currentAttackingIds.has(id)) {
-        this.scene.remove(visual.object);
-        this.disposeAttackObject(visual.object);
-        this.attackVisuals.delete(id);
-      }
-    }
-  }
-
-  private syncAttackVisual(
-    entityId: EntityId,
-    phase: 'prep' | 'cast',
-    zone: import('../components/combat').HitZoneConfig,
-    transform: import('../components/physics').TransformComponent
-  ): void {
-    const key = `${zone.hitZoneType}_${zone.radius ?? 0}_${zone.length ?? 0}_${zone.angle ?? 0}_${zone.rayCount ?? 0}`;
-    let visual = this.attackVisuals.get(entityId);
-
-    if (!visual || visual.key !== key) {
-      if (visual) {
-        this.scene.remove(visual.object);
-        this.disposeAttackObject(visual.object);
-      }
-      const object = this.createAttackObject(zone, phase);
-      visual = { object, key, phase };
-      this.attackVisuals.set(entityId, visual);
-      this.scene.add(object);
-    } else if (visual.phase !== phase) {
-      visual.phase = phase;
-      this.updateAttackObjectPhase(visual.object, zone.hitZoneType, phase);
-    }
-
-    // Привязываем положение чуть выше пола (0.02м) во избежание z-fighting
-    visual.object.position.set(transform.x, transform.y + 0.02, transform.z);
-    if (transform.rotation) {
-      visual.object.quaternion.set(
-        transform.rotation.x,
-        transform.rotation.y,
-        transform.rotation.z,
-        transform.rotation.w
-      );
-    }
-  }
-
-  private createAttackObject(
-    zone: import('../components/combat').HitZoneConfig,
-    phase: 'prep' | 'cast'
-  ): THREE.Object3D {
-    const isCast = phase === 'cast';
-
-    if (zone.hitZoneType === 'radius') {
-      const radius = zone.radius ?? 2.5;
-      const geo = new THREE.CircleGeometry(radius, 32);
-      geo.rotateX(-Math.PI / 2);
-      return new THREE.Mesh(geo, isCast ? this.matAttackCastMesh : this.matAttackPrepMesh);
-    }
-
-    if (zone.hitZoneType === 'angle') {
-      const radius = zone.length ?? zone.radius ?? 4.5;
-      const angle = zone.angle ?? Math.PI / 6;
-      const segments = 24;
-      const positions: number[] = [];
-      const halfAngle = angle / 2;
-
-      for (let i = 0; i < segments; i++) {
-        const a1 = -halfAngle + (i / segments) * angle;
-        const a2 = -halfAngle + ((i + 1) / segments) * angle;
-
-        positions.push(0, 0, 0);
-        positions.push(Math.cos(a1) * radius, 0, Math.sin(a1) * radius);
-        positions.push(Math.cos(a2) * radius, 0, Math.sin(a2) * radius);
-      }
-
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geo.computeVertexNormals();
-
-      return new THREE.Mesh(geo, isCast ? this.matAttackCastMesh : this.matAttackPrepMesh);
-    }
-
-    if (zone.hitZoneType === 'forward_line') {
-      const len = zone.length ?? 6.0;
-      const hw = 0.15; // полуширина полосы удара (15 см)
-      const positions = [0, 0, -hw, len, 0, -hw, len, 0, hw, 0, 0, -hw, len, 0, hw, 0, 0, hw];
-
-      const meshGeo = new THREE.BufferGeometry();
-      meshGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      meshGeo.computeVertexNormals();
-      const mesh = new THREE.Mesh(
-        meshGeo,
-        isCast ? this.matAttackCastMesh : this.matAttackPrepMesh
-      );
-
-      const lineGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(len, 0, 0),
-      ]);
-      const line = new THREE.Line(
-        lineGeo,
-        isCast ? this.matAttackCastLine : this.matAttackPrepLine
-      );
-
-      const group = new THREE.Group();
-      group.add(mesh);
-      group.add(line);
-      return group;
-    }
-
-    if (zone.hitZoneType === 'shrapnel') {
-      const length = zone.length ?? 5.0;
-      const angle = zone.angle ?? Math.PI / 3;
-      const count = Math.max(2, zone.rayCount ?? 5);
-      const halfAngle = angle / 2;
-      const points: THREE.Vector3[] = [];
-
-      for (let i = 0; i < count; i++) {
-        const fraction = count > 1 ? i / (count - 1) : 0.5;
-        const rayAngle = -halfAngle + fraction * angle;
-        points.push(new THREE.Vector3(0, 0, 0));
-        points.push(new THREE.Vector3(Math.cos(rayAngle) * length, 0, Math.sin(rayAngle) * length));
-      }
-
-      const geo = new THREE.BufferGeometry().setFromPoints(points);
-      return new THREE.LineSegments(geo, isCast ? this.matAttackCastLine : this.matAttackPrepLine);
-    }
-
-    return new THREE.Group();
-  }
-
-  private updateAttackObjectPhase(
-    obj: THREE.Object3D,
-    hitZoneType: import('../components/combat').HitZoneType,
-    phase: 'prep' | 'cast'
-  ): void {
-    const isCast = phase === 'cast';
-
-    if (hitZoneType === 'shrapnel') {
-      if (obj instanceof THREE.LineSegments) {
-        obj.material = isCast ? this.matAttackCastLine : this.matAttackPrepLine;
-      }
-    } else if (hitZoneType === 'forward_line') {
-      obj.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.material = isCast ? this.matAttackCastMesh : this.matAttackPrepMesh;
-        } else if (child instanceof THREE.Line) {
-          child.material = isCast ? this.matAttackCastLine : this.matAttackPrepLine;
-        }
-      });
-    } else {
-      if (obj instanceof THREE.Mesh) {
-        obj.material = isCast ? this.matAttackCastMesh : this.matAttackPrepMesh;
-      }
-    }
-  }
-
-  private disposeAttackObject(obj: THREE.Object3D): void {
-    obj.traverse((child) => {
-      if (
-        child instanceof THREE.Mesh ||
-        child instanceof THREE.Line ||
-        child instanceof THREE.LineSegments
-      ) {
-        child.geometry?.dispose();
-      }
-    });
+    // Синхронизация 3D зон атак в активных фазах prep и cast через менеджер
+    this.attackVisualsManager.update(world);
   }
 
   private async playAnimation(
     entityId: EntityId,
-    animatorComp: import('../components/rendering').AnimatorComponent,
+    animatorComp: AnimatorComponent,
     animKey: string
   ) {
     const state = this.animators.get(entityId);
@@ -763,30 +495,14 @@ export class ThreeSyncSystem {
     id: EntityId,
     archetype: string | undefined
   ): THREE.Object3D | undefined {
-    const animator = world.getComponent(id, 'animator');
-    const rigProfile = animator
-      ? CREATURE_RIG_PROFILES[animator.rigType as BodyStructureType]
-      : null;
-
-    // Сборка модульного рига для существ (только при наличии валидного 3D-ассета рига)
-    if (animator && archetype === 'creature' && rigProfile?.rigAsset) {
-      this.loadingMeshes.add(id);
-      const group = new THREE.Group();
-      group.userData.entityId = id;
-      group.userData.isModularRig = true;
-      this.assembleModularRigAsync(id, group, world).catch(console.error);
-      return group;
+    // Сборка модульного рига для существ через ассемблер
+    if (this.creatureAssembler.canAssembleModularRig(world, id, archetype)) {
+      return this.creatureAssembler.createModularRig(world, id);
     }
 
-    // Сборка оторванной составной части тела (предмет с иерархией assemblyRoot)
-    const assembly = world.getComponent(id, 'assemblyRoot');
-    if (assembly && (archetype === 'item' || archetype === 'bodyPart')) {
-      this.loadingMeshes.add(id);
-      const group = new THREE.Group();
-      group.userData.entityId = id;
-      group.userData.isDetachedLimb = true;
-      this.assembleDetachedLimbAsync(id, group, world).catch(console.error);
-      return group;
+    // Сборка оторванной составной части тела через ассемблер
+    if (this.creatureAssembler.canAssembleDetachedLimb(world, id, archetype)) {
+      return this.creatureAssembler.createDetachedLimb(world, id);
     }
 
     // Загрузка реального 3D меша для оторванных конечностей и предметов на полу
@@ -915,47 +631,7 @@ export class ThreeSyncSystem {
     } else if (archetype === 'terrain') {
       const terrainComp = world.getComponent(id, 'terrain');
       if (terrainComp) {
-        const res = terrainComp.resolution;
-        const size = terrainComp.size;
-
-        const geo = new THREE.PlaneGeometry(size, size, res - 1, res - 1);
-        geo.rotateX(-Math.PI / 2); // Ориентируем плоскость горизонтально в плоскости XZ
-
-        // Задаем начальные высоты вершин
-        const posAttr = geo.attributes.position;
-        for (let i = 0; i < posAttr.count; i++) {
-          posAttr.setY(i, terrainComp.heights[i]);
-        }
-        posAttr.needsUpdate = true;
-        geo.computeVertexNormals();
-
-        // Создаем текстуру Splatmap из Uint8Array высокой плотности (512x512)
-        const splatRes = terrainComp.splatResolution || 512;
-        const splatTexture = new THREE.DataTexture(
-          terrainComp.splatData,
-          splatRes,
-          splatRes,
-          THREE.RGBAFormat,
-          THREE.UnsignedByteType
-        );
-        splatTexture.wrapS = THREE.ClampToEdgeWrapping;
-        splatTexture.wrapT = THREE.ClampToEdgeWrapping;
-
-        // Включаем аппаратную билинейную интерполяцию для плавного смешивания (размытия) масок
-        splatTexture.magFilter = THREE.LinearFilter;
-        splatTexture.minFilter = THREE.LinearFilter;
-        // Отключаем мипмапы, так как для Splatmap они не нужны и могут вызывать артефакты на стыках
-        splatTexture.generateMipmaps = false;
-
-        splatTexture.needsUpdate = true;
-
-        const terrainMat = createTerrainMaterial(splatTexture, terrainComp.textureTiling);
-        mainMesh = new THREE.Mesh(geo, terrainMat);
-        mainMesh.receiveShadow = true;
-        mainMesh.userData.isTerrainMesh = true;
-        mainMesh.userData.splatTexture = splatTexture;
-        terrainComp.isGeometryDirty = false;
-        terrainComp.isSplatDirty = false;
+        return this.terrainSync.createTerrainMesh(id, terrainComp);
       }
     }
 
@@ -976,248 +652,5 @@ export class ThreeSyncSystem {
     }
 
     return undefined;
-  }
-
-  private async assembleModularRigAsync(
-    rootId: EntityId,
-    parentGroup: THREE.Group,
-    world: World
-  ): Promise<void> {
-    const animator = world.getComponent(rootId, 'animator');
-    const assembly = world.getComponent(rootId, 'assemblyRoot');
-    if (!animator || !assembly) {
-      this.loadingMeshes.delete(rootId);
-      return;
-    }
-
-    const rigProfile = CREATURE_RIG_PROFILES[animator.rigType as BodyStructureType];
-    if (!rigProfile || !rigProfile.rigAsset) {
-      this.loadingMeshes.delete(rootId);
-      return;
-    }
-
-    const currentGen = (this.loadingGenerations.get(rootId) ?? 0) + 1;
-    this.loadingGenerations.set(rootId, currentGen);
-
-    const isAborted = () =>
-      this.loadingGenerations.get(rootId) !== currentGen || !world.getEntity(rootId);
-
-    try {
-      const assetManager = AssetManager.getInstance();
-
-      const rig = await assetManager.getClonedModel(rigProfile.rigAsset);
-      if (!rig) throw new Error(`Rig ${rigProfile.rigAsset} failed to load`);
-
-      // Проверка актуальности после загрузки скелета
-      if (isAborted()) {
-        ThreeSyncSystem.disposeObject(rig);
-        ThreeSyncSystem.disposeObject(parentGroup);
-        this.scene.remove(parentGroup);
-        return;
-      }
-
-      // Метрический масштаб рига: 1 единица = 1 метр
-      rig.scale.set(1, 1, 1);
-      // Компенсация ориентации 3D-моделей (GLTF смотрит в +Z, физика смотрит в +X)
-      rig.rotation.y = Math.PI / 2;
-
-      parentGroup.add(rig);
-
-      // Кэшируем оригинальные кости сокетов персонажа ДО прикрепления оружия и конечностей
-      const socketBones = new Map<string, THREE.Object3D>();
-      rig.traverse((child) => {
-        if (child.name.includes('Socket')) {
-          socketBones.set(child.name, child);
-        }
-      });
-
-      const mixer = new THREE.AnimationMixer(rig);
-      this.animators.set(rootId, {
-        mixer,
-        currentClipName: '',
-        targetClipName: '',
-        currentAction: null,
-        rig,
-        socketBones,
-      });
-
-      // Итерируемся по частям тела и собираем меши
-      for (const partId of assembly.partIds) {
-        const visual = world.getComponent(partId, 'visualModel');
-        if (visual && visual.modelId && visual.rigNodeName) {
-          const targetNode = rig.getObjectByName(visual.rigNodeName);
-          if (targetNode) {
-            const meshClone = await assetManager.getClonedModel(visual.modelId);
-
-            // Проверка актуальности после загрузки каждой части тела
-            if (isAborted()) {
-              if (meshClone) ThreeSyncSystem.disposeObject(meshClone);
-              ThreeSyncSystem.disposeObject(parentGroup);
-              this.scene.remove(parentGroup);
-              return;
-            }
-
-            if (meshClone) {
-              meshClone.userData.partId = partId;
-              meshClone.userData.entityId = partId;
-
-              meshClone.traverse((c) => {
-                c.userData.partId = partId;
-                c.userData.entityId = partId;
-              });
-
-              if (meshClone.type === 'Scene' || meshClone.type === 'Group') {
-                targetNode.add(...meshClone.children);
-              } else {
-                targetNode.add(meshClone);
-              }
-            }
-          } else {
-            console.warn(`[ThreeSync] Socket node ${visual.rigNodeName} not found in rig!`);
-          }
-        }
-      }
-
-      ThreeSyncSystem.attachOutlines(parentGroup, this.matSilhouetteOutline);
-
-      const box = computeLocalBox(rig);
-      const visualCorrectionY = -box.min.y; // Автоматически поднимет или опустит меш так, чтобы нижняя точка всегда касалась Y = 0 в локальных координатах
-      rig.position.set(0, visualCorrectionY, 0);
-      // Запускаем дефолтную анимацию
-      this.playAnimation(rootId, animator, 'stand_idle').catch(console.error);
-    } catch (err) {
-      console.error(`[ThreeSyncSystem] Error assembling rig for ${rootId}:`, err);
-    } finally {
-      if (this.loadingGenerations.get(rootId) === currentGen) {
-        this.loadingMeshes.delete(rootId);
-      }
-    }
-  }
-
-  private async assembleDetachedLimbAsync(
-    rootId: EntityId,
-    parentGroup: THREE.Group,
-    world: World
-  ): Promise<void> {
-    const assembly = world.getComponent(rootId, 'assemblyRoot');
-    const visual = world.getComponent(rootId, 'visualModel');
-    if (!assembly || !assembly.partIds || assembly.partIds.length === 0) {
-      this.loadingMeshes.delete(rootId);
-      return;
-    }
-
-    const currentGen = (this.loadingGenerations.get(rootId) ?? 0) + 1;
-    this.loadingGenerations.set(rootId, currentGen);
-
-    const isAborted = () =>
-      this.loadingGenerations.get(rootId) !== currentGen || !world.getEntity(rootId);
-
-    try {
-      const assetManager = AssetManager.getInstance();
-      const rigStructure = (visual?.rigType as BodyStructureType) || 'humanoid';
-      const rigProfile = CREATURE_RIG_PROFILES[rigStructure] || CREATURE_RIG_PROFILES.humanoid;
-      const rigAsset = rigProfile?.rigAsset;
-
-      if (!rigAsset) {
-        throw new Error(`Rig asset not found for structure: ${rigStructure}`);
-      }
-
-      // Клонируем риг (в исходной T-позе без анимаций)
-      const rig = await assetManager.getClonedModel(rigAsset);
-      if (!rig) throw new Error(`Rig ${rigAsset} failed to load for detached limb`);
-
-      if (isAborted()) {
-        ThreeSyncSystem.disposeObject(rig);
-        ThreeSyncSystem.disposeObject(parentGroup);
-        this.scene.remove(parentGroup);
-        return;
-      }
-
-      // Масштаб 1:1, компенсация ориентации рига (GLTF смотрит в +Z, физика в +X)
-      rig.scale.set(1, 1, 1);
-      rig.rotation.y = Math.PI / 2;
-
-      // Скрываем все встроенные базовые меши рига
-      rig.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.visible = false;
-        }
-      });
-
-      // Прикрепляем меши только для тех частей тела, которые входят в отделившийся фрагмент
-      for (const partId of assembly.partIds) {
-        const partVisual = world.getComponent(partId, 'visualModel');
-        if (partVisual && partVisual.modelId && partVisual.rigNodeName) {
-          const targetNode = rig.getObjectByName(partVisual.rigNodeName);
-          if (targetNode) {
-            const meshClone = await assetManager.getClonedModel(partVisual.modelId);
-
-            if (isAborted()) {
-              if (meshClone) ThreeSyncSystem.disposeObject(meshClone);
-              ThreeSyncSystem.disposeObject(rig);
-              ThreeSyncSystem.disposeObject(parentGroup);
-              this.scene.remove(parentGroup);
-              return;
-            }
-
-            if (meshClone) {
-              // Для отсоединенного предмета привязываем клик строго к rootId (предмету), а не к скрытой части
-              meshClone.userData.entityId = rootId;
-              delete meshClone.userData.partId;
-
-              meshClone.traverse((c) => {
-                c.userData.entityId = rootId;
-                delete c.userData.partId;
-              });
-
-              // Безопасный перенос дочерних объектов с сохранением ссылок
-              const childrenToAttach = [...meshClone.children];
-              if (childrenToAttach.length > 0) {
-                for (const child of childrenToAttach) {
-                  targetNode.add(child);
-                }
-              } else {
-                targetNode.add(meshClone);
-              }
-            }
-          } else {
-            console.warn(
-              `[ThreeSync] Rig node ${partVisual.rigNodeName} not found in detached limb rig!`
-            );
-          }
-        }
-      }
-
-      // Вычисляем локальный Bounding Box видимой геометрии части тела
-      const limbBox = computeLocalBox(rig);
-
-      const boxCenter = new THREE.Vector3();
-      const boxSize = new THREE.Vector3(0.4, 0.4, 0.4);
-
-      if (!limbBox.isEmpty()) {
-        limbBox.getCenter(boxCenter);
-        limbBox.getSize(boxSize);
-        // Смещаем скелет так, чтобы геометрический центр видимой части совпал с (0, 0, 0) коллайдера
-        rig.position.sub(boxCenter);
-      }
-
-      parentGroup.add(rig);
-
-      // Получаем анатомический подтип части тела (torso, arm, leg, head)
-      const anchorPartId = assembly.rootPartId;
-      const anchorTag = world.getComponent(anchorPartId, 'tag');
-      const subType = anchorTag?.subType;
-
-      // Автоматический расчет точки хвата строго по локальным координатам меша
-      parentGroup.userData.gripTransform = computeDetachedLimbGrip(parentGroup, subType);
-
-      ThreeSyncSystem.attachOutlines(parentGroup, this.matSilhouetteOutline);
-    } catch (err) {
-      console.error(`[ThreeSyncSystem] Ошибка сборки отсоединенной конечности ${rootId}:`, err);
-    } finally {
-      if (this.loadingGenerations.get(rootId) === currentGen) {
-        this.loadingMeshes.delete(rootId);
-      }
-    }
   }
 }

@@ -39,6 +39,7 @@ import { TerrainBrushState } from './types';
 import { SelectionController } from './editor/SelectionController';
 import { GizmoController } from './editor/GizmoController';
 import { EditorMutationsAPI } from './editor/EditorMutationsAPI';
+import { EntityClonerService } from './editor/EntityClonerService';
 
 // Новая система истории (Паттерн Команда)
 import { CommandHistory } from './history/CommandHistory';
@@ -107,6 +108,7 @@ export class GameApp {
   public gizmo: GizmoController;
   public mutations: EditorMutationsAPI;
   public itemTransfer: ItemTransferService;
+  public cloner: EntityClonerService;
 
   public onFrame: (() => void) | null = null;
 
@@ -162,6 +164,7 @@ export class GameApp {
     this.gizmo = new GizmoController(this);
     this.mutations = new EditorMutationsAPI(this.world);
     this.itemTransfer = new ItemTransferService(this);
+    this.cloner = new EntityClonerService(this);
 
     this.resizeCanvas();
     window.addEventListener('resize', this.handleResize);
@@ -238,319 +241,11 @@ export class GameApp {
     return Array.from(resultSet);
   }
 
-  private cloneHierarchy(rootId: string, offset: { x: number; z: number; y?: number }): string {
-    const parts = getAnatomyParts(this.world, rootId).filter((p) => p !== rootId);
-    const containedItems = getAllContainedItems(this.world, rootId);
-    const allClusterIds = Array.from(new Set([rootId, ...parts, ...containedItems]));
-
-    const idMap = new Map<string, string>();
-    for (const oldId of allClusterIds) {
-      const prefix = oldId.split('_').slice(0, 2).join('_') || 'ent';
-      idMap.set(oldId, this.entityFactory.generateId(prefix));
-    }
-
-    for (const oldId of allClusterIds) {
-      const oldComp = this.world.getEntity(oldId);
-      if (!oldComp) continue;
-
-      const newId = idMap.get(oldId)!;
-      this.world.createEntity(newId);
-
-      for (const key of SERIALIZABLE_COMPONENT_KEYS) {
-        const val = oldComp[key];
-        if (val !== undefined) {
-          this.world.addComponent(newId, key, JSON.parse(JSON.stringify(val)));
-        }
-      }
-
-      const trans = this.world.getComponent(newId, 'transform');
-      if (trans) {
-        trans.x += offset.x;
-        trans.y += offset.y ?? 0;
-        trans.z += offset.z;
-        trans.isDirty = true;
-      }
-
-      const meta = this.world.getComponent(newId, 'meta');
-      if (meta && oldId === rootId) {
-        meta.name = `${meta.name} (Копия)`;
-      }
-
-      const bodyBrain = this.world.getComponent(newId, 'bodyBrain');
-      if (bodyBrain && bodyBrain.rootEntityId && idMap.has(bodyBrain.rootEntityId)) {
-        bodyBrain.rootEntityId = idMap.get(bodyBrain.rootEntityId);
-      }
-
-      const assemblyRoot = this.world.getComponent(newId, 'assemblyRoot');
-      if (assemblyRoot) {
-        if (idMap.has(assemblyRoot.rootPartId)) {
-          assemblyRoot.rootPartId = idMap.get(assemblyRoot.rootPartId)!;
-        }
-        assemblyRoot.partIds = assemblyRoot.partIds.map((pId) => idMap.get(pId) || pId);
-      }
-
-      const socketLink = this.world.getComponent(newId, 'socketLink');
-      if (socketLink) {
-        for (const link of Object.values(socketLink.links)) {
-          if (idMap.has(link.targetEntityId)) {
-            link.targetEntityId = idMap.get(link.targetEntityId)!;
-          }
-        }
-      }
-
-      const ownership = this.world.getComponent(newId, 'ownership');
-      if (ownership && idMap.has(ownership.ownerId)) {
-        ownership.ownerId = idMap.get(ownership.ownerId)!;
-      }
-
-      const equip = this.world.getComponent(newId, 'equip');
-      if (equip) {
-        for (const area of equip.equipmentAreas) {
-          area.itemIds = area.itemIds.map((itemId) => idMap.get(itemId) || itemId);
-        }
-      }
-
-      const inv = this.world.getComponent(newId, 'inventory');
-      if (inv) {
-        for (const row of inv.slots) {
-          for (const cell of row) {
-            if (cell.itemId && idMap.has(cell.itemId)) {
-              cell.itemId = idMap.get(cell.itemId)!;
-            }
-          }
-        }
-      }
-
-      const interactionSlots = this.world.getComponent(newId, 'interactionSlots');
-      if (interactionSlots) {
-        if (interactionSlots.itemId && idMap.has(interactionSlots.itemId)) {
-          interactionSlots.itemId = idMap.get(interactionSlots.itemId)!;
-        }
-      }
-
-      const oldPhys = this.world.getComponent(oldId, 'physicsBody');
-      const physStats = this.world.getComponent(newId, 'physicsStats');
-      if (oldPhys && trans && physStats) {
-        this.world.addComponent(newId, 'physicsBody', {
-          isStatic: oldPhys.isStatic,
-          category: oldPhys.category,
-          mask: oldPhys.mask,
-          isTrigger: oldPhys.isTrigger,
-        });
-        // TODO: На шаге 5 мы добавим клонирование RigidBody Rapier.
-      }
-
-      if (bodyBrain && bodyBrain.isActive) {
-        const newRootId = idMap.get(rootId)!;
-        const aiStats = this.world.getComponent(newRootId, 'aiStats');
-        const behavior = aiStats?.behavior?.current || 'IdleTree';
-        this.aiSystem.initBotBrain(this.world, newId, behavior);
-      }
-    }
-
-    return idMap.get(rootId)!;
-  }
-
   public duplicateEntities(
     ids: string[],
     offset: { x: number; z: number; y?: number } = EDITOR_CONFIG.cloneOffset
   ): string[] {
-    const validIds = ids.filter((id) => this.world.getEntity(id));
-    if (validIds.length === 0) return [];
-
-    const tx = new TransactionBuilder(this, 'Клонирование объектов');
-    tx.captureBefore([]);
-
-    const rootIdsToClone = validIds.filter((id) => {
-      const tag = this.world.getComponent(id, 'tag');
-      if (tag?.archetype === 'bodyPart') {
-        const root = getRootOwner(this.world, id);
-        if (root && validIds.includes(root)) return false;
-      }
-      const ownership = this.world.getComponent(id, 'ownership');
-      if (ownership && validIds.includes(ownership.ownerId)) return false;
-      return true;
-    });
-
-    const newIds: string[] = [];
-
-    for (const id of rootIdsToClone) {
-      const comp = this.world.getEntity(id);
-      if (!comp || !comp.transform) continue;
-
-      const tag = comp.tag;
-      const isModular = tag?.archetype === 'creature' || !!comp.assemblyRoot;
-
-      if (isModular) {
-        const newRootId = this.cloneHierarchy(id, offset);
-        newIds.push(newRootId);
-        continue;
-      }
-
-      const targetPos: Vec3 = {
-        x: comp.transform.x + offset.x,
-        y: comp.transform.y + (offset.y ?? 0),
-        z: comp.transform.z + offset.z,
-      };
-
-      const config: EntityConfig = {};
-      if (comp.tag) config.tag = JSON.parse(JSON.stringify(comp.tag));
-      if (comp.meta) {
-        config.meta = JSON.parse(JSON.stringify(comp.meta));
-        config.meta!.name = `${comp.meta.name} (Копия)`;
-      }
-      if (comp.physicsStats) {
-        config.physics = {
-          radius: comp.physicsStats.radius.base,
-          weight: comp.physicsStats.weight.base,
-          isSolid: comp.physicsStats.isSolid,
-          points: comp.physicsStats.points
-            ? JSON.parse(JSON.stringify(comp.physicsStats.points))
-            : undefined,
-        };
-      }
-      if (comp.health) {
-        config.health = {
-          maxHp: comp.health.max.base,
-          hp: comp.health.current,
-        };
-      }
-      if (comp.movementStats) {
-        config.movement = {
-          maxSpeed: comp.movementStats.maxSpeed.base,
-          maxTurnSpeed: comp.movementStats.maxTurnSpeed.base,
-          runSpeedMultiplier: comp.movementStats.runSpeedMultiplier,
-          crouchSpeedMultiplier: comp.movementStats.crouchSpeedMultiplier,
-          proneSpeedMultiplier: comp.movementStats.proneSpeedMultiplier,
-          walkSpeedMultiplier: comp.movementStats.walkSpeedMultiplier,
-          runTurnMultiplier: comp.movementStats.runTurnMultiplier,
-          crouchTurnMultiplier: comp.movementStats.crouchTurnMultiplier,
-          proneTurnMultiplier: comp.movementStats.proneTurnMultiplier,
-          walkTurnMultiplier: comp.movementStats.walkTurnMultiplier,
-          turnInPlaceTurnMultiplier: comp.movementStats.turnInPlaceTurnMultiplier,
-          strafeSpeedMultiplier: comp.movementStats.strafeSpeedMultiplier,
-          backwardSpeedMultiplier: comp.movementStats.backwardSpeedMultiplier,
-          strafeTurnMultiplier: comp.movementStats.strafeTurnMultiplier,
-          backwardTurnMultiplier: comp.movementStats.backwardTurnMultiplier,
-          pickupSpeedMultiplier: comp.movementStats.pickupSpeedMultiplier,
-          pickupTurnMultiplier: comp.movementStats.pickupTurnMultiplier,
-          standToCrouchTime: comp.movementStats.standToCrouchTime?.base,
-          crouchToStandTime: comp.movementStats.crouchToStandTime?.base,
-          standToProneTime: comp.movementStats.standToProneTime?.base,
-          proneToStandTime: comp.movementStats.proneToStandTime?.base,
-          crouchToProneTime: comp.movementStats.crouchToProneTime?.base,
-          proneToCrouchTime: comp.movementStats.proneToCrouchTime?.base,
-        };
-      }
-      if (comp.stealthStats) {
-        config.stealth = {
-          stealthPower: comp.stealthStats.stealthPower.base,
-          runStealthMultiplier: comp.stealthStats.runStealthMultiplier,
-          crouchStealthMultiplier: comp.stealthStats.crouchStealthMultiplier,
-          proneStealthMultiplier: comp.stealthStats.proneStealthMultiplier,
-          walkStealthMultiplier: comp.stealthStats.walkStealthMultiplier,
-          turnInPlaceStealthMultiplier: comp.stealthStats.turnInPlaceStealthMultiplier,
-          immobileStealthMultiplier: comp.stealthStats.immobileStealthMultiplier,
-        };
-      }
-      if (comp.aiStats) {
-        config.ai = {
-          behavior: comp.aiStats.behavior.current,
-          stats: comp.aiStats.stats ? JSON.parse(JSON.stringify(comp.aiStats.stats)) : undefined,
-        };
-      }
-      if (comp.areaEffector) {
-        config.areaEffector = JSON.parse(JSON.stringify(comp.areaEffector));
-      }
-      if (comp.visualModel) {
-        config.visualModel = JSON.parse(JSON.stringify(comp.visualModel));
-      }
-      if (comp.animator) {
-        config.animator = JSON.parse(JSON.stringify(comp.animator));
-      }
-      if (comp.item) {
-        config.item = JSON.parse(JSON.stringify(comp.item));
-      }
-      if (comp.weaponStats) {
-        config.weaponStats = {
-          baseDamage: comp.weaponStats.baseDamage.base,
-          prepTime: comp.weaponStats.prepTime.base,
-          castTime: comp.weaponStats.castTime.base,
-          recoveryTime: comp.weaponStats.recoveryTime.base,
-          prepTurnSlow: comp.weaponStats.prepTurnSlow,
-          recoveryTurnSlow: comp.weaponStats.recoveryTurnSlow,
-          prepMoveSlow: comp.weaponStats.prepMoveSlow,
-          recoveryMoveSlow: comp.weaponStats.recoveryMoveSlow,
-          castMoveSlow: comp.weaponStats.castMoveSlow,
-          minMultiplier: comp.weaponStats.minMultiplier,
-          maxMultiplier: comp.weaponStats.maxMultiplier,
-          critChance: comp.weaponStats.critChance,
-          critMultiplier: comp.weaponStats.critMultiplier,
-        };
-      }
-      if (comp.weaponZone) {
-        config.weaponZone = JSON.parse(JSON.stringify(comp.weaponZone));
-      }
-      if (comp.armorStats) {
-        config.armorStats = {
-          defense: comp.armorStats.defense.base,
-          flatReduction: comp.armorStats.flatReduction.base,
-        };
-      }
-      if (comp.inventory) {
-        config.inventory = {
-          size: { ...comp.inventory.size },
-        };
-      }
-      if (comp.interactionSlots) {
-        config.interactionSlots = JSON.parse(JSON.stringify(comp.interactionSlots));
-        config.interactionSlots!.itemId = null;
-      }
-      if (comp.equip) {
-        config.equip = JSON.parse(JSON.stringify(comp.equip));
-        config.equip!.equipmentAreas.forEach((a) => (a.itemIds = []));
-      }
-      if (comp.gizmo) {
-        config.gizmo = JSON.parse(JSON.stringify(comp.gizmo));
-      }
-      if (comp.timeScale) {
-        config.timeScale = JSON.parse(JSON.stringify(comp.timeScale));
-      }
-      config.transform = {
-        x: targetPos.x,
-        y: targetPos.y,
-        z: targetPos.z,
-        rotation: comp.transform.rotation
-          ? { ...comp.transform.rotation }
-          : {
-              x: 0,
-              y: Math.sin(comp.transform.angle * 0.5),
-              z: 0,
-              w: Math.cos(comp.transform.angle * 0.5),
-            },
-        angle: comp.transform.angle,
-      };
-
-      const newId = this.spawnEntity(config, targetPos);
-
-      const newTrans = this.world.getComponent(newId, 'transform');
-      if (newTrans) {
-        newTrans.angle = comp.transform.angle;
-      }
-
-      newIds.push(newId);
-    }
-
-    if (newIds.length > 0) {
-      this.selection.selectEntities(newIds);
-    }
-
-    this.syncPhysicsStructures();
-    tx.includeAdded(newIds);
-    tx.commit();
-    this.captureBaseState();
-
-    return newIds;
+    return this.cloner.duplicateEntities(ids, offset);
   }
 
   public startPickup(entityId: string, targetItemId: string): boolean {

@@ -4,6 +4,7 @@ import { AISystem } from '../systems/AISystem';
 import { EntityId, EntityConfig } from '../types';
 import { Vec3 } from '../../types';
 import { createStat } from '../stats/StatEvaluator';
+import { fastClone } from '../utils/clone';
 
 export function assembleBodyPart(
   world: World,
@@ -32,12 +33,12 @@ export function assembleBodyPart(
 
   // 4. Определение доступных сокетов
   if (config.socketDef) {
-    world.addComponent(id, 'socketDef', JSON.parse(JSON.stringify(config.socketDef)));
+    world.addComponent(id, 'socketDef', fastClone(config.socketDef));
   }
 
   // 5. Связи сокетов (соединения)
   if (config.socketLink) {
-    world.addComponent(id, 'socketLink', JSON.parse(JSON.stringify(config.socketLink)));
+    world.addComponent(id, 'socketLink', fastClone(config.socketLink));
   }
 
   // 6. Компонент мозга
@@ -47,12 +48,12 @@ export function assembleBodyPart(
 
   // 7. Слоты взаимодействия
   if (config.interactionSlots) {
-    world.addComponent(id, 'interactionSlots', JSON.parse(JSON.stringify(config.interactionSlots)));
+    world.addComponent(id, 'interactionSlots', fastClone(config.interactionSlots));
   }
 
   // 8. Области экипировки
   if (config.equip) {
-    world.addComponent(id, 'equip', JSON.parse(JSON.stringify(config.equip)));
+    world.addComponent(id, 'equip', fastClone(config.equip));
   }
 
   // 9. Трансформация в 3D
@@ -114,6 +115,6 @@ export function assembleBodyPart(
 
   // 16. Визуальная 3D-модель (ссылка на ассет)
   if (config.visualModel) {
-    world.addComponent(id, 'visualModel', JSON.parse(JSON.stringify(config.visualModel)));
+    world.addComponent(id, 'visualModel', fastClone(config.visualModel));
   }
 }

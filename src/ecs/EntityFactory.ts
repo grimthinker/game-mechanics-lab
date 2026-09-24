@@ -9,6 +9,7 @@ import { createStat } from './stats/StatEvaluator';
 import { BALANCE_CONFIG } from '../config/balanceConfig';
 import { CreatureBodyBlueprint, CREATURE_BLUEPRINTS } from './templates';
 import { AnatomySystem } from './systems/AnatomySystem';
+import { fastClone } from './utils/clone';
 
 export class EntityFactory {
   private anatomySystem = new AnatomySystem();
@@ -142,11 +143,10 @@ export class EntityFactory {
       const partId = partKeyToId.get(part.key)!;
       world.createEntity(partId);
 
-      const partConfig: EntityConfig = JSON.parse(JSON.stringify(part.config));
+      const partConfig: EntityConfig = fastClone(part.config);
       partConfig.socketLink = {
         links: partSocketLinks.get(part.key) || {},
       };
-
       if (part.meshAsset) {
         partConfig.visualModel = {
           modelId: part.meshAsset,
@@ -185,7 +185,7 @@ export class EntityFactory {
           const itemId = this.generateId('item');
           world.createEntity(itemId);
 
-          const itemConfig: EntityConfig = JSON.parse(JSON.stringify(itemDef.config));
+          const itemConfig: EntityConfig = fastClone(itemDef.config);
           itemConfig.ownership = { ownerId: targetPartId, status: 'equipped' };
 
           ARCHETYPE_ASSEMBLERS.item(world, physics, aiSystem, itemId, itemConfig, position);
@@ -215,7 +215,7 @@ export class EntityFactory {
     behavior: string = 'IdleTree',
     name: string = 'Существо'
   ): EntityId {
-    const rootId = this.spawnModularCreature(
+    return this.spawnModularCreature(
       world,
       physics,
       aiSystem,
@@ -224,12 +224,5 @@ export class EntityFactory {
       behavior,
       name
     );
-    if (behavior === 'PlayerTree') {
-      const app = (window as any).appRef;
-      if (app && 'playerEntityId' in app) {
-        app.playerEntityId = rootId;
-      }
-    }
-    return rootId;
   }
 }
