@@ -49,6 +49,10 @@ export class ModifierSystem {
           this.tickStatModifiers(comp.movementStats.dropPrepTime, localDt);
         if (comp.movementStats.dropRecoveryTime)
           this.tickStatModifiers(comp.movementStats.dropRecoveryTime, localDt);
+        if (comp.movementStats.jumpVelocity)
+          this.tickStatModifiers(comp.movementStats.jumpVelocity, localDt);
+        if (comp.movementStats.maxJumpSlopeAngle)
+          this.tickStatModifiers(comp.movementStats.maxJumpSlopeAngle, localDt);
       }
       if (comp.stealthStats) {
         this.tickStatModifiers(comp.stealthStats.stealthPower, localDt);

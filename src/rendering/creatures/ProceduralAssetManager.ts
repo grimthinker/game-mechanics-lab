@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { BodyStructureType } from '../../ecs/templates';
-import { IProceduralBuilder } from './IProceduralBuilder';
+import { IProceduralCreatureBuilder } from './IProceduralBuilder';
 import { QuadrupedProceduralBuilder } from './QuadrupedProceduralBuilder';
 import { HumanoidProceduralBuilder } from './HumanoidProceduralBuilder';
 
-export class ProceduralAssetManager {
-  private static instance: ProceduralAssetManager;
-  private builders = new Map<BodyStructureType, IProceduralBuilder>();
+export class ProceduralCreatureAssetManager {
+  private static instance: ProceduralCreatureAssetManager;
+  private builders = new Map<BodyStructureType, IProceduralCreatureBuilder>();
   private rigCache = new Map<BodyStructureType, THREE.Group>();
 
   private constructor() {
@@ -15,11 +15,11 @@ export class ProceduralAssetManager {
     this.builders.set('quadruped', new QuadrupedProceduralBuilder());
   }
 
-  public static getInstance(): ProceduralAssetManager {
-    if (!ProceduralAssetManager.instance) {
-      ProceduralAssetManager.instance = new ProceduralAssetManager();
+  public static getInstance(): ProceduralCreatureAssetManager {
+    if (!ProceduralCreatureAssetManager.instance) {
+      ProceduralCreatureAssetManager.instance = new ProceduralCreatureAssetManager();
     }
-    return ProceduralAssetManager.instance;
+    return ProceduralCreatureAssetManager.instance;
   }
 
   public hasBuilder(type: BodyStructureType): boolean {

@@ -7,12 +7,13 @@ import { SceneHierarchy } from './SceneHierarchy';
 import { SpawnPalette } from './SpawnPalette';
 import { BTGraph } from '../BTGraph';
 import { AnimationsTab } from './AnimationsTab';
+import { TerrainDock } from './TerrainDock';
 import { useResizable } from '../../hooks/useResizable';
 import { t } from '../../locales';
 import { BodyStructureType } from '../../ecs/templates';
 import { BBKeyType } from '../../ai/schema';
 
-export type DockTab = 'hierarchy' | 'palette' | 'bt' | 'animations';
+export type DockTab = 'hierarchy' | 'palette' | 'bt' | 'animations' | 'terrain';
 
 export interface LeftDockProps {
   app?: GameApp | null;
@@ -576,6 +577,22 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         >
           {t('dock.animations')}
         </button>
+        <button
+          onClick={() => setActiveTab('terrain')}
+          style={{
+            flex: 1,
+            backgroundColor: activeTab === 'terrain' ? '#252525' : 'transparent',
+            color: activeTab === 'terrain' ? '#fff' : '#888',
+            border: activeTab === 'terrain' ? '1px solid #3a3a3a' : '1px solid transparent',
+            borderRadius: '4px',
+            padding: '6px 4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+          }}
+        >
+          {t('dock.terrain')}
+        </button>
       </div>
 
       {/* Тело вкладки */}
@@ -592,6 +609,8 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         {activeTab === 'animations' && (
           <AnimationsTab world={world} selectedEntityId={selectedEntityId} />
         )}
+
+        {activeTab === 'terrain' && <TerrainDock app={app} />}
 
         {activeTab === 'palette' && (
           <SpawnPalette

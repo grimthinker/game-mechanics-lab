@@ -32,8 +32,10 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     // Инициализация KCC контроллера с автоподъемом на ступени и мягким скольжением
     const offset = 0.02; // отступ 2 см для исключения залипания
     this.characterController = this.world.createCharacterController(offset);
-    this.characterController.enableAutostep(0.12, 0.2, false); // шаг на мелкие бордюры до 12 см, не залезая на динамические предметы
-    this.characterController.enableSnapToGround(0.3); // прилипание к земле на спусках до 30 см
+    this.characterController.enableAutostep(0.15, 0.25, false); // преодоление ступеней и кочек до 15 см
+    this.characterController.enableSnapToGround(0.35); // прилипание к земле на спусках холмов до 35 см
+    this.characterController.setMaxSlopeClimbAngle((40 * Math.PI) / 180); // свободный подъем на склоны до 40 градусов
+    this.characterController.setMinSlopeSlideAngle((40 * Math.PI) / 180); // соскальзывание со склонов круче 40 градусов
     this.characterController.setApplyImpulsesToDynamicBodies(true); // передача импульса ящикам и предметам
     this.characterController.setSlideEnabled(true);
 
@@ -163,24 +165,41 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     collider.setTranslationWrtParent({ x: 0, y: offsetY, z: 0 });
     this.isBroadPhaseDirty = true;
   }
-
   public computeCharacterMovement(
     collider: RAPIER.Collider,
     desiredTranslation: Vec3,
-    characterMass: number
-  ): { movement: Vec3; isGrounded: boolean } {
+    characterMass: number,
+    isAirborne?: boolean
+  ): { movement: Vec3; isGrounded: boolean; groundNormal?: Vec3; slopeAngleDeg?: number } {
     if (!this.world || !this.characterController) {
-      return { movement: desiredTranslation, isGrounded: true };
+      return {
+        movement: desiredTranslation,
+        isGrounded: true,
+        groundNormal: { x: 0, y: 1, z: 0 },
+        slopeAngleDeg: 0,
+      };
     }
 
     this.characterController.setCharacterMass(characterMass);
+
+    // Во время свободного полета в прыжке отключаем принудительное прилипание к земле (snap-to-ground),
+    // чтобы KCC не затягивал летящую капсулу сквозь крутые наклонные полигоны холма
+    if (isAirborne) {
+      this.characterController.enableSnapToGround(0.0);
+    } else {
+      this.characterController.enableSnapToGround(0.35);
+    }
+
     // Исключаем сенсоры и кинематические тела (других существ) для мягкого расталкивания солвером
     const filterFlags =
       RAPIER.QueryFilterFlags.EXCLUDE_SENSORS | RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC;
 
     this.characterController.computeColliderMovement(collider, desiredTranslation, filterFlags);
 
-    // Точечно будим спящие динамические тела, с которыми столкнулся KCC на этом шаге
+    // Определение нормали поверхности и пробуждение динамических тел
+    let groundNormal: Vec3 = { x: 0, y: 1, z: 0 };
+    let maxNormalY = 0;
+
     const numCollisions = this.characterController.numComputedCollisions();
     for (let i = 0; i < numCollisions; i++) {
       const collision = this.characterController.computedCollision(i);
@@ -188,14 +207,48 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
       if (parentBody && parentBody.isDynamic() && parentBody.isSleeping()) {
         parentBody.wakeUp();
       }
+      if (collision && collision.normal1 && collision.normal1.y > maxNormalY) {
+        maxNormalY = collision.normal1.y;
+        groundNormal = {
+          x: collision.normal1.x,
+          y: collision.normal1.y,
+          z: collision.normal1.z,
+        };
+      }
     }
 
     const computed = this.characterController.computedMovement();
     const isGrounded = this.characterController.computedGrounded();
 
+    // Страховочный опрос нормали прямо под центром капсулы при контакте с землей
+    if (isGrounded && maxNormalY === 0) {
+      const colPos = collider.translation();
+      const downRay = this.world.castRayAndGetNormal(
+        new RAPIER.Ray(colPos, new RAPIER.Vector3(0, -1, 0)),
+        1.5,
+        true,
+        RAPIER.QueryFilterFlags.EXCLUDE_KINEMATIC | RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+      );
+      if (downRay && downRay.normal) {
+        groundNormal = { x: downRay.normal.x, y: downRay.normal.y, z: downRay.normal.z };
+      }
+    }
+
+    const nLen = Math.hypot(groundNormal.x, groundNormal.y, groundNormal.z);
+    if (nLen > 0.0001) {
+      groundNormal.x /= nLen;
+      groundNormal.y /= nLen;
+      groundNormal.z /= nLen;
+    }
+
+    // Угол наклона поверхности от горизонтали в градусах (0° = ровный пол, 90° = отвесная стена)
+    const slopeAngleDeg = Math.acos(Math.min(1, Math.max(0, groundNormal.y))) * (180 / Math.PI);
+
     return {
       movement: { x: computed.x, y: computed.y, z: computed.z },
       isGrounded,
+      groundNormal,
+      slopeAngleDeg,
     };
   }
 
@@ -299,6 +352,88 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     this.isBroadPhaseDirty = true;
 
     return { body, collider };
+  }
+
+  public createOrUpdateTerrain(
+    size: number,
+    resolution: number,
+    heights: Float32Array,
+    entityId?: string
+  ): { body: RAPIER.RigidBody; collider: RAPIER.Collider } | null {
+    if (!this.world) return null;
+
+    const safeRes = Math.max(2, Math.round(Number(resolution) || 128));
+    const safeSize = Math.max(1, Number(size) || 100);
+
+    // Удаляем предыдущий статический коллайдер пола / террейна
+    if (this.groundBody) {
+      this.removeRigidBody(this.groundBody);
+      this.groundBody = null;
+      this.groundCollider = null;
+    }
+
+    const groundBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0.0, 0.0, 0.0);
+    const body = this.createRigidBody(groundBodyDesc, entityId);
+
+    // 1. Генерация 3D вершин (X, Y, Z) террейна в мировых координатах
+    const numVerts = safeRes * safeRes;
+    const vertices = new Float32Array(numVerts * 3);
+    const step = safeSize / (safeRes - 1);
+    const halfSize = safeSize / 2;
+
+    for (let z = 0; z < safeRes; z++) {
+      for (let x = 0; x < safeRes; x++) {
+        const idx = z * safeRes + x;
+        const vIdx = idx * 3;
+        const h = heights[idx];
+        vertices[vIdx] = x * step - halfSize;
+        vertices[vIdx + 1] = typeof h === 'number' && Number.isFinite(h) ? h : 0;
+        vertices[vIdx + 2] = z * step - halfSize;
+      }
+    }
+
+    // 2. Генерация треугольников (индексов), полностью совпадающих с геометрией Three.js PlaneGeometry
+    const numQuads = (safeRes - 1) * (safeRes - 1);
+    const indices = new Uint32Array(numQuads * 6);
+    let iPtr = 0;
+
+    for (let z = 0; z < safeRes - 1; z++) {
+      for (let x = 0; x < safeRes - 1; x++) {
+        const row1 = z * safeRes;
+        const row2 = (z + 1) * safeRes;
+
+        const a = row1 + x;
+        const b = row1 + x + 1;
+        const c = row2 + x;
+        const d = row2 + x + 1;
+
+        indices[iPtr++] = a;
+        indices[iPtr++] = c;
+        indices[iPtr++] = b;
+
+        indices[iPtr++] = b;
+        indices[iPtr++] = c;
+        indices[iPtr++] = d;
+      }
+    }
+
+    try {
+      // trimesh в Rapier3D работает абсолютно стабильно, исключая паники WASM ядра
+      const colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
+      colliderDesc.setRestitution(0.0);
+      colliderDesc.setFriction(0.8);
+
+      const collider = this.createCollider(colliderDesc, body);
+
+      this.groundBody = body;
+      this.groundCollider = collider;
+      this.isBroadPhaseDirty = true;
+
+      return { body, collider };
+    } catch (err) {
+      console.error('[RapierPhysicsDriver] Ошибка создания физической коллизии террейна:', err);
+      return null;
+    }
   }
 
   public queryEntitiesInSphere(center: Vec3, radius: number): string[] {

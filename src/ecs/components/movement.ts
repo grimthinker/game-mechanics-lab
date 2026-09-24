@@ -11,7 +11,7 @@ export type TransitionCreatureStance =
   | 'stand_to_prone'
   | 'prone_to_stand';
 
-export type CreatureStance = BaseCreatureStance | TransitionCreatureStance | 'airborne';
+export type CreatureStance = BaseCreatureStance | TransitionCreatureStance | 'airborne' | 'sliding';
 
 export interface StanceTransitionComponent {
   fromStance: BaseCreatureStance;
@@ -53,6 +53,8 @@ export interface VelocityComponent {
   isGrounded?: boolean;
   airborneLockedVx?: number;
   airborneLockedVz?: number;
+  slopeAngleDeg?: number;
+  groundNormal?: import('../../types').Vec3;
 }
 
 export interface InputComponent {
@@ -100,6 +102,9 @@ export interface MovementConfig {
   dropRecoveryTime?: number;
   airborneTurnMultiplier?: number;
   jumpVelocity?: number;
+  maxJumpSlopeAngle?: number;
+  minSlopeSlideAngle?: number;
+  slopeSlideAcceleration?: number;
 }
 
 export interface MovementStatsComponent {
@@ -130,6 +135,9 @@ export interface MovementStatsComponent {
   dropRecoveryTime: StatValue<number>;
   airborneTurnMultiplier: number;
   jumpVelocity: StatValue<number>;
+  maxJumpSlopeAngle: StatValue<number>;
+  minSlopeSlideAngle: number;
+  slopeSlideAcceleration: number;
 }
 
 export interface StealthConfig {

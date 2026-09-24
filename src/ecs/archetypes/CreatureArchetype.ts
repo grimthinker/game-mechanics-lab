@@ -88,6 +88,13 @@ export function assembleCreature(
     airborneTurnMultiplier:
       config.movement?.airborneTurnMultiplier ?? BALANCE_CONFIG.creature.airborneTurnMultiplier,
     jumpVelocity: createStat(config.movement?.jumpVelocity ?? BALANCE_CONFIG.creature.jumpVelocity),
+    maxJumpSlopeAngle: createStat(
+      config.movement?.maxJumpSlopeAngle ?? BALANCE_CONFIG.creature.maxJumpSlopeAngle
+    ),
+    minSlopeSlideAngle:
+      config.movement?.minSlopeSlideAngle ?? BALANCE_CONFIG.creature.minSlopeSlideAngle,
+    slopeSlideAcceleration:
+      config.movement?.slopeSlideAcceleration ?? BALANCE_CONFIG.creature.slopeSlideAcceleration,
   });
 
   world.addComponent(id, 'velocity', {

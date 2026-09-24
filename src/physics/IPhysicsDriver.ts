@@ -77,8 +77,9 @@ export interface IPhysicsDriver {
   computeCharacterMovement(
     collider: RAPIER.Collider,
     desiredTranslation: Vec3,
-    characterMass: number
-  ): { movement: Vec3; isGrounded: boolean };
+    characterMass: number,
+    isAirborne?: boolean
+  ): { movement: Vec3; isGrounded: boolean; groundNormal?: Vec3; slopeAngleDeg?: number };
 
   /** Проверяет наличие свободного пространства над головой для подъема из приседа/лежа */
   checkCeilingClearance(
@@ -104,6 +105,14 @@ export interface IPhysicsDriver {
     thickness?: number,
     y?: number
   ): { body: RAPIER.RigidBody; collider: RAPIER.Collider };
+
+  /** Создает или обновляет физический Heightfield-коллайдер ландшафта в Rapier3D */
+  createOrUpdateTerrain(
+    size: number,
+    resolution: number,
+    heights: Float32Array,
+    entityId?: string
+  ): { body: RAPIER.RigidBody; collider: RAPIER.Collider } | null;
 
   /** Запрашивает все сущности в радиусе (сферическое перекрытие в 3D) */
   queryEntitiesInSphere(center: Vec3, radius: number): string[];

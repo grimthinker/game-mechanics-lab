@@ -24,6 +24,7 @@ export class ThreeRenderer implements IRenderer {
   public camera: THREE.PerspectiveCamera;
   public transformControl: TransformControls;
   private isDraggingGizmo = false;
+  private brushCursor: THREE.Mesh;
 
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -101,6 +102,21 @@ export class ThreeRenderer implements IRenderer {
         }
       }
     });
+
+    const brushGeo = new THREE.RingGeometry(0.9, 1.0, 32);
+    brushGeo.rotateX(-Math.PI / 2);
+    this.brushCursor = new THREE.Mesh(
+      brushGeo,
+      new THREE.MeshBasicMaterial({
+        color: 0xf39c12,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false, // Чтобы кольцо было видно сквозь неровности
+        side: THREE.DoubleSide,
+      })
+    );
+    this.brushCursor.visible = false;
+    this.scene.add(this.brushCursor);
   }
 
   public getCanvas(): HTMLCanvasElement {
@@ -159,10 +175,31 @@ export class ThreeRenderer implements IRenderer {
     this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
     this.raycaster.setFromCamera(this.mouseNDC, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+    // Исключаем тяжелый меш террейна (~32 000 полигонов), сетку и служебные объекты ДО вызова трассировки на CPU
+    const pickableObjects: THREE.Object3D[] = [];
+    for (let i = 0; i < this.scene.children.length; i++) {
+      const child = this.scene.children[i];
+      if (
+        child.userData.isTerrainMesh ||
+        child.userData.entityId === 'terrain' ||
+        child instanceof THREE.GridHelper ||
+        child === this.brushCursor ||
+        child === this.transformControl.getHelper()
+      ) {
+        continue;
+      }
+      // Если это группа террейна с дочерним тяжелым мешем
+      if (child.children && child.children.some((c) => c.userData.isTerrainMesh)) {
+        continue;
+      }
+      pickableObjects.push(child);
+    }
+
+    const intersects = this.raycaster.intersectObjects(pickableObjects, true);
 
     for (const hit of intersects) {
-      if (hit.object.userData.isSelectionOutline || hit.object instanceof THREE.GridHelper) {
+      if (hit.object.userData.isSelectionOutline) {
         continue;
       }
       let curr: THREE.Object3D | null = hit.object;
@@ -264,6 +301,24 @@ export class ThreeRenderer implements IRenderer {
       }
     } else {
       this.transformControl.detach();
+    }
+
+    // Отрисовка 3D-курсора кисти террейна
+    if (context.editorData.terrainBrush?.active && context.editorData.cursorWorldPos) {
+      this.brushCursor.visible = true;
+      this.brushCursor.position.set(
+        context.editorData.cursorWorldPos.x,
+        context.editorData.cursorWorldPos.y + 0.1,
+        context.editorData.cursorWorldPos.z
+      );
+      const r = context.editorData.terrainBrush.radius;
+      this.brushCursor.scale.set(r, r, r);
+
+      (this.brushCursor.material as THREE.MeshBasicMaterial).color.setHex(
+        context.editorData.terrainBrush.tool === 'paint' ? 0x3498db : 0xf39c12
+      );
+    } else {
+      this.brushCursor.visible = false;
     }
 
     this.renderer.render(this.scene, this.camera);

@@ -24,7 +24,20 @@ export class WorldSerializer {
       for (const key of SERIALIZABLE_COMPONENT_KEYS) {
         const componentValue = comp[key];
         if (componentValue !== undefined) {
-          data.components[key] = JSON.parse(JSON.stringify(componentValue));
+          if (key === 'terrain') {
+            const t = componentValue as import('./components/terrain').TerrainComponent;
+            data.components[key] = {
+              size: t.size,
+              resolution: t.resolution,
+              splatResolution: t.splatResolution || 512,
+              textureTiling: t.textureTiling,
+              // Сохраняем как обычные массивы (JSON.stringify безопасно преобразует NaN в null, а при загрузке null станет 0)
+              heights: Array.from(t.heights),
+              splatData: Array.from(t.splatData),
+            };
+          } else {
+            data.components[key] = JSON.parse(JSON.stringify(componentValue));
+          }
         }
       }
 
@@ -143,7 +156,73 @@ export class WorldSerializer {
       // 1. Восстановление сериализуемых компонентов согласно белому списку
       for (const key of SERIALIZABLE_COMPONENT_KEYS) {
         if (comps[key] !== undefined) {
-          this.app.world.addComponent(ent.id, key, comps[key]);
+          if (key === 'terrain') {
+            const rawT = comps[key];
+            const res = rawT.resolution || 128;
+            const splatRes = rawT.splatResolution || 512;
+            let heights: Float32Array;
+            let splatData: Uint8Array;
+
+            if (rawT.heights && Array.isArray(rawT.heights)) {
+              heights = new Float32Array(rawT.heights);
+            } else if (rawT.heightsBase64) {
+              const bin = atob(rawT.heightsBase64);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              heights = new Float32Array(bytes.buffer);
+            } else {
+              heights = new Float32Array(res * res);
+            }
+
+            if (rawT.splatData && Array.isArray(rawT.splatData)) {
+              splatData = new Uint8Array(rawT.splatData);
+            } else if (rawT.splatBase64) {
+              const bin = atob(rawT.splatBase64);
+              splatData = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) splatData[i] = bin.charCodeAt(i);
+            } else {
+              splatData = new Uint8Array(splatRes * splatRes * 4);
+            }
+
+            // Проверка и авто-исправление размеров массивов при повреждениях
+            if (heights.length !== res * res) {
+              console.warn(
+                `[WorldSerializer] Исправление размера карты высот с ${heights.length} на ${res * res}`
+              );
+              const newHeights = new Float32Array(res * res);
+              newHeights.set(heights.subarray(0, Math.min(heights.length, res * res)));
+              heights = newHeights;
+            }
+
+            if (splatData.length !== splatRes * splatRes * 4) {
+              const newSplat = new Uint8Array(splatRes * splatRes * 4);
+              newSplat.set(
+                splatData.subarray(0, Math.min(splatData.length, splatRes * splatRes * 4))
+              );
+              splatData = newSplat;
+            }
+
+            // Защита от NaN, которые могли вызвать панику в Rapier3D (unreachable)
+            for (let i = 0; i < heights.length; i++) {
+              if (Number.isNaN(heights[i]) || !Number.isFinite(heights[i])) {
+                heights[i] = 0;
+              }
+            }
+
+            this.app.world.addComponent(ent.id, 'terrain', {
+              size: rawT.size || 100,
+              resolution: res,
+              splatResolution: splatRes,
+              heights,
+              splatData,
+              textureTiling: rawT.textureTiling || 24,
+              isGeometryDirty: true,
+              isSplatDirty: true,
+              isPhysicsDirty: true,
+            });
+          } else {
+            this.app.world.addComponent(ent.id, key, comps[key]);
+          }
         }
       }
 
@@ -299,7 +378,9 @@ export class WorldSerializer {
               ? 'item'
               : comps.physicsStats.points
                 ? 'obstacle'
-                : 'creature');
+                : comps.terrain
+                  ? 'terrain'
+                  : 'creature');
 
         if (archetype !== 'marker' && (!isPartOfCreature || archetype !== 'bodyPart')) {
           if (archetype === 'obstacle') {
@@ -351,7 +432,8 @@ export class WorldSerializer {
               category,
               mask,
             });
-          } else {
+          } else if (archetype !== 'terrain') {
+            // ... logic for creatures, items, zones
             let isStatic = false;
             let isTrigger = false;
             let category = CollisionCategory.CREATURE;

@@ -4,6 +4,8 @@ import { Camera } from '../Camera';
 import { EntityId } from '../ecs/types';
 import { Point, Vec3 } from '../types';
 
+import { TerrainBrushState } from '../types';
+
 export interface EditorRenderData {
   selectedId: EntityId | null;
   selectedIds: Set<EntityId>;
@@ -11,6 +13,8 @@ export interface EditorRenderData {
   marqueeBox?: { start: Point; current: Point } | null;
   showAIDebug?: boolean;
   gizmoTool?: 'select' | 'translate' | 'rotate';
+  terrainBrush?: TerrainBrushState;
+  cursorWorldPos?: Vec3 | null;
 }
 
 export interface RenderContext {

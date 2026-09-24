@@ -13,7 +13,8 @@ import {
   computeLocalBox,
   GripTransform,
 } from '../../rendering/gripCalculators';
-import { ProceduralAssetManager } from '../../rendering/procedural/ProceduralAssetManager';
+import { createTerrainMaterial } from '../../rendering/terrain/TerrainMaterial';
+import { ProceduralCreatureAssetManager } from '../../rendering/creatures/ProceduralAssetManager';
 
 interface AnimatorState {
   mixer: THREE.AnimationMixer;
@@ -312,6 +313,31 @@ export class ThreeSyncSystem {
             obj.rotation.set(0, 0, 0);
           }
           obj.scale.set(1, 1, 1);
+        }
+
+        // Синхронизация геометрии и текстурных масок террейна
+        if (archetype === 'terrain') {
+          const terrainComp = world.getComponent(id, 'terrain');
+          if (terrainComp) {
+            const terrainMesh = obj.children.find((c) => c.userData.isTerrainMesh) as THREE.Mesh;
+            if (terrainMesh && terrainMesh.geometry) {
+              if (terrainComp.isGeometryDirty) {
+                const posAttr = terrainMesh.geometry.attributes.position;
+                const heights = terrainComp.heights;
+                for (let i = 0; i < posAttr.count; i++) {
+                  posAttr.setY(i, heights[i]);
+                }
+                posAttr.needsUpdate = true;
+                terrainMesh.geometry.computeVertexNormals();
+                terrainComp.isGeometryDirty = false;
+              }
+
+              if (terrainComp.isSplatDirty && terrainMesh.userData.splatTexture) {
+                terrainMesh.userData.splatTexture.needsUpdate = true;
+                terrainComp.isSplatDirty = false;
+              }
+            }
+          }
         }
 
         const isSelected = selectedIds.has(id);
@@ -672,8 +698,8 @@ export class ThreeSyncSystem {
 
     let clip: THREE.AnimationClip | null = null;
 
-    if (ProceduralAssetManager.getInstance().hasBuilder(structureType)) {
-      clip = ProceduralAssetManager.getInstance().getAnimationClip(structureType, animKey);
+    if (ProceduralCreatureAssetManager.getInstance().hasBuilder(structureType)) {
+      clip = ProceduralCreatureAssetManager.getInstance().getAnimationClip(structureType, animKey);
     }
 
     if (!clip) {
@@ -886,6 +912,51 @@ export class ThreeSyncSystem {
       mainMesh.position.y = 1;
       const r = effector?.radius ?? radius;
       group.scale.set(r, 1, r);
+    } else if (archetype === 'terrain') {
+      const terrainComp = world.getComponent(id, 'terrain');
+      if (terrainComp) {
+        const res = terrainComp.resolution;
+        const size = terrainComp.size;
+
+        const geo = new THREE.PlaneGeometry(size, size, res - 1, res - 1);
+        geo.rotateX(-Math.PI / 2); // Ориентируем плоскость горизонтально в плоскости XZ
+
+        // Задаем начальные высоты вершин
+        const posAttr = geo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+          posAttr.setY(i, terrainComp.heights[i]);
+        }
+        posAttr.needsUpdate = true;
+        geo.computeVertexNormals();
+
+        // Создаем текстуру Splatmap из Uint8Array высокой плотности (512x512)
+        const splatRes = terrainComp.splatResolution || 512;
+        const splatTexture = new THREE.DataTexture(
+          terrainComp.splatData,
+          splatRes,
+          splatRes,
+          THREE.RGBAFormat,
+          THREE.UnsignedByteType
+        );
+        splatTexture.wrapS = THREE.ClampToEdgeWrapping;
+        splatTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+        // Включаем аппаратную билинейную интерполяцию для плавного смешивания (размытия) масок
+        splatTexture.magFilter = THREE.LinearFilter;
+        splatTexture.minFilter = THREE.LinearFilter;
+        // Отключаем мипмапы, так как для Splatmap они не нужны и могут вызывать артефакты на стыках
+        splatTexture.generateMipmaps = false;
+
+        splatTexture.needsUpdate = true;
+
+        const terrainMat = createTerrainMaterial(splatTexture, terrainComp.textureTiling);
+        mainMesh = new THREE.Mesh(geo, terrainMat);
+        mainMesh.receiveShadow = true;
+        mainMesh.userData.isTerrainMesh = true;
+        mainMesh.userData.splatTexture = splatTexture;
+        terrainComp.isGeometryDirty = false;
+        terrainComp.isSplatDirty = false;
+      }
     }
 
     if (mainMesh) {

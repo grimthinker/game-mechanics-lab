@@ -34,6 +34,16 @@ export interface ModularPlacementOptions {
 }
 
 export type GizmoTool = 'select' | 'translate' | 'rotate';
-
 export type PlacementMode =
   { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; options: ModularPlacementOptions };
+
+export type TerrainToolType = 'raise' | 'lower' | 'flatten' | 'smooth' | 'paint';
+export type TerrainTextureChannel = 0 | 1 | 2 | 3; // R: Grass, G: Rock, B: Dirt, A: Sand
+
+export interface TerrainBrushState {
+  active: boolean;
+  tool: TerrainToolType;
+  texture: TerrainTextureChannel;
+  radius: number;
+  strength: number;
+}

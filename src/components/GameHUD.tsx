@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { World } from '../ecs/World';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 import { t } from '../locales';
@@ -20,6 +20,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onExitToEditor,
   onGotoSimulation,
 }) => {
+  // Легкий интервал обновления текста HUD в реальном времени (10 раз в секунду)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((prev) => (prev + 1) % 10000);
+    }, 100);
+    return () => clearInterval(timer);
+  }, []);
+
   if (!world) return null;
 
   // Поиск сущности игрока (PlayerTree)
@@ -55,19 +64,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const stance =
     currentStance === 'airborne'
       ? t('hud.airborne')
-      : currentStance === 'prone'
-        ? t('hud.prone')
-        : currentStance === 'crouching'
-          ? t('hud.crouching')
-          : currentStance && currentStance.includes('_to_')
-            ? t('hud.transition')
-            : t('hud.standing');
-  const moveMode =
-    meta?.movementMode === 'sprinting'
-      ? t('hud.sprint')
-      : meta?.movementMode === 'walking'
-        ? t('hud.walk')
-        : t('hud.jog');
+      : currentStance === 'sliding'
+        ? t('hud.sliding')
+        : currentStance === 'prone'
+          ? t('hud.prone')
+          : currentStance === 'crouching'
+            ? t('hud.crouching')
+            : currentStance && currentStance.includes('_to_')
+              ? t('hud.transition')
+              : t('hud.standing');
+
+  let moveMode = t('hud.immobile');
+  if (meta?.movementMode === 'sprinting') {
+    moveMode = t('hud.sprint');
+  } else if (meta?.movementMode === 'jogging') {
+    moveMode = t('hud.jog');
+  } else if (meta?.movementMode === 'walking') {
+    moveMode = t('hud.walk');
+  } else if (meta?.movementMode === 'turning') {
+    moveMode = t('hud.turning');
+  } else if (meta?.movementMode === 'immobile') {
+    moveMode = t('hud.immobile');
+  }
+
   return (
     <>
       {/* Верхняя левая панель: Статус персонажа */}

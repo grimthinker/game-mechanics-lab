@@ -826,11 +826,15 @@ export const App: React.FC = () => {
                           const app = appRef.current;
                           if (!app) return;
                           app.executeTransaction(t('history.spawnPlayer'), () => {
+                            const spawnPos = {
+                              ...pieMenuState.worldPos,
+                              y: (pieMenuState.worldPos as any).y + 0.15,
+                            };
                             const id = app.entityFactory.spawnModularHumanoid(
                               app.world,
                               app.physics,
                               app.aiSystem,
-                              pieMenuState.worldPos,
+                              spawnPos,
                               'PlayerTree',
                               t('palette.player')
                             );
@@ -848,11 +852,15 @@ export const App: React.FC = () => {
                           const app = appRef.current;
                           if (!app) return;
                           app.executeTransaction(t('history.spawnAttacker'), () => {
+                            const spawnPos = {
+                              ...pieMenuState.worldPos,
+                              y: (pieMenuState.worldPos as any).y + 0.15,
+                            };
                             const id = app.entityFactory.spawnModularHumanoid(
                               app.world,
                               app.physics,
                               app.aiSystem,
-                              pieMenuState.worldPos,
+                              spawnPos,
                               'AttackerTree',
                               t('palette.attacker')
                             );

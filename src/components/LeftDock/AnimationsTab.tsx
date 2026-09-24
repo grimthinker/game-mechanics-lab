@@ -4,7 +4,7 @@ import { World } from '../../ecs/World';
 import { getRootOwner } from '../../ecs/utils/hierarchy';
 import { BodyStructureType } from '../../ecs/templates';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
-import { ProceduralAssetManager } from '../../rendering/procedural/ProceduralAssetManager';
+import { ProceduralCreatureAssetManager } from '../../rendering/creatures/ProceduralAssetManager';
 import { AssetManager } from '../../rendering/AssetManager';
 import { ThreeSyncSystem } from '../../ecs/systems/ThreeSyncSystem';
 import { computeLocalBox } from '../../rendering/gripCalculators';
@@ -52,8 +52,10 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ world, selectedEnt
     const structureType = animator.rigType as BodyStructureType;
     const animSet = new Set<string>();
 
-    if (ProceduralAssetManager.getInstance().hasBuilder(structureType)) {
-      const builder = (ProceduralAssetManager.getInstance() as any).builders?.get(structureType);
+    if (ProceduralCreatureAssetManager.getInstance().hasBuilder(structureType)) {
+      const builder = (ProceduralCreatureAssetManager.getInstance() as any).builders?.get(
+        structureType
+      );
       if (builder) {
         const clips: Map<string, any> = builder.createAnimationClips();
         for (const k of clips.keys()) {
@@ -305,8 +307,8 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ world, selectedEnt
     if (!mixer || !structureType) return;
 
     let clip: THREE.AnimationClip | null = null;
-    if (ProceduralAssetManager.getInstance().hasBuilder(structureType)) {
-      clip = ProceduralAssetManager.getInstance().getAnimationClip(structureType, animName);
+    if (ProceduralCreatureAssetManager.getInstance().hasBuilder(structureType)) {
+      clip = ProceduralCreatureAssetManager.getInstance().getAnimationClip(structureType, animName);
     }
 
     const applyToMixer = (c: THREE.AnimationClip) => {

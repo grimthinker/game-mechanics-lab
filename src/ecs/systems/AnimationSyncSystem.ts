@@ -27,6 +27,9 @@ export class AnimationSyncSystem {
         targetAnim = `drop_item_${slotKind}`;
       } else if (meta.stance === 'airborne') {
         targetAnim = 'airborne';
+      } else if (meta.stance === 'sliding') {
+        // Поза сохранения баланса при соскальзывании с холма
+        targetAnim = 'stand_jog';
       } else if (stanceTransition && stanceTransition.transitionStance) {
         // Проигрываем анимацию перехода между стойками (например: stand_to_prone, prone_to_stand)
         targetAnim = stanceTransition.transitionStance;

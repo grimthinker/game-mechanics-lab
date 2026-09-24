@@ -85,6 +85,7 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
     if (s === 'crouching') return { text: t('hud.crouching'), color: '#8e44ad' };
     if (s === 'prone') return { text: t('hud.prone'), color: '#795548' };
     if (s === 'airborne') return { text: t('hud.airborne'), color: '#00bcd4' };
+    if (s === 'sliding') return { text: t('hud.sliding'), color: '#e67e22' };
     return { text: `${t('hud.transition')} (${s})`, color: '#d35400' };
   };
 

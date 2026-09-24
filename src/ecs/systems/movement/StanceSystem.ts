@@ -58,9 +58,12 @@ export class StanceSystem {
 
       const velocity = world.getComponent(id, 'velocity');
       const isGrounded = velocity?.isGrounded ?? true;
+      const currentSlope = velocity?.slopeAngleDeg ?? 0;
+      const minSlideAngle = movementStats.minSlopeSlideAngle ?? 40;
+      const isSliding = isGrounded && currentSlope > minSlideAngle;
 
       // 1. Нахождение в воздухе (Airborne)
-      if (!isGrounded) {
+      if (!isGrounded && !isSliding) {
         if (meta.stance !== 'airborne') {
           world.removeComponent(id, 'stanceTransition');
 
@@ -85,7 +88,6 @@ export class StanceSystem {
           }
         }
 
-        // В воздухе скорость поворота снижается до 0.5x
         const airTurnMult = movementStats.airborneTurnMultiplier ?? 0.5;
         addModifier(movementStats.maxTurnSpeed, {
           id: 'stance_turn',
@@ -97,7 +99,52 @@ export class StanceSystem {
         continue;
       }
 
-      // 2. Момент приземления на землю (выход из Airborne)
+      // 2. Автоматический вход в стойку скольжения (Sliding) при уклоне > 40°
+      if (isSliding) {
+        if (meta.stance !== 'sliding') {
+          world.removeComponent(id, 'stanceTransition');
+
+          let baseStance: BaseCreatureStance = 'standing';
+          if (meta.stance === 'crouching' || meta.stance?.includes('crouch'))
+            baseStance = 'crouching';
+          else if (meta.stance === 'prone' || meta.stance?.includes('prone')) baseStance = 'prone';
+
+          meta.previousGroundedStance = meta.previousGroundedStance ?? baseStance;
+          meta.stance = 'sliding';
+
+          if (physics) {
+            const physStats = world.getComponent(id, 'physicsStats');
+            const radius = physStats?.radius.current ?? 0.4;
+            physics.updateCreatureColliderStance(world, id, 'sliding', radius);
+          }
+        }
+
+        // При скольжении поворот корпуса затруднен из-за высокой инерции спуска (0.4x)
+        addModifier(movementStats.maxTurnSpeed, {
+          id: 'stance_turn',
+          type: ModifierType.PERCENT_MULT,
+          value: 0.4,
+        });
+        removeModifier(movementStats.maxSpeed, 'stance_speed');
+
+        continue;
+      }
+
+      // 3. Выход из стойки скольжения (Sliding) на пологий участок склона или равнину
+      if (meta.stance === 'sliding') {
+        const returnStance: BaseCreatureStance =
+          input.desiredStance ?? meta.previousGroundedStance ?? 'standing';
+        meta.previousGroundedStance = undefined;
+        meta.stance = returnStance;
+
+        if (physics) {
+          const physStats = world.getComponent(id, 'physicsStats');
+          const radius = physStats?.radius.current ?? 0.4;
+          physics.updateCreatureColliderStance(world, id, returnStance, radius);
+        }
+      }
+
+      // 4. Момент приземления на землю (выход из Airborne)
       if (meta.stance === 'airborne') {
         if (velocity) {
           velocity.airborneLockedVx = undefined;

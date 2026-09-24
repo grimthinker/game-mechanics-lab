@@ -1,7 +1,15 @@
 export type EntityId = string;
 
 export type EntityArchetype =
-  'creature' | 'item' | 'projectile' | 'zone' | 'marker' | 'particles' | 'obstacle' | 'bodyPart';
+  | 'creature'
+  | 'item'
+  | 'projectile'
+  | 'zone'
+  | 'marker'
+  | 'particles'
+  | 'obstacle'
+  | 'bodyPart'
+  | 'terrain';
 
 export const enum CollisionCategory {
   NONE = 0,

@@ -10,7 +10,9 @@ export * from './components/ai';
 export * from './components/inventory';
 export * from './components/anatomy';
 export * from './components/rendering';
+export * from './components/terrain';
 
+import { TerrainComponent } from './components/terrain';
 import {
   TagComponent,
   RenderableComponent,
@@ -34,6 +36,7 @@ import {
   MovementConfig,
   StealthStatsComponent,
   StealthConfig,
+  CreatureMetaComponent,
 } from './components/movement';
 import {
   HealthComponent,
@@ -125,6 +128,7 @@ export interface EntityComponents {
   perception?: PerceptionComponent;
   consciousness?: ConsciousnessComponent;
   locomotionState?: LocomotionStateComponent;
+  terrain?: TerrainComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -168,6 +172,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'perception',
   'consciousness',
   'locomotionState',
+  'terrain',
 ] as const;
 
 export interface EntityConfig {
@@ -188,7 +193,7 @@ export interface EntityConfig {
   inventory?: InventorySetup;
   equip?: EquipmentComponent;
   interactionSlots?: InteractionSlotsComponent;
-  meta?: import('./components/movement').CreatureMetaComponent;
+  meta?: CreatureMetaComponent;
   ownership?: OwnershipComponent;
   transform?: TransformComponent;
   weaponStats?: Partial<WeaponCombatConfig>;
@@ -204,4 +209,5 @@ export interface EntityConfig {
   vision?: VisionConfig;
   hearing?: HearingConfig;
   perception?: PerceptionComponent;
+  terrain?: TerrainComponent;
 }

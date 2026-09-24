@@ -1,5 +1,6 @@
 import { LOGIC_CONFIG } from '../../../ai/config';
 import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
+import { BALANCE_CONFIG } from '../../../config/balanceConfig';
 import { Radians } from '../../../utils';
 import { World } from '../../World';
 import {
@@ -87,7 +88,10 @@ export class VelocitySystem {
       if (input.wantsJump) {
         input.wantsJump = false;
         const isGrounded = velocity.isGrounded ?? transform.y <= 0;
-        if (isGrounded && meta.stance !== 'airborne') {
+        // Прыжок категорически запрещен в воздухе (airborne) и при соскальзывании по склону (sliding)
+        const canJumpStance = meta.stance !== 'airborne' && meta.stance !== 'sliding';
+
+        if (isGrounded && canJumpStance) {
           const jumpImpulse = movementStats.jumpVelocity?.current ?? 5.0;
           velocity.vy = jumpImpulse;
           velocity.isGrounded = false;

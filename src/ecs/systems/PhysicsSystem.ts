@@ -8,6 +8,8 @@ import {
 } from '../types';
 import { calculateTotalEntityWeight } from '../utils/hierarchy';
 import { IPhysicsDriver } from '../../physics/IPhysicsDriver';
+import { BALANCE_CONFIG } from '../../config/balanceConfig';
+import { getTerrainHeightAt } from '../components/terrain';
 
 export class PhysicsSystem {
   public obstaclesEnabled: boolean = true;
@@ -23,8 +25,21 @@ export class PhysicsSystem {
    * Применяет ручные трансформации (из редактора/UI), помеченные флагом isDirty,
    * напрямую к телам Rapier3D. Гарантирует отсутствие гонок данных.
    */
+  public syncTerrainPhysics(world: World): void {
+    if (!this.driver || !this.driver.isReady) return;
+    const terrainEntities = world.getEntitiesWith('terrain');
+    for (const [id, { terrain }] of terrainEntities) {
+      if (terrain.isPhysicsDirty) {
+        this.driver.createOrUpdateTerrain(terrain.size, terrain.resolution, terrain.heights, id);
+        terrain.isPhysicsDirty = false;
+      }
+    }
+  }
+
   public syncDirtyTransforms(world: World): void {
     if (!this.driver || !this.driver.isReady) return;
+
+    this.syncTerrainPhysics(world);
 
     let anyDirty = false;
     const entities = world.getEntitiesWith('transform', 'physicsBody');
@@ -93,6 +108,9 @@ export class PhysicsSystem {
     } else if (stance === 'airborne') {
       targetHeight = 1.8;
       capRadius = radius;
+    } else if (stance === 'sliding') {
+      targetHeight = 1.6; // Слегка заниженный центр тяжести для устойчивости на склоне
+      capRadius = radius;
     }
 
     const halfHeight = Math.max(0.01, (targetHeight - 2 * capRadius) / 2);
@@ -102,6 +120,8 @@ export class PhysicsSystem {
   }
 
   public update(dt: number, world: World): void {
+    this.syncTerrainPhysics(world);
+
     // Синхронизация полного веса и коллизий физических тел с актуальными статами
     const statEntities = world.getEntitiesWith('physicsBody', 'physicsStats');
     for (const [id, { physicsBody, physicsStats }] of statEntities) {
@@ -151,39 +171,94 @@ export class PhysicsSystem {
         const physStats = world.getComponent(id, 'physicsStats');
         const characterMass = physStats?.totalWeight ?? physStats?.weight.current ?? 75;
 
+        const meta = world.getComponent(id, 'meta');
+        const movementStats = world.getComponent(id, 'movementStats');
+        const minSlideAngle =
+          movementStats?.minSlopeSlideAngle ?? BALANCE_CONFIG.creature.minSlopeSlideAngle;
+
+        // Предыдущее состояние контакта со склоном
+        const prevSlope = velocity.slopeAngleDeg ?? 0;
+        const wasSliding = (velocity.isGrounded ?? true) && prevSlope > minSlideAngle;
+        const isAirborne =
+          (meta?.stance === 'airborne' || velocity.isGrounded === false) && !wasSliding;
+
         // Расчет перемещения через KCC контроллер
-        const { movement, isGrounded } = this.driver.computeCharacterMovement(
-          phys.rawCollider,
-          { x: desiredDx, y: desiredDy, z: desiredDz },
-          characterMass
-        );
+        const { movement, isGrounded, groundNormal, slopeAngleDeg } =
+          this.driver.computeCharacterMovement(
+            phys.rawCollider,
+            { x: desiredDx, y: desiredDy, z: desiredDz },
+            characterMass,
+            isAirborne
+          );
 
         transform.x += movement.x;
         transform.y += movement.y;
         transform.z += movement.z;
 
-        // Фиксируем реальную скорость (фактическое перемещение) для синхронизации анимаций
         velocity.actualSpeed = localDt > 0 ? Math.hypot(movement.x, movement.z) / localDt : 0;
 
-        // Если персонаж достиг уровня пола или зафиксирован KCC как стоящий на земле
+        const currentSlope = slopeAngleDeg ?? 0;
+        const isSlidingNow = currentSlope > minSlideAngle;
+
+        // Определение контакта с землей: на крутом склоне считаем существо на земле, если оно упирается в склон
         let grounded = isGrounded;
-        if (transform.y <= 0) {
+        if (isGrounded || (Math.abs(movement.y - desiredDy) > 0.0001 && desiredDy < 0)) {
+          grounded = true;
+          // Обнуляем вертикальную скорость только на ровной поверхности, при скольжении сохраняем импульс вниз
+          if (!isSlidingNow) {
+            velocity.vy = 0;
+          }
+        }
+
+        // --- МАТЕМАТИЧЕСКИЙ ЩИТ: защита от проваливания сквозь полигоны террейна ---
+        const terrainEntities = world.getEntitiesWith('terrain');
+        if (terrainEntities.length > 0) {
+          const terrainComp = terrainEntities[0][1].terrain;
+          const terrainFloorY = getTerrainHeightAt(terrainComp, transform.x, transform.z);
+
+          if (terrainFloorY !== null && transform.y < terrainFloorY) {
+            transform.y = terrainFloorY;
+            if (!isSlidingNow) {
+              velocity.vy = 0;
+            }
+            grounded = true;
+          }
+        }
+
+        // Страховочный сброс при падении за границу карты
+        if (transform.y < -50) {
           transform.y = 0;
-          velocity.vy = 0;
-          grounded = true;
-        } else if (isGrounded) {
-          velocity.vy = 0;
-          grounded = true;
-        } else if (Math.abs(movement.y - desiredDy) > 0.0001 && desiredDy < 0) {
-          // Если движение по Y вниз ограничено коллизией с препятствием — уперлись в поверхность
           velocity.vy = 0;
           grounded = true;
         }
 
         velocity.isGrounded = grounded;
+        velocity.groundNormal = groundNormal;
+        velocity.slopeAngleDeg = currentSlope;
+
+        // Плавное нарастание скорости скольжения вниз по склону
+        if (grounded && isSlidingNow && groundNormal) {
+          const slideAccel =
+            movementStats?.slopeSlideAcceleration ?? BALANCE_CONFIG.creature.slopeSlideAcceleration;
+
+          const horizLen = Math.hypot(groundNormal.x, groundNormal.z);
+          if (horizLen > 0.001) {
+            const downX = groundNormal.x / horizLen;
+            const downZ = groundNormal.z / horizLen;
+
+            const slopeFactor = Math.min(
+              1.0,
+              (currentSlope - minSlideAngle) / Math.max(1, 90 - minSlideAngle)
+            );
+            const effectiveAccel = slideAccel * (0.8 + 0.6 * slopeFactor);
+
+            // Накапливаем внешнюю скорость непрерывно
+            velocity.externalVx = (velocity.externalVx ?? 0) + downX * effectiveAccel * localDt;
+            velocity.externalVz = (velocity.externalVz ?? 0) + downZ * effectiveAccel * localDt;
+          }
+        }
 
         if (phys.rawBody) {
-          // Мгновенная синхронизация положения коллайдера в Rapier для исключения задержек между подшагами
           phys.rawBody.setTranslation(
             {
               x: transform.x,
@@ -209,13 +284,17 @@ export class PhysicsSystem {
         velocity.isGrounded = transform.y <= 0;
       }
 
-      // Затухание внешнего импульса (трение / инерция)
-      if (extVx !== 0 || extVy !== 0 || extVz !== 0) {
-        const damping = 5.0;
+      // Плавное затухание внешнего импульса без сброса накопленной скорости
+      const curExtVx = velocity.externalVx ?? 0;
+      const curExtVy = velocity.externalVy ?? 0;
+      const curExtVz = velocity.externalVz ?? 0;
+
+      if (curExtVx !== 0 || curExtVy !== 0 || curExtVz !== 0) {
+        const damping = 3.5;
         const factor = Math.max(0, 1 - damping * localDt);
-        velocity.externalVx = extVx * factor;
-        velocity.externalVy = extVy * factor;
-        velocity.externalVz = extVz * factor;
+        velocity.externalVx = curExtVx * factor;
+        velocity.externalVy = curExtVy * factor;
+        velocity.externalVz = curExtVz * factor;
 
         if (Math.abs(velocity.externalVx) < 0.01) velocity.externalVx = 0;
         if (Math.abs(velocity.externalVy) < 0.01) velocity.externalVy = 0;

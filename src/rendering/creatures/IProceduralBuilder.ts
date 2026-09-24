@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export interface IProceduralBuilder {
+export interface IProceduralCreatureBuilder {
   /** Создает пустой иерархический каркас рига с пивотами и сокетами */
   createRigTemplate(): THREE.Group;
 

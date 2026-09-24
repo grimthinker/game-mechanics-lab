@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { IProceduralBuilder } from './IProceduralBuilder';
+import { IProceduralCreatureBuilder } from './IProceduralBuilder';
 
-export class HumanoidProceduralBuilder implements IProceduralBuilder {
+export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
   private clipsCache: Map<string, THREE.AnimationClip> | null = null;
 
   public createRigTemplate(): THREE.Group {

@@ -21,6 +21,7 @@ import { GameMode } from './config/gameConfig';
 import { WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
+import { createDefaultTerrainConfig } from './ecs/archetypes/TerrainArchetype';
 import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
 import { CREATURE_BLUEPRINTS } from './ecs/templates';
 import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
@@ -33,6 +34,7 @@ import { deg2Rad, Radians } from './utils';
 import { compileTreeBlackboardSchema } from './ai/schema';
 import { AssetManager } from './rendering/AssetManager';
 
+import { TerrainBrushState } from './types';
 // Контроллеры редактора
 import { SelectionController } from './editor/SelectionController';
 import { GizmoController } from './editor/GizmoController';
@@ -120,6 +122,14 @@ export class GameApp {
   private readonly MAX_ACCUMULATOR_DT: number = 0.2;
 
   public gameMode: GameMode = GameMode.EDITOR;
+
+  public terrainBrush: TerrainBrushState = {
+    active: false,
+    tool: 'raise',
+    texture: 0,
+    radius: 3.0,
+    strength: 2.0,
+  };
 
   private handleResize = () => this.resizeCanvas();
 
@@ -680,6 +690,9 @@ export class GameApp {
     const by = hasZ ? (p as Vec3).y : 0;
     const bz = hasZ ? (p as Vec3).z : (p.y ?? 0);
 
+    // Создаем базовый процедурный ландшафт 100x100 метров со Splatmap-текстурами
+    this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
+
     this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
@@ -1101,6 +1114,12 @@ export class GameApp {
       this.selection.selectedEntityIds
     );
 
+    let cursorWorldPos: Vec3 | null = null;
+    if (this.mouseScreenPos) {
+      const pt = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
+      cursorWorldPos = { x: pt.x, y: pt.y, z: pt.z };
+    }
+
     this.renderer.render({
       camera: this.camera,
       world: this.world,
@@ -1113,6 +1132,8 @@ export class GameApp {
         marqueeBox: this.selection.marqueeBox,
         showAIDebug: this.showAIDebug,
         gizmoTool: this.gizmo.tool,
+        terrainBrush: this.terrainBrush,
+        cursorWorldPos,
       },
       showUIOverlays: this.showUIOverlays,
     });
