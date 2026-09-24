@@ -3,6 +3,7 @@ import { PhysicsSystem } from '../ecs/systems/PhysicsSystem';
 import { Camera } from '../Camera';
 import { EntityId } from '../ecs/types';
 import { Point, Vec3 } from '../types';
+import { IModelPreview } from './IModelPreview';
 
 import { TerrainBrushState } from '../types';
 export interface EditorRenderData {
@@ -36,4 +37,7 @@ export interface IRenderer {
   getScreenRay?(clientX: number, clientY: number): { origin: Vec3; direction: Vec3 };
   pickEntity?(clientX: number, clientY: number): EntityId | null;
   projectToScreen?(pos: Vec3): Vec3 | null;
+
+  /** Фабрика для создания изолированного окна предпросмотра 3D-моделей (без ECS сцены) */
+  createModelPreview?(): IModelPreview;
 }

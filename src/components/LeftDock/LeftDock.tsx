@@ -607,7 +607,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         )}
 
         {activeTab === 'animations' && (
-          <AnimationsTab world={world} selectedEntityId={selectedEntityId} />
+          <AnimationsTab app={app} world={world} selectedEntityId={selectedEntityId} />
         )}
 
         {activeTab === 'terrain' && <TerrainDock app={app} />}

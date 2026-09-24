@@ -1,22 +1,21 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import * as THREE from 'three';
 import { World } from '../../ecs/World';
+import { GameApp } from '../../GameApp';
 import { getRootOwner } from '../../ecs/utils/hierarchy';
 import { BodyStructureType } from '../../ecs/templates';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { ProceduralCreatureAssetManager } from '../../rendering/creatures/ProceduralAssetManager';
-import { AssetManager } from '../../rendering/AssetManager';
-import { ThreeSyncSystem } from '../../ecs/systems/ThreeSyncSystem';
-import { computeLocalBox } from '../../rendering/gripCalculators';
+import { ModelPreviewViewport } from '../ModelPreviewViewport';
 import { useResizable } from '../../hooks/useResizable';
 import { t } from '../../locales';
 
 interface AnimationsTabProps {
+  app?: GameApp | null;
   world: World | null | undefined;
   selectedEntityId: string | null;
 }
 
-export const AnimationsTab: React.FC<AnimationsTabProps> = ({ world, selectedEntityId }) => {
+export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, selectedEntityId }) => {
   const [search, setSearch] = useState('');
   const [speed, setSpeed] = useState<number>(1.0);
   const [activeAnim, setActiveAnim] = useState<string>('stand_idle');
@@ -80,275 +79,12 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ world, selectedEnt
     return animationsList.filter((name) => name.toLowerCase().includes(q));
   }, [animationsList, search]);
 
-  // --- Изолированный 3D-вьюпорт предпросмотра модели ---
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const currentActionRef = useRef<THREE.AnimationAction | null>(null);
-  const modelGroupRef = useRef<THREE.Group | null>(null);
-  const targetOrbitRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0.8, 0));
-  const orbitParamsRef = useRef({
-    yaw: 0.3,
-    pitch: 0.15,
-    distance: 2.8,
-    isDragging: false,
-    lastX: 0,
-    lastY: 0,
-  });
-
-  // Сборка и загрузка модели в изолированную сцену
-  useEffect(() => {
-    const container = canvasContainerRef.current;
-    if (!container || !creatureRootId || !world || !animator) return;
-
-    let isDisposed = false;
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#141414');
-
-    const width = container.clientWidth || 300;
-    const height = container.clientHeight || 240;
-
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-
-    // Освещение
-    const ambient = new THREE.AmbientLight(0xffffff, 0.85);
-    scene.add(ambient);
-    const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-    dir.position.set(3, 8, 5);
-    scene.add(dir);
-    const fillLight = new THREE.DirectionalLight(0x90b0ff, 0.4);
-    fillLight.position.set(-4, 3, -3);
-    scene.add(fillLight);
-
-    // Круглая метрическая подставка под ногами
-    const platformGeo = new THREE.CylinderGeometry(0.8, 0.85, 0.04, 32);
-    const platformMat = new THREE.MeshStandardMaterial({ color: 0x242424, roughness: 0.7 });
-    const platform = new THREE.Mesh(platformGeo, platformMat);
-    platform.position.y = -0.02;
-    scene.add(platform);
-
-    const modelGroup = new THREE.Group();
-    scene.add(modelGroup);
-    modelGroupRef.current = modelGroup;
-
-    const structureType = animator.rigType as BodyStructureType;
-    const rigProfile = CREATURE_RIG_PROFILES[structureType];
-
-    // Асинхронная загрузка рига и прикрепление частей тела
-    const assemblePreviewModel = async () => {
-      if (!rigProfile?.rigAsset) return;
-
-      try {
-        const rig = await AssetManager.getInstance().getClonedModel(rigProfile.rigAsset);
-        if (isDisposed || !rig) return;
-
-        rig.scale.set(1, 1, 1);
-        rig.rotation.y = Math.PI / 2;
-        modelGroup.add(rig);
-
-        const assembly = world.getComponent(creatureRootId, 'assemblyRoot');
-        if (assembly?.partIds) {
-          for (const partId of assembly.partIds) {
-            const visual = world.getComponent(partId, 'visualModel');
-            if (visual?.modelId && visual?.rigNodeName) {
-              const targetNode = rig.getObjectByName(visual.rigNodeName);
-              if (targetNode) {
-                const meshClone = await AssetManager.getInstance().getClonedModel(visual.modelId);
-                if (isDisposed) return;
-                if (meshClone) {
-                  if (meshClone.type === 'Scene' || meshClone.type === 'Group') {
-                    targetNode.add(...meshClone.children);
-                  } else {
-                    targetNode.add(meshClone);
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Выравнивание основания модели на платформу Y = 0
-        const box = computeLocalBox(rig);
-        const visualCorrectionY = -box.min.y;
-        rig.position.set(0, visualCorrectionY, 0);
-
-        const updatedBox = new THREE.Box3().setFromObject(rig);
-        const center = new THREE.Vector3();
-        updatedBox.getCenter(center);
-        targetOrbitRef.current.copy(center);
-
-        const size = new THREE.Vector3();
-        updatedBox.getSize(size);
-        orbitParamsRef.current.distance = Math.max(1.8, Math.max(size.x, size.y, size.z) * 1.9);
-
-        // Инициализация аниматора превью
-        const mixer = new THREE.AnimationMixer(rig);
-        mixerRef.current = mixer;
-
-        // Запуск выбранной анимации
-        playClip(activeAnim || 'stand_idle', mixer, structureType);
-      } catch (err) {
-        console.error('[AnimationsTab Preview] Error loading preview model:', err);
-      }
-    };
-
-    assemblePreviewModel();
-
-    // ResizeObserver для точной подгонки Canvas при перетаскивании сплиттера
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        const h = entry.contentRect.height;
-        if (w > 0 && h > 0) {
-          camera.aspect = w / h;
-          camera.updateProjectionMatrix();
-          renderer.setSize(w, h);
-        }
-      }
-    });
-    resizeObserver.observe(container);
-
-    // Управление вращением камеры мышью в превью
-    const handlePointerDown = (e: MouseEvent) => {
-      orbitParamsRef.current.isDragging = true;
-      orbitParamsRef.current.lastX = e.clientX;
-      orbitParamsRef.current.lastY = e.clientY;
-    };
-    const handlePointerMove = (e: MouseEvent) => {
-      if (!orbitParamsRef.current.isDragging) return;
-      const dx = e.clientX - orbitParamsRef.current.lastX;
-      const dy = e.clientY - orbitParamsRef.current.lastY;
-      orbitParamsRef.current.yaw -= dx * 0.01; // Инвертировано по горизонтали
-      orbitParamsRef.current.pitch = Math.max(
-        -0.3,
-        Math.min(1.2, orbitParamsRef.current.pitch + dy * 0.01)
-      );
-      orbitParamsRef.current.lastX = e.clientX;
-      orbitParamsRef.current.lastY = e.clientY;
-    };
-    const handlePointerUp = () => {
-      orbitParamsRef.current.isDragging = false;
-    };
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      orbitParamsRef.current.distance = Math.max(
-        0.8,
-        Math.min(6.0, orbitParamsRef.current.distance + e.deltaY * 0.002)
-      );
-    };
-
-    container.addEventListener('mousedown', handlePointerDown);
-    window.addEventListener('mousemove', handlePointerMove);
-    window.addEventListener('mouseup', handlePointerUp);
-    container.addEventListener('wheel', handleWheel, { passive: false });
-
-    // Цикл рендера превью
-    let rafId: number;
-    let lastTime = performance.now();
-
-    const animate = (time: number) => {
-      const dt = Math.min(0.1, (time - lastTime) / 1000);
-      lastTime = time;
-
-      if (mixerRef.current) {
-        mixerRef.current.update(dt);
-      }
-
-      // Обновление положения орбитальной камеры
-      const { yaw, pitch, distance } = orbitParamsRef.current;
-      const target = targetOrbitRef.current;
-      const camX = target.x + distance * Math.cos(pitch) * Math.sin(yaw);
-      const camY = target.y + distance * Math.sin(pitch);
-      const camZ = target.z + distance * Math.cos(pitch) * Math.cos(yaw);
-      camera.position.set(camX, camY, camZ);
-      camera.lookAt(target);
-
-      renderer.render(scene, camera);
-      rafId = requestAnimationFrame(animate);
-    };
-    rafId = requestAnimationFrame(animate);
-
-    return () => {
-      isDisposed = true;
-      cancelAnimationFrame(rafId);
-      resizeObserver.disconnect();
-      container.removeEventListener('mousedown', handlePointerDown);
-      window.removeEventListener('mousemove', handlePointerMove);
-      window.removeEventListener('mouseup', handlePointerUp);
-      container.removeEventListener('wheel', handleWheel);
-
-      if (mixerRef.current) {
-        mixerRef.current.stopAllAction();
-        mixerRef.current = null;
-      }
-      currentActionRef.current = null;
-
-      if (modelGroupRef.current) {
-        ThreeSyncSystem.disposeObject(modelGroupRef.current);
-        modelGroupRef.current = null;
-      }
-      renderer.dispose();
-      if (renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
-    };
-  }, [creatureRootId, world]);
-
-  // Воспроизведение выбранного клипа на модели превью
-  const playClip = (
-    animName: string,
-    mixer = mixerRef.current,
-    structureType = animator?.rigType as BodyStructureType
-  ) => {
-    if (!mixer || !structureType) return;
-
-    let clip: THREE.AnimationClip | null = null;
-    if (ProceduralCreatureAssetManager.getInstance().hasBuilder(structureType)) {
-      clip = ProceduralCreatureAssetManager.getInstance().getAnimationClip(structureType, animName);
-    }
-
-    const applyToMixer = (c: THREE.AnimationClip) => {
-      mixer.stopAllAction();
-      const action = mixer.clipAction(c);
-      action.reset();
-      action.setEffectiveTimeScale(speed);
-      action.setLoop(THREE.LoopRepeat, Infinity);
-      action.play();
-      currentActionRef.current = action;
-    };
-
-    if (clip) {
-      applyToMixer(clip);
-    } else {
-      const profile = CREATURE_RIG_PROFILES[structureType];
-      const url = profile?.animations?.[animName];
-      if (url && !url.startsWith('proc://')) {
-        AssetManager.getInstance()
-          .loadGLTF(url)
-          .then((gltf) => {
-            if (gltf.animations?.[0]) {
-              applyToMixer(gltf.animations[0]);
-            }
-          });
-      }
-    }
-  };
-
   const handleSelectAnimation = (animName: string) => {
     setActiveAnim(animName);
-    playClip(animName);
   };
 
-  // Реактивное обновление скорости на активном действии
   const handleSpeedChange = (newSpeed: number) => {
     setSpeed(newSpeed);
-    if (currentActionRef.current) {
-      currentActionRef.current.setEffectiveTimeScale(newSpeed);
-    }
   };
 
   if (!selectedEntityId || !creatureRootId || !animator) {
@@ -570,30 +306,14 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ world, selectedEnt
           flexShrink: 0,
         }}
       >
-        <div
-          ref={canvasContainerRef}
-          style={{ width: '100%', height: '100%', cursor: 'grab', position: 'relative' }}
-          onMouseDown={(e) => (e.currentTarget.style.cursor = 'grabbing')}
-          onMouseUp={(e) => (e.currentTarget.style.cursor = 'grab')}
+        <ModelPreviewViewport
+          app={app}
+          world={world}
+          creatureId={creatureRootId}
+          structureType={animator.rigType}
+          animName={activeAnim}
+          speed={speed}
         />
-
-        {/* Наложение подсказки на окно превью */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '6px',
-            left: '8px',
-            fontSize: '9px',
-            color: '#666',
-            pointerEvents: 'none',
-            userSelect: 'none',
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            padding: '2px 6px',
-            borderRadius: '3px',
-          }}
-        >
-          {t('dock.previewControlsHint')}
-        </div>
       </div>
     </div>
   );

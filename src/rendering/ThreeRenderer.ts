@@ -12,6 +12,8 @@ import { AI_DEBUG_CONFIG } from '../config/aiDebugConfig';
 import { getEffectiveLogicBrain } from '../ecs/utils/anatomy';
 import { getRootOwner } from '../ecs/utils/hierarchy';
 import { LOGIC_CONFIG } from '../ai/config';
+import { IModelPreview } from './IModelPreview';
+import { ThreeModelPreview } from './ThreeModelPreview';
 
 export class ThreeRenderer implements IRenderer {
   private container: HTMLDivElement;
@@ -131,7 +133,7 @@ export class ThreeRenderer implements IRenderer {
     return this.canvas;
   }
 
-  public screenToWorld(clientX: number, clientY: number, _camera: Camera): import('../types').Vec3 {
+  public screenToWorld(clientX: number, clientY: number, _camera: Camera): Vec3 {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
     this.mouseNDC.y = -((clientY - rect.top) / rect.height) * 2 + 1;
@@ -160,7 +162,7 @@ export class ThreeRenderer implements IRenderer {
     };
   }
 
-  public projectToScreen(pos: import('../types').Vec3): import('../types').Vec3 | null {
+  public projectToScreen(pos: Vec3): Vec3 | null {
     const vector = this._tempV1.set(pos.x, pos.y, pos.z);
     vector.project(this.camera);
 
@@ -175,6 +177,10 @@ export class ThreeRenderer implements IRenderer {
       y: (-(vector.y * 0.5) + 0.5) * rect.height,
       z: vector.z,
     };
+  }
+
+  public createModelPreview(): IModelPreview {
+    return new ThreeModelPreview();
   }
 
   public pickEntity(clientX: number, clientY: number): EntityId | null {

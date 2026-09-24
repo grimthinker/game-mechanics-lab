@@ -1,91 +1,35 @@
-import { World } from './ecs/World';
-import { PhysicsSystem } from './ecs/systems/PhysicsSystem';
-import { MovementSystem } from './ecs/systems/MovementSystem';
-import { StealthSystem } from './ecs/systems/StealthSystem';
-import { AttackSystem } from './ecs/systems/AttackSystem';
-import { DamageSystem } from './ecs/systems/DamageSystem';
-import { AISystem } from './ecs/systems/AISystem';
-import { InteractionSystem } from './ecs/systems/InteractionSystem';
-import { AreaEffectorSystem } from './ecs/systems/AreaEffectorSystem';
-import { AnatomySystem } from './ecs/systems/AnatomySystem';
-import { AnimationSyncSystem } from './ecs/systems/AnimationSyncSystem';
-import { ModifierSystem } from './ecs/systems/ModifierSystem';
-import { AttachmentSystem } from './ecs/systems/AttachmentSystem';
 import { Camera } from './Camera';
 import { ThreeRenderer } from './rendering/ThreeRenderer';
-import { ThreeSyncSystem } from './ecs/systems/ThreeSyncSystem';
 import { IRenderer } from './rendering/IRenderer';
 import { Point, Vec3 } from './types';
-import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode } from './config/gameConfig';
-import { SerializedEntityData, SerializedWorldData, WorldSerializer } from './ecs/WorldSerializer';
+import { SerializedWorldData } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
-import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
-import { createDefaultTerrainConfig } from './ecs/archetypes/TerrainArchetype';
-import { getAnatomyParts, getAllContainedItems, getRootOwner } from './ecs/utils/hierarchy';
-import { calculateThrowVelocity } from './utils';
-import { CREATURE_BLUEPRINTS } from './ecs/templates';
-import { SERIALIZABLE_COMPONENT_KEYS, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from './ecs/types';
 import { EventBus } from './core/EventBus';
-import { BTLogicComponent } from './ai/core';
 import { serializeBTNode } from './ai/serializer';
 import { getEffectiveLogicBrain } from './ecs/utils/anatomy';
-import { EDITOR_CONFIG } from './config/editorConfig';
-import { deg2Rad, Radians } from './utils';
 import { compileTreeBlackboardSchema } from './ai/schema';
 import { AssetManager } from './rendering/AssetManager';
 
-import { TerrainBrushState } from './types';
-// Контроллеры редактора
-import { SelectionController } from './editor/SelectionController';
-import { GizmoController } from './editor/GizmoController';
-import { EditorMutationsAPI } from './editor/EditorMutationsAPI';
-import { EntityClonerService } from './editor/EntityClonerService';
-
-// Новая система истории (Паттерн Команда)
-import { CommandHistory } from './history/CommandHistory';
-import { TransactionBuilder } from './history/TransactionBuilder';
-import { EntitySnapshotCommand } from './history/commands/EntitySnapshotCommand';
-import { ItemTransferService } from './editor/ItemTransferService';
-
-// Физический драйвер 3D
-import { IPhysicsDriver, PhysicalRaycastResult } from './physics/IPhysicsDriver';
-import { RapierPhysicsDriver } from './physics/RapierPhysicsDriver';
+import { TimeManager } from './core/TimeManager';
+import { GameSimulation } from './core/GameSimulation';
+import { EditorInteractionManager } from './editor/EditorInteractionManager';
+import { PhysicalRaycastResult } from './physics/IPhysicsDriver';
+import { calculateThrowVelocity } from './utils';
 
 export { EntityAdapter } from './EntityAdapter';
 
 export class GameApp {
   private container: HTMLDivElement;
   public renderer: IRenderer;
-  public world: World;
-
-  public commandHistory: CommandHistory = new CommandHistory(EDITOR_CONFIG.historyMaxDepth);
-  public get history(): CommandHistory {
-    return this.commandHistory;
-  }
-  private mouseScreenPos: Point | null = null;
-
-  public physics: PhysicsSystem;
-  public physicsDriver: IPhysicsDriver;
-  private movementSystem: MovementSystem;
-  private stealthSystem: StealthSystem;
-  private attackSystem: AttackSystem;
-  public damageSystem: DamageSystem;
-  public aiSystem: AISystem;
-  private anatomySystem: AnatomySystem;
-  private threeSyncSystem: ThreeSyncSystem;
-  public interactionSystem: InteractionSystem;
-  private areaEffectorSystem: AreaEffectorSystem;
-  private animationSyncSystem: AnimationSyncSystem;
-  private modifierSystem: ModifierSystem;
-  public attachmentSystem: AttachmentSystem;
   public camera: Camera;
 
-  public playerEntityId: string | null = null;
-  public entityFactory: EntityFactory;
-  public serializer: WorldSerializer;
-  public editorSnapshot: SerializedWorldData | null = null;
+  public time: TimeManager;
+  public simulation: GameSimulation;
+  public editor: EditorInteractionManager;
+
   public throwTargeting: { slotIndex: number; partId: string; itemId: string } | null = null;
+  private mouseScreenPos: Point | null = null;
 
   private _showUIOverlays: boolean = true;
   public get showUIOverlays() {
@@ -107,61 +51,6 @@ export class GameApp {
     this.emitState();
   }
 
-  private _globalTimeScale: number = 1.0;
-  public get globalTimeScale() {
-    return this._globalTimeScale;
-  }
-  public set globalTimeScale(val: number) {
-    if (this._globalTimeScale === val) return;
-    this._globalTimeScale = val;
-    this.emitState();
-  }
-
-  public getPlayerEntityId(): string | null {
-    if (this.playerEntityId && this.world.hasEntity(this.playerEntityId)) {
-      const health = this.world.getComponent(this.playerEntityId, 'health');
-      if (health?.isAlive) return this.playerEntityId;
-    }
-
-    const entities = this.world.getEntitiesWith('aiStats', 'health');
-    for (const [id, comp] of entities) {
-      if (comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive) {
-        this.playerEntityId = id;
-        return id;
-      }
-    }
-    return null;
-  }
-
-  // Контроллеры редактора
-  public selection: SelectionController;
-  public gizmo: GizmoController;
-  public mutations: EditorMutationsAPI;
-  public itemTransfer: ItemTransferService;
-  public cloner: EntityClonerService;
-
-  public onFrame: (() => void) | null = null;
-
-  private lastTime: number = 0;
-  private isRunning: boolean = false;
-
-  private _isPaused: boolean = true;
-  public get isPaused() {
-    return this._isPaused;
-  }
-  public set isPaused(val: boolean) {
-    if (this._isPaused === val) return;
-    this._isPaused = val;
-    this.emitState();
-  }
-
-  private lastBTUpdate: number = 0;
-  private lastBTTargetId: string | null = null;
-
-  private physicsAccumulator: number = 0;
-  private readonly FIXED_DT: number = 1 / 60;
-  private readonly MAX_ACCUMULATOR_DT: number = 0.2;
-
   private _gameMode: GameMode = GameMode.EDITOR;
   public get gameMode() {
     return this._gameMode;
@@ -172,67 +61,114 @@ export class GameApp {
     this.emitState();
   }
 
-  public emitState(): void {
-    EventBus.emit('engine:state-changed', {
-      mode: this._gameMode,
-      isPaused: this._isPaused,
-      timeScale: this._globalTimeScale,
-      showUIOverlays: this._showUIOverlays,
-      showAIDebug: this._showAIDebug,
-    });
+  public onFrame: (() => void) | null = null;
+
+  private lastBTUpdate: number = 0;
+  private lastBTTargetId: string | null = null;
+
+  // --- ФАСАДЫ ДЛЯ ОБРАТНОЙ СОВМЕСТИМОСТИ (UI / ECS) ---
+  public get world() {
+    return this.simulation.world;
+  }
+  public get physics() {
+    return this.simulation.physics;
+  }
+  public get physicsDriver() {
+    return this.simulation.physicsDriver;
+  }
+  public get aiSystem() {
+    return this.simulation.aiSystem;
+  }
+  public get interactionSystem() {
+    return this.simulation.interactionSystem;
+  }
+  public get damageSystem() {
+    return this.simulation.damageSystem;
+  }
+  public get attachmentSystem() {
+    return this.simulation.attachmentSystem;
+  }
+  public get entityFactory() {
+    return this.simulation.entityFactory;
+  }
+  public get serializer() {
+    return this.simulation.serializer;
+  }
+  public get playerEntityId() {
+    return this.simulation.playerEntityId;
+  }
+  public set playerEntityId(val) {
+    this.simulation.playerEntityId = val;
   }
 
-  public terrainBrush: TerrainBrushState = {
-    active: false,
-    tool: 'raise',
-    texture: 0,
-    radius: 3.0,
-    strength: 2.0,
-  };
+  public get commandHistory() {
+    return this.editor.commandHistory;
+  }
+  public get history() {
+    return this.editor.commandHistory;
+  }
+  public get selection() {
+    return this.editor.selection;
+  }
+  public get gizmo() {
+    return this.editor.gizmo;
+  }
+  public get mutations() {
+    return this.editor.mutations;
+  }
+  public get itemTransfer() {
+    return this.editor.itemTransfer;
+  }
+  public get cloner() {
+    return this.editor.cloner;
+  }
+  public get terrainBrush() {
+    return this.editor.terrainBrush;
+  }
+  public set terrainBrush(val) {
+    this.editor.terrainBrush = val;
+  }
+  public get editorSnapshot() {
+    return this.editor.editorSnapshot;
+  }
+  public set editorSnapshot(val) {
+    this.editor.editorSnapshot = val;
+  }
 
-  private handleResize = () => this.resizeCanvas();
+  public get isPaused() {
+    return this.time.isPaused;
+  }
+  public set isPaused(val) {
+    this.time.isPaused = val;
+  }
+  public get globalTimeScale() {
+    return this.time.globalTimeScale;
+  }
+  public set globalTimeScale(val) {
+    this.time.globalTimeScale = val;
+  }
 
   constructor(container: HTMLDivElement) {
     this.container = container;
     const threeRenderer = new ThreeRenderer(container);
     this.renderer = threeRenderer;
-    this.threeSyncSystem = new ThreeSyncSystem(threeRenderer.scene);
-    this.world = new World();
-    this.physicsDriver = new RapierPhysicsDriver();
-    this.physics = new PhysicsSystem();
-    this.physics.driver = this.physicsDriver;
-    this.movementSystem = new MovementSystem();
-    this.stealthSystem = new StealthSystem();
-    this.attackSystem = new AttackSystem();
-    this.damageSystem = new DamageSystem();
-    this.aiSystem = new AISystem();
-    this.anatomySystem = new AnatomySystem();
-    this.interactionSystem = new InteractionSystem();
-    this.areaEffectorSystem = new AreaEffectorSystem();
-    this.animationSyncSystem = new AnimationSyncSystem();
-    this.modifierSystem = new ModifierSystem();
-    this.attachmentSystem = new AttachmentSystem();
     this.camera = new Camera();
-    this.entityFactory = new EntityFactory();
-    this.serializer = new WorldSerializer(this);
 
-    // Инициализация контроллеров
-    this.selection = new SelectionController(this);
-    this.gizmo = new GizmoController(this);
-    this.mutations = new EditorMutationsAPI(this.world);
-    this.itemTransfer = new ItemTransferService(this);
-    this.cloner = new EntityClonerService(this);
+    this.simulation = new GameSimulation(this);
+    this.editor = new EditorInteractionManager(this);
+    this.time = new TimeManager(this);
 
     this.resizeCanvas();
     window.addEventListener('resize', this.handleResize);
 
-    // Подписываемся на смену выделения для фиксации состояния ДО редактирования в Инспекторе
     EventBus.on('selection:changed', () => {
       if (this.gameMode === GameMode.EDITOR) {
         this.captureBaseState();
       }
     });
   }
+
+  private handleResize = () => this.resizeCanvas();
 
   public get canvas(): HTMLCanvasElement {
     return this.renderer.getCanvas();
@@ -248,519 +184,104 @@ export class GameApp {
     this.renderer.resize(w, h);
   }
 
-  private isPhysicsStructureDirty: boolean = false;
-
-  public markPhysicsStructureDirty(): void {
-    this.isPhysicsStructureDirty = true;
-  }
-
-  public syncPhysicsStructures(): void {
-    if (!this.physicsDriver || !this.physicsDriver.isReady) return;
-    this.anatomySystem.update(0, this.world, this.physics);
-    this.attachmentSystem.update(this.world, this.physics);
-    this.physics.syncDirtyTransforms(this.world);
-    this.physicsDriver.updateSceneQueries();
-    this.isPhysicsStructureDirty = false;
-  }
-
-  public spawnEntity(config: EntityConfig, position?: Vec3, forcedId?: string): string {
-    const id = this.entityFactory.spawnEntity(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      config,
-      position,
-      forcedId
-    );
-    this.syncPhysicsStructures();
-    return id;
-  }
-
-  /**
-   * Возвращает развернутый массив ID, включая части тела и содержимое инвентаря.
-   */
-  public gatherHierarchyIds(rootIds: string[]): string[] {
-    const resultSet = new Set<string>();
-    for (const id of rootIds) {
-      if (resultSet.has(id)) continue;
-
-      resultSet.add(id);
-      const parts = getAnatomyParts(this.world, id);
-
-      for (const partId of parts) {
-        resultSet.add(partId);
-        const items = getAllContainedItems(this.world, partId);
-        for (const itemId of items) {
-          resultSet.add(itemId);
-        }
-      }
-    }
-    return Array.from(resultSet);
-  }
-
-  public duplicateEntities(
-    ids: string[],
-    offset: { x: number; z: number; y?: number } = EDITOR_CONFIG.cloneOffset
-  ): string[] {
-    return this.cloner.duplicateEntities(ids, offset);
-  }
-
-  public startPickup(entityId: string, targetItemId: string): boolean {
-    return InteractionSystem.requestPickup(this.world, entityId, targetItemId);
-  }
-
-  public cancelInteraction(entityId: string): boolean {
-    return this.interactionSystem.cancelInteraction(this.world, this.physics, entityId);
-  }
-
-  public deleteSelectedEntity(): void {
-    this.deleteSelectedEntities();
-  }
-
-  public deleteSelectedEntities(): void {
-    const ids = Array.from(
-      this.selection.selectedEntityIds.size > 0
-        ? this.selection.selectedEntityIds
-        : this.selection.selectedEntityId
-          ? [this.selection.selectedEntityId]
-          : []
-    );
-
-    if (ids.length === 0) return;
-
-    const tx = new TransactionBuilder(this, 'Удаление объектов');
-    tx.captureBefore(ids);
-
-    for (const id of ids) {
-      this.deleteEntityRecursive(id);
-      if (this.selection.hoveredEntityId === id) this.selection.hoverEntity(null);
-    }
-
-    this.syncPhysicsStructures();
-    this.selection.clear();
-    tx.commit();
-    this.captureBaseState();
-  }
-
-  public deleteItemFromInteractionSlot(partId: string): boolean {
-    const slot = this.world.getComponent(partId, 'interactionSlots');
-    if (slot && slot.itemId) {
-      const itemId = slot.itemId;
-      slot.itemId = null;
-      this.deleteEntityRecursive(itemId);
-      this.attachmentSystem.update(this.world, this.physics);
-      return true;
-    }
-    return false;
-  }
-
-  public deleteItemFromEquipmentArea(containerId: string, areaId: string, itemId: string): boolean {
-    const equip = this.world.getComponent(containerId, 'equip');
-    if (!equip) return false;
-    const area = equip.equipmentAreas.find((a) => a.id === areaId);
-    if (!area) return false;
-    const idx = area.itemIds.indexOf(itemId);
-    if (idx !== -1) {
-      area.itemIds.splice(idx, 1);
-      this.deleteEntityRecursive(itemId);
-      this.attachmentSystem.update(this.world, this.physics);
-      return true;
-    }
-    return false;
-  }
-
-  public deleteEntityRecursive(id: string): void {
-    if (!this.world.getEntity(id)) return;
-    if (this.playerEntityId === id) this.playerEntityId = null;
-
-    const tag = this.world.getComponent(id, 'tag');
-    const isAssembly = this.world.getComponent(id, 'assemblyRoot');
-    if (tag?.archetype === 'creature' || isAssembly) {
-      const parts = getAnatomyParts(this.world, id);
-      for (const partId of parts) {
-        if (partId !== id) {
-          this.deleteEntityRecursive(partId);
-        }
-      }
-    }
-
-    const attachedEntities = this.world.getEntitiesWith('attachment');
-    for (const [childId, { attachment }] of attachedEntities) {
-      if (attachment.parentId === id) {
-        this.deleteEntityRecursive(childId);
-      }
-    }
-
-    const slotsComp = this.world.getComponent(id, 'interactionSlots');
-    if (slotsComp && slotsComp.itemId) {
-      this.deleteEntityRecursive(slotsComp.itemId);
-    }
-    const eq = this.world.getComponent(id, 'equip');
-    if (eq && eq.equipmentAreas) {
-      for (const area of eq.equipmentAreas) {
-        for (const itemId of area.itemIds) {
-          this.deleteEntityRecursive(itemId);
-        }
-      }
-    }
-    const inv = this.world.getComponent(id, 'inventory');
-    if (inv) {
-      for (const row of inv.slots) {
-        for (const cell of row) {
-          if (cell.itemId) this.deleteEntityRecursive(cell.itemId);
-        }
-      }
-    }
-    const phys = this.world.getComponent(id, 'physicsBody');
-    if (phys) {
-      if (phys.rawBody) {
-        this.physicsDriver.removeRigidBody(phys.rawBody);
-      }
-    }
-    this.aiSystem.unregisterEntity(id);
-    this.world.removeEntity(id);
-  }
-
-  public clearWorld(): void {
-    this.playerEntityId = null;
-    const entities = this.world.getAllEntities();
-    for (const [id, comp] of entities) {
-      if (comp.physicsBody) {
-        if (comp.physicsBody.rawBody) {
-          this.physicsDriver.removeRigidBody(comp.physicsBody.rawBody);
-        }
-      }
-      this.world.removeEntity(id);
-    }
-    this.aiSystem.clear();
-    this.selection.clear();
-    this.threeSyncSystem.clearMeshes();
-    EventBus.emit('world:updated');
-  }
-
-  public initDefaultWorld(center?: Vec3): void {
-    this.clearWorld();
-    this.commandHistory.clear();
-
-    const { x: bx, y: by, z: bz } = center ?? { x: 0, y: 0, z: 0 };
-
-    // Создаем базовый процедурный ландшафт 100x100 метров со Splatmap-текстурами
-    this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
-
-    this.entityFactory.spawnModularHumanoid(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      { x: bx, y: by, z: bz },
-      'PlayerTree',
-      'Игрок'
-    );
-
-    this.entityFactory.spawnModularCreature(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      { x: bx + 1.5, y: by, z: bz + 1.5 },
-      CREATURE_BLUEPRINTS.quadruped,
-      'FollowerTree',
-      'Собака'
-    );
-
-    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz });
-    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx - 4.5, y: by, z: bz });
-    this.spawnEntity(
-      createZoneConfig('repel', 2.5, 20, 'Зона отталкивания', false, false, false, true, 50, 0),
-      { x: bx - 4.5, y: by, z: bz - 4.5 }
-    );
-    this.spawnEntity(
-      createZoneConfig('attract', 2.5, 20, 'Зона притягивания', false, false, false, true, 50, 0),
-      { x: bx + 4.5, y: by, z: bz - 4.5 }
-    );
-    this.spawnEntity(
-      createZoneConfig(
-        'time_dilation',
-        2.5,
-        0.4,
-        'Зона замедления (0.4x)',
-        false,
-        false,
-        false,
-        false
-      ),
-      { x: bx - 4.5, y: by, z: bz + 4.5 }
-    );
-    this.spawnEntity(
-      createZoneConfig(
-        'time_dilation',
-        2.5,
-        1.8,
-        'Зона ускорения (1.8x)',
-        false,
-        false,
-        false,
-        false
-      ),
-      { x: bx + 4.5, y: by, z: bz + 4.5 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'obstacle' },
-        meta: { name: 'Каменная стена', entityType: 'obstacle', destructible: true },
-        health: { hp: 100, maxHp: 100 },
-        physics: {
-          radius: 2.0,
-          weight: 1000,
-          isSolid: true,
-          points: [
-            { x: -2, y: -0.5 },
-            { x: 2, y: -0.5 },
-            { x: 2, y: 0.5 },
-            { x: -2, y: 0.5 },
-          ],
-        },
-      },
-      { x: bx, y: by, z: bz + 4.0 }
-    );
-
-    const itemsX = bx - 1.5;
-
-    // Спавним предметы на высоте в воздухе (в безопасной зоне)
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'weapon' },
-        item: {
-          name: 'Аура разрушения',
-          type: 'weapon',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.4, weight: 1, isSolid: true },
-        weaponStats: { baseDamage: 30, prepTime: 0.3, castTime: 0, recoveryTime: 0.4 },
-        weaponZone: {
-          hitZoneType: 'radius',
-          radius: 2.0,
-          pierceObstacles: false,
-          pierceCreatures: false,
-          pierceItems: false,
-        },
-      },
-      { x: itemsX, y: by + 1.0, z: bz - 2.0 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'weapon' },
-        item: {
-          name: 'Шрапнельный дробовик',
-          type: 'weapon',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.4, weight: 2, isSolid: true },
-        weaponStats: { baseDamage: 15, prepTime: 0.4, castTime: 0, recoveryTime: 0.5 },
-        weaponZone: {
-          hitZoneType: 'shrapnel',
-          length: 4.0,
-          angle: deg2Rad(60),
-          rayCount: 5,
-          pierceObstacles: false,
-          pierceCreatures: false,
-          pierceItems: false,
-        },
-      },
-      { x: itemsX, y: by + 0.5, z: bz - 1.0 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'weapon' },
-        item: {
-          name: 'Копьё пронзания',
-          type: 'weapon',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.4, weight: 3, isSolid: true },
-        weaponStats: { baseDamage: 25, prepTime: 0.2, castTime: 0, recoveryTime: 0.3 },
-        weaponZone: {
-          hitZoneType: 'forward_line',
-          length: 4.5,
-          pierceObstacles: false,
-          pierceCreatures: false,
-          pierceItems: false,
-        },
-      },
-      { x: itemsX, y: by + 1.5, z: bz + 0.0 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'armor' },
-        item: {
-          name: 'Тяжёлый нагрудник',
-          type: 'armor',
-          maxStack: 1,
-          count: 1,
-          size: 20,
-          equipTypes: ['torso'],
-          equippable: true,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.4, weight: 20, isSolid: true },
-        armorStats: { defense: 25, flatReduction: 5 },
-      },
-      { x: itemsX, y: by + 0.2, z: bz + 1.0 }
-    );
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'armor' },
-        item: {
-          name: 'Стальной шлем',
-          type: 'armor',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: ['head'],
-          equippable: true,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.3, weight: 10, isSolid: true },
-        armorStats: { defense: 15, flatReduction: 2 },
-      },
-      { x: bx, y: by + 1.5, z: bz + 4.0 } as any
-    );
-
-    // Легкий предмет "Камень" для тестирования бросков
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'resource' },
-        item: {
-          name: 'Камень',
-          type: 'resource',
-          maxStack: 10,
-          count: 1,
-          size: 2,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.2, weight: 0.8, isSolid: true },
-      },
-      { x: bx + 1.0, y: by + 0.2, z: bz + 1.0 }
-    );
-
-    this.syncPhysicsStructures();
-  }
-
-  public serializeWorld(): SerializedWorldData {
-    return this.serializer.serializeWorld();
-  }
-
-  public deserializeWorld(data: SerializedWorldData): void {
-    this.serializer.deserializeWorld(data);
-    this.syncPhysicsStructures();
-  }
-
-  private baseStateForCommit: SerializedEntityData[] = [];
-  private baseSelectionForCommit = { id: null as string | null, ids: [] as string[] };
-
-  public captureBaseState(): void {
-    const ids = Array.from(this.selection.selectedEntityIds);
-    this.baseStateForCommit = this.serializer.serializeEntities(this.gatherHierarchyIds(ids));
-    this.baseSelectionForCommit = {
-      id: this.selection.selectedEntityId,
-      ids: [...ids],
-    };
-  }
-
-  /**
-   * Синхронно выполняет действие и сразу упаковывает его в транзакцию Команды.
-   */
-  public executeTransaction<T>(description: string, action: () => T): T {
-    const tx = new TransactionBuilder(this, description);
-    tx.captureBefore(Array.from(this.selection.selectedEntityIds));
-    const result = action();
-    tx.includeAdded(Array.from(this.selection.selectedEntityIds));
-    tx.commit();
-    this.captureBaseState();
-    return result;
-  }
-
-  /**
-   * Синхронно фиксирует изменения, сделанные через поля Инспектора.
-   */
-  public commitHistory(description: string = 'Изменение'): void {
-    if (this.gameMode !== GameMode.EDITOR) return;
-
-    const currentIds = Array.from(this.selection.selectedEntityIds);
-    const currentExpanded = this.gatherHierarchyIds(currentIds);
-
-    const allAffected = new Set<string>();
-    this.baseStateForCommit.forEach((e) => allAffected.add(e.id));
-    currentExpanded.forEach((id) => allAffected.add(id));
-
-    const affectedArr = Array.from(allAffected);
-    const afterEntities = this.serializer.serializeEntities(affectedArr);
-
-    const command = new EntitySnapshotCommand(
-      description,
-      this,
-      affectedArr,
-      this.baseStateForCommit,
-      afterEntities,
-      this.baseSelectionForCommit,
-      { id: this.selection.selectedEntityId, ids: currentIds }
-    );
-    this.commandHistory.push(command);
-    this.syncPhysicsStructures();
-    this.captureBaseState();
-  }
-
-  public undo(): boolean {
-    if (this.gameMode !== GameMode.EDITOR || !this.commandHistory.canUndo()) return false;
-    this.commandHistory.undo();
-    this.captureBaseState();
-    return true;
-  }
-
-  public redo(): boolean {
-    if (this.gameMode !== GameMode.EDITOR || !this.commandHistory.canRedo()) return false;
-    this.commandHistory.redo();
-    this.captureBaseState();
-    return true;
+  public emitState(): void {
+    EventBus.emit('engine:state-changed', {
+      mode: this._gameMode,
+      isPaused: this.isPaused,
+      timeScale: this.globalTimeScale,
+      showUIOverlays: this._showUIOverlays,
+      showAIDebug: this._showAIDebug,
+    });
   }
 
   public start(): void {
-    if (this.isRunning) return;
-    this.isRunning = true;
-    this.lastTime = performance.now();
-    requestAnimationFrame((t) => this.loop(t));
+    this.time.start();
   }
 
   public destroy(): void {
-    this.isRunning = false;
+    this.time.stop();
     window.removeEventListener('resize', this.handleResize);
-    this.threeSyncSystem.destroy();
+    this.simulation.destroy();
     if (this.renderer.destroy) {
       this.renderer.destroy();
     }
-    this.physicsDriver.destroy();
     AssetManager.getInstance().clear();
   }
 
+  // --- ДЕЛЕГАТЫ СИМУЛЯЦИИ И ФИЗИКИ ---
+  public markPhysicsStructureDirty(): void {
+    this.simulation.markPhysicsStructureDirty();
+  }
+  public syncPhysicsStructures(): void {
+    this.simulation.syncPhysicsStructures();
+  }
+  public spawnEntity(config: EntityConfig, position?: Vec3, forcedId?: string): string {
+    return this.simulation.spawnEntity(config, position, forcedId);
+  }
+  public gatherHierarchyIds(rootIds: string[]): string[] {
+    return this.simulation.gatherHierarchyIds(rootIds);
+  }
+  public startPickup(entityId: string, targetItemId: string): boolean {
+    return this.simulation.startPickup(entityId, targetItemId);
+  }
+  public cancelInteraction(entityId: string): boolean {
+    return this.simulation.cancelInteraction(entityId);
+  }
+  public deleteItemFromInteractionSlot(partId: string): boolean {
+    return this.simulation.deleteItemFromInteractionSlot(partId);
+  }
+  public deleteItemFromEquipmentArea(containerId: string, areaId: string, itemId: string): boolean {
+    return this.simulation.deleteItemFromEquipmentArea(containerId, areaId, itemId);
+  }
+  public deleteEntityRecursive(id: string): void {
+    this.simulation.deleteEntityRecursive(id);
+  }
+  public clearWorld(): void {
+    this.simulation.clearWorld();
+  }
+  public initDefaultWorld(center?: Vec3): void {
+    this.simulation.initDefaultWorld(center);
+  }
+  public serializeWorld(): SerializedWorldData {
+    return this.simulation.serializeWorld();
+  }
+  public deserializeWorld(data: SerializedWorldData): void {
+    this.simulation.deserializeWorld(data);
+  }
+  public clearPlayerAim(): void {
+    this.simulation.clearPlayerAim();
+  }
+  public getPlayerEntityId(): string | null {
+    return this.simulation.getPlayerEntityId();
+  }
+
+  // --- ДЕЛЕГАТЫ РЕДАКТОРА ---
+  public executeTransaction<T>(description: string, action: () => T): T {
+    return this.editor.executeTransaction(description, action);
+  }
+  public captureBaseState(): void {
+    this.editor.captureBaseState();
+  }
+  public commitHistory(description?: string): void {
+    this.editor.commitHistory(description);
+  }
+  public undo(): boolean {
+    return this.editor.undo();
+  }
+  public redo(): boolean {
+    return this.editor.redo();
+  }
+  public deleteSelectedEntity(): void {
+    this.editor.deleteSelectedEntity();
+  }
+  public deleteSelectedEntities(): void {
+    this.editor.deleteSelectedEntities();
+  }
+  public duplicateEntities(ids: string[], offset?: any): string[] {
+    return this.editor.duplicateEntities(ids, offset);
+  }
+
+  // --- ВЗАИМОДЕЙСТВИЕ И РЕНДЕР ---
   public updateBTData(force: boolean = false): void {
     const targetId = this.selection.selectedEntityId;
     const now = performance.now();
@@ -789,6 +310,7 @@ export class GameApp {
       btSchema: schema,
     });
   }
+
   public updateEntityBlackboard(entityId: string, key: string, value: any): void {
     const brain = getEffectiveLogicBrain(this.world, entityId);
     if (brain) {
@@ -805,134 +327,6 @@ export class GameApp {
     }
   }
 
-  private updateSystems(dt: number): void {
-    if (this.gameMode === GameMode.GAME && this.mouseScreenPos) {
-      const playerId = this.getPlayerEntityId() ?? undefined;
-      const worldPoint = this.getCanvasPoint(
-        this.mouseScreenPos.x,
-        this.mouseScreenPos.y,
-        playerId
-      );
-      this.updatePlayerAim(worldPoint);
-    }
-
-    this.anatomySystem.update(dt, this.world, this.physics);
-    this.modifierSystem.update(dt, this.world);
-    this.aiSystem.update(dt, this.world);
-    this.interactionSystem.update(dt, this.world, this.physics);
-    this.attackSystem.update(dt, this.world, this.physics);
-    this.movementSystem.update(dt, this.world, this.physics);
-    this.stealthSystem.update(dt, this.world);
-    this.physics.update(dt, this.world);
-    this.attachmentSystem.update(this.world, this.physics);
-    this.areaEffectorSystem.update(dt, this.world, this.physics);
-    this.damageSystem.update(dt, this.world);
-    this.animationSyncSystem.update(dt, this.world);
-  }
-
-  private loop(time: number): void {
-    if (!this.isRunning) return;
-
-    const realDt = Math.min(this.MAX_ACCUMULATOR_DT, (time - this.lastTime) / 1000);
-    this.lastTime = time;
-
-    let consumedTimeForRender = 0;
-
-    if (!this.isPaused) {
-      const simulatedDt = realDt * this.globalTimeScale;
-      this.physicsAccumulator += simulatedDt;
-
-      // Детерминированный цикл FixedUpdate: логика и физика тикают со строго фиксированным шагом 1/60 с
-      while (this.physicsAccumulator >= this.FIXED_DT) {
-        this.updateSystems(this.FIXED_DT);
-        this.physicsDriver.step(this.FIXED_DT);
-        this.physicsAccumulator -= this.FIXED_DT;
-        consumedTimeForRender += this.FIXED_DT;
-      }
-
-      // Синхронизируем позиции динамических тел из Rapier в ECS
-      this.syncDynamicBodiesToTransforms();
-
-      if (this.gameMode === GameMode.GAME) {
-        const isAnyPlayerAlive = this.world
-          .getAllEntities()
-          .some(
-            ([_, comp]) => comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
-          );
-        if (!isAnyPlayerAlive) {
-          EventBus.emit('game:playerDied');
-        }
-      }
-    } else {
-      this.physicsAccumulator = 0;
-      // В режиме паузы передаем реальное время, чтобы Idle-анимации в редакторе продолжали дышать
-      consumedTimeForRender = realDt;
-
-      if (this.isPhysicsStructureDirty) {
-        this.syncPhysicsStructures();
-      }
-    }
-
-    this.updateBTData(false);
-
-    // Синхронизация ручных изменений трансформаций (из UI/Gizmo) с физическим движком (даже на паузе)
-    this.physics.syncDirtyTransforms(this.world);
-
-    // Плавная синхронизация Three.js сцены и миксеров анимаций по честному времени кадра рендера
-    const renderDt = this.isPaused ? realDt : realDt * this.globalTimeScale;
-    this.threeSyncSystem.update(
-      renderDt,
-      this.world,
-      this.gameMode,
-      this.selection.selectedEntityIds
-    );
-
-    let cursorWorldPos: Vec3 | null = null;
-    let throwTrajectory: { start: Vec3; v0: Vec3 } | null = null;
-
-    if (this.mouseScreenPos) {
-      const pt = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
-      cursorWorldPos = { x: pt.x, y: pt.y, z: pt.z };
-
-      if (this.throwTargeting && this.gameMode === GameMode.GAME) {
-        const slot = this.world.getComponent(this.throwTargeting.partId, 'interactionSlots');
-        const physStats = this.world.getComponent(this.throwTargeting.itemId, 'physicsStats');
-        const transform =
-          this.world.getComponent(this.throwTargeting.partId, 'transform') ??
-          this.world.getComponent(this.getPlayerEntityId() ?? '', 'transform');
-
-        if (slot && physStats && transform) {
-          // Вынос точки броска (рука/грудь)
-          const startPos = { x: transform.x, y: transform.y + 1.2, z: transform.z };
-          const v0 = calculateThrowVelocity(startPos, pt, slot.strength, physStats.weight.current);
-          throwTrajectory = { start: startPos, v0 };
-        }
-      }
-    }
-
-    this.renderer.render({
-      camera: this.camera,
-      world: this.world,
-      physics: this.physics,
-      gameMode: this.gameMode,
-      editorData: {
-        selectedId: this.selection.selectedEntityId,
-        selectedIds: this.selection.selectedEntityIds,
-        hoveredId: this.selection.hoveredEntityId,
-        marqueeBox: this.selection.marqueeBox,
-        showAIDebug: this.showAIDebug,
-        gizmoTool: this.gizmo.tool,
-        terrainBrush: this.terrainBrush,
-        cursorWorldPos,
-        throwTrajectory,
-      },
-      showUIOverlays: this.showUIOverlays,
-    });
-    if (this.onFrame) this.onFrame();
-
-    requestAnimationFrame((t) => this.loop(t));
-  }
-
   public setMouseScreenPos(clientX: number | null, clientY: number | null): void {
     if (clientX === null || clientY === null) {
       this.mouseScreenPos = null;
@@ -941,77 +335,8 @@ export class GameApp {
     }
   }
 
-  public updatePlayerAim(worldPoint: Vec3): void {
-    const entities = this.world.getEntitiesWith('transform', 'input', 'health', 'aiStats');
-    for (const [, { transform, input, health, aiStats }] of entities) {
-      if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
-        const dx = worldPoint.x - transform.x;
-        const dz = worldPoint.z - transform.z;
-
-        const dist = Math.hypot(dx, dz);
-        if (dist > 0.05) {
-          input.targetLookAngle = Math.atan2(dz, dx) as Radians;
-        }
-      }
-    }
-  }
-  public clearPlayerAim(): void {
-    const entities = this.world.getEntitiesWith('input');
-    for (const [, { input }] of entities) {
-      input.targetLookAngle = undefined;
-    }
-  }
-
-  /**
-   * Считывает координаты и ориентацию из симуляции Rapier3D для всех Dynamic тел
-   */
-  private syncDynamicBodiesToTransforms(): void {
-    const dynamicEntities = this.world.getEntitiesWith('transform', 'physicsBody');
-    for (const [id, { transform, physicsBody }] of dynamicEntities) {
-      if (physicsBody.rawBody && physicsBody.bodyType === 'dynamic') {
-        // Если тело спит — его координаты гарантированно не изменились, пропускаем такт
-        if (physicsBody.rawBody.isSleeping()) {
-          continue;
-        }
-
-        const translation = physicsBody.rawBody.translation();
-        const rotation = physicsBody.rawBody.rotation();
-        const linvel = physicsBody.rawBody.linvel();
-        const angvel = physicsBody.rawBody.angvel();
-
-        transform.x = translation.x;
-        transform.y = translation.y;
-        transform.z = translation.z;
-
-        transform.rotation.x = rotation.x;
-        transform.rotation.y = rotation.y;
-        transform.rotation.z = rotation.z;
-        transform.rotation.w = rotation.w;
-
-        // Вычисляем угол рыскания Yaw вокруг вертикальной оси Y
-        const siny_cosp = 2 * (rotation.w * rotation.y + rotation.x * rotation.z);
-        const cosy_cosp = 1 - 2 * (rotation.y * rotation.y + rotation.z * rotation.z);
-        transform.angle = Math.atan2(siny_cosp, cosy_cosp) as Radians;
-
-        // Синхронизируем физическую скорость в ECS для сериализации при сохранении/Undo
-        let vel = this.world.getComponent(id, 'velocity');
-        if (!vel) {
-          this.world.addComponent(id, 'velocity', {
-            vx: linvel.x,
-            vy: linvel.y,
-            vz: linvel.z,
-            currentSpeed: Math.hypot(linvel.x, linvel.z),
-            currentTurnSpeed: 0 as Radians,
-            angvel: { x: angvel.x, y: angvel.y, z: angvel.z },
-          });
-        } else {
-          vel.vx = linvel.x;
-          vel.vy = linvel.y;
-          vel.vz = linvel.z;
-          vel.angvel = { x: angvel.x, y: angvel.y, z: angvel.z };
-        }
-      }
-    }
+  public getMouseScreenPos(): Point | null {
+    return this.mouseScreenPos;
   }
 
   public startPan(clientX: number, clientY: number): void {
@@ -1041,9 +366,50 @@ export class GameApp {
 
   public getCanvasPoint(clientX: number, clientY: number, excludeEntityId?: string): Vec3 {
     const hit = this.raycastPhysics(clientX, clientY, excludeEntityId);
-    if (hit) {
-      return hit.point;
-    }
+    if (hit) return hit.point;
     return this.renderer.screenToWorld(clientX, clientY, this.camera);
+  }
+
+  public renderFrame(): void {
+    let cursorWorldPos: Vec3 | null = null;
+    let throwTrajectory: { start: Vec3; v0: Vec3 } | null = null;
+
+    if (this.mouseScreenPos) {
+      const pt = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
+      cursorWorldPos = { x: pt.x, y: pt.y, z: pt.z };
+
+      if (this.throwTargeting && this.gameMode === GameMode.GAME) {
+        const slot = this.world.getComponent(this.throwTargeting.partId, 'interactionSlots');
+        const physStats = this.world.getComponent(this.throwTargeting.itemId, 'physicsStats');
+        const transform =
+          this.world.getComponent(this.throwTargeting.partId, 'transform') ??
+          this.world.getComponent(this.getPlayerEntityId() ?? '', 'transform');
+
+        if (slot && physStats && transform) {
+          const startPos = { x: transform.x, y: transform.y + 1.2, z: transform.z };
+          const v0 = calculateThrowVelocity(startPos, pt, slot.strength, physStats.weight.current);
+          throwTrajectory = { start: startPos, v0 };
+        }
+      }
+    }
+
+    this.renderer.render({
+      camera: this.camera,
+      world: this.world,
+      physics: this.physics,
+      gameMode: this.gameMode,
+      editorData: {
+        selectedId: this.selection.selectedEntityId,
+        selectedIds: this.selection.selectedEntityIds,
+        hoveredId: this.selection.hoveredEntityId,
+        marqueeBox: this.selection.marqueeBox,
+        showAIDebug: this.showAIDebug,
+        gizmoTool: this.gizmo.tool,
+        terrainBrush: this.terrainBrush,
+        cursorWorldPos,
+        throwTrajectory,
+      },
+      showUIOverlays: this.showUIOverlays,
+    });
   }
 }
