@@ -77,7 +77,7 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
                 const val = Number(e.target.value);
                 setFovAngle(val);
                 if (app) {
-                  app.updateEntityVision(targetId, { fovAngle: deg2Rad(val) });
+                  app.mutations.updateEntityVision(targetId, { fovAngle: deg2Rad(val) });
                   onCommit(t('history.visionChange'));
                 }
               }}
@@ -104,7 +104,7 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
                 const val = Number(e.target.value);
                 setClarity(val);
                 if (app) {
-                  app.updateEntityVision(targetId, { clarity: val });
+                  app.mutations.updateEntityVision(targetId, { clarity: val });
                   onCommit(t('history.visionChange'));
                 }
               }}
@@ -131,7 +131,7 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
                 const val = Number(e.target.value);
                 setVisionMaxDistance(val);
                 if (app) {
-                  app.updateEntityVision(targetId, { maxDistance: val });
+                  app.mutations.updateEntityVision(targetId, { maxDistance: val });
                   onCommit(t('history.visionChange'));
                 }
               }}
@@ -174,7 +174,7 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
                 const val = Number(e.target.value);
                 setSensitivity(val);
                 if (app) {
-                  app.updateEntityHearing(targetId, { sensitivity: val });
+                  app.mutations.updateEntityHearing(targetId, { sensitivity: val });
                   onCommit(t('history.hearingChange'));
                 }
               }}
@@ -201,7 +201,7 @@ export const SensesInspector: React.FC<SensesInspectorProps> = ({
                 const val = Number(e.target.value);
                 setHearingMaxDistance(val);
                 if (app) {
-                  app.updateEntityHearing(targetId, { maxDistance: val });
+                  app.mutations.updateEntityHearing(targetId, { maxDistance: val });
                   onCommit(t('history.hearingChange'));
                 }
               }}

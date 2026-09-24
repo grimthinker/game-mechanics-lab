@@ -37,14 +37,16 @@ export const App: React.FC = () => {
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const [mode, setMode] = useState<GameMode>(GameMode.EDITOR);
+  const [engineState, setEngineState] = useState({
+    mode: GameMode.EDITOR,
+    isPaused: true,
+    timeScale: 1.0,
+    showUIOverlays: true,
+    showAIDebug: false,
+  });
+
   const [isWasmReady, setIsWasmReady] = useState<boolean>(false);
   const [isEngineReady, setIsEngineReady] = useState<boolean>(false);
-  const [snapshot, setSnapshot] = useState<any>(null);
-  const snapshotRef = useRef<any>(null);
-  snapshotRef.current = snapshot;
-  const [showUIOverlays, setShowUIOverlays] = useState<boolean>(true);
-  const [showAIDebug, setShowAIDebug] = useState<boolean>(false);
   const [gizmoTool, setGizmoTool] = useState<GizmoTool>('translate');
   const [leftDockTab, setLeftDockTab] = useState<DockTab>('hierarchy');
   const [pieMenuState, setPieMenuState] = useState<PieMenuState | null>(null);
@@ -58,30 +60,6 @@ export const App: React.FC = () => {
     setPieMenuState(null);
   }, []);
 
-  const modeRef = useRef(mode);
-
-  const applyShowUIOverlays = useCallback((val: boolean) => {
-    setShowUIOverlays(val);
-    if (appRef.current) appRef.current.showUIOverlays = val;
-  }, []);
-
-  const applyShowAIDebug = useCallback((val: boolean) => {
-    setShowAIDebug(val);
-    if (appRef.current) appRef.current.showAIDebug = val;
-  }, []);
-
-  const applyGameMode = useCallback((m: GameMode) => {
-    setMode(m);
-    modeRef.current = m;
-    setPieMenuState(null);
-    if (appRef.current) appRef.current.gameMode = m;
-  }, []);
-
-  const applyGlobalTimeScale = useCallback((val: number) => {
-    setGlobalTimeScale(val);
-    if (appRef.current) appRef.current.globalTimeScale = val;
-  }, []);
-
   const [obstaclesEnabled, setObstaclesEnabled] = useState(true);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
@@ -92,10 +70,8 @@ export const App: React.FC = () => {
     zone: true,
     marker: true,
   });
-  const [isPaused, setIsPaused] = useState<boolean>(true);
   const [placementMode, setPlacementMode] = useState<PlacementMode | null>(null);
   const [bbPicking, setBbPicking] = useState<BlackboardPickingState | null>(null);
-  const [globalTimeScale, setGlobalTimeScale] = useState<number>(1.0);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
   const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
@@ -119,13 +95,17 @@ export const App: React.FC = () => {
   }, []);
 
   const { syncPlayerControls } = useKeyboardControls({
-    isModalOpen: isPaused,
+    isModalOpen: engineState.isPaused,
     isEditModalOpen: false,
-    mode,
+    mode: engineState.mode,
   });
 
   // Подписка на события движка через EventBus
   useEffect(() => {
+    const unsubState = EventBus.on('engine:state-changed', (state) => {
+      setEngineState(state);
+    });
+
     const unsubSelection = EventBus.on(
       'selection:changed',
       ({ selectedEntityId: sId, selectedEntityIds: sIds }) => {
@@ -149,9 +129,10 @@ export const App: React.FC = () => {
     );
 
     const unsubPlayerDied = EventBus.on('game:playerDied', () => {
-      applyGameMode(GameMode.SIMULATION);
-      if (appRef.current) appRef.current.isPaused = true;
-      setIsPaused(true);
+      if (appRef.current) {
+        appRef.current.gameMode = GameMode.SIMULATION;
+        appRef.current.isPaused = true;
+      }
     });
 
     const unsubWorld = EventBus.on('world:updated', () => {
@@ -159,12 +140,13 @@ export const App: React.FC = () => {
     });
 
     return () => {
+      unsubState();
       unsubSelection();
       unsubBT();
       unsubPlayerDied();
       unsubWorld();
     };
-  }, [applyGameMode, syncPlayerControls]);
+  }, [syncPlayerControls]);
 
   const updateStats = useCallback(() => {
     const app = appRef.current;
@@ -187,7 +169,7 @@ export const App: React.FC = () => {
     setPlacementMode,
     syncPlayerControls,
     updateStats,
-    mode,
+    mode: engineState.mode,
     typeFilters,
     onOpenPieMenu: setPieMenuState,
     onClosePieMenu: closePieMenu,
@@ -202,16 +184,15 @@ export const App: React.FC = () => {
     if (!app || !canvas) return;
     app.camera.resetZoomAndRotation(canvas);
     updateStats();
-    saveWorldToStorage(app, snapshotRef.current);
+    saveWorldToStorage(app, app.editorSnapshot);
   }, [closePieMenu, updateStats]);
 
   const createNewWorld = useCallback(() => {
     closePieMenu();
-    setSnapshot(null);
-    snapshotRef.current = null;
     const app = appRef.current;
     if (!app) return;
 
+    app.editorSnapshot = null;
     app.initDefaultWorld();
     saveWorldToStorage(app);
     syncPlayerControls();
@@ -243,12 +224,7 @@ export const App: React.FC = () => {
     appRef.current = app;
     setApp(app);
 
-    app.gameMode = modeRef.current;
-    app.isPaused = true;
-    setIsPaused(true);
-    app.globalTimeScale = globalTimeScale;
-    app.showUIOverlays = showUIOverlays;
-    app.showAIDebug = showAIDebug;
+    app.emitState(); // Форсируем первичную синхронизацию в React
 
     app.start();
 
@@ -284,7 +260,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleSave = () => {
       if (appRef.current) {
-        saveWorldToStorage(appRef.current, snapshotRef.current);
+        saveWorldToStorage(appRef.current, appRef.current.editorSnapshot);
       }
     };
 
@@ -309,13 +285,11 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
 
-    if (modeRef.current === GameMode.EDITOR || modeRef.current === GameMode.GAME) {
+    if (app.gameMode === GameMode.EDITOR || app.gameMode === GameMode.GAME) {
       return;
     }
 
-    const nextState = !app.isPaused;
-    app.isPaused = nextState;
-    setIsPaused(nextState);
+    app.isPaused = !app.isPaused;
   }, []);
 
   const goToEditor = useCallback(() => {
@@ -323,53 +297,46 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
-    if (snapshot) {
-      app.deserializeWorld(snapshot);
-      setSnapshot(null);
-      snapshotRef.current = null;
+    if (app.editorSnapshot) {
+      app.deserializeWorld(app.editorSnapshot);
+      app.editorSnapshot = null;
     }
-    applyGameMode(GameMode.EDITOR);
+    app.gameMode = GameMode.EDITOR;
     app.isPaused = true;
-    setIsPaused(true);
     app.selection.clear();
     saveWorldToStorage(app);
-  }, [snapshot, applyGameMode]);
+  }, []);
 
   const goToSimulation = useCallback(() => {
     GlobalInput.keys.clear();
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
-    let currentSnapshot = snapshot;
-    if (modeRef.current === GameMode.EDITOR) {
-      currentSnapshot = app.serializeWorld();
-      setSnapshot(currentSnapshot);
-      snapshotRef.current = currentSnapshot;
+
+    if (app.gameMode === GameMode.EDITOR) {
+      app.editorSnapshot = app.serializeWorld();
     }
-    applyGameMode(GameMode.SIMULATION);
+
+    app.gameMode = GameMode.SIMULATION;
     app.isPaused = false;
-    setIsPaused(false);
     app.selection.clear();
-    saveWorldToStorage(app, currentSnapshot);
-  }, [applyGameMode, snapshot]);
+    saveWorldToStorage(app, app.editorSnapshot);
+  }, []);
 
   const goToGame = useCallback(() => {
     GlobalInput.keys.clear();
     const app = appRef.current;
     if (!app) return;
-    let currentSnapshot = snapshot;
-    if (modeRef.current === GameMode.EDITOR) {
-      currentSnapshot = app.serializeWorld();
-      setSnapshot(currentSnapshot);
-      snapshotRef.current = currentSnapshot;
-    }
-    applyGlobalTimeScale(1.0); // Возвращаем нормальную скорость времени для игры
-    applyGameMode(GameMode.GAME);
 
+    if (app.gameMode === GameMode.EDITOR) {
+      app.editorSnapshot = app.serializeWorld();
+    }
+
+    app.globalTimeScale = 1.0;
+    app.gameMode = GameMode.GAME;
     app.isPaused = false;
-    setIsPaused(false);
-    saveWorldToStorage(app, currentSnapshot);
-  }, [applyGameMode, applyGlobalTimeScale, snapshot]);
+    saveWorldToStorage(app, app.editorSnapshot);
+  }, []);
 
   const handleDeleteEntity = useCallback(() => {
     const app = appRef.current;
@@ -468,8 +435,8 @@ export const App: React.FC = () => {
   }, [bbPicking]);
 
   useGlobalShortcuts({
-    mode,
-    isPaused,
+    mode: engineState.mode,
+    isPaused: engineState.isPaused,
     togglePause,
     handleDeleteEntity,
     onQuickSpawn: handleQuickSpawn,
@@ -516,9 +483,9 @@ export const App: React.FC = () => {
       )}
 
       {/* Верхняя панель управления скрывается в режиме игры */}
-      {mode !== GameMode.GAME && (
+      {engineState.mode !== GameMode.GAME && (
         <TopBar
-          mode={mode}
+          mode={engineState.mode}
           goToEditor={goToEditor}
           goToSimulation={goToSimulation}
           goToGame={goToGame}
@@ -548,8 +515,7 @@ export const App: React.FC = () => {
                 const data = JSON.parse(evt.target?.result as string);
                 const app = appRef.current;
                 if (app) {
-                  setSnapshot(null);
-                  snapshotRef.current = null;
+                  app.editorSnapshot = null;
                   app.deserializeWorld(data);
                   app.commandHistory.clear();
                   saveWorldToStorage(app);
@@ -562,26 +528,32 @@ export const App: React.FC = () => {
             };
             reader.readAsText(file);
           }}
-          isPaused={isPaused}
+          isPaused={engineState.isPaused}
           togglePause={togglePause}
-          globalTimeScale={globalTimeScale}
-          setGlobalTimeScale={applyGlobalTimeScale}
+          globalTimeScale={engineState.timeScale}
+          setGlobalTimeScale={(val) => {
+            if (appRef.current) appRef.current.globalTimeScale = val;
+          }}
           canUndo={appRef.current?.commandHistory.canUndo() ?? false}
           canRedo={appRef.current?.commandHistory.canRedo() ?? false}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onOpenHotkeys={() => setIsHotkeysOpen(true)}
-          showUIOverlays={showUIOverlays}
-          setShowUIOverlays={applyShowUIOverlays}
-          showAIDebug={showAIDebug}
-          setShowAIDebug={applyShowAIDebug}
+          showUIOverlays={engineState.showUIOverlays}
+          setShowUIOverlays={(val) => {
+            if (appRef.current) appRef.current.showUIOverlays = val;
+          }}
+          showAIDebug={engineState.showAIDebug}
+          setShowAIDebug={(val) => {
+            if (appRef.current) appRef.current.showAIDebug = val;
+          }}
         />
       )}
 
       {/* Основная рабочая область (Flex-контейнер) */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* Левый док (Иерархия, Палитра, BT) */}
-        {mode !== GameMode.GAME && (
+        {engineState.mode !== GameMode.GAME && (
           <LeftDock
             app={appRef.current}
             world={appRef.current?.world}
@@ -623,7 +595,7 @@ export const App: React.FC = () => {
           onContextMenu={handleContextMenu}
         >
           {/* Статус-бар холста (зум, координаты, сброс вида, выбор манипулятора) */}
-          {mode !== GameMode.GAME && (
+          {engineState.mode !== GameMode.GAME && (
             <CanvasHUD
               camera={appRef.current?.camera}
               cursorWorldPos={cursorWorldPos}
@@ -634,7 +606,7 @@ export const App: React.FC = () => {
           )}
 
           {/* Внутриигровой интерфейс HUD */}
-          {mode === GameMode.GAME && (
+          {engineState.mode === GameMode.GAME && (
             <GameHUD
               app={appRef.current}
               world={appRef.current?.world}
@@ -645,7 +617,7 @@ export const App: React.FC = () => {
           )}
 
           {/* Нижняя панель группового выделения (Drawer) */}
-          {mode !== GameMode.GAME && (
+          {engineState.mode !== GameMode.GAME && (
             <MultiSelectionDrawer
               selectedEntityIds={selectedEntityIds}
               selectedEntityId={selectedEntityId}
@@ -741,7 +713,7 @@ export const App: React.FC = () => {
           )}
 
           {/* Радиальное контекстное меню (Pie Menu) */}
-          {pieMenuState && mode === GameMode.EDITOR && (
+          {pieMenuState && engineState.mode === GameMode.EDITOR && (
             <PieMenu
               position={pieMenuState.screenPos}
               title={
@@ -992,10 +964,10 @@ export const App: React.FC = () => {
         </div>
 
         {/* Правый док (Живой Инспектор) */}
-        {mode !== GameMode.GAME && (
+        {engineState.mode !== GameMode.GAME && (
           <Inspector
             app={appRef.current}
-            mode={mode}
+            mode={engineState.mode}
             selectedEntityId={selectedEntityId}
             world={appRef.current?.world}
             onCommitHistory={handleCommitHistory}

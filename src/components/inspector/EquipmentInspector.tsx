@@ -183,7 +183,9 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                 }}
                 onChange={(e) => {
                   if (app) {
-                    app.updateEquipmentArea(containerId, area.id, { name: e.target.value });
+                    app.mutations.updateEquipmentArea(containerId, area.id, {
+                      name: e.target.value,
+                    });
                     onCommit(t('history.equipName'));
                   }
                 }}
@@ -206,7 +208,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                     }}
                     onChange={(e) => {
                       if (app) {
-                        app.updateEquipmentArea(containerId, area.id, {
+                        app.mutations.updateEquipmentArea(containerId, area.id, {
                           space: Math.max(1, +e.target.value),
                         });
                         onCommit(t('history.equipSpace'));
@@ -223,7 +225,7 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                         return;
                       }
                       if (app) {
-                        app.removeEquipmentArea(containerId, area.id);
+                        app.mutations.removeEquipmentArea(containerId, area.id);
                         onCommit(t('history.equipRemove'));
                       }
                     }}
@@ -290,7 +292,9 @@ export const EquipmentInspector: React.FC<EquipmentInspectorProps> = ({
                 style={{ width: '65%', padding: '2px 4px', fontSize: '11px' }}
                 onChange={(e) => {
                   if (app) {
-                    app.updateEquipmentArea(containerId, area.id, { type: e.target.value });
+                    app.mutations.updateEquipmentArea(containerId, area.id, {
+                      type: e.target.value,
+                    });
                     onCommit(t('history.equipType'));
                   }
                 }}

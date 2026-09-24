@@ -81,11 +81,39 @@ export class GameApp {
   public camera: Camera;
 
   public playerEntityId: string | null = null;
-  public showUIOverlays: boolean = true;
-  public showAIDebug: boolean = false;
-  public globalTimeScale: number = 1.0;
   public entityFactory: EntityFactory;
   public serializer: WorldSerializer;
+  public editorSnapshot: any = null;
+
+  private _showUIOverlays: boolean = true;
+  public get showUIOverlays() {
+    return this._showUIOverlays;
+  }
+  public set showUIOverlays(val: boolean) {
+    if (this._showUIOverlays === val) return;
+    this._showUIOverlays = val;
+    this.emitState();
+  }
+
+  private _showAIDebug: boolean = false;
+  public get showAIDebug() {
+    return this._showAIDebug;
+  }
+  public set showAIDebug(val: boolean) {
+    if (this._showAIDebug === val) return;
+    this._showAIDebug = val;
+    this.emitState();
+  }
+
+  private _globalTimeScale: number = 1.0;
+  public get globalTimeScale() {
+    return this._globalTimeScale;
+  }
+  public set globalTimeScale(val: number) {
+    if (this._globalTimeScale === val) return;
+    this._globalTimeScale = val;
+    this.emitState();
+  }
 
   public getPlayerEntityId(): string | null {
     if (this.playerEntityId && this.world.hasEntity(this.playerEntityId)) {
@@ -114,7 +142,16 @@ export class GameApp {
 
   private lastTime: number = 0;
   private isRunning: boolean = false;
-  public isPaused: boolean = false;
+
+  private _isPaused: boolean = true;
+  public get isPaused() {
+    return this._isPaused;
+  }
+  public set isPaused(val: boolean) {
+    if (this._isPaused === val) return;
+    this._isPaused = val;
+    this.emitState();
+  }
 
   private lastBTUpdate: number = 0;
   private lastBTTargetId: string | null = null;
@@ -123,7 +160,25 @@ export class GameApp {
   private readonly FIXED_DT: number = 1 / 60;
   private readonly MAX_ACCUMULATOR_DT: number = 0.2;
 
-  public gameMode: GameMode = GameMode.EDITOR;
+  private _gameMode: GameMode = GameMode.EDITOR;
+  public get gameMode() {
+    return this._gameMode;
+  }
+  public set gameMode(val: GameMode) {
+    if (this._gameMode === val) return;
+    this._gameMode = val;
+    this.emitState();
+  }
+
+  public emitState(): void {
+    EventBus.emit('engine:state-changed', {
+      mode: this._gameMode,
+      isPaused: this._isPaused,
+      timeScale: this._globalTimeScale,
+      showUIOverlays: this._showUIOverlays,
+      showAIDebug: this._showAIDebug,
+    });
+  }
 
   public terrainBrush: TerrainBrushState = {
     active: false,
@@ -951,139 +1006,5 @@ export class GameApp {
       return hit.point;
     }
     return this.renderer.screenToWorld(clientX, clientY, this.camera);
-  }
-
-  // --- Методы-фасады (delegates) для обратной совместимости с Инспектором ---
-
-  public updateEntityTransform(
-    id: string,
-    patch: { x?: number; y?: number; z?: number; angle?: number }
-  ): boolean {
-    return this.mutations.updateEntityTransform(id, patch);
-  }
-
-  public updateEntityMeta(id: string, patch: { name?: string; destructible?: boolean }): boolean {
-    return this.mutations.updateEntityMeta(id, patch);
-  }
-
-  public updateEntityPhysics(
-    id: string,
-    patch: { radius?: number; weight?: number; isSolid?: boolean }
-  ): boolean {
-    return this.mutations.updateEntityPhysics(id, patch);
-  }
-
-  public updateEntityHealth(id: string, patch: { hp?: number; maxHp?: number }): boolean {
-    return this.mutations.updateEntityHealth(id, patch);
-  }
-
-  public updateEntityFunctionalHealth(id: string, patch: { fp?: number; maxFp?: number }): boolean {
-    return this.mutations.updateEntityFunctionalHealth(id, patch);
-  }
-
-  public updateEntitySocketLinkStrength(id: string, socketId: string, strength: number): boolean {
-    return this.mutations.updateEntitySocketLinkStrength(id, socketId, strength);
-  }
-
-  public updateEntityMovementStats(id: string, patch: any): boolean {
-    return this.mutations.updateEntityMovementStats(id, patch);
-  }
-
-  public updateEntityStealthStats(id: string, patch: any): boolean {
-    return this.mutations.updateEntityStealthStats(id, patch);
-  }
-
-  public updateEntityAIBehavior(id: string, behavior: string): boolean {
-    return this.mutations.updateEntityAIBehavior(id, behavior);
-  }
-
-  public updateEntityAreaEffector(id: string, patch: any): boolean {
-    return this.mutations.updateEntityAreaEffector(id, patch);
-  }
-
-  public updateEntityWeapon(id: string, patch: any): boolean {
-    return this.mutations.updateEntityWeapon(id, patch);
-  }
-
-  public updateEntityArmor(id: string, patch: any): boolean {
-    return this.mutations.updateEntityArmor(id, patch);
-  }
-
-  public updateEntityGenericItem(id: string, patch: any): boolean {
-    return this.mutations.updateEntityGenericItem(id, patch);
-  }
-
-  public updateEntityHeart(id: string, patch: { requiresBrain?: boolean }): boolean {
-    return this.mutations.updateEntityHeart(id, patch);
-  }
-
-  public updateEntityVision(
-    id: string,
-    patch: { fovAngle?: number; clarity?: number; maxDistance?: number }
-  ): boolean {
-    return this.mutations.updateEntityVision(id, patch);
-  }
-
-  public updateEntityHearing(
-    id: string,
-    patch: { sensitivity?: number; maxDistance?: number }
-  ): boolean {
-    return this.mutations.updateEntityHearing(id, patch);
-  }
-
-  public updateEntityBag(id: string, patch: any, isBagEmpty: boolean): boolean {
-    return this.mutations.updateEntityBag(id, patch, isBagEmpty);
-  }
-
-  public updateEntityInteractionSlot(
-    partOrCreatureId: string,
-    patch: { name?: string; interactDist?: number; strength?: number; slotKind?: string }
-  ): boolean {
-    return this.mutations.updateEntityInteractionSlot(partOrCreatureId, patch);
-  }
-
-  public addEntityInteractionSlot(
-    partId: string,
-    defaultName: string = 'Новая рука',
-    interactDist: number = 1.5,
-    strength: number = 15,
-    slotKind: string = 'left_hand'
-  ): boolean {
-    return this.mutations.addEntityInteractionSlot(
-      partId,
-      defaultName,
-      interactDist,
-      strength,
-      slotKind
-    );
-  }
-
-  public removeEntityInteractionSlot(partId: string): boolean {
-    return this.mutations.removeEntityInteractionSlot(partId);
-  }
-
-  public updateEquipmentArea(
-    containerId: string,
-    areaId: string,
-    patch: { name?: string; space?: number; type?: string }
-  ): boolean {
-    return this.mutations.updateEquipmentArea(containerId, areaId, patch);
-  }
-
-  public addEquipmentArea(
-    containerId: string,
-    defaultType: string = 'new_equip_type',
-    defaultName: string = 'Новая область',
-    space?: number
-  ): string {
-    return this.mutations.addEquipmentArea(containerId, defaultType, defaultName, space);
-  }
-
-  public removeEquipmentArea(containerId: string, areaId: string): boolean {
-    return this.mutations.removeEquipmentArea(containerId, areaId);
-  }
-
-  public setEntityInventoryGrid(id: string, enable: boolean): boolean {
-    return this.mutations.setEntityInventoryGrid(id, enable);
   }
 }

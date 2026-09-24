@@ -46,7 +46,7 @@ export const HeartInspector: React.FC<HeartInspectorProps> = ({
             const val = e.target.checked;
             setRequiresBrain(val);
             if (app) {
-              app.updateEntityHeart(targetId, { requiresBrain: val });
+              app.mutations.updateEntityHeart(targetId, { requiresBrain: val });
               onCommit(t('history.heartChange'));
             }
           }}

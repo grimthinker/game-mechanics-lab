@@ -42,7 +42,7 @@ export const HealthInspector: React.FC<HealthInspectorProps> = ({
     if (patch.maxHp !== undefined) setMaxHp(nextMaxHp);
 
     if (app) {
-      app.updateEntityHealth(targetId, { hp: nextHp, maxHp: nextMaxHp });
+      app.mutations.updateEntityHealth(targetId, { hp: nextHp, maxHp: nextMaxHp });
       onCommit(t('history.healthChange'));
     }
   };

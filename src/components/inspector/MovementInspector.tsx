@@ -62,7 +62,7 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
     const next = { ...values, ...patch };
     setValues(next);
     if (app) {
-      app.updateEntityMovementStats(targetId, patch);
+      app.mutations.updateEntityMovementStats(targetId, patch);
       onCommit(t('history.movementChange'));
     }
   };

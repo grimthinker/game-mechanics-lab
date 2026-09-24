@@ -49,7 +49,7 @@ export const FunctionalHealthInspector: React.FC<FunctionalHealthInspectorProps>
   const handleFpChange = (newFp: number) => {
     setFp(newFp);
     if (app) {
-      app.updateEntityFunctionalHealth(targetId, { fp: newFp });
+      app.mutations.updateEntityFunctionalHealth(targetId, { fp: newFp });
       onCommit(t('history.fpChange'));
     }
   };
@@ -57,7 +57,7 @@ export const FunctionalHealthInspector: React.FC<FunctionalHealthInspectorProps>
   const handleMaxFpChange = (newMaxFp: number) => {
     setMaxFp(newMaxFp);
     if (app) {
-      app.updateEntityFunctionalHealth(targetId, { maxFp: newMaxFp });
+      app.mutations.updateEntityFunctionalHealth(targetId, { maxFp: newMaxFp });
       onCommit(t('history.fpChange'));
     }
   };

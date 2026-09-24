@@ -72,7 +72,7 @@ export const WeaponInspector: React.FC<WeaponInspectorProps> = ({
     const updated = { ...weaponData, ...patch };
     setWeaponData(updated);
     if (app) {
-      app.updateEntityWeapon(targetId, updated);
+      app.mutations.updateEntityWeapon(targetId, updated);
       onCommit(t('history.weaponChange'));
     }
   };
@@ -101,7 +101,7 @@ export const WeaponInspector: React.FC<WeaponInspectorProps> = ({
     };
     setWeaponData(updated);
     if (app) {
-      app.updateEntityWeapon(targetId, updated);
+      app.mutations.updateEntityWeapon(targetId, updated);
       onCommit(t('history.weaponChange'));
     }
   };

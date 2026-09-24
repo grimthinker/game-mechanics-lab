@@ -34,7 +34,7 @@ export const AreaEffectorInspector: React.FC<AreaEffectorInspectorProps> = ({
     const next = { ...values, ...patch };
     setValues(next);
     if (app) {
-      app.updateEntityAreaEffector(targetId, patch);
+      app.mutations.updateEntityAreaEffector(targetId, patch);
       onCommit(t('history.effectorChange'));
     }
   };

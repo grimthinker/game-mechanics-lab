@@ -63,7 +63,7 @@ export const ArmorInspector: React.FC<ArmorInspectorProps> = ({
     };
     setArmorData(updated);
     if (app) {
-      app.updateEntityArmor(targetId, updated);
+      app.mutations.updateEntityArmor(targetId, updated);
       onCommit(t('history.armorChange'));
     }
   };

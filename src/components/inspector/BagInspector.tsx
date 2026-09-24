@@ -53,7 +53,7 @@ export const BagInspector: React.FC<BagInspectorProps> = ({
     const updated = { ...bagData, ...patch };
     setBagData(updated);
     if (app) {
-      app.updateEntityBag(targetId, updated, isBagEmpty);
+      app.mutations.updateEntityBag(targetId, updated, isBagEmpty);
       onCommit(t('history.bagChange'));
     }
   };

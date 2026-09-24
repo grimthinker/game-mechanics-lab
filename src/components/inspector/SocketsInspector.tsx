@@ -70,7 +70,11 @@ export const SocketsInspector: React.FC<SocketsInspectorProps> = ({
                 style={{ width: '60px', padding: '2px' }}
                 onChange={(e) => {
                   if (app) {
-                    app.updateEntitySocketLinkStrength(targetId, socketId, Number(e.target.value));
+                    app.mutations.updateEntitySocketLinkStrength(
+                      targetId,
+                      socketId,
+                      Number(e.target.value)
+                    );
                     onCommit(t('history.socketStrengthChange'));
                   }
                 }}

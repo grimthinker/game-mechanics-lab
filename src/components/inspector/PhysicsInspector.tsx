@@ -50,7 +50,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
     if (patch.isSolid !== undefined) setIsSolid(nextIsSolid);
 
     if (app) {
-      app.updateEntityPhysics(targetId, {
+      app.mutations.updateEntityPhysics(targetId, {
         radius: nextRadius,
         weight: nextWeight,
         isSolid: nextIsSolid,

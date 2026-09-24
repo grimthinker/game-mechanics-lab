@@ -1,6 +1,14 @@
 import { BTNodeDTO } from '../ai/core';
+import { GameMode } from '../config/gameConfig';
 
 export interface EventMap {
+  'engine:state-changed': {
+    mode: GameMode;
+    isPaused: boolean;
+    timeScale: number;
+    showUIOverlays: boolean;
+    showAIDebug: boolean;
+  };
   'selection:changed': {
     selectedEntityId: string | null;
     selectedEntityIds: string[];

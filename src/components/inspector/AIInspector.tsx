@@ -41,7 +41,7 @@ export const AIInspector: React.FC<AIInspectorProps> = ({
           const val = e.target.value;
           setBehavior(val);
           if (app) {
-            app.updateEntityAIBehavior(targetId, val);
+            app.mutations.updateEntityAIBehavior(targetId, val);
             onCommit(t('history.aiChange'));
           }
         }}

@@ -47,7 +47,7 @@ export const GenericItemInspector: React.FC<GenericItemInspectorProps> = ({
     const updated = { ...data, ...patch };
     setData(updated);
     if (app) {
-      app.updateEntityGenericItem(targetId, updated);
+      app.mutations.updateEntityGenericItem(targetId, updated);
       onCommit(t('history.genericItemChange'));
     }
   };

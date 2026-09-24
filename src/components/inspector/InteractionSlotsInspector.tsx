@@ -147,7 +147,9 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     }}
                     onChange={(e) => {
                       if (app) {
-                        app.updateEntityInteractionSlot(info.partId, { name: e.target.value });
+                        app.mutations.updateEntityInteractionSlot(info.partId, {
+                          name: e.target.value,
+                        });
                         onCommit(t('history.slotConfigure'));
                       }
                     }}
@@ -202,7 +204,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     style={{ width: '70px', padding: '2px' }}
                     onChange={(e) => {
                       if (app) {
-                        app.updateEntityInteractionSlot(info.partId, {
+                        app.mutations.updateEntityInteractionSlot(info.partId, {
                           interactDist: Math.max(0, +e.target.value),
                         });
                         onCommit(t('history.slotConfigure'));
@@ -229,7 +231,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     style={{ width: '70px', padding: '2px' }}
                     onChange={(e) => {
                       if (app) {
-                        app.updateEntityInteractionSlot(info.partId, {
+                        app.mutations.updateEntityInteractionSlot(info.partId, {
                           strength: Math.max(0, +e.target.value),
                         });
                         onCommit(t('history.slotConfigure'));
@@ -260,7 +262,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
                     }}
                     onChange={(e) => {
                       if (app) {
-                        app.updateEntityInteractionSlot(info.partId, {
+                        app.mutations.updateEntityInteractionSlot(info.partId, {
                           slotKind: e.target.value,
                         });
                         onCommit(t('history.slotConfigure'));
@@ -413,7 +415,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           }}
           onChange={(e) => {
             if (app) {
-              app.updateEntityInteractionSlot(targetId, { name: e.target.value });
+              app.mutations.updateEntityInteractionSlot(targetId, { name: e.target.value });
               onCommit(t('history.slotConfigure'));
             }
           }}
@@ -463,7 +465,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           style={{ width: '70px', padding: '2px' }}
           onChange={(e) => {
             if (app) {
-              app.updateEntityInteractionSlot(targetId, {
+              app.mutations.updateEntityInteractionSlot(targetId, {
                 interactDist: Math.max(0, +e.target.value),
               });
               onCommit(t('history.slotConfigure'));
@@ -490,7 +492,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           style={{ width: '70px', padding: '2px' }}
           onChange={(e) => {
             if (app) {
-              app.updateEntityInteractionSlot(targetId, {
+              app.mutations.updateEntityInteractionSlot(targetId, {
                 strength: Math.max(0, +e.target.value),
               });
               onCommit(t('history.slotConfigure'));
@@ -521,7 +523,7 @@ export const InteractionSlotsInspector: React.FC<InteractionSlotsInspectorProps>
           }}
           onChange={(e) => {
             if (app) {
-              app.updateEntityInteractionSlot(targetId, {
+              app.mutations.updateEntityInteractionSlot(targetId, {
                 slotKind: e.target.value,
               });
               onCommit(t('history.slotConfigure'));

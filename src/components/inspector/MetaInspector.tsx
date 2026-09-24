@@ -58,7 +58,7 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
     if (patch.angle !== undefined) setYawDeg(Math.round(rad2Deg(patch.angle)));
 
     if (app) {
-      app.updateEntityTransform(targetId, patch);
+      app.mutations.updateEntityTransform(targetId, patch);
       onCommit('Изменение координат');
     }
   };
@@ -66,7 +66,7 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
   const handleNameChange = (val: string) => {
     setName(val);
     if (app) {
-      app.updateEntityMeta(targetId, { name: val, destructible });
+      app.mutations.updateEntityMeta(targetId, { name: val, destructible });
       onCommit(t('history.nameChange'));
     }
   };
@@ -74,7 +74,7 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
   const handleDestructibleChange = (val: boolean) => {
     setDestructible(val);
     if (app) {
-      app.updateEntityMeta(targetId, { name, destructible: val });
+      app.mutations.updateEntityMeta(targetId, { name, destructible: val });
       onCommit(t('history.nameChange'));
     }
   };

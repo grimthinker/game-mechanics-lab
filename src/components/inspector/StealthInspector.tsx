@@ -45,7 +45,7 @@ export const StealthInspector: React.FC<StealthInspectorProps> = ({
     const next = { ...values, ...patch };
     setValues(next);
     if (app) {
-      app.updateEntityStealthStats(targetId, patch);
+      app.mutations.updateEntityStealthStats(targetId, patch);
       onCommit(t('history.stealthChange'));
     }
   };
