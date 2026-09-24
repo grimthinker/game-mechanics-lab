@@ -1,6 +1,103 @@
-import { World } from '../ecs/World';
 import { setBaseStat } from '../ecs/stats/StatEvaluator';
 import { deg2Rad } from '../utils';
+import { HitZoneType, ZoneEffectType } from '../ecs/types';
+import { World } from '../ecs/World';
+
+export interface MovementStatsPatch {
+  maxSpeed?: number;
+  maxTurnSpeed?: number;
+  runSpeedMultiplier?: number;
+  crouchSpeedMultiplier?: number;
+  proneSpeedMultiplier?: number;
+  walkSpeedMultiplier?: number;
+  runTurnMultiplier?: number;
+  crouchTurnMultiplier?: number;
+  proneTurnMultiplier?: number;
+  walkTurnMultiplier?: number;
+  turnInPlaceTurnMultiplier?: number;
+  strafeSpeedMultiplier?: number;
+  backwardSpeedMultiplier?: number;
+  strafeTurnMultiplier?: number;
+  backwardTurnMultiplier?: number;
+  pickupSpeedMultiplier?: number;
+  pickupTurnMultiplier?: number;
+  standToCrouchTime?: number;
+  crouchToStandTime?: number;
+  standToProneTime?: number;
+  proneToStandTime?: number;
+  crouchToProneTime?: number;
+  proneToCrouchTime?: number;
+  dropPrepTime?: number;
+  dropRecoveryTime?: number;
+}
+
+export interface StealthStatsPatch {
+  stealthPower?: number;
+  crouchStealthMultiplier?: number;
+  proneStealthMultiplier?: number;
+  runStealthMultiplier?: number;
+  walkStealthMultiplier?: number;
+  turnInPlaceStealthMultiplier?: number;
+  immobileStealthMultiplier?: number;
+}
+
+export interface AreaEffectorPatch {
+  effect?: ZoneEffectType;
+  valuePerSec?: number;
+  radius?: number;
+  ignoreParent?: boolean;
+  destroyOnParentDeath?: boolean;
+  destroyOnParentRemoval?: boolean;
+  distanceAttenuation?: boolean;
+  centerValue?: number;
+  boundaryValue?: number;
+}
+
+export interface WeaponMutationPatch {
+  name?: string;
+  size?: number;
+  equipTypes?: string[];
+  equippable?: boolean;
+  equipTimeMultiplier?: number;
+  baseDamage?: number;
+  prepTime?: number;
+  recoveryTime?: number;
+  length?: number;
+  radius?: number;
+  rayCount?: number;
+  angle?: number;
+  pierceObstacles?: boolean;
+  pierceCreatures?: boolean;
+  pierceItems?: boolean;
+  hitZoneType?: HitZoneType;
+}
+
+export interface ArmorMutationPatch {
+  name?: string;
+  size?: number;
+  equipTypes?: string[];
+  equippable?: boolean;
+  equipTimeMultiplier?: number;
+  defense?: number;
+  flatReduction?: number;
+}
+
+export interface GenericItemMutationPatch {
+  size?: number;
+  equipTypes?: string[];
+  equippable?: boolean;
+  equipTimeMultiplier?: number;
+}
+
+export interface BagMutationPatch {
+  name?: string;
+  size?: number;
+  equipTypes?: string[];
+  equippable?: boolean;
+  equipTimeMultiplier?: number;
+  width?: number;
+  height?: number;
+}
 
 export class EditorMutationsAPI {
   constructor(private world: World) {}
@@ -144,7 +241,7 @@ export class EditorMutationsAPI {
     return true;
   }
 
-  public updateEntityMovementStats(id: string, patch: any): boolean {
+  public updateEntityMovementStats(id: string, patch: MovementStatsPatch): boolean {
     const ms = this.world.getComponent(id, 'movementStats');
     if (!ms) return false;
     let changed = false;
@@ -179,8 +276,9 @@ export class EditorMutationsAPI {
     ] as const;
 
     for (const m of multipliers) {
-      if (patch[m] !== undefined && (ms as any)[m] !== patch[m]) {
-        (ms as any)[m] = patch[m];
+      const val = patch[m];
+      if (val !== undefined && ms[m] !== val) {
+        ms[m] = val;
         changed = true;
       }
     }
@@ -197,15 +295,16 @@ export class EditorMutationsAPI {
     ] as const;
 
     for (const t of transitionTimes) {
-      if (patch[t] !== undefined && (ms as any)[t]?.base !== patch[t]) {
-        setBaseStat((ms as any)[t], patch[t]);
+      const val = patch[t];
+      if (val !== undefined && ms[t]?.base !== val) {
+        setBaseStat(ms[t], val);
         changed = true;
       }
     }
     return changed;
   }
 
-  public updateEntityStealthStats(id: string, patch: any): boolean {
+  public updateEntityStealthStats(id: string, patch: StealthStatsPatch): boolean {
     const st = this.world.getComponent(id, 'stealthStats');
     if (!st) return false;
     let changed = false;
@@ -224,8 +323,9 @@ export class EditorMutationsAPI {
     ] as const;
 
     for (const m of multipliers) {
-      if (patch[m] !== undefined && (st as any)[m] !== patch[m]) {
-        (st as any)[m] = patch[m];
+      const val = patch[m];
+      if (val !== undefined && st[m] !== val) {
+        st[m] = val;
         changed = true;
       }
     }
@@ -240,7 +340,7 @@ export class EditorMutationsAPI {
     return true;
   }
 
-  public updateEntityAreaEffector(id: string, patch: any): boolean {
+  public updateEntityAreaEffector(id: string, patch: AreaEffectorPatch): boolean {
     const effector = this.world.getComponent(id, 'areaEffector');
     const physStats = this.world.getComponent(id, 'physicsStats');
     if (!effector) return false;
@@ -254,7 +354,7 @@ export class EditorMutationsAPI {
     return true;
   }
 
-  public updateEntityWeapon(id: string, patch: any): boolean {
+  public updateEntityWeapon(id: string, patch: WeaponMutationPatch): boolean {
     const item = this.world.getComponent(id, 'item');
     const wStats = this.world.getComponent(id, 'weaponStats');
     const wZone = this.world.getComponent(id, 'weaponZone');
@@ -314,7 +414,7 @@ export class EditorMutationsAPI {
     return changed;
   }
 
-  public updateEntityArmor(id: string, patch: any): boolean {
+  public updateEntityArmor(id: string, patch: ArmorMutationPatch): boolean {
     const item = this.world.getComponent(id, 'item');
     const aStats = this.world.getComponent(id, 'armorStats');
     const meta = this.world.getComponent(id, 'meta');
@@ -380,7 +480,7 @@ export class EditorMutationsAPI {
     return changed;
   }
 
-  public updateEntityGenericItem(id: string, patch: any): boolean {
+  public updateEntityGenericItem(id: string, patch: GenericItemMutationPatch): boolean {
     const item = this.world.getComponent(id, 'item');
     if (!item) return false;
     let changed = false;
@@ -461,7 +561,7 @@ export class EditorMutationsAPI {
     return changed;
   }
 
-  public updateEntityBag(id: string, patch: any, isBagEmpty: boolean): boolean {
+  public updateEntityBag(id: string, patch: BagMutationPatch, isBagEmpty: boolean): boolean {
     const item = this.world.getComponent(id, 'item');
     const inv = this.world.getComponent(id, 'inventory');
     let changed = false;
@@ -491,11 +591,13 @@ export class EditorMutationsAPI {
       }
     }
 
-    if (inv && isBagEmpty && patch.width && patch.height) {
-      if (inv.size.width !== patch.width || inv.size.height !== patch.height) {
-        inv.size = { width: patch.width, height: patch.height };
-        inv.slots = Array.from({ length: patch.height }, () =>
-          Array.from({ length: patch.width }, () => ({ itemId: null, count: 0 }))
+    if (inv && isBagEmpty && patch.width !== undefined && patch.height !== undefined) {
+      const newWidth = patch.width;
+      const newHeight = patch.height;
+      if (inv.size.width !== newWidth || inv.size.height !== newHeight) {
+        inv.size = { width: newWidth, height: newHeight };
+        inv.slots = Array.from({ length: newHeight }, () =>
+          Array.from({ length: newWidth }, () => ({ itemId: null, count: 0 }))
         );
         changed = true;
       }

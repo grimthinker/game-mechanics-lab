@@ -1,5 +1,6 @@
 import { BTNodeDTO } from '../ai/core';
 import { GameMode } from '../config/gameConfig';
+import { TreeBBSchema } from '../ai/schema';
 
 export interface EventMap {
   'engine:state-changed': {
@@ -17,8 +18,8 @@ export interface EventMap {
   'inventory:updated': void;
   'bt:updated': {
     btData: BTNodeDTO | null;
-    btBlackboard: Record<string, any> | null;
-    btSchema: Record<string, any> | null;
+    btBlackboard: Record<string, unknown> | null;
+    btSchema: TreeBBSchema | null;
   };
   'game:playerDied': void;
   'inspector:navigate': {

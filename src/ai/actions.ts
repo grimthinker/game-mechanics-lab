@@ -19,7 +19,7 @@ export class BTConditionValidTarget extends BTSimpleAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const targetId = bb.get('targetId');
+    const targetId = bb.get<string | undefined>('targetId');
 
     if (targetId === undefined) return NodeStatus.FAILURE;
     const target = entity.utils.getEntity(targetId);
@@ -270,7 +270,7 @@ export class BTCommandAcceptCandidate extends BTSimpleAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const candidate = bb.get('bestCandidateId');
+    const candidate = bb.get<string | undefined>('bestCandidateId');
 
     if (candidate !== undefined) {
       bb.set('targetId', candidate);

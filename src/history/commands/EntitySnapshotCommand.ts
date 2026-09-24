@@ -1,13 +1,14 @@
 import { ICommand } from '../ICommand';
 import type { GameApp } from '../../GameApp';
+import { SerializedEntityData } from '../../ecs/WorldSerializer';
 
 export class EntitySnapshotCommand implements ICommand {
   constructor(
     public readonly description: string,
     private app: GameApp,
     private allAffectedIds: string[],
-    private beforeEntities: any[],
-    private afterEntities: any[],
+    private beforeEntities: SerializedEntityData[],
+    private afterEntities: SerializedEntityData[],
     private beforeSelection: { id: string | null; ids: string[] },
     private afterSelection: { id: string | null; ids: string[] }
   ) {}
@@ -20,7 +21,10 @@ export class EntitySnapshotCommand implements ICommand {
     this.applyState(this.beforeEntities, this.beforeSelection);
   }
 
-  private applyState(entitiesData: any[], selection: { id: string | null; ids: string[] }): void {
+  private applyState(
+    entitiesData: SerializedEntityData[],
+    selection: { id: string | null; ids: string[] }
+  ): void {
     // 1. Быстрое удаление всех затронутых сущностей из физики и мира перед накатом состояния
     for (const id of this.allAffectedIds) {
       if (this.app.world.getEntity(id)) {

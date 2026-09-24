@@ -594,14 +594,19 @@ export class ThreeRenderer implements IRenderer {
             targetZ = Number(targetPosVal[1]) || 0;
             hasTargetPos = true;
           }
-        } else if ('x' in targetPosVal && 'y' in targetPosVal) {
-          targetX = Number(targetPosVal.x) || 0;
-          if (targetPosVal.z !== undefined) {
-            targetY = Number(targetPosVal.y) || 0.1;
-            targetZ = Number(targetPosVal.z) || 0;
+        } else if (
+          typeof targetPosVal === 'object' &&
+          targetPosVal !== null &&
+          'x' in targetPosVal
+        ) {
+          const posObj = targetPosVal as { x?: unknown; y?: unknown; z?: unknown };
+          targetX = Number(posObj.x) || 0;
+          if ('z' in posObj && posObj.z !== undefined) {
+            targetY = Number(posObj.y) || 0.1;
+            targetZ = Number(posObj.z) || 0;
           } else {
             targetY = 0.1;
-            targetZ = Number(targetPosVal.y) || 0;
+            targetZ = Number(posObj.y) || 0;
           }
           hasTargetPos = true;
         }

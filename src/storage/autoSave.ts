@@ -1,16 +1,20 @@
 import { GameApp } from '../GameApp';
 import { CameraState } from '../Camera';
+import { SerializedWorldData } from '../ecs/WorldSerializer';
 
 export interface AutoSaveData {
   version: number;
   timestamp: number;
-  world: any;
+  world: SerializedWorldData;
   camera: CameraState;
 }
 
 export const AUTOSAVE_STORAGE_KEY = 'game_world_autosave_v2';
 
-export function saveWorldToStorage(app: GameApp, editorSnapshot?: any): boolean {
+export function saveWorldToStorage(
+  app: GameApp,
+  editorSnapshot?: SerializedWorldData | null
+): boolean {
   try {
     const worldData = editorSnapshot ?? app.serializeWorld();
     const cameraData = app.camera.serialize();

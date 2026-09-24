@@ -1,26 +1,58 @@
+import RAPIER from '@dimforge/rapier3d-compat';
 import { GameApp } from '../GameApp';
 import {
-  EntityConfig,
+  EntityComponents,
   CollisionCategory,
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
   SERIALIZABLE_COMPONENT_KEYS,
+  StatValue,
 } from './types';
-import { deg2Rad, Radians } from '../utils';
+import { Radians } from '../utils';
 import { evaluateStat } from './stats/StatEvaluator';
 import { fastClone } from './utils/clone';
+
+export interface SerializedTerrainData {
+  size: number;
+  resolution: number;
+  splatResolution: number;
+  textureTiling: number;
+  heights: number[];
+  splatData: number[];
+  heightsBase64?: string;
+  splatBase64?: string;
+}
+
+export interface SerializedBrainData {
+  blackboardData: Record<string, unknown>;
+}
+
+export type SerializedComponents = Omit<Partial<EntityComponents>, 'brain' | 'terrain'> & {
+  brain?: SerializedBrainData;
+  terrain?: SerializedTerrainData;
+  [key: string]: unknown;
+};
+
+export interface SerializedEntityData {
+  id: string;
+  components: SerializedComponents;
+}
+
+export interface SerializedWorldData {
+  entities: SerializedEntityData[];
+}
 
 export class WorldSerializer {
   constructor(private app: GameApp) {}
 
-  public serializeEntities(ids: string[]): any[] {
-    const entitiesData: any[] = [];
+  public serializeEntities(ids: string[]): SerializedEntityData[] {
+    const entitiesData: SerializedEntityData[] = [];
 
     for (const id of ids) {
       const comp = this.app.world.getEntity(id);
       if (!comp) continue;
 
-      const data: any = { id, components: {} };
+      const data: SerializedEntityData = { id, components: {} };
 
       for (const key of SERIALIZABLE_COMPONENT_KEYS) {
         const componentValue = comp[key];
@@ -36,7 +68,7 @@ export class WorldSerializer {
               splatData: Array.from(t.splatData),
             };
           } else {
-            data.components[key] = fastClone(componentValue);
+            (data.components as Record<string, unknown>)[key] = fastClone(componentValue);
           }
         }
       }
@@ -44,7 +76,7 @@ export class WorldSerializer {
       if (comp.brain) {
         const bbData = { ...comp.brain.blackboard.getData() };
         delete bbData.pressedKeys;
-        delete (bbData as any).pressed_keys;
+        delete bbData.pressed_keys;
         data.components.brain = {
           blackboardData: fastClone(bbData),
         };
@@ -56,17 +88,17 @@ export class WorldSerializer {
     return entitiesData;
   }
 
-  public serializeWorld(): any {
+  public serializeWorld(): SerializedWorldData {
     const allIds = this.app.world.getAllEntities().map(([id]) => id);
     return {
       entities: this.serializeEntities(allIds),
     };
   }
 
-  public deserializeEntities(entitiesData: any[]): void {
+  public deserializeEntities(entitiesData: SerializedEntityData[]): void {
     if (!entitiesData || !Array.isArray(entitiesData)) return;
 
-    const entityMap = new Map<string, any>();
+    const entityMap = new Map<string, SerializedEntityData>();
     const allAssemblyPartIds = new Set<string>();
 
     for (const ent of entitiesData) {
@@ -279,7 +311,7 @@ export class WorldSerializer {
       }
 
       // 2. Нормализация характеристик до создания физики
-      const normalizeStat = (stat: any) => {
+      const normalizeStat = (stat: StatValue<number> | undefined) => {
         if (stat && typeof stat === 'object' && 'base' in stat) {
           stat.modifiers = Array.isArray(stat.modifiers) ? stat.modifiers : [];
           stat.current = evaluateStat(stat);
@@ -372,11 +404,11 @@ export class WorldSerializer {
         const isPartOfCreature = allAssemblyPartIds.has(ent.id);
         const archetype =
           comps.tag?.archetype ??
-          (comps.areaEffector || comps.zoneTrigger
+          (comps.areaEffector || (comps as Record<string, unknown>).zoneTrigger
             ? 'zone'
             : comps.item
               ? 'item'
-              : comps.physicsStats.points
+              : comps.physicsStats?.points
                 ? 'obstacle'
                 : comps.terrain
                   ? 'terrain'
@@ -395,8 +427,8 @@ export class WorldSerializer {
             const isSolid = comps.physicsStats.isSolid && isAlive;
             const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
-            let rawBody: any = undefined;
-            let rawCollider: any = undefined;
+            let rawBody: RAPIER.RigidBody | undefined = undefined;
+            let rawCollider: RAPIER.Collider | undefined = undefined;
 
             if (this.app.physicsDriver?.isReady) {
               const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0, z: trans?.z ?? 0 };
@@ -433,14 +465,13 @@ export class WorldSerializer {
               mask,
             });
           } else if (archetype !== 'terrain') {
-            // ... logic for creatures, items, zones
             let isStatic = false;
             let isTrigger = false;
             let category = CollisionCategory.CREATURE;
             let mask = comps.physicsStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
-            let rawBody: any = undefined;
-            let rawCollider: any = undefined;
+            let rawBody: RAPIER.RigidBody | undefined = undefined;
+            let rawCollider: RAPIER.Collider | undefined = undefined;
 
             if (archetype === 'item' || comps.physicsBody?.bodyType === 'dynamic') {
               category = CollisionCategory.ITEM;
@@ -570,7 +601,7 @@ export class WorldSerializer {
     }
   }
 
-  public deserializeWorld(data: any): void {
+  public deserializeWorld(data: SerializedWorldData): void {
     if (!data) return;
     this.app.clearWorld();
 

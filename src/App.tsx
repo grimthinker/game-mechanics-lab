@@ -31,6 +31,7 @@ import { EDITOR_CONFIG } from './config/editorConfig';
 import { t } from './locales';
 import { EventBus } from './core/EventBus';
 import { initRapier } from './physics/rapierLoader';
+import { TreeBBSchema } from './ai/schema';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -74,8 +75,8 @@ export const App: React.FC = () => {
   const [bbPicking, setBbPicking] = useState<BlackboardPickingState | null>(null);
 
   const [btData, setBtData] = useState<BTNodeDTO | null>(null);
-  const [btBlackboard, setBtBlackboard] = useState<Record<string, any> | null>(null);
-  const [btSchema, setBtSchema] = useState<Record<string, any> | null>(null);
+  const [btBlackboard, setBtBlackboard] = useState<Record<string, unknown> | null>(null);
+  const [btSchema, setBtSchema] = useState<TreeBBSchema | null>(null);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   const [isCreatureWizardOpen, setIsCreatureWizardOpen] = useState(false);
 

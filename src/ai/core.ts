@@ -198,18 +198,18 @@ export type AIEvent = {
 };
 
 export class Blackboard {
-  private data: Record<string, any> = {};
+  private data: Record<string, unknown> = {};
 
-  public getData(): Record<string, any> {
+  public getData(): Record<string, unknown> {
     return this.data;
   }
 
-  public set(key: string, value: any): void {
+  public set(key: string, value: unknown): void {
     this.data[key] = value;
   }
 
-  public get(key: string): any {
-    return this.data[key];
+  public get<T = any>(key: string): T {
+    return this.data[key] as T;
   }
 
   public has(key: string): boolean {
@@ -221,9 +221,7 @@ export class Blackboard {
   }
 }
 
-export type PathKeys = {
-  [K in keyof BBData]-?: BBData[K] extends Vec3[] ? K : never;
-}[keyof BBData];
+export type PathKeys = 'currentPath' | 'patrolPoints' | 'patrolRouteTmp';
 
 type SquaredStats = {
   [K in keyof BehaviorStatsConfig as `${K}Sq`]: number;

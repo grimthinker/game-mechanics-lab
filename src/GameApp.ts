@@ -18,7 +18,7 @@ import { IRenderer } from './rendering/IRenderer';
 import { Point, Vec3 } from './types';
 import { EntityFactory } from './ecs/EntityFactory';
 import { GameMode } from './config/gameConfig';
-import { WorldSerializer } from './ecs/WorldSerializer';
+import { SerializedEntityData, SerializedWorldData, WorldSerializer } from './ecs/WorldSerializer';
 import { EntityConfig } from './ecs/types';
 import { createZoneConfig } from './ecs/archetypes/ZoneArchetype';
 import { createDefaultTerrainConfig } from './ecs/archetypes/TerrainArchetype';
@@ -83,7 +83,7 @@ export class GameApp {
   public playerEntityId: string | null = null;
   public entityFactory: EntityFactory;
   public serializer: WorldSerializer;
-  public editorSnapshot: any = null;
+  public editorSnapshot: SerializedWorldData | null = null;
 
   private _showUIOverlays: boolean = true;
   public get showUIOverlays() {
@@ -644,16 +644,16 @@ export class GameApp {
     this.syncPhysicsStructures();
   }
 
-  public serializeWorld(): any {
+  public serializeWorld(): SerializedWorldData {
     return this.serializer.serializeWorld();
   }
 
-  public deserializeWorld(data: any): void {
+  public deserializeWorld(data: SerializedWorldData): void {
     this.serializer.deserializeWorld(data);
     this.syncPhysicsStructures();
   }
 
-  private baseStateForCommit: any[] = [];
+  private baseStateForCommit: SerializedEntityData[] = [];
   private baseSelectionForCommit = { id: null as string | null, ids: [] as string[] };
 
   public captureBaseState(): void {

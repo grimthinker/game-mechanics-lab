@@ -1,8 +1,9 @@
 import type { GameApp } from '../GameApp';
 import { EntitySnapshotCommand } from './commands/EntitySnapshotCommand';
+import { SerializedEntityData } from '../ecs/WorldSerializer';
 
 export class TransactionBuilder {
-  private beforeEntities: any[] = [];
+  private beforeEntities: SerializedEntityData[] = [];
   private allAffectedIds = new Set<string>();
   private beforeSelection: { id: string | null; ids: string[] };
 
