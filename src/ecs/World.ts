@@ -1,7 +1,10 @@
 import { EntityId, EntityComponents } from './types';
 export class World {
   private entities: Map<EntityId, EntityComponents> = new Map();
-  private queryCache: Map<string, Array<[EntityId, EntityComponents]>> = new Map();
+  private queryCache: Map<
+    string,
+    { keys: (keyof EntityComponents)[]; entities: Array<[EntityId, EntityComponents]> }
+  > = new Map();
 
   public createEntity(id: EntityId): EntityId {
     this.entities.set(id, {});
@@ -12,10 +15,10 @@ export class World {
     const entity = this.entities.get(id);
     if (!entity) return false;
 
-    for (const cachedArray of this.queryCache.values()) {
-      const idx = cachedArray.findIndex((e) => e[0] === id);
+    for (const entry of this.queryCache.values()) {
+      const idx = entry.entities.findIndex((e) => e[0] === id);
       if (idx !== -1) {
-        cachedArray.splice(idx, 1);
+        entry.entities.splice(idx, 1);
       }
     }
 
@@ -34,14 +37,11 @@ export class World {
     entity[key] = component;
 
     if (isNew) {
-      for (const [queryKey, cachedArray] of this.queryCache.entries()) {
-        const queryKeys = queryKey.split(',');
-        if (queryKeys.includes(key as string)) {
-          const satisfies = queryKeys.every(
-            (k) => entity[k as keyof EntityComponents] !== undefined
-          );
+      for (const entry of this.queryCache.values()) {
+        if (entry.keys.includes(key)) {
+          const satisfies = entry.keys.every((k) => entity[k] !== undefined);
           if (satisfies) {
-            cachedArray.push([id, entity]);
+            entry.entities.push([id, entity]);
           }
         }
       }
@@ -54,12 +54,11 @@ export class World {
 
     delete entity[key];
 
-    for (const [queryKey, cachedArray] of this.queryCache.entries()) {
-      const queryKeys = queryKey.split(',');
-      if (queryKeys.includes(key as string)) {
-        const idx = cachedArray.findIndex((e) => e[0] === id);
+    for (const entry of this.queryCache.values()) {
+      if (entry.keys.includes(key)) {
+        const idx = entry.entities.findIndex((e) => e[0] === id);
         if (idx !== -1) {
-          cachedArray.splice(idx, 1);
+          entry.entities.splice(idx, 1);
         }
       }
     }
@@ -85,21 +84,22 @@ export class World {
   ): Array<[EntityId, Required<Pick<EntityComponents, K>> & EntityComponents]> {
     const queryKey = keys.slice().sort().join(',');
 
-    let cachedArray = this.queryCache.get(queryKey);
-    if (!cachedArray) {
-      cachedArray = [];
+    let entry = this.queryCache.get(queryKey);
+    if (!entry) {
+      const entitiesArr: Array<[EntityId, EntityComponents]> = [];
       for (const [id, components] of this.entities.entries()) {
         const hasAll = keys.every((k) => components[k] !== undefined);
         if (hasAll) {
-          cachedArray.push([id, components]);
+          entitiesArr.push([id, components]);
         }
       }
-      this.queryCache.set(queryKey, cachedArray);
+      entry = { keys: keys.slice(), entities: entitiesArr };
+      this.queryCache.set(queryKey, entry);
     }
 
     // Возвращаем поверхностную копию, чтобы избежать багов с пропуском элементов
     // при удалении сущностей или компонентов внутри итерации по этому массиву в системах.
-    return cachedArray.slice() as Array<
+    return entry.entities.slice() as Array<
       [EntityId, Required<Pick<EntityComponents, K>> & EntityComponents]
     >;
   }

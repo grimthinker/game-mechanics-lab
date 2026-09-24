@@ -31,6 +31,14 @@ export class ThreeRenderer implements IRenderer {
   private intersectionPoint = new THREE.Vector3();
   private mouseNDC = new THREE.Vector2();
 
+  // --- Временные векторы для оптимизации (Scratch vectors) ---
+  private _tempV1 = new THREE.Vector3();
+  private _tempV2 = new THREE.Vector3();
+  private _tempV3 = new THREE.Vector3();
+  private _tempV4 = new THREE.Vector3();
+  private _camPos = new THREE.Vector3();
+  private _camDir = new THREE.Vector3();
+
   constructor(container: HTMLDivElement) {
     this.container = container;
 
@@ -153,7 +161,7 @@ export class ThreeRenderer implements IRenderer {
   }
 
   public projectToScreen(pos: import('../types').Vec3): import('../types').Vec3 | null {
-    const vector = new THREE.Vector3(pos.x, pos.y, pos.z);
+    const vector = this._tempV1.set(pos.x, pos.y, pos.z);
     vector.project(this.camera);
 
     // Если объект за спиной камеры
@@ -410,7 +418,7 @@ export class ThreeRenderer implements IRenderer {
       else if (archetype === 'creature') meshHeight = 1.8;
 
       // Проекция 3D точки (верхушка меша) на 2D экран
-      const pos3D = new THREE.Vector3(transform.x, transform.y + meshHeight + 0.3, transform.z);
+      const pos3D = this._tempV1.set(transform.x, transform.y + meshHeight + 0.3, transform.z);
       pos3D.project(this.camera);
 
       // Отбрасываем объекты за спиной камеры
@@ -459,7 +467,7 @@ export class ThreeRenderer implements IRenderer {
     const meshHeight = Math.max(0.3, radius * 1.5);
 
     // Корректные 3D координаты в метрах (высота Y + сдвиг, глубина Z)
-    const pos3D = new THREE.Vector3(transform.x, transform.y + meshHeight + 0.2, transform.z);
+    const pos3D = this._tempV1.set(transform.x, transform.y + meshHeight + 0.2, transform.z);
     pos3D.project(this.camera);
 
     if (pos3D.z > 1) return;
@@ -558,7 +566,7 @@ export class ThreeRenderer implements IRenderer {
       );
     }
 
-    const selfPos3D = new THREE.Vector3(posX, posY + 0.8, posZ);
+    const selfYOffset = posY + 0.8;
 
     // 3. Линия к target_pos (если задано в памяти)
     const targetPosVal =
@@ -568,47 +576,52 @@ export class ThreeRenderer implements IRenderer {
       bb?.get('targetPosition');
 
     if (targetPosVal !== undefined && targetPosVal !== null) {
-      let targetPos3D: THREE.Vector3 | null = null;
+      let targetX = 0,
+        targetY = 0,
+        targetZ = 0;
+      let hasTargetPos = false;
+
       if (typeof targetPosVal === 'object') {
         if (Array.isArray(targetPosVal)) {
           if (targetPosVal.length >= 3) {
-            targetPos3D = new THREE.Vector3(
-              Number(targetPosVal[0]) || 0,
-              Number(targetPosVal[1]) || 0,
-              Number(targetPosVal[2]) || 0
-            );
+            targetX = Number(targetPosVal[0]) || 0;
+            targetY = Number(targetPosVal[1]) || 0;
+            targetZ = Number(targetPosVal[2]) || 0;
+            hasTargetPos = true;
           } else if (targetPosVal.length >= 2) {
-            targetPos3D = new THREE.Vector3(
-              Number(targetPosVal[0]) || 0,
-              0.1,
-              Number(targetPosVal[1]) || 0
-            );
+            targetX = Number(targetPosVal[0]) || 0;
+            targetY = 0.1;
+            targetZ = Number(targetPosVal[1]) || 0;
+            hasTargetPos = true;
           }
         } else if ('x' in targetPosVal && 'y' in targetPosVal) {
-          const x = Number(targetPosVal.x) || 0;
+          targetX = Number(targetPosVal.x) || 0;
           if (targetPosVal.z !== undefined) {
-            targetPos3D = new THREE.Vector3(
-              x,
-              Number(targetPosVal.y) || 0.1,
-              Number(targetPosVal.z) || 0
-            );
+            targetY = Number(targetPosVal.y) || 0.1;
+            targetZ = Number(targetPosVal.z) || 0;
           } else {
-            targetPos3D = new THREE.Vector3(x, 0.1, Number(targetPosVal.y) || 0);
+            targetY = 0.1;
+            targetZ = Number(targetPosVal.y) || 0;
           }
+          hasTargetPos = true;
         }
       }
 
-      if (targetPos3D) {
+      if (hasTargetPos) {
         this.drawProjectedLine(
-          selfPos3D,
-          targetPos3D,
+          posX,
+          selfYOffset,
+          posZ,
+          targetX,
+          targetY,
+          targetZ,
           AI_DEBUG_CONFIG.colors.pathLine,
           AI_DEBUG_CONFIG.dashArrays.path,
           2
         );
 
         // Маркер точки target_pos
-        const proj = targetPos3D.clone().project(this.camera);
+        const proj = this._tempV1.set(targetX, targetY, targetZ).project(this.camera);
         if (proj.z <= 1.0) {
           const sx = (proj.x * 0.5 + 0.5) * w;
           const sy = (-(proj.y * 0.5) + 0.5) * h;
@@ -639,17 +652,23 @@ export class ThreeRenderer implements IRenderer {
         (targetOwnerRoot ? world.getComponent(targetOwnerRoot, 'transform') : undefined);
 
       if (targetTrans) {
-        const targetPos3D = new THREE.Vector3(targetTrans.x, targetTrans.y + 0.8, targetTrans.z);
+        const tX = targetTrans.x;
+        const tY = targetTrans.y + 0.8;
+        const tZ = targetTrans.z;
 
         this.drawProjectedLine(
-          selfPos3D,
-          targetPos3D,
+          posX,
+          selfYOffset,
+          posZ,
+          tX,
+          tY,
+          tZ,
           AI_DEBUG_CONFIG.colors.targetLine,
           AI_DEBUG_CONFIG.dashArrays.targetLine,
           2
         );
 
-        const proj = targetPos3D.clone().project(this.camera);
+        const proj = this._tempV1.set(tX, tY, tZ).project(this.camera);
         if (proj.z <= 1.0) {
           const sx = (proj.x * 0.5 + 0.5) * w;
           const sy = (-(proj.y * 0.5) + 0.5) * h;
@@ -692,27 +711,23 @@ export class ThreeRenderer implements IRenderer {
     this.uiCtx.lineWidth = 1.5;
     this.uiCtx.setLineDash(dashArray);
 
-    const tempVec = new THREE.Vector3();
     let pathStarted = false;
 
     this.uiCtx.beginPath();
 
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
-      tempVec.set(
-        centerX + Math.cos(angle) * radius,
-        centerY + 0.03,
-        centerZ + Math.sin(angle) * radius
-      );
-      tempVec.project(this.camera);
+      this._tempV1
+        .set(centerX + Math.cos(angle) * radius, centerY + 0.03, centerZ + Math.sin(angle) * radius)
+        .project(this.camera);
 
-      if (tempVec.z > 1.0) {
+      if (this._tempV1.z > 1.0) {
         pathStarted = false;
         continue;
       }
 
-      const screenX = (tempVec.x * 0.5 + 0.5) * w;
-      const screenY = (-(tempVec.y * 0.5) + 0.5) * h;
+      const screenX = (this._tempV1.x * 0.5 + 0.5) * w;
+      const screenY = (-(this._tempV1.y * 0.5) + 0.5) * h;
 
       if (!pathStarted) {
         this.uiCtx.moveTo(screenX, screenY);
@@ -726,23 +741,28 @@ export class ThreeRenderer implements IRenderer {
     this.uiCtx.restore();
 
     if (label) {
-      tempVec.set(
-        centerX + Math.cos(labelAngle) * radius,
-        centerY + 0.03,
-        centerZ + Math.sin(labelAngle) * radius
-      );
-      tempVec.project(this.camera);
-      if (tempVec.z <= 1.0) {
-        const screenX = (tempVec.x * 0.5 + 0.5) * w;
-        const screenY = (-(tempVec.y * 0.5) + 0.5) * h;
+      this._tempV1
+        .set(
+          centerX + Math.cos(labelAngle) * radius,
+          centerY + 0.03,
+          centerZ + Math.sin(labelAngle) * radius
+        )
+        .project(this.camera);
+      if (this._tempV1.z <= 1.0) {
+        const screenX = (this._tempV1.x * 0.5 + 0.5) * w;
+        const screenY = (-(this._tempV1.y * 0.5) + 0.5) * h;
         this.renderBadge(label, screenX, screenY - 10, strokeColor);
       }
     }
   }
 
   private drawProjectedLine(
-    from: THREE.Vector3,
-    to: THREE.Vector3,
+    fromX: number,
+    fromY: number,
+    fromZ: number,
+    toX: number,
+    toY: number,
+    toZ: number,
     strokeColor: string,
     dashArray: number[],
     lineWidth: number = 2
@@ -750,32 +770,31 @@ export class ThreeRenderer implements IRenderer {
     const w = this.uiCanvas.width;
     const h = this.uiCanvas.height;
 
-    const v1 = from.clone().project(this.camera);
-    const v2 = to.clone().project(this.camera);
+    const v1 = this._tempV1.set(fromX, fromY, fromZ).project(this.camera);
+    const v2 = this._tempV2.set(toX, toY, toZ).project(this.camera);
 
     if (v1.z > 1.0 && v2.z > 1.0) return;
 
-    let pFrom = from.clone();
-    let pTo = to.clone();
+    const pFrom = this._tempV3.set(fromX, fromY, fromZ);
+    const pTo = this._tempV4.set(toX, toY, toZ);
 
     if (v1.z > 1.0 || v2.z > 1.0) {
-      const camPos = new THREE.Vector3();
-      this.camera.getWorldPosition(camPos);
-      const camDir = new THREE.Vector3();
-      this.camera.getWorldDirection(camDir);
+      this.camera.getWorldPosition(this._camPos);
+      this.camera.getWorldDirection(this._camDir);
 
-      const dist1 = from.clone().sub(camPos).dot(camDir);
-      const dist2 = to.clone().sub(camPos).dot(camDir);
+      // Вектора для вычисления дот-продукта (без изменения исходных pFrom/pTo)
+      const dist1 = this._tempV1.copy(pFrom).sub(this._camPos).dot(this._camDir);
+      const dist2 = this._tempV2.copy(pTo).sub(this._camPos).dot(this._camDir);
       const nearPlane = 0.2;
 
       if (dist1 < nearPlane && dist2 < nearPlane) return;
 
       if (dist1 < nearPlane) {
         const t = (nearPlane - dist1) / (dist2 - dist1);
-        pFrom = from.clone().lerp(to, t);
+        pFrom.lerp(pTo, t);
       } else if (dist2 < nearPlane) {
         const t = (nearPlane - dist2) / (dist1 - dist2);
-        pTo = to.clone().lerp(from, t);
+        pTo.lerp(pFrom, t);
       }
 
       const s1 = pFrom.project(this.camera);
