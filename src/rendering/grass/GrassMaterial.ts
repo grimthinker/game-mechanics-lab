@@ -26,7 +26,7 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
   };
 
   material.userData.isSharedMaterial = true;
-  material.customProgramCacheKey = () => 'InteractiveGrassMaterial_v1';
+  material.customProgramCacheKey = () => 'InteractiveGrassMaterial_v2';
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
@@ -66,7 +66,7 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
 
       // 1. Поиск ближайшего интерактора относительно КОРНЯ куста
       vec2 tramplingDir = vec2(0.0);
-      float maxBendAngle = 0.0;
+      float maxTrampleFactor = 0.0;
 
       for (int i = 0; i < 16; i++) {
         if (i >= uInteractorCount) break;
@@ -85,33 +85,47 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
           float len = length(diff);
           vec2 pushDir = len > 0.001 ? diff / len : vec2(0.0, 1.0);
 
-          // Угол приминания: до ~80 градусов (1.40 радиан), почти параллельно земле
-          float bendAngle = factor * 1.40;
-          if (bendAngle > maxBendAngle) {
-            maxBendAngle = bendAngle;
+          if (factor > maxTrampleFactor) {
+            maxTrampleFactor = factor;
             tramplingDir = pushDir;
           }
         }
       }
 
-// 2. Вращение листка при приминании (формула Родрига) с сохранением длины
-      if (maxBendAngle > 0.001) {
-        // Ось вращения лежит горизонтально в плоскости пола и перпендикулярна направлению удара ноги
-        vec3 bendAxis = normalize(vec3(tramplingDir.y, 0.0, -tramplingDir.x));
+      // 2. Квадратичный изгиб консоли с пифагоровым сохранением длины (Pythagorean Length Preservation)
+      float origY = max(0.001, bladeOffset.y);
 
-        // Кончик листка гнется сильнее, корень остается на месте (угол * hFactor)
-        float currentAngle = maxBendAngle * hFactor;
-        float cosA = cos(currentAngle);
-        float sinA = sin(currentAngle);
+      // Квадратичный спад жесткости: у основания травинка жесткая (0.0), к верхушке изгиб нарастает (1.0)
+      float bendCurve = hFactor * hFactor;
 
-        // Вращение сохраняет исходную евклидову длину вектора bladeOffset
-        bladeOffset = bladeOffset * cosA + cross(bendAxis, bladeOffset) * sinA + bendAxis * dot(bendAxis, bladeOffset) * (1.0 - cosA);
+      // Горизонтальное смещение от приминания
+      float trampleDistance = origY * bendCurve * maxTrampleFactor * 0.95;
+      vec2 trampleVec = tramplingDir * trampleDistance;
+
+      // Процедурный ветер с плавной фазой
+      float wave = sin(uTime * uWindSpeed + instanceRoot.x * 0.4 + instanceRoot.z * 0.3);
+      vec2 windVec = vec2(0.85, 0.52) * (wave * uWindStrength * bendCurve * origY);
+
+      // Суммарный вектор горизонтального отклонения
+      vec2 totalPush = trampleVec + windVec;
+      float pushDist = length(totalPush);
+
+      // Контролируемое сжатие стебля под нагрузкой (до 15% укорочения при полном приминании, без растяжения)
+      float compression = 1.0 - (0.15 * maxTrampleFactor * hFactor);
+      float maxAllowedRadius = origY * compression;
+
+      // Ограничение смещения в пределах допустимой длины
+      if (pushDist > maxAllowedRadius * 0.96) {
+        totalPush = (totalPush / pushDist) * (maxAllowedRadius * 0.96);
+        pushDist = maxAllowedRadius * 0.96;
       }
 
-      // 3. Процедурный ветер (мягкое покачивание верхушек)
-      float wave = sin(uTime * uWindSpeed + instanceRoot.x * 0.4 + instanceRoot.z * 0.3);
-      vec2 windDir = vec2(0.85, 0.52);
-      bladeOffset.xz += windDir * (wave * uWindStrength * (hFactor * hFactor));
+      // Новая высота Y по теореме Пифагора: Y^2 + pushDist^2 = maxAllowedRadius^2
+      float newY = sqrt(max(0.001, maxAllowedRadius * maxAllowedRadius - pushDist * pushDist));
+
+      // Применяем смещение: сдвиг по горизонтали и опускание верхушки без растягивания гипотенузы
+      bladeOffset.xz += totalPush;
+      bladeOffset.y = newY;
 
       // Итоговая позиция: корень куста + жестко повернутый вектор травинки
       vec4 worldPos = vec4(instanceRoot.xyz + bladeOffset, 1.0);
