@@ -52,13 +52,17 @@ export function forceDropItemFromPart(
       rawBody = physics.driver.createDynamicBody({ x: dropX, y: dropY + 0.5, z: dropZ }, itemId);
       const radius = physStats.radius.current ?? 0.3;
       const size = radius * 0.8;
+      const hx = physStats.halfExtents?.x ?? size / 2;
+      const hy = physStats.halfExtents?.y ?? size / 2;
+      const hz = physStats.halfExtents?.z ?? size / 2;
 
       rawCollider = physics.driver.createCuboidCollider(
-        size / 2,
-        size / 2,
-        size / 2,
+        hx,
+        hy,
+        hz,
         rawBody,
-        physStats.weight.current
+        physStats.weight.current,
+        physStats.colliderOffset
       );
       rawCollider.setRestitution(0.3);
       rawBody.setLinearDamping(0.95);

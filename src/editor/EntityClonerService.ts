@@ -63,6 +63,12 @@ export class EntityClonerService {
           weight: comp.physicsStats.weight.base,
           isSolid: comp.physicsStats.isSolid,
           points: comp.physicsStats.points ? fastClone(comp.physicsStats.points) : undefined,
+          halfExtents: comp.physicsStats.halfExtents
+            ? fastClone(comp.physicsStats.halfExtents)
+            : undefined,
+          colliderOffset: comp.physicsStats.colliderOffset
+            ? fastClone(comp.physicsStats.colliderOffset)
+            : undefined,
         };
       }
       if (comp.health) {

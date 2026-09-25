@@ -62,6 +62,7 @@ export function assembleObstacle(
     radius: createStat(boundingRadius),
     weight: createStat(1000),
     isSolid,
+    height: config.physics?.height,
     points: fastClone(points),
   });
 
@@ -105,7 +106,7 @@ export function assembleObstacle(
   }
   const width = Math.max(0.2, maxX - minX);
   const depth = Math.max(0.2, maxY - minY);
-  const height = (config.physics as any)?.height ?? 1.5;
+  const height = config.physics?.height ?? 1.5;
 
   const hx = width / 2;
   const hy = height / 2;
@@ -120,7 +121,11 @@ export function assembleObstacle(
     rawBody.setRotation({ x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) }, false);
 
     // Смещаем коллайдер вверх на hy, чтобы основание стояло на плоскости Y=0
-    rawCollider = physics.driver.createCuboidCollider(hx, hy, hz, rawBody, 0, hy);
+    rawCollider = physics.driver.createCuboidCollider(hx, hy, hz, rawBody, 0, {
+      x: 0,
+      y: hy,
+      z: 0,
+    });
   }
   world.addComponent(id, 'physicsBody', {
     rawBody,
@@ -131,7 +136,11 @@ export function assembleObstacle(
     mask,
   });
 
-  // 7. Компонент видимости
+  // 7. Компонент видимости и визуальная модель
+  if (config.visualModel) {
+    world.addComponent(id, 'visualModel', fastClone(config.visualModel));
+  }
+
   world.addComponent(id, 'renderable', {
     zIndex: RENDER_Z_INDEX.OBSTACLES,
     isVisible: true,

@@ -511,9 +511,9 @@ export class ThreeSyncSystem {
       return this.creatureAssembler.createDetachedLimb(world, id);
     }
 
-    // Загрузка реального 3D меша для оторванных конечностей и предметов на полу
+    // Загрузка реального 3D меша для сущностей с визуальной моделью (предметы, препятствия, части тела)
     const visual = world.getComponent(id, 'visualModel');
-    if (visual && visual.modelId && (archetype === 'item' || archetype === 'bodyPart')) {
+    if (visual && visual.modelId) {
       const group = new THREE.Group();
       group.userData.entityId = id;
       this.loadingMeshes.add(id);
@@ -538,8 +538,10 @@ export class ThreeSyncSystem {
               group.add(mesh);
             }
 
-            const itemComp = world.getComponent(id, 'item');
-            group.userData.gripTransform = computeItemGrip(group, itemComp?.type);
+            if (archetype === 'item' || archetype === 'bodyPart') {
+              const itemComp = world.getComponent(id, 'item');
+              group.userData.gripTransform = computeItemGrip(group, itemComp?.type);
+            }
 
             const physStats = world.getComponent(id, 'physicsStats');
             const radius = physStats ? physStats.radius.current : 16;

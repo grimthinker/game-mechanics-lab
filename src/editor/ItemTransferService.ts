@@ -243,7 +243,20 @@ export class ItemTransferService {
         if (this.app.physicsDriver && this.app.physicsDriver.isReady) {
           const pos3D = { x: posX, y: posY ?? 1.5, z: posZ };
           rawBody = this.app.physicsDriver.createDynamicBody(pos3D, itemId);
-          rawCollider = this.app.physicsDriver.createBallCollider(radius, rawBody, weight);
+
+          const size = radius * 0.8;
+          const hx = physStats.halfExtents?.x ?? size / 2;
+          const hy = physStats.halfExtents?.y ?? size / 2;
+          const hz = physStats.halfExtents?.z ?? size / 2;
+
+          rawCollider = this.app.physicsDriver.createCuboidCollider(
+            hx,
+            hy,
+            hz,
+            rawBody,
+            weight,
+            physStats.colliderOffset
+          );
           rawCollider.setRestitution(0.3);
         }
 

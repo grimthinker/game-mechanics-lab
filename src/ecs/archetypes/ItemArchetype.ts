@@ -56,6 +56,10 @@ export function assembleItem(
     radius: createStat(radius),
     weight: createStat(weight),
     isSolid,
+    halfExtents: config.physics?.halfExtents ? { ...config.physics.halfExtents } : undefined,
+    colliderOffset: config.physics?.colliderOffset
+      ? { ...config.physics.colliderOffset }
+      : undefined,
   });
 
   // 4.5. Принадлежность (если предмет экипирован или находится в инвентаре)
@@ -153,13 +157,18 @@ export function assembleItem(
       const pos3D = { x: posX, y: posY, z: posZ };
       rawBody = physics.driver.createDynamicBody(pos3D, id);
 
-      const size = radius * 0.8; // Уменьшенный в 2 раза куб
+      const size = radius * 0.8; // Уменьшенный в 2 раза куб по умолчанию
+      const hx = config.physics?.halfExtents?.x ?? size / 2;
+      const hy = config.physics?.halfExtents?.y ?? size / 2;
+      const hz = config.physics?.halfExtents?.z ?? size / 2;
+
       rawCollider = physics.driver.createCuboidCollider(
-        size / 2,
-        size / 2,
-        size / 2,
+        hx,
+        hy,
+        hz,
         rawBody,
-        weight
+        weight,
+        config.physics?.colliderOffset
       );
       rawCollider.setRestitution(0.3);
 
@@ -178,7 +187,11 @@ export function assembleItem(
     });
   }
 
-  // 7. Компонент видимости
+  // 7. Компонент видимости и визуальная модель
+  if (config.visualModel) {
+    world.addComponent(id, 'visualModel', fastClone(config.visualModel));
+  }
+
   world.addComponent(id, 'renderable', {
     zIndex: RENDER_Z_INDEX.ITEMS,
     isVisible: !isPossessed,

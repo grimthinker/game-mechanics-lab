@@ -90,14 +90,14 @@ export interface IPhysicsDriver {
     ignoreEntityId?: string
   ): boolean;
 
-  /** Создает коллайдер-кубоид (hx, hy, hz — половины размеров по осям) с опциональным вертикальным смещением */
+  /** Создает коллайдер-кубоид (hx, hy, hz — половины размеров по осям) с опциональным смещением центра */
   createCuboidCollider(
     hx: number,
     hy: number,
     hz: number,
     parent: RAPIER.RigidBody,
     mass?: number,
-    offsetY?: number
+    offset?: Vec3 | number
   ): RAPIER.Collider;
   /** Создает статический пол (кубоид), верхняя грань которого находится на высоте y */
   createGround(

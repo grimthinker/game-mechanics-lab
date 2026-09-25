@@ -50,9 +50,18 @@ export class AssetManager {
    */
   public async getClonedModel(url: string): Promise<THREE.Object3D | null> {
     if (url.startsWith('proc://')) {
-      const { ProceduralCreatureAssetManager: ProceduralCreatureAssetManager } =
-        await import('./creatures/ProceduralAssetManager');
-      const model = ProceduralCreatureAssetManager.getInstance().getClonedAsset(url);
+      let model: THREE.Object3D | null = null;
+
+      if (url.startsWith('proc://prop/')) {
+        const { ProceduralPropManager } = await import('./props/ProceduralPropManager');
+        const propName = url.replace('proc://prop/', '');
+        model = ProceduralPropManager.getInstance().getProp(propName);
+      } else {
+        const { ProceduralCreatureAssetManager } =
+          await import('./creatures/ProceduralAssetManager');
+        model = ProceduralCreatureAssetManager.getInstance().getClonedAsset(url);
+      }
+
       if (model) {
         model.traverse((child) => {
           if (child instanceof THREE.Mesh) {

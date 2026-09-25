@@ -96,14 +96,16 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           }),
         },
         {
-          id: 'weapon_spear',
-          name: t('palette.spear'),
-          description: t('palette.spearDesc'),
+          id: 'weapon_sword',
+          name: 'Меч',
+          description: 'Оружие ближнего боя',
           icon: '🗡️',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'weapon' },
+            meta: { name: 'Меч', entityType: 'item' },
+            visualModel: { modelId: 'proc://prop/sword' },
             item: {
-              name: t('palette.spear'),
+              name: 'Меч',
               type: 'weapon',
               maxStack: 1,
               size: 10,
@@ -111,9 +113,15 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: false,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 0.4, weight: 1, isSolid: true },
+            physics: {
+              radius: 0.4,
+              weight: 2,
+              isSolid: true,
+              halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
+              colliderOffset: { x: 0, y: 0.36, z: 0 },
+            },
             weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
-            weaponZone: { hitZoneType: 'forward_line', length: 4.5 },
+            weaponZone: { hitZoneType: 'angle', radius: 2.5, angle: deg2Rad(90) },
           }),
         },
         {
@@ -306,6 +314,24 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
     {
       title: t('palette.categoryObstacles'),
       items: [
+        {
+          id: 'obstacle_tree',
+          name: 'Дерево',
+          description: 'Процедурное дерево',
+          icon: '🌳',
+          createConfig: () => ({
+            tag: { archetype: 'obstacle' },
+            meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
+            visualModel: { modelId: 'proc://prop/tree' },
+            physics: {
+              radius: 0.6,
+              weight: 5000,
+              isSolid: true,
+              height: 4.0,
+              points: createRectanglePoints(0.6, 0.6),
+            },
+          }),
+        },
         {
           id: 'obstacle_wall',
           name: t('palette.wall'),

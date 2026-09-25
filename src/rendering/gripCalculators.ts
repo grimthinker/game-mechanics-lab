@@ -115,8 +115,8 @@ export function computeItemGrip(itemObj: THREE.Object3D, _itemType?: string): Gr
 
   if (explicitGrip) {
     explicitGrip.updateMatrix();
-    const pos = explicitGrip.position.clone().negate();
     const quat = explicitGrip.quaternion.clone().invert();
+    const pos = explicitGrip.position.clone().negate().applyQuaternion(quat);
     return { position: pos, quaternion: quat };
   }
 

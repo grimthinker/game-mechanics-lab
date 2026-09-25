@@ -451,11 +451,19 @@ export class WorldSerializer {
                 if (p.y < minY) minY = p.y;
                 if (p.y > maxY) maxY = p.y;
               }
-              const hx = Math.max(0.1, (maxX - minX) / 2);
-              const hy = 0.75; // 1.5м / 2
-              const hz = Math.max(0.1, (maxY - minY) / 2);
+              const width = Math.max(0.2, maxX - minX);
+              const depth = Math.max(0.2, maxY - minY);
+              const height = comps.physicsStats?.height ?? 1.5;
 
-              rawCollider = this.app.physicsDriver.createCuboidCollider(hx, hy, hz, rawBody, 0, hy);
+              const hx = width / 2;
+              const hy = height / 2;
+              const hz = depth / 2;
+
+              rawCollider = this.app.physicsDriver.createCuboidCollider(hx, hy, hz, rawBody, 0, {
+                x: 0,
+                y: hy,
+                z: 0,
+              });
             }
 
             this.app.world.addComponent(ent.id, 'physicsBody', {
@@ -489,12 +497,17 @@ export class WorldSerializer {
                 const w = comps.physicsStats?.weight?.current ?? 1;
 
                 const size = r * 0.8;
+                const hx = comps.physicsStats?.halfExtents?.x ?? size / 2;
+                const hy = comps.physicsStats?.halfExtents?.y ?? size / 2;
+                const hz = comps.physicsStats?.halfExtents?.z ?? size / 2;
+
                 rawCollider = this.app.physicsDriver.createCuboidCollider(
-                  size / 2,
-                  size / 2,
-                  size / 2,
+                  hx,
+                  hy,
+                  hz,
                   rawBody,
-                  w
+                  w,
+                  comps.physicsStats?.colliderOffset
                 );
                 rawCollider.setRestitution(0.3);
                 rawBody.setLinearDamping(0.95);

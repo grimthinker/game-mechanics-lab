@@ -24,7 +24,7 @@ import { createZoneConfig } from '../ecs/archetypes/ZoneArchetype';
 import { createDefaultTerrainConfig } from '../ecs/archetypes/TerrainArchetype';
 import { getAnatomyParts, getAllContainedItems } from '../ecs/utils/hierarchy';
 import { CREATURE_BLUEPRINTS } from '../ecs/templates';
-import { Radians, deg2Rad } from '../utils';
+import { Radians, deg2Rad, createRectanglePoints } from '../utils';
 import { EventBus } from './EventBus';
 
 export class GameSimulation {
@@ -507,8 +507,10 @@ export class GameSimulation {
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
+        meta: { name: 'Меч', entityType: 'item' },
+        visualModel: { modelId: 'proc://prop/sword' },
         item: {
-          name: 'Копьё пронзания',
+          name: 'Меч',
           type: 'weapon',
           maxStack: 1,
           count: 1,
@@ -517,11 +519,18 @@ export class GameSimulation {
           equippable: false,
           equipTimeMultiplier: 1.0,
         },
-        physics: { radius: 0.4, weight: 3, isSolid: true },
+        physics: {
+          radius: 0.4,
+          weight: 2,
+          isSolid: true,
+          halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
+          colliderOffset: { x: 0, y: 0.36, z: 0 },
+        },
         weaponStats: { baseDamage: 25, prepTime: 0.2, castTime: 0, recoveryTime: 0.3 },
         weaponZone: {
-          hitZoneType: 'forward_line',
-          length: 4.5,
+          hitZoneType: 'angle',
+          radius: 2.5,
+          angle: deg2Rad(90),
           pierceObstacles: false,
           pierceCreatures: false,
           pierceItems: false,
@@ -584,6 +593,33 @@ export class GameSimulation {
       },
       { x: bx + 1.0, y: by + 0.2, z: bz + 1.0 }
     );
+
+    // Спавн леса (45 деревьев)
+    const treeCount = 45;
+    for (let i = 0; i < treeCount; i++) {
+      const tx = bx + (Math.random() - 0.5) * 80;
+      const tz = bz + (Math.random() - 0.5) * 80;
+
+      // Не спавним деревья слишком близко к центру (поляне)
+      const distToCenter = Math.hypot(tx - bx, tz - bz);
+      if (distToCenter < 8) continue;
+
+      this.spawnEntity(
+        {
+          tag: { archetype: 'obstacle' },
+          meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
+          visualModel: { modelId: 'proc://prop/tree' },
+          physics: {
+            radius: 0.6,
+            weight: 5000,
+            isSolid: true,
+            height: 4.0,
+            points: createRectanglePoints(0.6, 0.6),
+          },
+        },
+        { x: tx, y: by, z: tz }
+      );
+    }
 
     this.syncPhysicsStructures();
   }

@@ -42,10 +42,13 @@ export interface PhysicsConfig {
   weight: number;
   totalWeight?: number;
   size?: number;
+  height?: number;
   isSolid?: boolean;
   points?: Point[];
   linearDamping?: number;
   angularDamping?: number;
+  halfExtents?: Vec3;
+  colliderOffset?: Vec3;
 }
 
 export interface PhysicsStatsComponent {
@@ -53,6 +56,9 @@ export interface PhysicsStatsComponent {
   weight: StatValue<number>;
   totalWeight?: number;
   size?: number;
+  height?: number;
   isSolid: boolean;
   points?: Point[];
+  halfExtents?: Vec3;
+  colliderOffset?: Vec3;
 }

@@ -103,8 +103,7 @@ export class TrampleTextureManager {
            vec2 toPixel = vUv - stamp.xy;
             float dist = length(toPixel);
             if (dist < radius) {
-              // Ядро 100% давления под ногами: в пределах 45% радиуса нажим всегда максимален
-              float coreRadius = radius * 0.15;
+              float coreRadius = radius * 0.25;
               float falloff = 1.0;
               if (dist > coreRadius) {
                 float t = (dist - coreRadius) / (radius - coreRadius);

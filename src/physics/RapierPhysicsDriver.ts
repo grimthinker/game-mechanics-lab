@@ -308,15 +308,17 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     hz: number,
     parent: RAPIER.RigidBody,
     mass?: number,
-    offsetY?: number
+    offset?: Vec3 | number
   ): RAPIER.Collider {
     const desc = RAPIER.ColliderDesc.cuboid(
       Math.max(0.01, hx),
       Math.max(0.01, hy),
       Math.max(0.01, hz)
     );
-    if (offsetY !== undefined && offsetY !== 0) {
-      desc.setTranslation(0.0, offsetY, 0.0);
+    if (typeof offset === 'number') {
+      desc.setTranslation(0.0, offset, 0.0);
+    } else if (offset && typeof offset === 'object') {
+      desc.setTranslation(offset.x ?? 0, offset.y ?? 0, offset.z ?? 0);
     }
     if (mass !== undefined && mass > 0) {
       desc.setMass(mass);

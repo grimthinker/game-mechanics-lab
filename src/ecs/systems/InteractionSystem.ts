@@ -260,13 +260,24 @@ export class InteractionSystem {
           if (physStats && physics.driver && physics.driver.isReady) {
             const radius = physStats.radius.current ?? 0.3;
             const weight = physStats.weight.current ?? 1;
+            const size = radius * 0.8;
+            const hx = physStats.halfExtents?.x ?? size / 2;
+            const hy = physStats.halfExtents?.y ?? size / 2;
+            const hz = physStats.halfExtents?.z ?? size / 2;
             const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
             const rawBody = physics.driver.createDynamicBody(
               { x: dropX, y: dropY + 0.5, z: dropZ },
               targetId
             );
-            const rawCollider = physics.driver.createBallCollider(radius, rawBody, weight);
+            const rawCollider = physics.driver.createCuboidCollider(
+              hx,
+              hy,
+              hz,
+              rawBody,
+              weight,
+              physStats.colliderOffset
+            );
             rawCollider.setRestitution(0.3);
 
             world.addComponent(targetId, 'physicsBody', {
@@ -832,12 +843,17 @@ export class InteractionSystem {
         rawBody = physics.driver.createDynamicBody({ x: endX, y: dropY, z: endZ }, itemId);
         const size = itemRadius * 0.8;
         const weight = physStats.weight.current ?? 1;
+        const hx = physStats.halfExtents?.x ?? size / 2;
+        const hy = physStats.halfExtents?.y ?? size / 2;
+        const hz = physStats.halfExtents?.z ?? size / 2;
+
         rawCollider = physics.driver.createCuboidCollider(
-          size / 2,
-          size / 2,
-          size / 2,
+          hx,
+          hy,
+          hz,
           rawBody,
-          weight
+          weight,
+          physStats.colliderOffset
         );
         rawCollider.setRestitution(0.3);
         rawBody.setLinearDamping(0.95);
@@ -956,12 +972,17 @@ export class InteractionSystem {
         rawBody = physics.driver.createDynamicBody({ x: endX, y: spawnY, z: endZ }, itemId);
         const size = itemRadius * 0.8;
         const weight = physStats.weight.current ?? 1;
+        const hx = physStats.halfExtents?.x ?? size / 2;
+        const hy = physStats.halfExtents?.y ?? size / 2;
+        const hz = physStats.halfExtents?.z ?? size / 2;
+
         rawCollider = physics.driver.createCuboidCollider(
-          size / 2,
-          size / 2,
-          size / 2,
+          hx,
+          hy,
+          hz,
           rawBody,
-          weight
+          weight,
+          physStats.colliderOffset
         );
         rawCollider.setRestitution(0.3);
         rawBody.setLinearDamping(0.05); // Минимальное сопротивление воздуха для честной параболы
