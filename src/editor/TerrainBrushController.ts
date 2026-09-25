@@ -81,6 +81,7 @@ export class TerrainBrushController {
 
       if (modified) {
         terrainComp.isSplatDirty = true;
+        terrainComp.splatVersion = (terrainComp.splatVersion ?? 0) + 1;
       }
       return undefined;
     }
@@ -149,6 +150,7 @@ export class TerrainBrushController {
 
     if (modified) {
       terrainComp.isGeometryDirty = true;
+      terrainComp.geometryVersion = (terrainComp.geometryVersion ?? 0) + 1;
     }
 
     return targetH;

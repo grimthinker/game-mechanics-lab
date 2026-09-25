@@ -31,6 +31,8 @@ export class TerrainModifyCommand implements ICommand {
       comp.isGeometryDirty = true;
       comp.isSplatDirty = true;
       comp.isPhysicsDirty = true;
+      comp.geometryVersion = (comp.geometryVersion ?? 0) + 1;
+      comp.splatVersion = (comp.splatVersion ?? 0) + 1;
 
       // Принудительно вызываем обновление физики (важно для отката на паузе)
       this.app.syncPhysicsStructures();

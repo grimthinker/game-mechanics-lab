@@ -190,12 +190,13 @@ export class ThreeRenderer implements IRenderer {
 
     this.raycaster.setFromCamera(this.mouseNDC, this.camera);
 
-    // Исключаем тяжелый меш террейна (~32 000 полигонов), сетку и служебные объекты ДО вызова трассировки на CPU
+    // Исключаем тяжелый меш террейна, траву (~18 000 инстансов), сетку и служебные объекты ДО вызова трассировки на CPU
     const pickableObjects: THREE.Object3D[] = [];
     for (let i = 0; i < this.scene.children.length; i++) {
       const child = this.scene.children[i];
       if (
         child.userData.isTerrainMesh ||
+        child.userData.isGrassMesh ||
         child.userData.entityId === 'terrain' ||
         child instanceof THREE.GridHelper ||
         child === this.brushCursor ||

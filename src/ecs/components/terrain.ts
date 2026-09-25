@@ -14,6 +14,10 @@ export interface TerrainComponent {
   splatData: Uint8Array;
   /** Масштаб тайлинга детальных текстур */
   textureTiling: number;
+  /** Счетчик версий высот для независимого отслеживания изменений системами */
+  geometryVersion?: number;
+  /** Счетчик версий текстурной маски (Splatmap) для независимого отслеживания изменений системами */
+  splatVersion?: number;
   /** Флаг необходимости перестроения вертексов Three.js геометрии */
   isGeometryDirty?: boolean;
   /** Флаг необходимости обновления текстуры Splatmap */

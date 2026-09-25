@@ -248,6 +248,8 @@ export class WorldSerializer {
               heights,
               splatData,
               textureTiling: rawT.textureTiling || 24,
+              geometryVersion: 1,
+              splatVersion: 1,
               isGeometryDirty: true,
               isSplatDirty: true,
               isPhysicsDirty: true,

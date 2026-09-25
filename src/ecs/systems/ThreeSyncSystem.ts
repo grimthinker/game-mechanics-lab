@@ -15,6 +15,7 @@ import {
 } from '../../rendering/creatures/CreatureMeshAssembler';
 import { disposeObject, attachOutlines } from '../../rendering/renderUtils';
 import { AttackVisualsManager } from '../../rendering/attacks/AttackVisualsManager';
+import { GrassSyncSystem } from '../../rendering/grass/GrassSyncSystem';
 
 export class ThreeSyncSystem {
   public static disposeObject = disposeObject;
@@ -32,6 +33,7 @@ export class ThreeSyncSystem {
   private attackVisualsManager: AttackVisualsManager;
   private terrainSync: TerrainSyncSystem;
   private creatureAssembler: CreatureMeshAssembler;
+  private grassSync: GrassSyncSystem;
 
   // Кэшированные материалы для производительности (фоллбэк)
   private matPlayer = new THREE.MeshLambertMaterial({ color: 0x2980b9 });
@@ -96,6 +98,7 @@ export class ThreeSyncSystem {
       (id, state) => this.animators.set(id, state),
       (id, animator, anim) => this.playAnimation(id, animator, anim)
     );
+    this.grassSync = new GrassSyncSystem(scene);
   }
 
   public clearMeshes(): void {
@@ -106,6 +109,7 @@ export class ThreeSyncSystem {
       }
     }
     this.attackVisualsManager.clear();
+    this.grassSync.clear();
     this.meshes.clear();
     this.animators.clear();
     this.loadingMeshes.clear();
@@ -115,6 +119,7 @@ export class ThreeSyncSystem {
   public destroy(): void {
     this.clearMeshes();
     this.attackVisualsManager.destroy();
+    this.grassSync.destroy();
 
     // Очищаем кэшированные фоллбэк-материалы
     this.matPlayer.dispose();
@@ -302,7 +307,6 @@ export class ThreeSyncSystem {
 
               if (info.slot.itemId) {
                 const itemObj = this.meshes.get(info.slot.itemId);
-                // Удаляем из сокета любые посторонние объекты, если в слоте сменился предмет
                 for (let c = socketBone.children.length - 1; c >= 0; c--) {
                   const child = socketBone.children[c];
                   if (child !== itemObj) {
@@ -327,7 +331,6 @@ export class ThreeSyncSystem {
                   }
                 }
               } else {
-                // Если слот пуст (предмет выброшен/снят), гарантированно очищаем сокет кости руки
                 while (socketBone.children.length > 0) {
                   const child = socketBone.children[0];
                   socketBone.remove(child);
@@ -345,7 +348,6 @@ export class ThreeSyncSystem {
         // 4. Фоллбэк-визуализация примитивов
         else if (!isEquippedInHand) {
           const health = world.getComponent(id, 'health');
-          // В блинчик сплющиваются только погибшие существа (трупы), но не предметы!
           if (health && !health.isAlive && archetype === 'creature') {
             obj.scale.set(1, 0.1, 1);
             obj.position.y = 0.05;
@@ -397,7 +399,6 @@ export class ThreeSyncSystem {
     // Очистка удаленных из мира сущностей с освобождением VRAM
     for (const [id, mesh] of this.meshes.entries()) {
       if (!activeIds.has(id)) {
-        // Инвалидируем все фоновые загрузки для этого ID
         this.loadingGenerations.set(id, (this.loadingGenerations.get(id) ?? 0) + 1);
         ThreeSyncSystem.disposeObject(mesh);
         if (mesh.parent) {
@@ -410,6 +411,11 @@ export class ThreeSyncSystem {
 
     // Синхронизация 3D зон атак в активных фазах prep и cast через менеджер
     this.attackVisualsManager.update(world);
+
+    // Синхронизация процедурной интерактивной травы
+    const terrainEntities = world.getEntitiesWith('terrain');
+    const terrainComp = terrainEntities.length > 0 ? terrainEntities[0][1].terrain : undefined;
+    this.grassSync.update(dt, world, terrainComp);
   }
 
   private async playAnimation(
@@ -518,7 +524,6 @@ export class ThreeSyncSystem {
       AssetManager.getInstance()
         .getClonedModel(visual.modelId)
         .then((mesh) => {
-          // Проверяем, не была ли сущность удалена, пересоздана или отменена во время загрузки
           if (this.loadingGenerations.get(id) !== currentGen || !world.getEntity(id)) {
             if (mesh) ThreeSyncSystem.disposeObject(mesh);
             ThreeSyncSystem.disposeObject(group);
@@ -533,17 +538,15 @@ export class ThreeSyncSystem {
               group.add(mesh);
             }
 
-            // Рассчитываем и кэшируем точку хвата предмета
             const itemComp = world.getComponent(id, 'item');
             group.userData.gripTransform = computeItemGrip(group, itemComp?.type);
 
-            // Добавляем невидимый куб для возможности клика и выделения
             const physStats = world.getComponent(id, 'physicsStats');
             const radius = physStats ? physStats.radius.current : 16;
             const outlineGeo = new THREE.BoxGeometry(radius * 1.5, radius * 1.5, radius * 1.5);
             const outline = new THREE.Mesh(outlineGeo, this.matSelection);
             outline.userData.isSelectionOutline = true;
-            outline.userData.isSharedMaterial = true; // Защищаем this.matSelection
+            outline.userData.isSharedMaterial = true;
             outline.visible = false;
             group.add(outline);
           }
@@ -597,7 +600,6 @@ export class ThreeSyncSystem {
         w = Math.max(0.2, maxX - minX);
         d = Math.max(0.2, maxY - minY);
       }
-      // Метрическая высота стены (1.5 метра)
       const h = 1.5;
       const geo = new THREE.BoxGeometry(w, h, d);
       mainMesh = new THREE.Mesh(geo, this.matObstacle);
@@ -609,10 +611,10 @@ export class ThreeSyncSystem {
       else if (item?.type === 'armor') mat = this.matArmor;
       else if (item?.type === 'bag') mat = this.matBag;
 
-      const size = radius * 0.8; // Размер синхронизирован с физическим кубическим коллайдером
+      const size = radius * 0.8;
       const geo = new THREE.BoxGeometry(size, size, size);
       mainMesh = new THREE.Mesh(geo, mat);
-      mainMesh.position.y = 0; // Центр меша совпадает с центром тяжести тела Rapier
+      mainMesh.position.y = 0;
     } else if (archetype === 'zone') {
       const effector = world.getComponent(id, 'areaEffector');
       let mat = this.matZoneNeutral;
@@ -622,7 +624,6 @@ export class ThreeSyncSystem {
       else if (effector?.effect === 'time_dilation') {
         mat = (effector.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
       }
-      // Создаем базовый цилиндр радиусом 1 метр, который динамически масштабируется в update
       const geo = new THREE.CylinderGeometry(1, 1, 2, 32);
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = 1;
@@ -638,7 +639,7 @@ export class ThreeSyncSystem {
     if (mainMesh) {
       group.userData.entityId = id;
       mainMesh.userData.entityId = id;
-      mainMesh.userData.isSharedMaterial = true; // Защищаем кэшированный материал
+      mainMesh.userData.isSharedMaterial = true;
       group.add(mainMesh);
 
       if (archetype === 'item' || archetype === 'bodyPart') {
