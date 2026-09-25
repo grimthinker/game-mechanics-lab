@@ -66,7 +66,10 @@ export class BTConditionEngaged extends BTSimpleAction {
 }
 
 export class BTActionPursue extends BTAction {
-  public static readonly defaultParams = { stopDist: LOGIC_CONFIG.followStopDist };
+  public static readonly defaultParams = {
+    stopDist: LOGIC_CONFIG.followStopDist,
+    sprintMinDistance: undefined as number | undefined,
+  };
   private params: typeof BTActionPursue.defaultParams;
   private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('currentPath');
   private stopDistSq: number;
@@ -99,10 +102,17 @@ export class BTActionPursue extends BTAction {
     const selfPos = entity.getPos();
     const dx = targetPos.x - selfPos.x;
     const dz = targetPos.z - selfPos.z;
+    const distSq = dx * dx + dz * dz;
 
     const input = entity.input;
 
-    if (dx * dx + dz * dz <= this.stopDistSq) {
+    if (this.params.sprintMinDistance !== undefined && input) {
+      const dist = Math.hypot(dx, dz);
+      input.isRunning =
+        this.params.sprintMinDistance === 0 ? true : dist > this.params.sprintMinDistance;
+    }
+
+    if (distSq <= this.stopDistSq) {
       if (input) {
         input.desiredMoveVector = null;
         input.moveForward = 0;
@@ -111,6 +121,7 @@ export class BTActionPursue extends BTAction {
         input.turnDirection = 0;
         input.turnRatio = 0;
         input.targetLookAngle = undefined;
+        input.isRunning = false;
       }
       return NodeStatus.SUCCESS;
     }
@@ -137,6 +148,9 @@ export class BTActionPursue extends BTAction {
   protected stopAction(entity: EntityAdapter): void {
     entity.brain!.blackboard.remove('currentPath');
     this.movementNode.abort(entity);
+    if (entity.input) {
+      entity.input.isRunning = false;
+    }
   }
 }
 

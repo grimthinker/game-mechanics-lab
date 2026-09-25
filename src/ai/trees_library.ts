@@ -135,7 +135,7 @@ export function DogFetchTree(): BTNode {
           new BTActionSetTarget({ sourceKey: 'masterEntityId' }),
           new BTServicePathUpdater(
             new BTSequence([
-              new BTActionPursue({ stopDist: 1.5 }),
+              new BTActionPursue({ stopDist: 1.5, sprintMinDistance: 10 }),
               new BTConditionDistance({ maxDistance: 2.2 }),
               new BTActionRotateToPos(),
               new BTActionFetchDeliver(),
@@ -148,7 +148,10 @@ export function DogFetchTree(): BTNode {
           new BTConditionFetchState({ expectedState: 'chasing_item' }),
           new BTActionSetTarget({ sourceKey: 'fetchTargetId' }),
           new BTServicePathUpdater(
-            new BTSequence([new BTActionPursue({ stopDist: 0.6 }), new BTActionFetchPickup()])
+            new BTSequence([
+              new BTActionPursue({ stopDist: 0.6, sprintMinDistance: 0 }),
+              new BTActionFetchPickup(),
+            ])
           ),
         ]),
 
@@ -158,7 +161,7 @@ export function DogFetchTree(): BTNode {
           new BTServicePathUpdater(
             new BTSelector([
               new BTSequence([new BTConditionEngaged(), new BTActionRotateToPos()]),
-              new BTActionPursue(),
+              new BTActionPursue({ sprintMinDistance: 10 }),
             ])
           ),
         ]),
