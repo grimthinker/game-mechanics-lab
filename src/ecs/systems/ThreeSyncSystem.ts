@@ -86,7 +86,7 @@ export class ThreeSyncSystem {
     side: THREE.BackSide,
   });
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
     this.scene = scene;
     this.attackVisualsManager = new AttackVisualsManager(scene);
     this.terrainSync = new TerrainSyncSystem();
@@ -98,7 +98,7 @@ export class ThreeSyncSystem {
       (id, state) => this.animators.set(id, state),
       (id, animator, anim) => this.playAnimation(id, animator, anim)
     );
-    this.grassSync = new GrassSyncSystem(scene);
+    this.grassSync = new GrassSyncSystem(scene, renderer);
   }
 
   public clearMeshes(): void {

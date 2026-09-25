@@ -69,8 +69,11 @@ export class GameSimulation {
     this.entityFactory = new EntityFactory();
     this.serializer = new WorldSerializer(app);
 
-    // Доступ к 3D-сцене для синхронизатора через фасад GameApp
-    this.threeSyncSystem = new ThreeSyncSystem((app.renderer as any).scene);
+    // Доступ к 3D-сцене и WebGL-рендереру для синхронизатора через фасад GameApp
+    this.threeSyncSystem = new ThreeSyncSystem(
+      (app.renderer as any).scene,
+      (app.renderer as any).renderer
+    );
   }
 
   public fixedUpdate(dt: number): void {

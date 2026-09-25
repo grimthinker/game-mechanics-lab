@@ -4,6 +4,7 @@ import { TerrainComponent, getTerrainHeightAt } from '../../ecs/components/terra
 import { GrassGeometryBuilder } from './GrassGeometryBuilder';
 import { createGrassMaterial } from './GrassMaterial';
 import { GRASS_CONFIG } from '../../config/grassConfig';
+import { TrampleStamp, TrampleTextureManager } from './TrampleTextureManager';
 
 interface GrassInstanceData {
   x: number;
@@ -19,6 +20,8 @@ interface GrassInstanceData {
 
 export class GrassSyncSystem {
   private scene: THREE.Scene;
+  private renderer?: THREE.WebGLRenderer;
+  private trampleManager: TrampleTextureManager;
 
   // Три варианта мешей для разного количества лепестков в пучке
   private mesh3: THREE.InstancedMesh | null = null;
@@ -46,7 +49,6 @@ export class GrassSyncSystem {
   private prob4: number = GRASS_CONFIG.probabilities.blade4;
 
   private dummy = new THREE.Object3D();
-  private interactorsArray: THREE.Vector4[];
 
   // Кэш сгенерированных позиций для быстрого обновления высот при скульпте холмов
   private instanceCache: GrassInstanceData[] = [];
@@ -58,14 +60,16 @@ export class GrassSyncSystem {
   private lastGeometryVersion: number = -1;
   private lastDensityFactor: number = GRASS_CONFIG.defaultDensityFactor;
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
     this.scene = scene;
+    this.renderer = renderer;
+    this.trampleManager = new TrampleTextureManager(256);
+
     this.geo3 = GrassGeometryBuilder.createClusterGeometry({ bladeCount: 3 });
     this.geo4 = GrassGeometryBuilder.createClusterGeometry({ bladeCount: 4 });
     this.geo5 = GrassGeometryBuilder.createClusterGeometry({ bladeCount: 5 });
 
     this.grassMaterial = createGrassMaterial();
-    this.interactorsArray = Array.from({ length: 16 }, () => new THREE.Vector4(0, -999, 0, 0));
   }
 
   public update(dt: number, world: World, terrainComp?: TerrainComponent): void {
@@ -98,14 +102,26 @@ export class GrassSyncSystem {
       this.lastGeometryVersion = currentGeomVer;
     }
 
-    // Обновляем время для волн ветра в шейдере
+    // Обновляем время для волн ветра и параметры террейна в шейдере
     const shader = this.grassMaterial.userData.shader;
-    if (shader && shader.uniforms.uTime) {
-      shader.uniforms.uTime.value += dt;
+    if (shader) {
+      if (shader.uniforms.uTime) {
+        shader.uniforms.uTime.value += dt;
+      }
+      if (shader.uniforms.uTerrainSize) {
+        shader.uniforms.uTerrainSize.value = terrainComp.size;
+      }
     }
 
-    // Собираем и передаем координаты интеракторов
-    this.updateInteractors(world);
+    // Симуляция текстуры приминания (GPU Trample Map)
+    if (this.renderer) {
+      const stamps = this.collectTrampleStamps(world);
+      this.trampleManager.update(this.renderer, dt, stamps, terrainComp.size);
+
+      if (shader && shader.uniforms.uTrampleMap) {
+        shader.uniforms.uTrampleMap.value = this.trampleManager.getTexture();
+      }
+    }
   }
 
   private rebuildGrass(terrain: TerrainComponent): void {
@@ -289,35 +305,37 @@ export class GrassSyncSystem {
     }
   }
 
-  private updateInteractors(world: World): void {
-    const shader = this.grassMaterial.userData.shader;
-    if (!shader || !shader.uniforms.uInteractors) return;
+  private collectTrampleStamps(world: World): TrampleStamp[] {
+    const stamps: TrampleStamp[] = [];
 
-    interface Candidate {
-      x: number;
-      y: number;
-      z: number;
-      radius: number;
-      priority: number;
-    }
-
-    const candidates: Candidate[] = [];
-
+    // 1. Игрок
     const entities = world.getEntitiesWith('transform', 'aiStats', 'health');
     for (const [id, { transform, aiStats, health }] of entities) {
       if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
         const physStats = world.getComponent(id, 'physicsStats');
-        candidates.push({
+        const vel = world.getComponent(id, 'velocity');
+        const speed = Math.hypot(vel?.vx ?? 0, vel?.vz ?? 0);
+        const isMoving = speed > 0.1;
+
+        const dirX = isMoving ? vel!.vx / speed : 0;
+        const dirZ = isMoving ? vel!.vz / speed : 0;
+
+        const baseRadius = physStats?.radius.current ?? 0.4;
+        const stampRadius = baseRadius + (isMoving ? 0.35 : 0.22);
+
+        stamps.push({
           x: transform.x,
-          y: transform.y,
           z: transform.z,
-          radius: (physStats?.radius.current ?? 0.4) + 0.45,
-          priority: 100,
+          radius: stampRadius,
+          dirX,
+          dirZ,
+          strength: 1.0,
         });
         break;
       }
     }
 
+    // 2. Другие существа (включая собаку)
     const creatures = world.getEntitiesWith('transform', 'health', 'meta');
     for (const [id, { transform, health, meta }] of creatures) {
       if (meta.entityType === 'creature' && health.isAlive) {
@@ -325,16 +343,28 @@ export class GrassSyncSystem {
         if (ai?.behavior.current === 'PlayerTree') continue;
 
         const physStats = world.getComponent(id, 'physicsStats');
-        candidates.push({
+        const vel = world.getComponent(id, 'velocity');
+        const speed = Math.hypot(vel?.vx ?? 0, vel?.vz ?? 0);
+        const isMoving = speed > 0.1;
+
+        const dirX = isMoving ? vel!.vx / speed : 0;
+        const dirZ = isMoving ? vel!.vz / speed : 0;
+
+        const baseRadius = physStats?.radius.current ?? 0.4;
+        const stampRadius = baseRadius + (isMoving ? 0.3 : 0.2);
+
+        stamps.push({
           x: transform.x,
-          y: transform.y,
           z: transform.z,
-          radius: (physStats?.radius.current ?? 0.4) + 0.35,
-          priority: 50,
+          radius: stampRadius,
+          dirX,
+          dirZ,
+          strength: 0.95,
         });
       }
     }
 
+    // 3. Предметы (брошенные, летящие или катящиеся)
     const items = world.getEntitiesWith('transform', 'item');
     for (const [id, { transform, item }] of items) {
       if (world.getComponent(id, 'ownership')) continue;
@@ -345,35 +375,30 @@ export class GrassSyncSystem {
 
       const weight = physStats?.weight.current ?? 1;
       const size = item.size ?? 1;
-      const isMoving = vel && (vel.currentSpeed > 0.3 || Math.abs(vel.vy) > 0.3);
+      const speed = Math.hypot(vel?.vx ?? 0, vel?.vz ?? 0);
+
+      const isMoving = vel && (speed > 0.3 || Math.abs(vel.vy) > 0.3);
       const isAirborne = thrown?.isAirborne;
 
-      if (size >= 8 || weight >= 4 || isAirborne || isMoving) {
+      if (size >= 4 || weight >= 2 || isAirborne || isMoving) {
         const itemRadius = physStats?.radius.current ?? 0.3;
-        candidates.push({
+        const isDirMoving = speed > 0.05;
+        const dirX = isDirMoving ? vel!.vx / speed : 0;
+        const dirZ = isDirMoving ? vel!.vz / speed : 0;
+        const stampRadius = itemRadius + (isMoving || isAirborne ? 0.25 : 0.15);
+
+        stamps.push({
           x: transform.x,
-          y: transform.y,
           z: transform.z,
-          radius: itemRadius + 0.3,
-          priority: isAirborne ? 40 : 20,
+          radius: stampRadius,
+          dirX,
+          dirZ,
+          strength: Math.min(1.0, 0.4 + weight * 0.1),
         });
       }
     }
 
-    candidates.sort((a, b) => b.priority - a.priority);
-    const count = Math.min(16, candidates.length);
-
-    for (let i = 0; i < 16; i++) {
-      if (i < count) {
-        const c = candidates[i];
-        this.interactorsArray[i].set(c.x, c.y, c.z, c.radius);
-      } else {
-        this.interactorsArray[i].set(0, -999, 0, 0);
-      }
-    }
-
-    shader.uniforms.uInteractors.value = this.interactorsArray;
-    shader.uniforms.uInteractorCount.value = count;
+    return stamps;
   }
 
   public clear(): void {
@@ -398,6 +423,8 @@ export class GrassSyncSystem {
     this.lastSplatVersion = -1;
     this.lastGeometryVersion = -1;
     this.lastDensityFactor = GRASS_CONFIG.defaultDensityFactor;
+
+    this.trampleManager.clear(this.renderer);
   }
 
   public destroy(): void {
@@ -406,5 +433,6 @@ export class GrassSyncSystem {
     this.geo4.dispose();
     this.geo5.dispose();
     this.grassMaterial.dispose();
+    this.trampleManager.destroy();
   }
 }
