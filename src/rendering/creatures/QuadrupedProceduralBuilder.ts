@@ -29,24 +29,28 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
     tailPivot.position.set(0, 0.08, -0.36);
     torso.add(tailPivot);
 
+    // Передняя левая лапа (+X)
     const frontLeftLegPivot = new THREE.Group();
     frontLeftLegPivot.name = 'FrontLeftLegPivot';
-    frontLeftLegPivot.position.set(-0.16, 0.4, 0.22);
+    frontLeftLegPivot.position.set(0.16, 0.4, 0.22);
     root.add(frontLeftLegPivot);
 
+    // Передняя правая лапа (-X)
     const frontRightLegPivot = new THREE.Group();
     frontRightLegPivot.name = 'FrontRightLegPivot';
-    frontRightLegPivot.position.set(0.16, 0.4, 0.22);
+    frontRightLegPivot.position.set(-0.16, 0.4, 0.22);
     root.add(frontRightLegPivot);
 
+    // Задняя левая лапа (+X)
     const backLeftLegPivot = new THREE.Group();
     backLeftLegPivot.name = 'BackLeftLegPivot';
-    backLeftLegPivot.position.set(-0.16, 0.4, -0.22);
+    backLeftLegPivot.position.set(0.16, 0.4, -0.22);
     root.add(backLeftLegPivot);
 
+    // Задняя правая лапа (-X)
     const backRightLegPivot = new THREE.Group();
     backRightLegPivot.name = 'BackRightLegPivot';
-    backRightLegPivot.position.set(0.16, 0.4, -0.22);
+    backRightLegPivot.position.set(-0.16, 0.4, -0.22);
     root.add(backRightLegPivot);
 
     return root;
@@ -100,21 +104,25 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
         nose.castShadow = true;
         headGroup.add(nose);
 
+        // Левый глаз (+X)
         const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.02), eyeMat);
-        leftEye.position.set(-0.11, 0.08, 0.25);
+        leftEye.position.set(0.11, 0.08, 0.25);
         headGroup.add(leftEye);
 
+        // Правый глаз (-X)
         const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.02), eyeMat);
-        rightEye.position.set(0.11, 0.08, 0.25);
+        rightEye.position.set(-0.11, 0.08, 0.25);
         headGroup.add(rightEye);
 
+        // Левое ухо (+X)
         const leftEar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.05), furMat);
-        leftEar.position.set(-0.1, 0.24, 0.08);
+        leftEar.position.set(0.1, 0.24, 0.08);
         leftEar.castShadow = true;
         headGroup.add(leftEar);
 
+        // Правое ухо (-X)
         const rightEar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.05), furMat);
-        rightEar.position.set(0.1, 0.24, 0.08);
+        rightEar.position.set(-0.1, 0.24, 0.08);
         rightEar.castShadow = true;
         headGroup.add(rightEar);
 
@@ -177,10 +185,10 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       quat.setFromEuler(euler);
       tailQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      fllP.push(-0.16, 0.4, 0.22);
-      frlP.push(0.16, 0.4, 0.22);
-      bllP.push(-0.16, 0.4, -0.22);
-      brlP.push(0.16, 0.4, -0.22);
+      fllP.push(0.16, 0.4, 0.22);
+      frlP.push(-0.16, 0.4, 0.22);
+      bllP.push(0.16, 0.4, -0.22);
+      brlP.push(-0.16, 0.4, -0.22);
     }
 
     const legTrackTimes = [0.0, duration];
@@ -254,10 +262,10 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
         quat.setFromEuler(euler);
         cTailQ.push(quat.x, quat.y, quat.z, quat.w);
 
-        cFllP.push(-0.16, 0.4 + bounce, 0.22);
-        cFrlP.push(0.16, 0.4 + bounce, 0.22);
-        cBllP.push(-0.16, 0.4 + bounce, -0.22);
-        cBrlP.push(0.16, 0.4 + bounce, -0.22);
+        cFllP.push(0.16, 0.4 + bounce, 0.22);
+        cFrlP.push(-0.16, 0.4 + bounce, 0.22);
+        cBllP.push(0.16, 0.4 + bounce, -0.22);
+        cBrlP.push(-0.16, 0.4 + bounce, -0.22);
 
         euler.set(swing, 0, 0);
         quat.setFromEuler(euler);
@@ -317,7 +325,6 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       ),
     ]);
 
-    // --- Анимация нахождения в воздухе для четвероногого (airborne) ---
     const durationDogAirborne = 0.8;
     const dogAirFrames = fps * durationDogAirborne;
     const dogAirTimes: number[] = [];
@@ -343,33 +350,34 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       dogAirTorsoP.push(0, 0.48 + floatY, 0);
       dogAirTorsoQ.push(...idQ);
 
-      // Голова держится прямо вперед
       dogAirHeadQ.push(...idQ);
 
-      // Хвост приподнят и мягко покачивается для баланса
       euler.set(-0.5 + Math.sin(cycle) * 0.1, 0, 0);
       quat.setFromEuler(euler);
       dogAirTailQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      dogAirFllP.push(-0.16, 0.4, 0.22);
-      dogAirFrlP.push(0.16, 0.4, 0.22);
-      dogAirBllP.push(-0.16, 0.4, -0.22);
-      dogAirBrlP.push(0.16, 0.4, -0.22);
+      dogAirFllP.push(0.16, 0.4, 0.22);
+      dogAirFrlP.push(-0.16, 0.4, 0.22);
+      dogAirBllP.push(0.16, 0.4, -0.22);
+      dogAirBrlP.push(-0.16, 0.4, -0.22);
 
       const drift = Math.sin(cycle) * 0.05;
-      euler.set(drift, 0, -0.1);
+
+      // Лапы слева (+X) разводятся в сторону +X (+Z угол)
+      euler.set(drift, 0, 0.1);
       quat.setFromEuler(euler);
       dogAirFllQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      euler.set(-drift, 0, 0.1);
+      // Лапы справа (-X) разводятся в сторону -X (-Z угол)
+      euler.set(-drift, 0, -0.1);
       quat.setFromEuler(euler);
       dogAirFrlQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      euler.set(-drift, 0, -0.1);
+      euler.set(-drift, 0, 0.1);
       quat.setFromEuler(euler);
       dogAirBllQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      euler.set(drift, 0, 0.1);
+      euler.set(drift, 0, -0.1);
       quat.setFromEuler(euler);
       dogAirBrlQ.push(quat.x, quat.y, quat.z, quat.w);
     }
@@ -400,7 +408,6 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       return [quat.x, quat.y, quat.z, quat.w];
     };
 
-    // --- Анимация подбора предмета челюстями с земли (pickup_jaws) ---
     const pickupTimes = [0.0, 0.18, 0.35, 0.48, 0.65];
     const pickupTorsoP = [0, 0.48, 0, 0, 0.44, 0.03, 0, 0.4, 0.05, 0, 0.45, 0.02, 0, 0.48, 0];
     const pickupTorsoQ = [
@@ -426,10 +433,10 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(-0.7, 0, 0),
     ];
     const pickupFllP = [
-      -0.16, 0.4, 0.22, -0.16, 0.38, 0.23, -0.16, 0.35, 0.25, -0.16, 0.38, 0.23, -0.16, 0.4, 0.22,
+      0.16, 0.4, 0.22, 0.16, 0.38, 0.23, 0.16, 0.35, 0.25, 0.16, 0.38, 0.23, 0.16, 0.4, 0.22,
     ];
     const pickupFrlP = [
-      0.16, 0.4, 0.22, 0.16, 0.38, 0.23, 0.16, 0.35, 0.25, 0.16, 0.38, 0.23, 0.16, 0.4, 0.22,
+      -0.16, 0.4, 0.22, -0.16, 0.38, 0.23, -0.16, 0.35, 0.25, -0.16, 0.38, 0.23, -0.16, 0.4, 0.22,
     ];
     const pickupFrontLegQ = [
       ...getQuat(0, 0, 0),
@@ -439,10 +446,10 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(0, 0, 0),
     ];
     const pickupRearLegP = [
-      -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22,
+      0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22,
     ];
     const pickupRearLegPr = [
-      0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22, 0.16, 0.4, -0.22,
+      -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22, -0.16, 0.4, -0.22,
     ];
     const pickupRearLegQ = [
       ...getQuat(0, 0, 0),
@@ -480,7 +487,6 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       ),
     ]);
 
-    // --- Анимация сброса предмета из пасти под ноги (drop_item_jaws) ---
     const dropTimes = [0.0, 0.12, 0.24, 0.38];
     const dropTorsoP = [0, 0.48, 0, 0, 0.46, 0.02, 0, 0.44, 0.03, 0, 0.48, 0];
     const dropTorsoQ = [
@@ -504,10 +510,10 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
     ];
     const dropLegTrackTimes = [0.0, 0.38];
     const dropLegTrackQ = [...idQ, ...idQ];
-    const dropFllP = [-0.16, 0.4, 0.22, -0.16, 0.4, 0.22];
-    const dropFrlP = [0.16, 0.4, 0.22, 0.16, 0.4, 0.22];
-    const dropBllP = [-0.16, 0.4, -0.22, -0.16, 0.4, -0.22];
-    const dropBrlP = [0.16, 0.4, -0.22, 0.16, 0.4, -0.22];
+    const dropFllP = [0.16, 0.4, 0.22, 0.16, 0.4, 0.22];
+    const dropFrlP = [-0.16, 0.4, 0.22, -0.16, 0.4, 0.22];
+    const dropBllP = [0.16, 0.4, -0.22, 0.16, 0.4, -0.22];
+    const dropBrlP = [-0.16, 0.4, -0.22, -0.16, 0.4, -0.22];
 
     const dogDropClip = new THREE.AnimationClip('drop_item_jaws', 0.38, [
       new THREE.VectorKeyframeTrack('Torso.position', dropTimes, dropTorsoP),

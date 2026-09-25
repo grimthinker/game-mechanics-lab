@@ -85,7 +85,13 @@ export const HotkeysModal: React.FC<HotkeysModalProps> = ({ isOpen, onClose }) =
               <kbd>Space</kbd> {t('hotkeys.spaceJump')}
             </li>
             <li>
-              <kbd>F</kbd> {t('hotkeys.fAttack')}
+              <kbd>F</kbd> / <kbd>G</kbd> {t('hotkeys.fAttack')} (Правая / Левая рука)
+            </li>
+            <li>
+              <kbd>1</kbd> .. <kbd>5</kbd> Меню соответствующего слота взаимодействия
+            </li>
+            <li>
+              <kbd>Q</kbd> / <kbd>R</kbd> / <kbd>T</kbd> В меню слота: Кинуть / Выбросить / Описание
             </li>
             <li>
               <kbd>LCtrl + LMB</kbd> {t('hotkeys.ctrlLmbPickup')}

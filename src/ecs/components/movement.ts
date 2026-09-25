@@ -71,6 +71,7 @@ export interface InputComponent {
   wantsAttack: boolean;
   wantsJump?: boolean;
   attackSlotIndex?: number;
+  attackSlotKind?: string;
   desiredStance?: BaseCreatureStance;
 }
 

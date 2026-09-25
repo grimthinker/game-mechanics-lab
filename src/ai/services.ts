@@ -357,6 +357,8 @@ export class BTServiceInputController extends BTService {
       input.isRunning = false;
       input.isSlowWalking = false;
       input.wantsAttack = false;
+      input.attackSlotIndex = undefined;
+      input.attackSlotKind = undefined;
       input.wantsJump = false;
       input.desiredStance = 'standing';
     }
@@ -373,6 +375,8 @@ export class BTServiceInputController extends BTService {
       input.isRunning = false;
       input.isSlowWalking = false;
       input.wantsAttack = false;
+      input.attackSlotIndex = undefined;
+      input.attackSlotKind = undefined;
       input.wantsJump = false;
       input.desiredStance = 'standing';
     }
@@ -434,7 +438,17 @@ export class BTServiceInputController extends BTService {
       input.isCrouching = false;
     }
 
-    input.wantsAttack = keysSet.has('f');
+    if (keysSet.has('f')) {
+      input.wantsAttack = true;
+      input.attackSlotKind = 'right_hand';
+    } else if (keysSet.has('g')) {
+      input.wantsAttack = true;
+      input.attackSlotKind = 'left_hand';
+    } else {
+      input.wantsAttack = false;
+      input.attackSlotKind = undefined;
+    }
+
     input.wantsJump = keysSet.has(' ');
   }
 }

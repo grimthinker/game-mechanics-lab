@@ -13,19 +13,25 @@ export class AttackSystem {
     for (const [id, { activeAttacks, health, input }] of entities) {
       if (!health.isAlive) continue;
 
-      if (input.wantsAttack && !input.isRunning) {
+      // Запрет параллельных атак: одновременно может выполняться строго одна атака
+      if (activeAttacks.attacks.length > 0) {
+        input.wantsAttack = false;
+        input.attackSlotIndex = undefined;
+        input.attackSlotKind = undefined;
+      } else if (input.wantsAttack && !input.isRunning) {
         const aggSlots = getAggregatedInteractionSlots(world, id);
-        const busyGlobalIndices = new Set(activeAttacks.attacks.map((a) => a.slotIndex));
         let chosenGlobalIndex = -1;
 
-        if (input.attackSlotIndex !== undefined) {
+        if (input.attackSlotKind !== undefined) {
+          chosenGlobalIndex = aggSlots.findIndex((info) => {
+            if (info.isBroken || info.slot.itemId === null) return false;
+            if ((info.slot.slotKind ?? 'left_hand') !== input.attackSlotKind) return false;
+            const item = world.getComponent(info.slot.itemId, 'item');
+            return item?.type === 'weapon';
+          });
+        } else if (input.attackSlotIndex !== undefined) {
           const slotInfo = aggSlots[input.attackSlotIndex];
-          if (
-            slotInfo &&
-            !slotInfo.isBroken &&
-            slotInfo.slot.itemId !== null &&
-            !busyGlobalIndices.has(input.attackSlotIndex)
-          ) {
+          if (slotInfo && !slotInfo.isBroken && slotInfo.slot.itemId !== null) {
             const item = world.getComponent(slotInfo.slot.itemId, 'item');
             if (item?.type === 'weapon') {
               chosenGlobalIndex = input.attackSlotIndex;
@@ -33,12 +39,7 @@ export class AttackSystem {
           }
         } else {
           chosenGlobalIndex = aggSlots.findIndex((info) => {
-            if (
-              info.isBroken ||
-              info.slot.itemId === null ||
-              busyGlobalIndices.has(info.globalSlotIndex)
-            )
-              return false;
+            if (info.isBroken || info.slot.itemId === null) return false;
             const item = world.getComponent(info.slot.itemId, 'item');
             return item?.type === 'weapon';
           });
@@ -65,6 +66,7 @@ export class AttackSystem {
 
         input.wantsAttack = false;
         input.attackSlotIndex = undefined;
+        input.attackSlotKind = undefined;
       }
 
       for (let i = activeAttacks.attacks.length - 1; i >= 0; i--) {

@@ -219,7 +219,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           <strong style={{ color: '#fff' }}>Space</strong> {t('hud.hintJump')}
         </span>
         <span>
-          <strong style={{ color: '#fff' }}>F</strong> {t('hud.hintAttack')}
+          <strong style={{ color: '#fff' }}>F</strong> {t('hud.hintAttack')} (Прав)
+        </span>
+        <span>
+          <strong style={{ color: '#fff' }}>G</strong> {t('hud.hintAttack')} (Лев)
+        </span>
+        <span>
+          <strong style={{ color: '#fff' }}>1-5</strong> Слоты
         </span>
         <span>
           <strong style={{ color: '#fff' }}>Shift</strong> {t('hud.hintSprint')}

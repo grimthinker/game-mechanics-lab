@@ -92,6 +92,7 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
     globalSlotIndex: number;
     itemName: string;
   } | null>(null);
+  const slotDomRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Реактивное обновление при изменениях в мире ECS и инвентаре
   useEffect(() => {
@@ -100,17 +101,6 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
     return () => {
       unsubWorld();
       unsubInv();
-    };
-  }, []);
-
-  // Закрытие контекстного меню по клавише Escape
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setContextMenu(null);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -177,6 +167,107 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
   const VISIBLE_COUNT = 5;
   const maxScroll = Math.max(0, slots.length - VISIBLE_COUNT);
   const visibleSlots = slots.slice(scrollIndex, scrollIndex + VISIBLE_COUNT);
+
+  const handleDrop = (globalSlotIndex: number) => {
+    if (app && targetCreatureId) {
+      const brain =
+        app.world.getComponent(targetCreatureId, 'brain') ||
+        (app.world.getComponent(targetCreatureId, 'assemblyRoot') ? true : false);
+      if (brain) {
+        app.updateEntityBlackboard(targetCreatureId, 'requestedDropSlot', globalSlotIndex);
+      } else {
+        app.world.addComponent(targetCreatureId, 'dropItemIntent', {
+          slotIndex: globalSlotIndex,
+        });
+      }
+    }
+    setContextMenu(null);
+  };
+
+  const handleThrow = (globalSlotIndex: number) => {
+    if (app && targetCreatureId) {
+      const aggSlots = getAggregatedInteractionSlots(app.world, targetCreatureId);
+      const slotInfo = aggSlots[globalSlotIndex];
+      if (slotInfo && slotInfo.slot.itemId) {
+        app.throwTargeting = {
+          slotIndex: globalSlotIndex,
+          partId: slotInfo.partId,
+          itemId: slotInfo.slot.itemId,
+        };
+      }
+    }
+    setContextMenu(null);
+  };
+
+  // Обработка горячих клавиш: 1..5 для слотов, а при открытом меню Q/R/T/Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'SELECT' || target.tagName === 'TEXTAREA')
+      ) {
+        return;
+      }
+
+      if (contextMenu) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          setContextMenu(null);
+          return;
+        }
+        if (e.code === 'KeyQ' || e.key.toLowerCase() === 'q') {
+          e.preventDefault();
+          handleThrow(contextMenu.globalSlotIndex);
+          return;
+        }
+        if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') {
+          e.preventDefault();
+          handleDrop(contextMenu.globalSlotIndex);
+          return;
+        }
+        if (e.code === 'KeyT' || e.key.toLowerCase() === 't') {
+          e.preventDefault();
+          // Описание: сейчас не активно, ничего не делает
+          return;
+        }
+      }
+      const num = parseInt(e.key, 10);
+      if (!isNaN(num) && num >= 1 && num <= 5 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const slotIdx = num - 1;
+        if (slotIdx >= 0 && slotIdx < visibleSlots.length) {
+          const info = visibleSlots[slotIdx];
+          const item = info.slot.itemId ? world?.getComponent(info.slot.itemId, 'item') : null;
+          if (item) {
+            e.preventDefault();
+            if (contextMenu && contextMenu.globalSlotIndex === info.globalSlotIndex) {
+              setContextMenu(null);
+              return;
+            }
+            const el = slotDomRefs.current[slotIdx];
+            let x = window.innerWidth / 2;
+            let y = window.innerHeight - 100;
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              x = rect.left + rect.width / 2;
+              y = rect.top;
+            }
+            setContextMenu({
+              x,
+              y,
+              globalSlotIndex: info.globalSlotIndex,
+              itemName: item.name,
+            });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu, visibleSlots, world, app, targetCreatureId]);
 
   // Заглушки пустых слотов, если у моба меньше 5 рук
   const placeholderCount = Math.max(0, VISIBLE_COUNT - visibleSlots.length);
@@ -402,7 +493,7 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
           )}
 
           {/* Видимые слоты (до 5 штук) */}
-          {visibleSlots.map((info) => {
+          {visibleSlots.map((info, idx) => {
             const slot = info.slot;
             const item = slot.itemId ? world.getComponent(slot.itemId, 'item') : null;
             const isBroken = info.isBroken;
@@ -410,6 +501,9 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
             return (
               <div
                 key={`slot_${info.partId}_${slot.id}`}
+                ref={(el) => {
+                  slotDomRefs.current[idx] = el;
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -428,6 +522,24 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                 }}
                 title={`${slot.name || 'Слот'} (${isBroken ? 'Травмировано' : item ? item.name : 'Пусто'})`}
               >
+                {/* Номер горячей клавиши слота [1..5] */}
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    left: 3,
+                    fontSize: '9px',
+                    fontWeight: 'bold',
+                    color: '#444',
+                    backgroundColor: 'rgba(255,255,255,0.7)',
+                    padding: '0 3px',
+                    borderRadius: '2px',
+                    lineHeight: '11px',
+                  }}
+                >
+                  {idx + 1}
+                </span>
+
                 {item ? (
                   <div
                     style={{
@@ -569,25 +681,7 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
 
               <button
                 type="button"
-                onClick={() => {
-                  if (app && targetCreatureId) {
-                    const brain =
-                      app.world.getComponent(targetCreatureId, 'brain') ||
-                      (app.world.getComponent(targetCreatureId, 'assemblyRoot') ? true : false);
-                    if (brain) {
-                      app.updateEntityBlackboard(
-                        targetCreatureId,
-                        'requestedDropSlot',
-                        contextMenu.globalSlotIndex
-                      );
-                    } else {
-                      app.world.addComponent(targetCreatureId, 'dropItemIntent', {
-                        slotIndex: contextMenu.globalSlotIndex,
-                      });
-                    }
-                  }
-                  setContextMenu(null);
-                }}
+                onClick={() => handleDrop(contextMenu.globalSlotIndex)}
                 style={{
                   backgroundColor: '#dcdcdc',
                   border: '1px solid #777',
@@ -604,26 +698,12 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cfcfcf')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dcdcdc')}
               >
-                Выбросить под ноги
+                Выбросить под ноги [R]
               </button>
 
               <button
                 type="button"
-                onClick={() => {
-                  if (app && targetCreatureId) {
-                    // Активируем режим прицеливания (HUD закроется, курсор станет прицелом)
-                    const aggSlots = getAggregatedInteractionSlots(app.world, targetCreatureId);
-                    const slotInfo = aggSlots[contextMenu.globalSlotIndex];
-                    if (slotInfo && slotInfo.slot.itemId) {
-                      app.throwTargeting = {
-                        slotIndex: contextMenu.globalSlotIndex,
-                        partId: slotInfo.partId,
-                        itemId: slotInfo.slot.itemId,
-                      };
-                    }
-                  }
-                  setContextMenu(null);
-                }}
+                onClick={() => handleThrow(contextMenu.globalSlotIndex)}
                 style={{
                   backgroundColor: '#dcdcdc',
                   border: '1px solid #777',
@@ -640,7 +720,7 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#cfcfcf')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#dcdcdc')}
               >
-                Кинуть (Прицел)
+                Кинуть (Прицел) [Q]
               </button>
 
               <button
@@ -658,7 +738,7 @@ export const RetroSlotsHUD: React.FC<RetroSlotsHUDProps> = ({ app, world, select
                   boxSizing: 'border-box',
                 }}
               >
-                Описание
+                Описание [T]
               </button>
             </div>
           </div>,

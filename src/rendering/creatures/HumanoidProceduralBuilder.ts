@@ -18,32 +18,36 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     headPivot.position.set(0, 0.35, 0);
     torso.add(headPivot);
 
+    // Правая рука (анатомически -X при взгляде в сторону +Z)
     const rightArmPivot = new THREE.Group();
     rightArmPivot.name = 'RightArmPivot';
-    rightArmPivot.position.set(0.35, 0.25, 0);
+    rightArmPivot.position.set(-0.35, 0.25, 0);
     const rightHandSocket = new THREE.Group();
     rightHandSocket.name = 'RightHandSocket';
     rightHandSocket.position.set(0, -0.6, 0);
     rightArmPivot.add(rightHandSocket);
     torso.add(rightArmPivot);
 
+    // Левая рука (анатомически +X при взгляде в сторону +Z)
     const leftArmPivot = new THREE.Group();
     leftArmPivot.name = 'LeftArmPivot';
-    leftArmPivot.position.set(-0.35, 0.25, 0);
+    leftArmPivot.position.set(0.35, 0.25, 0);
     const leftHandSocket = new THREE.Group();
     leftHandSocket.name = 'LeftHandSocket';
     leftHandSocket.position.set(0, -0.6, 0);
     leftArmPivot.add(leftHandSocket);
     torso.add(leftArmPivot);
 
+    // Правая нога (-X)
     const rightLegPivot = new THREE.Group();
     rightLegPivot.name = 'RightLegPivot';
-    rightLegPivot.position.set(0.15, 0.65, 0);
+    rightLegPivot.position.set(-0.15, 0.65, 0);
     root.add(rightLegPivot);
 
+    // Левая нога (+X)
     const leftLegPivot = new THREE.Group();
     leftLegPivot.name = 'LeftLegPivot';
-    leftLegPivot.position.set(-0.15, 0.65, 0);
+    leftLegPivot.position.set(0.15, 0.65, 0);
     root.add(leftLegPivot);
 
     return root;
@@ -158,10 +162,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       const rLegP: number[] = [];
       const headQ: number[] = [];
 
-      // Ноги стоят прямо на нормальной высоте таза (0.65) без проседания
       const legBaseY = 0.65;
-
-      // Высота туловища опирается на прямые ноги с учётом тригонометрии наклона
       const fixedTorsoPosY = torsoBaseBottomY + torsoHalfHeight * Math.cos(torsoXRot);
       const fixedTorsoPosZ = torsoHalfHeight * Math.sin(torsoXRot);
 
@@ -182,8 +183,8 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
         const swing = Math.sin(cycle) * swingAmount;
         const bounce = bounceAmount > 0 ? Math.pow(Math.sin(cycle), 2) * bounceAmount : 0;
 
-        lLegP.push(-0.15, legBaseY + bounce, 0);
-        rLegP.push(0.15, legBaseY + bounce, 0);
+        lLegP.push(0.15, legBaseY + bounce, 0);
+        rLegP.push(-0.15, legBaseY + bounce, 0);
 
         euler.set(swing, 0, 0);
         quat.setFromEuler(euler);
@@ -238,9 +239,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       const lLegP: number[] = [];
       const rLegP: number[] = [];
 
-      // Ноги не опускаются: высота сустава остаётся 0.65
       const legPosY = 0.65;
-
       const baseTorsoY = torsoBaseBottomY + torsoHalfHeight * Math.cos(torsoXRot);
       const fixedTorsoZ = torsoHalfHeight * Math.sin(torsoXRot);
 
@@ -258,8 +257,8 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
         const time = (i / idleFrames) * durationIdle;
         times.push(time);
 
-        lLegP.push(-0.15, legPosY, 0);
-        rLegP.push(0.15, legPosY, 0);
+        lLegP.push(0.15, legPosY, 0);
+        rLegP.push(-0.15, legPosY, 0);
 
         const breathe = Math.sin((i / idleFrames) * Math.PI * 2) * 0.015;
         torsoP.push(0, baseTorsoY + breathe, fixedTorsoZ);
@@ -317,15 +316,9 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       1.1,
       0,
     ];
+
+    // Наклон корпуса в сторону левой руки (+X)
     const pickupTorsoQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(pickupTiltPre, -0.1, 0.03),
-      ...getQuat(pickupTiltDeep, -0.18, 0.05),
-      ...getQuat(pickupTiltDeep, -0.18, 0.05),
-      ...getQuat(pickupTiltRec, -0.06, 0.02),
-      ...getQuat(0, 0, 0),
-    ];
-    const pickupTorsoQRight = [
       ...getQuat(0, 0, 0),
       ...getQuat(pickupTiltPre, 0.1, -0.03),
       ...getQuat(pickupTiltDeep, 0.18, -0.05),
@@ -333,15 +326,18 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(pickupTiltRec, 0.06, -0.02),
       ...getQuat(0, 0, 0),
     ];
-    const pickupHeadQLeft = [
+
+    // Наклон корпуса в сторону правой руки (-X)
+    const pickupTorsoQRight = [
       ...getQuat(0, 0, 0),
-      ...getQuat(-0.2, 0.08, 0),
-      ...getQuat(-0.35, 0.12, 0),
-      ...getQuat(-0.35, 0.12, 0),
-      ...getQuat(-0.15, 0.04, 0),
+      ...getQuat(pickupTiltPre, -0.1, 0.03),
+      ...getQuat(pickupTiltDeep, -0.18, 0.05),
+      ...getQuat(pickupTiltDeep, -0.18, 0.05),
+      ...getQuat(pickupTiltRec, -0.06, 0.02),
       ...getQuat(0, 0, 0),
     ];
-    const pickupHeadQRight = [
+
+    const pickupHeadQLeft = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.2, -0.08, 0),
       ...getQuat(-0.35, -0.12, 0),
@@ -349,23 +345,18 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(-0.15, -0.04, 0),
       ...getQuat(0, 0, 0),
     ];
+
+    const pickupHeadQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.2, 0.08, 0),
+      ...getQuat(-0.35, 0.12, 0),
+      ...getQuat(-0.35, 0.12, 0),
+      ...getQuat(-0.15, 0.04, 0),
+      ...getQuat(0, 0, 0),
+    ];
+
+    // Движение левой руки (тянется вперед и слегка внутрь к центру)
     const pickupActiveArmQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(-0.85, 0.1, 0.12),
-      ...getQuat(-1.42, 0.18, 0.25),
-      ...getQuat(-1.2, -0.1, 0.15),
-      ...getQuat(-0.5, -0.05, 0.1),
-      ...getQuat(0, 0, 0),
-    ];
-    const pickupPassiveArmQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(0.12, -0.02, -0.08),
-      ...getQuat(0.2, -0.04, -0.12),
-      ...getQuat(0.2, -0.04, -0.12),
-      ...getQuat(0.08, -0.02, -0.05),
-      ...getQuat(0, 0, 0),
-    ];
-    const pickupActiveArmQRight = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.85, -0.1, -0.12),
       ...getQuat(-1.42, -0.18, -0.25),
@@ -373,7 +364,8 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(-0.5, 0.05, -0.1),
       ...getQuat(0, 0, 0),
     ];
-    const pickupPassiveArmQRight = [
+
+    const pickupPassiveArmQLeft = [
       ...getQuat(0, 0, 0),
       ...getQuat(0.12, 0.02, 0.08),
       ...getQuat(0.2, 0.04, 0.12),
@@ -381,9 +373,29 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(0.08, 0.02, 0.05),
       ...getQuat(0, 0, 0),
     ];
+
+    // Движение правой руки (тянется вперед и слегка внутрь к центру)
+    const pickupActiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.85, 0.1, 0.12),
+      ...getQuat(-1.42, 0.18, 0.25),
+      ...getQuat(-1.2, -0.1, 0.15),
+      ...getQuat(-0.5, -0.05, 0.1),
+      ...getQuat(0, 0, 0),
+    ];
+
+    const pickupPassiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.12, -0.02, -0.08),
+      ...getQuat(0.2, -0.04, -0.12),
+      ...getQuat(0.2, -0.04, -0.12),
+      ...getQuat(0.08, -0.02, -0.05),
+      ...getQuat(0, 0, 0),
+    ];
+
     const pickupLegTimes = [0.0, 0.75];
-    const pickupLLegP = [-0.15, 0.65, 0, -0.15, 0.65, 0];
-    const pickupRLegP = [0.15, 0.65, 0, 0.15, 0.65, 0];
+    const pickupLLegP = [0.15, 0.65, 0, 0.15, 0.65, 0];
+    const pickupRLegP = [-0.15, 0.65, 0, -0.15, 0.65, 0];
     const pickupLegQ = [...idQ, ...idQ];
 
     const pickupLeftClip = new THREE.AnimationClip('pickup_left_hand', 0.75, [
@@ -446,20 +458,22 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       1.1,
       0,
     ];
+
     const dropItemTorsoQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(-0.03, -0.05, 0),
-      ...getQuat(0.06, 0.06, -0.02),
-      ...getQuat(0.02, 0.02, 0),
-      ...getQuat(0, 0, 0),
-    ];
-    const dropItemTorsoQRight = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.03, 0.05, 0),
       ...getQuat(0.06, -0.06, 0.02),
       ...getQuat(0.02, -0.02, 0),
       ...getQuat(0, 0, 0),
     ];
+    const dropItemTorsoQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.03, -0.05, 0),
+      ...getQuat(0.06, 0.06, -0.02),
+      ...getQuat(0.02, 0.02, 0),
+      ...getQuat(0, 0, 0),
+    ];
+
     const dropItemHeadQ = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.05, 0, 0),
@@ -467,65 +481,68 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(0.04, 0, 0),
       ...getQuat(0, 0, 0),
     ];
+
     const dropItemActiveArmQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(0.3, -0.05, -0.05),
-      ...getQuat(-1.2, -0.1, 0.1),
-      ...getQuat(-0.4, -0.05, 0.05),
-      ...getQuat(0, 0, 0),
-    ];
-    const dropItemPassiveArmQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(0, 0, 0.03),
-      ...getQuat(0.05, 0, 0.06),
-      ...getQuat(0.02, 0, 0.02),
-      ...getQuat(0, 0, 0),
-    ];
-    const dropItemActiveArmQRight = [
       ...getQuat(0, 0, 0),
       ...getQuat(0.3, 0.05, 0.05),
       ...getQuat(-1.2, 0.1, -0.1),
       ...getQuat(-0.4, 0.05, -0.05),
       ...getQuat(0, 0, 0),
     ];
-    const dropItemPassiveArmQRight = [
+    const dropItemPassiveArmQLeft = [
       ...getQuat(0, 0, 0),
       ...getQuat(0, 0, -0.03),
       ...getQuat(0.05, 0, -0.06),
       ...getQuat(0.02, 0, -0.02),
       ...getQuat(0, 0, 0),
     ];
+
+    const dropItemActiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.3, -0.05, -0.05),
+      ...getQuat(-1.2, -0.1, 0.1),
+      ...getQuat(-0.4, -0.05, 0.05),
+      ...getQuat(0, 0, 0),
+    ];
+    const dropItemPassiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0, 0, 0.03),
+      ...getQuat(0.05, 0, 0.06),
+      ...getQuat(0.02, 0, 0.02),
+      ...getQuat(0, 0, 0),
+    ];
+
     const dropItemLLegP = [
-      -0.15,
+      0.15,
       0.65,
       0,
-      -0.15,
+      0.15,
       0.65,
       -0.01,
-      -0.15,
+      0.15,
       0.65 + dropItemTinyHop,
       0.015,
-      -0.15,
+      0.15,
       0.65,
       0,
-      -0.15,
+      0.15,
       0.65,
       0,
     ];
     const dropItemRLegP = [
-      0.15,
+      -0.15,
       0.65,
       0,
-      0.15,
+      -0.15,
       0.65,
       -0.01,
-      0.15,
+      -0.15,
       0.65 + dropItemTinyHop,
       0.015,
-      0.15,
+      -0.15,
       0.65,
       0,
-      0.15,
+      -0.15,
       0.65,
       0,
     ];
@@ -571,64 +588,47 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', dropItemTimes, dropItemLegQ),
     ]);
 
-    // --- Анимация сильного броска вдаль (throw_item) ---
     const throwItemTimes = [0.0, 0.14, 0.26, 0.38, 0.55];
     const throwItemTorsoP = [0, 1.1, 0, 0, 1.09, -0.02, 0, 1.13, 0.03, 0, 1.11, 0.01, 0, 1.1, 0];
 
     const throwItemTorsoQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(-0.12, -0.15, 0.04), // Замах назад с поворотом корпуса
-      ...getQuat(0.2, 0.16, -0.05), // Мощный бросок вперед с доворотом
-      ...getQuat(0.06, 0.04, -0.01),
-      ...getQuat(0, 0, 0),
-    ];
-    const throwItemTorsoQRight = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.12, 0.15, -0.04),
       ...getQuat(0.2, -0.16, 0.05),
       ...getQuat(0.06, -0.04, 0.01),
       ...getQuat(0, 0, 0),
     ];
-
-    const throwItemHeadQLeft = [
+    const throwItemTorsoQRight = [
       ...getQuat(0, 0, 0),
-      ...getQuat(-0.1, 0.1, 0),
-      ...getQuat(0.16, -0.08, 0),
-      ...getQuat(0.05, 0, 0),
+      ...getQuat(-0.12, -0.15, 0.04),
+      ...getQuat(0.2, 0.16, -0.05),
+      ...getQuat(0.06, 0.04, -0.01),
       ...getQuat(0, 0, 0),
     ];
-    const throwItemHeadQRight = [
+
+    const throwItemHeadQLeft = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.1, -0.1, 0),
       ...getQuat(0.16, 0.08, 0),
       ...getQuat(0.05, 0, 0),
       ...getQuat(0, 0, 0),
     ];
+    const throwItemHeadQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.1, 0.1, 0),
+      ...getQuat(0.16, -0.08, 0),
+      ...getQuat(0.05, 0, 0),
+      ...getQuat(0, 0, 0),
+    ];
 
-    // Активная рука отводится далеко назад (+0.75) и выбрасывается далеко вперед (-1.85)
     const throwItemActiveArmQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(0.75, -0.12, -0.25),
-      ...getQuat(-1.85, -0.15, 0.22),
-      ...getQuat(-0.7, -0.05, 0.08),
-      ...getQuat(0, 0, 0),
-    ];
-    const throwItemPassiveArmQLeft = [
-      ...getQuat(0, 0, 0),
-      ...getQuat(-0.5, 0.1, 0.15), // Противовес для баланса
-      ...getQuat(0.35, -0.05, -0.1),
-      ...getQuat(0.1, 0, -0.02),
-      ...getQuat(0, 0, 0),
-    ];
-
-    const throwItemActiveArmQRight = [
       ...getQuat(0, 0, 0),
       ...getQuat(0.75, 0.12, 0.25),
       ...getQuat(-1.85, 0.15, -0.22),
       ...getQuat(-0.7, 0.05, -0.08),
       ...getQuat(0, 0, 0),
     ];
-    const throwItemPassiveArmQRight = [
+    const throwItemPassiveArmQLeft = [
       ...getQuat(0, 0, 0),
       ...getQuat(-0.5, -0.1, -0.15),
       ...getQuat(0.35, 0.05, 0.1),
@@ -636,11 +636,26 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ...getQuat(0, 0, 0),
     ];
 
+    const throwItemActiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(0.75, -0.12, -0.25),
+      ...getQuat(-1.85, -0.15, 0.22),
+      ...getQuat(-0.7, -0.05, 0.08),
+      ...getQuat(0, 0, 0),
+    ];
+    const throwItemPassiveArmQRight = [
+      ...getQuat(0, 0, 0),
+      ...getQuat(-0.5, 0.1, 0.15),
+      ...getQuat(0.35, -0.05, -0.1),
+      ...getQuat(0.1, 0, -0.02),
+      ...getQuat(0, 0, 0),
+    ];
+
     const throwItemLLegP = [
-      -0.15, 0.65, 0, -0.15, 0.65, -0.02, -0.15, 0.67, 0.04, -0.15, 0.65, 0.01, -0.15, 0.65, 0,
+      0.15, 0.65, 0, 0.15, 0.65, -0.02, 0.15, 0.67, 0.04, 0.15, 0.65, 0.01, 0.15, 0.65, 0,
     ];
     const throwItemRLegP = [
-      0.15, 0.65, 0, 0.15, 0.65, -0.02, 0.15, 0.67, 0.04, 0.15, 0.65, 0.01, 0.15, 0.65, 0,
+      -0.15, 0.65, 0, -0.15, 0.65, -0.02, -0.15, 0.67, 0.04, -0.15, 0.65, 0.01, -0.15, 0.65, 0,
     ];
     const throwItemLegQ = [...idQ, ...idQ, ...idQ, ...idQ, ...idQ];
 
@@ -708,18 +723,18 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     ];
     const storeRArmQ = [
       ...getQuat(0, 0, 0),
-      ...getQuat(0.12, 0.02, 0.22),
-      ...getQuat(0.38, -0.1, 0.14),
-      ...getQuat(0.44, -0.2, -0.08),
-      ...getQuat(0.22, -0.04, 0.18),
+      ...getQuat(0.12, -0.02, -0.22),
+      ...getQuat(0.38, 0.1, -0.14),
+      ...getQuat(0.44, 0.2, 0.08),
+      ...getQuat(0.22, 0.04, -0.18),
       ...getQuat(0, 0, 0),
     ];
     const storeLArmQ = [
       ...getQuat(0, 0, 0),
-      ...getQuat(-0.08, 0.02, -0.08),
-      ...getQuat(-0.15, 0.08, -0.12),
-      ...getQuat(-0.15, 0.08, -0.12),
-      ...getQuat(-0.05, 0.02, -0.05),
+      ...getQuat(-0.08, -0.02, 0.08),
+      ...getQuat(-0.15, -0.08, 0.12),
+      ...getQuat(-0.15, -0.08, 0.12),
+      ...getQuat(-0.05, -0.02, 0.05),
       ...getQuat(0, 0, 0),
     ];
     const storeLegTimes = [0.0, 0.75];
@@ -732,12 +747,12 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         storeLegTimes,
-        [-0.15, 0.65, 0, -0.15, 0.65, 0]
+        [0.15, 0.65, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         storeLegTimes,
-        [0.15, 0.65, 0, 0.15, 0.65, 0]
+        [-0.15, 0.65, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', storeLegTimes, [...idQ, ...idQ]),
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', storeLegTimes, [
@@ -768,18 +783,18 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     ];
     const retrieveRArmQ = [
       ...getQuat(0, 0, 0),
-      ...getQuat(0.22, -0.04, 0.18),
-      ...getQuat(0.44, -0.2, -0.08),
-      ...getQuat(0.28, -0.06, 0.2),
-      ...getQuat(-0.85, 0.15, -0.15),
+      ...getQuat(0.22, 0.04, -0.18),
+      ...getQuat(0.44, 0.2, 0.08),
+      ...getQuat(0.28, 0.06, -0.2),
+      ...getQuat(-0.85, -0.15, 0.15),
       ...getQuat(0, 0, 0),
     ];
     const retrieveLArmQ = [
       ...getQuat(0, 0, 0),
-      ...getQuat(-0.12, 0.05, -0.1),
-      ...getQuat(-0.15, 0.08, -0.12),
-      ...getQuat(-0.1, 0.04, -0.06),
-      ...getQuat(-0.15, 0, -0.1),
+      ...getQuat(-0.12, -0.05, 0.1),
+      ...getQuat(-0.15, -0.08, 0.12),
+      ...getQuat(-0.1, -0.04, 0.06),
+      ...getQuat(-0.15, 0, 0.1),
       ...getQuat(0, 0, 0),
     ];
     const retrieveClip = new THREE.AnimationClip('retrieve_inv', 0.85, [
@@ -791,12 +806,12 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         [0.0, 0.85],
-        [-0.15, 0.65, 0, -0.15, 0.65, 0]
+        [0.15, 0.65, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         [0.0, 0.85],
-        [0.15, 0.65, 0, 0.15, 0.65, 0]
+        [-0.15, 0.65, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', [0.0, 0.85], [...idQ, ...idQ]),
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', [0.0, 0.85], [...idQ, ...idQ]),
@@ -825,27 +840,27 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ]),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', putOnTimes, [
         ...getQuat(0, 0, 0),
-        ...getQuat(-2.15, 0.25, -0.3),
-        ...getQuat(-1.4, 0.15, -0.25),
-        ...getQuat(-0.85, 0.1, -0.2),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', putOnTimes, [
-        ...getQuat(0, 0, 0),
         ...getQuat(-2.15, -0.25, 0.3),
         ...getQuat(-1.4, -0.15, 0.25),
         ...getQuat(-0.85, -0.1, 0.2),
         ...getQuat(0, 0, 0),
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', putOnTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(-2.15, 0.25, -0.3),
+        ...getQuat(-1.4, 0.15, -0.25),
+        ...getQuat(-0.85, 0.1, -0.2),
+        ...getQuat(0, 0, 0),
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         [0.0, 1.05],
-        [-0.15, 0.65, 0, -0.15, 0.65, 0]
+        [0.15, 0.65, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         [0.0, 1.05],
-        [0.15, 0.65, 0, 0.15, 0.65, 0]
+        [-0.15, 0.65, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', [0.0, 1.05], [...idQ, ...idQ]),
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', [0.0, 1.05], [...idQ, ...idQ]),
@@ -874,27 +889,27 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ]),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', takeOffTimes, [
         ...getQuat(0, 0, 0),
-        ...getQuat(-0.85, 0.1, -0.2),
-        ...getQuat(-2.2, 0.25, -0.3),
-        ...getQuat(-1.0, 0.1, -0.15),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', takeOffTimes, [
-        ...getQuat(0, 0, 0),
         ...getQuat(-0.85, -0.1, 0.2),
         ...getQuat(-2.2, -0.25, 0.3),
         ...getQuat(-1.0, -0.1, 0.15),
         ...getQuat(0, 0, 0),
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', takeOffTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(-0.85, 0.1, -0.2),
+        ...getQuat(-2.2, 0.25, -0.3),
+        ...getQuat(-1.0, 0.1, -0.15),
+        ...getQuat(0, 0, 0),
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         [0.0, 1.05],
-        [-0.15, 0.65, 0, -0.15, 0.65, 0]
+        [0.15, 0.65, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         [0.0, 1.05],
-        [0.15, 0.65, 0, 0.15, 0.65, 0]
+        [-0.15, 0.65, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', [0.0, 1.05], [...idQ, ...idQ]),
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', [0.0, 1.05], [...idQ, ...idQ]),
@@ -930,19 +945,19 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       quat.setFromEuler(euler);
       proneHeadQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      proneRArmP.push(0.35, 0.25, 0);
-      proneLArmP.push(-0.35, 0.25, 0);
-
-      euler.set(-2.38, 0.15, -0.22);
-      quat.setFromEuler(euler);
-      proneRArmQ.push(quat.x, quat.y, quat.z, quat.w);
+      proneRArmP.push(-0.35, 0.25, 0);
+      proneLArmP.push(0.35, 0.25, 0);
 
       euler.set(-2.38, -0.15, 0.22);
       quat.setFromEuler(euler);
+      proneRArmQ.push(quat.x, quat.y, quat.z, quat.w);
+
+      euler.set(-2.38, 0.15, -0.22);
+      quat.setFromEuler(euler);
       proneLArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      proneLLegP.push(-0.15, 0.14, -0.05);
-      proneRLegP.push(0.15, 0.14, -0.05);
+      proneLLegP.push(0.15, 0.14, -0.05);
+      proneRLegP.push(-0.15, 0.14, -0.05);
       proneLegQ.push(...proneLegRot);
     }
 
@@ -984,49 +999,49 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'RightArmPivot.position',
         [0.0, 1.3],
-        [0.35, 0.25, 0, 0.35, 0.25, 0]
+        [-0.35, 0.25, 0, -0.35, 0.25, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'LeftArmPivot.position',
         [0.0, 1.3],
-        [-0.35, 0.25, 0, -0.35, 0.25, 0]
+        [0.35, 0.25, 0, 0.35, 0.25, 0]
       ),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', standToProneTimes, [
-        ...getQuat(0, 0, 0),
-        ...getQuat(-1.45, 0, -0.1),
-        ...getQuat(-1.95, 0.1, -0.2),
-        ...getQuat(-2.25, 0.15, -0.22),
-        ...getQuat(-2.38, 0.15, -0.22),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', standToProneTimes, [
         ...getQuat(0, 0, 0),
         ...getQuat(-1.45, 0, 0.1),
         ...getQuat(-1.95, -0.1, 0.2),
         ...getQuat(-2.25, -0.15, 0.22),
         ...getQuat(-2.38, -0.15, 0.22),
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', standToProneTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(-1.45, 0, -0.1),
+        ...getQuat(-1.95, 0.1, -0.2),
+        ...getQuat(-2.25, 0.15, -0.22),
+        ...getQuat(-2.38, 0.15, -0.22),
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         standToProneTimes,
-        [-0.15, 0.65, 0, -0.15, 0.65, 0, -0.15, 0.56, 0.23, -0.15, 0.2, -0.02, -0.15, 0.14, -0.05]
+        [0.15, 0.65, 0, 0.15, 0.65, 0, 0.15, 0.56, 0.23, 0.15, 0.2, -0.02, 0.15, 0.14, -0.05]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         standToProneTimes,
-        [0.15, 0.65, 0, 0.15, 0.65, 0, 0.15, 0.56, 0.23, 0.15, 0.2, -0.02, 0.15, 0.14, -0.05]
+        [-0.15, 0.65, 0, -0.15, 0.65, 0, -0.15, 0.56, 0.23, -0.15, 0.2, -0.02, -0.15, 0.14, -0.05]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', standToProneTimes, [
         ...idQ,
         ...idQ,
         ...getQuat(0.45, 0, 0),
-        ...getQuat(1.45, 0, 0),
+        ...getQuat(1.5, 0, 0),
         ...getQuat(1.57, 0, 0),
       ]),
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', standToProneTimes, [
         ...idQ,
         ...idQ,
         ...getQuat(0.45, 0, 0),
-        ...getQuat(1.45, 0, 0),
+        ...getQuat(1.5, 0, 0),
         ...getQuat(1.57, 0, 0),
       ]),
     ]);
@@ -1055,36 +1070,36 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'RightArmPivot.position',
         [0.0, 1.35],
-        [0.35, 0.25, 0, 0.35, 0.25, 0]
+        [-0.35, 0.25, 0, -0.35, 0.25, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'LeftArmPivot.position',
         [0.0, 1.35],
-        [-0.35, 0.25, 0, -0.35, 0.25, 0]
+        [0.35, 0.25, 0, 0.35, 0.25, 0]
       ),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', proneToStandTimes, [
-        ...getQuat(-2.38, 0.15, -0.22),
-        ...getQuat(-1.85, 0.12, -0.2),
-        ...getQuat(-1.0, 0, -0.1),
-        ...getQuat(-0.2, 0, 0),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', proneToStandTimes, [
         ...getQuat(-2.38, -0.15, 0.22),
         ...getQuat(-1.85, -0.12, 0.2),
         ...getQuat(-1.0, 0, 0.1),
         ...getQuat(-0.2, 0, 0),
         ...getQuat(0, 0, 0),
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', proneToStandTimes, [
+        ...getQuat(-2.38, 0.15, -0.22),
+        ...getQuat(-1.85, 0.12, -0.2),
+        ...getQuat(-1.0, 0, -0.1),
+        ...getQuat(-0.2, 0, 0),
+        ...getQuat(0, 0, 0),
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         proneToStandTimes,
-        [-0.15, 0.14, -0.05, -0.15, 0.24, -0.05, -0.15, 0.48, -0.02, -0.15, 0.67, 0, -0.15, 0.65, 0]
+        [0.15, 0.14, -0.05, 0.15, 0.24, -0.05, 0.15, 0.48, -0.02, 0.15, 0.67, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         proneToStandTimes,
-        [0.15, 0.14, -0.05, 0.15, 0.24, -0.05, 0.15, 0.48, -0.02, 0.15, 0.67, 0, 0.15, 0.65, 0]
+        [-0.15, 0.14, -0.05, -0.15, 0.24, -0.05, -0.15, 0.48, -0.02, -0.15, 0.67, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', proneToStandTimes, [
         ...getQuat(1.57, 0, 0),
@@ -1126,39 +1141,39 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'RightArmPivot.position',
         [0.0, 1.15],
-        [0.35, 0.25, 0, 0.35, 0.25, 0]
+        [-0.35, 0.25, 0, -0.35, 0.25, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'LeftArmPivot.position',
         [0.0, 1.15],
-        [-0.35, 0.25, 0, -0.35, 0.25, 0]
+        [0.35, 0.25, 0, 0.35, 0.25, 0]
       ),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', crouchToProneTimes, [
-        ...idQ,
-        ...getQuat(-1.5, 0, -0.12),
-        ...getQuat(-1.95, 0.1, -0.2),
-        ...getQuat(-2.3, 0.15, -0.22),
-        ...getQuat(-2.38, 0.15, -0.22),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', crouchToProneTimes, [
         ...idQ,
         ...getQuat(-1.5, 0, 0.12),
         ...getQuat(-1.95, -0.1, 0.2),
         ...getQuat(-2.3, -0.15, 0.22),
         ...getQuat(-2.38, -0.15, 0.22),
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', crouchToProneTimes, [
+        ...idQ,
+        ...getQuat(-1.5, 0, -0.12),
+        ...getQuat(-1.95, 0.1, -0.2),
+        ...getQuat(-2.3, 0.15, -0.22),
+        ...getQuat(-2.38, 0.15, -0.22),
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
+        crouchToProneTimes,
+        [0.15, 0.65, 0, 0.15, 0.6, -0.01, 0.15, 0.36, -0.04, 0.15, 0.18, -0.05, 0.15, 0.14, -0.05]
+      ),
+      new THREE.VectorKeyframeTrack(
+        'RightLegPivot.position',
         crouchToProneTimes,
         [
           -0.15, 0.65, 0, -0.15, 0.6, -0.01, -0.15, 0.36, -0.04, -0.15, 0.18, -0.05, -0.15, 0.14,
           -0.05,
         ]
-      ),
-      new THREE.VectorKeyframeTrack(
-        'RightLegPivot.position',
-        crouchToProneTimes,
-        [0.15, 0.65, 0, 0.15, 0.6, -0.01, 0.15, 0.36, -0.04, 0.15, 0.18, -0.05, 0.15, 0.14, -0.05]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', crouchToProneTimes, [
         ...idQ,
@@ -1200,36 +1215,36 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'RightArmPivot.position',
         [0.0, 1.15],
-        [0.35, 0.25, 0, 0.35, 0.25, 0]
+        [-0.35, 0.25, 0, -0.35, 0.25, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'LeftArmPivot.position',
         [0.0, 1.15],
-        [-0.35, 0.25, 0, -0.35, 0.25, 0]
+        [0.35, 0.25, 0, 0.35, 0.25, 0]
       ),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', proneToCrouchTimes, [
-        ...getQuat(-2.38, 0.15, -0.22),
-        ...getQuat(-1.85, 0.12, -0.2),
-        ...getQuat(-1.1, 0, -0.1),
-        ...getQuat(-0.25, 0, 0),
-        ...idQ,
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', proneToCrouchTimes, [
         ...getQuat(-2.38, -0.15, 0.22),
         ...getQuat(-1.85, -0.12, 0.2),
         ...getQuat(-1.1, 0, 0.1),
         ...getQuat(-0.25, 0, 0),
         ...idQ,
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', proneToCrouchTimes, [
+        ...getQuat(-2.38, 0.15, -0.22),
+        ...getQuat(-1.85, 0.12, -0.2),
+        ...getQuat(-1.1, 0, -0.1),
+        ...getQuat(-0.25, 0, 0),
+        ...idQ,
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         proneToCrouchTimes,
-        [-0.15, 0.14, -0.05, -0.15, 0.3, -0.05, -0.15, 0.5, -0.02, -0.15, 0.67, 0, -0.15, 0.65, 0]
+        [0.15, 0.14, -0.05, 0.15, 0.3, -0.05, 0.15, 0.5, -0.02, 0.15, 0.67, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         proneToCrouchTimes,
-        [0.15, 0.14, -0.05, 0.15, 0.3, -0.05, 0.15, 0.5, -0.02, 0.15, 0.67, 0, 0.15, 0.65, 0]
+        [-0.15, 0.14, -0.05, -0.15, 0.3, -0.05, -0.15, 0.5, -0.02, -0.15, 0.67, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', proneToCrouchTimes, [
         ...getQuat(1.57, 0, 0),
@@ -1248,55 +1263,9 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     ]);
 
     const attackTimes = [0.0, 0.08, 0.18, 0.28, 0.4];
-    const attackLeftClip = new THREE.AnimationClip('attack_left_hand', 0.4, [
-      new THREE.VectorKeyframeTrack(
-        'Torso.position',
-        attackTimes,
-        [0, 1.1, 0, 0, 1.11, 0, 0, 1.08, 0.03, 0, 1.1, 0.01, 0, 1.1, 0]
-      ),
-      new THREE.QuaternionKeyframeTrack('Torso.quaternion', attackTimes, [
-        ...getQuat(0, 0, 0),
-        ...getQuat(-0.06, -0.15, 0.02),
-        ...getQuat(0.14, 0.12, -0.04),
-        ...getQuat(0.04, 0.02, 0),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', attackTimes, [
-        ...getQuat(0, 0, 0),
-        ...getQuat(0.05, 0.08, 0),
-        ...getQuat(0.18, -0.05, 0),
-        ...getQuat(0.05, 0, 0),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', attackTimes, [
-        ...getQuat(0, 0, 0),
-        ...getQuat(1.1, -0.15, -0.2),
-        ...getQuat(-1.45, 0.1, 0.15),
-        ...getQuat(-0.75, 0, 0.05),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', attackTimes, [
-        ...getQuat(0, 0, 0),
-        ...getQuat(0.15, 0, 0.15),
-        ...getQuat(0.3, 0.08, 0.15),
-        ...getQuat(0.1, 0, 0.05),
-        ...getQuat(0, 0, 0),
-      ]),
-      new THREE.VectorKeyframeTrack(
-        'LeftLegPivot.position',
-        [0.0, 0.4],
-        [-0.15, 0.65, 0, -0.15, 0.65, 0]
-      ),
-      new THREE.VectorKeyframeTrack(
-        'RightLegPivot.position',
-        [0.0, 0.4],
-        [0.15, 0.65, 0, 0.15, 0.65, 0]
-      ),
-      new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', [0.0, 0.4], [...idQ, ...idQ]),
-      new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', [0.0, 0.4], [...idQ, ...idQ]),
-    ]);
 
-    const attackRightClip = new THREE.AnimationClip('attack_right_hand', 0.4, [
+    // Атака левой рукой (LeftArmPivot на +X)
+    const attackLeftClip = new THREE.AnimationClip('attack_left_hand', 0.4, [
       new THREE.VectorKeyframeTrack(
         'Torso.position',
         attackTimes,
@@ -1316,14 +1285,14 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
         ...getQuat(0.05, 0, 0),
         ...getQuat(0, 0, 0),
       ]),
-      new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', attackTimes, [
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', attackTimes, [
         ...getQuat(0, 0, 0),
         ...getQuat(1.1, 0.15, 0.2),
         ...getQuat(-1.45, -0.1, -0.15),
         ...getQuat(-0.75, 0, -0.05),
         ...getQuat(0, 0, 0),
       ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', attackTimes, [
+      new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', attackTimes, [
         ...getQuat(0, 0, 0),
         ...getQuat(0.15, 0, -0.15),
         ...getQuat(0.3, -0.08, -0.15),
@@ -1333,12 +1302,61 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         [0.0, 0.4],
-        [-0.15, 0.65, 0, -0.15, 0.65, 0]
+        [0.15, 0.65, 0, 0.15, 0.65, 0]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         [0.0, 0.4],
+        [-0.15, 0.65, 0, -0.15, 0.65, 0]
+      ),
+      new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', [0.0, 0.4], [...idQ, ...idQ]),
+      new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', [0.0, 0.4], [...idQ, ...idQ]),
+    ]);
+
+    // Атака правой рукой (RightArmPivot на -X)
+    const attackRightClip = new THREE.AnimationClip('attack_right_hand', 0.4, [
+      new THREE.VectorKeyframeTrack(
+        'Torso.position',
+        attackTimes,
+        [0, 1.1, 0, 0, 1.11, 0, 0, 1.08, 0.03, 0, 1.1, 0.01, 0, 1.1, 0]
+      ),
+      new THREE.QuaternionKeyframeTrack('Torso.quaternion', attackTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(-0.06, -0.15, 0.02),
+        ...getQuat(0.14, 0.12, -0.04),
+        ...getQuat(0.04, 0.02, 0),
+        ...getQuat(0, 0, 0),
+      ]),
+      new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', attackTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(0.05, 0.08, 0),
+        ...getQuat(0.18, -0.05, 0),
+        ...getQuat(0.05, 0, 0),
+        ...getQuat(0, 0, 0),
+      ]),
+      new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', attackTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(1.1, -0.15, -0.2),
+        ...getQuat(-1.45, 0.1, 0.15),
+        ...getQuat(-0.75, 0, 0.05),
+        ...getQuat(0, 0, 0),
+      ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', attackTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(0.15, 0, 0.15),
+        ...getQuat(0.3, 0.08, 0.15),
+        ...getQuat(0.1, 0, 0.05),
+        ...getQuat(0, 0, 0),
+      ]),
+      new THREE.VectorKeyframeTrack(
+        'LeftLegPivot.position',
+        [0.0, 0.4],
         [0.15, 0.65, 0, 0.15, 0.65, 0]
+      ),
+      new THREE.VectorKeyframeTrack(
+        'RightLegPivot.position',
+        [0.0, 0.4],
+        [-0.15, 0.65, 0, -0.15, 0.65, 0]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', [0.0, 0.4], [...idQ, ...idQ]),
       new THREE.QuaternionKeyframeTrack('RightLegPivot.quaternion', [0.0, 0.4], [...idQ, ...idQ]),
@@ -1367,27 +1385,27 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ]),
       new THREE.QuaternionKeyframeTrack('RightArmPivot.quaternion', fallTimes, [
         ...getQuat(0, 0, 0),
-        ...getQuat(-1.7, 0.3, 0.45),
-        ...getQuat(-1.1, 0.15, 0.35),
-        ...getQuat(0.1, 0, 0.3),
-        ...getQuat(0.05, 0.02, 0.18),
-      ]),
-      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', fallTimes, [
-        ...getQuat(0, 0, 0),
         ...getQuat(-1.7, -0.3, -0.45),
         ...getQuat(-1.1, -0.15, -0.35),
         ...getQuat(0.1, 0, -0.3),
         ...getQuat(0.05, -0.02, -0.18),
       ]),
+      new THREE.QuaternionKeyframeTrack('LeftArmPivot.quaternion', fallTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(-1.7, 0.3, 0.45),
+        ...getQuat(-1.1, 0.15, 0.35),
+        ...getQuat(0.1, 0, 0.3),
+        ...getQuat(0.05, 0.02, 0.18),
+      ]),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         fallTimes,
-        [-0.15, 0.65, 0, -0.15, 0.5, 0.15, -0.15, 0.3, 0.1, -0.15, 0.2, 0.05, -0.15, 0.14, 0.05]
+        [0.15, 0.65, 0, 0.15, 0.5, 0.15, 0.15, 0.3, 0.1, 0.15, 0.2, 0.05, 0.15, 0.14, 0.05]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         fallTimes,
-        [0.15, 0.65, 0, 0.15, 0.5, 0.15, 0.15, 0.3, 0.1, 0.15, 0.2, 0.05, 0.15, 0.14, 0.05]
+        [-0.15, 0.65, 0, -0.15, 0.5, 0.15, -0.15, 0.3, 0.1, -0.15, 0.2, 0.05, -0.15, 0.14, 0.05]
       ),
       new THREE.QuaternionKeyframeTrack('LeftLegPivot.quaternion', fallTimes, [
         ...idQ,
@@ -1415,37 +1433,37 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       new THREE.QuaternionKeyframeTrack(
         'HeadPivot.quaternion',
         [0.0, 1.0],
-        [...getQuat(-0.05, 0.12, 0.22), ...getQuat(-0.05, 0.12, 0.22)]
+        [...getQuat(-0.05, -0.12, -0.22), ...getQuat(-0.05, -0.12, -0.22)]
       ),
       new THREE.QuaternionKeyframeTrack(
         'RightArmPivot.quaternion',
         [0.0, 1.0],
-        [...getQuat(0.08, 0.05, 0.28), ...getQuat(0.08, 0.05, 0.28)]
+        [...getQuat(0.08, -0.05, -0.28), ...getQuat(0.08, -0.05, -0.28)]
       ),
       new THREE.QuaternionKeyframeTrack(
         'LeftArmPivot.quaternion',
         [0.0, 1.0],
-        [...getQuat(0.08, -0.05, -0.24), ...getQuat(0.08, -0.05, -0.24)]
+        [...getQuat(0.08, 0.05, 0.24), ...getQuat(0.08, 0.05, 0.24)]
       ),
       new THREE.VectorKeyframeTrack(
         'LeftLegPivot.position',
         [0.0, 1.0],
-        [-0.15, 0.14, 0.05, -0.15, 0.14, 0.05]
+        [0.15, 0.14, 0.05, 0.15, 0.14, 0.05]
       ),
       new THREE.VectorKeyframeTrack(
         'RightLegPivot.position',
         [0.0, 1.0],
-        [0.15, 0.14, 0.05, 0.15, 0.14, 0.05]
+        [-0.15, 0.14, 0.05, -0.15, 0.14, 0.05]
       ),
       new THREE.QuaternionKeyframeTrack(
         'LeftLegPivot.quaternion',
         [0.0, 1.0],
-        [...getQuat(-1.57, 0, -0.1), ...getQuat(-1.57, 0, -0.1)]
+        [...getQuat(-1.57, 0, 0.1), ...getQuat(-1.57, 0, 0.1)]
       ),
       new THREE.QuaternionKeyframeTrack(
         'RightLegPivot.quaternion',
         [0.0, 1.0],
-        [...getQuat(-1.57, 0, 0.12), ...getQuat(-1.57, 0, 0.12)]
+        [...getQuat(-1.57, 0, -0.12), ...getQuat(-1.57, 0, -0.12)]
       ),
     ]);
 
@@ -1469,8 +1487,8 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       const cycle = (i / crawlFrames) * Math.PI * 2;
 
       const torsoY = 0.25 + Math.pow(Math.sin(cycle), 2) * 0.015;
-      const bodyRollZ = Math.sin(cycle) * 0.04;
-      const bodyTwistY = Math.cos(cycle) * 0.04;
+      const bodyRollZ = -Math.sin(cycle) * 0.04;
+      const bodyTwistY = -Math.cos(cycle) * 0.04;
 
       crawlTorsoP.push(0, torsoY, 0.33);
       euler.set(1.25 + Math.sin(cycle * 2) * 0.02, bodyTwistY, bodyRollZ);
@@ -1482,20 +1500,20 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       crawlHeadQ.push(quat.x, quat.y, quat.z, quat.w);
 
       const armReach = Math.sin(cycle) * 0.12;
-      crawlRArmP.push(0.35, 0.25 + armReach, 0);
-      crawlLArmP.push(-0.35, 0.25 - armReach, 0);
+      crawlRArmP.push(-0.35, 0.25 + armReach, 0);
+      crawlLArmP.push(0.35, 0.25 - armReach, 0);
 
-      euler.set(-2.38 + armReach * 1.5, 0.15, -0.22);
+      euler.set(-2.38 + armReach * 1.5, -0.15, 0.22);
       quat.setFromEuler(euler);
       crawlRArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      euler.set(-2.38 - armReach * 1.5, -0.15, 0.22);
+      euler.set(-2.38 - armReach * 1.5, 0.15, -0.22);
       quat.setFromEuler(euler);
       crawlLArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
       const legSlide = Math.sin(cycle) * 0.08;
-      crawlLLegP.push(-0.15, 0.14, -0.05 - legSlide);
-      crawlRLegP.push(0.15, 0.14, -0.05 + legSlide);
+      crawlLLegP.push(0.15, 0.14, -0.05 - legSlide);
+      crawlRLegP.push(-0.15, 0.14, -0.05 + legSlide);
       crawlLegQ.push(...proneLegRot);
     }
 
@@ -1517,7 +1535,6 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       const duration = 0.15;
       const times = [0.0, duration];
 
-      // Высота и Z-вынос туловища в положении crouch (при угле наклона 0.45)
       const crouchTorsoY = torsoBaseBottomY + torsoHalfHeight * Math.cos(0.45);
       const crouchTorsoZ = torsoHalfHeight * Math.sin(0.45);
 
@@ -1526,7 +1543,6 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       const startTorsoZ = fromCrouch ? crouchTorsoZ : 0;
       const endTorsoZ = fromCrouch ? 0 : crouchTorsoZ;
 
-      // Ноги не смещаются по вертикали — всегда 0.65
       const legY = 0.65;
 
       const startRot = fromCrouch ? 0.45 : 0;
@@ -1549,18 +1565,18 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
         new THREE.QuaternionKeyframeTrack('Torso.quaternion', times, [...q1, ...q2]),
         new THREE.QuaternionKeyframeTrack('HeadPivot.quaternion', times, [...hq1, ...hq2]),
         new THREE.VectorKeyframeTrack('LeftLegPivot.position', times, [
-          -0.15,
+          0.15,
           legY,
           0,
-          -0.15,
+          0.15,
           legY,
           0,
         ]),
         new THREE.VectorKeyframeTrack('RightLegPivot.position', times, [
-          0.15,
+          -0.15,
           legY,
           0,
-          0.15,
+          -0.15,
           legY,
           0,
         ]),
@@ -1572,7 +1588,6 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     const standToCrouchClip = createStanceTransitionClip('stand_to_crouch', false);
     const crouchToStandClip = createStanceTransitionClip('crouch_to_stand', true);
 
-    // --- Анимация невесомости / падения в воздухе (airborne) ---
     const durationAirborne = 1.0;
     const airborneFrames = fps * durationAirborne;
     const airborneTimes: number[] = [];
@@ -1586,14 +1601,13 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     const airborneLLegQ: number[] = [];
     const airborneRLegQ: number[] = [];
 
-    const torsoPitchBase = 0.08; // Легкий наклон корпуса вперед (~4.5°)
+    const torsoPitchBase = 0.08;
 
     for (let i = 0; i <= airborneFrames; i++) {
       const time = (i / airborneFrames) * durationAirborne;
       airborneTimes.push(time);
       const cycle = (i / airborneFrames) * Math.PI * 2;
 
-      // Плавное парение корпуса по высоте
       const floatY = Math.sin(cycle) * 0.015;
       const torsoSwayPitch = torsoPitchBase + Math.sin(cycle) * 0.02;
       const torsoRoll = Math.sin(cycle) * 0.015;
@@ -1604,32 +1618,31 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       quat.setFromEuler(euler);
       airborneTorsoQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      // Голова держится строго прямо по горизонту (полная компенсация наклона корпуса)
       euler.set(-torsoSwayPitch, 0, -torsoRoll);
       quat.setFromEuler(euler);
       airborneHeadQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      // Руки разведены в стороны (Z) и слегка вперед (X) для удержания баланса
       const armWave = Math.sin(cycle) * 0.06;
-      euler.set(-0.28 + Math.cos(cycle) * 0.05, 0.1, -0.55 - armWave);
+
+      // Левая рука (+X): отведение в сторону (+Z угол)
+      euler.set(-0.28 + Math.cos(cycle) * 0.05, -0.1, 0.55 + armWave);
       quat.setFromEuler(euler);
       airborneLArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      euler.set(-0.28 + Math.cos(cycle) * 0.05, -0.1, 0.55 + armWave);
+      // Правая рука (-X): отведение в сторону (-Z угол)
+      euler.set(-0.28 + Math.cos(cycle) * 0.05, 0.1, -0.55 - armWave);
       quat.setFromEuler(euler);
       airborneRArmQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      // Ноги не подгибаются к корпусу: суставы на базовой высоте 0.65
-      airborneLLegP.push(-0.15, 0.65, 0);
-      airborneRLegP.push(0.15, 0.65, 0);
+      airborneLLegP.push(0.15, 0.65, 0);
+      airborneRLegP.push(-0.15, 0.65, 0);
 
-      // Ноги слегка разведены в стороны (отведение ~7°) с плавным покачиванием вперед-назад в противофазе
       const legDrift = Math.sin(cycle) * 0.07;
-      euler.set(legDrift, 0.04, -0.12);
+      euler.set(legDrift, -0.04, 0.12);
       quat.setFromEuler(euler);
       airborneLLegQ.push(quat.x, quat.y, quat.z, quat.w);
 
-      euler.set(-legDrift, -0.04, 0.12);
+      euler.set(-legDrift, 0.04, -0.12);
       quat.setFromEuler(euler);
       airborneRLegQ.push(quat.x, quat.y, quat.z, quat.w);
     }
