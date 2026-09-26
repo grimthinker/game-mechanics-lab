@@ -7,6 +7,7 @@ import {
   ModifierType,
 } from '../../types';
 import { addModifier, removeModifier } from '../../stats/StatEvaluator';
+import { BALANCE_CONFIG } from '../../../config/balanceConfig';
 
 const STANCE_HEIGHTS: Record<BaseCreatureStance, number> = {
   standing: 1.8,
@@ -192,12 +193,17 @@ export class StanceSystem {
         input.desiredStance ?? (input.isCrouching ? 'crouching' : currentBaseStance);
 
       // Проверка потолка (Can Stand Up Check) при попытке подняться выше
-      const curH = STANCE_HEIGHTS[currentBaseStance] ?? 1.8;
-      const desH = STANCE_HEIGHTS[desiredStance] ?? 1.8;
+      const physStats = world.getComponent(id, 'physicsStats');
+      const baseHeight = physStats?.height.current ?? 1.8;
+
+      const curMult = BALANCE_CONFIG.creature.stanceHeightMultipliers[currentBaseStance] ?? 1.0;
+      const desMult = BALANCE_CONFIG.creature.stanceHeightMultipliers[desiredStance] ?? 1.0;
+
+      const curH = baseHeight * curMult;
+      const desH = baseHeight * desMult;
 
       if (desH > curH && physics?.driver?.isReady) {
         const transform = world.getComponent(id, 'transform');
-        const physStats = world.getComponent(id, 'physicsStats');
         const radius = physStats?.radius.current ?? 0.4;
         if (transform) {
           const isBlocked = physics.driver.checkCeilingClearance(transform, radius, curH, desH, id);

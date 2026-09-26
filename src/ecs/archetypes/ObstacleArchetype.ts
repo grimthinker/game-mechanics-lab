@@ -60,9 +60,9 @@ export function assembleObstacle(
   // 3. Физические характеристики
   world.addComponent(id, 'physicsStats', {
     radius: createStat(boundingRadius),
+    height: createStat(config.physics?.height ?? 1.5),
     weight: createStat(1000),
     isSolid,
-    height: config.physics?.height,
     points: fastClone(points),
   });
 

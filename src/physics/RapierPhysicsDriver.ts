@@ -157,14 +157,32 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     halfHeight: number,
     radius: number,
     offsetY: number
-  ): void {
-    if (!this.world) return;
-    // В Rapier3D напрямую методы setHalfHeight и setRadius отсутствуют, нужно использовать setShape
-    const newShape = new RAPIER.Capsule(Math.max(0.01, halfHeight), Math.max(0.01, radius));
-    collider.setShape(newShape);
-    collider.setTranslationWrtParent({ x: 0, y: offsetY, z: 0 });
+  ): RAPIER.Collider {
+    if (!this.world) return collider;
+    const parentBody = collider.parent();
+    if (!parentBody) return collider;
+
+    const isSensor = collider.isSensor();
+    const friction = collider.friction();
+    const restitution = collider.restitution();
+    const collisionGroups = collider.collisionGroups();
+    const solverGroups = collider.solverGroups();
+
+    this.world.removeCollider(collider, false);
+
+    const desc = RAPIER.ColliderDesc.capsule(Math.max(0.01, halfHeight), Math.max(0.01, radius));
+    desc.setTranslation(0.0, offsetY, 0.0);
+    desc.setSensor(isSensor);
+    desc.setFriction(friction);
+    desc.setRestitution(restitution);
+    desc.setCollisionGroups(collisionGroups);
+    desc.setSolverGroups(solverGroups);
+
+    const newCollider = this.world.createCollider(desc, parentBody);
     this.isBroadPhaseDirty = true;
+    return newCollider;
   }
+
   public computeCharacterMovement(
     collider: RAPIER.Collider,
     desiredTranslation: Vec3,
@@ -325,6 +343,45 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     }
     return this.createCollider(desc, parent);
   }
+
+  public updateCuboidCollider(
+    collider: RAPIER.Collider,
+    hx: number,
+    hy: number,
+    hz: number,
+    offsetY?: number
+  ): RAPIER.Collider {
+    if (!this.world) return collider;
+    const parentBody = collider.parent();
+    if (!parentBody) return collider;
+
+    const isSensor = collider.isSensor();
+    const friction = collider.friction();
+    const restitution = collider.restitution();
+    const collisionGroups = collider.collisionGroups();
+    const solverGroups = collider.solverGroups();
+
+    this.world.removeCollider(collider, false);
+
+    const desc = RAPIER.ColliderDesc.cuboid(
+      Math.max(0.01, hx),
+      Math.max(0.01, hy),
+      Math.max(0.01, hz)
+    );
+    if (offsetY !== undefined) {
+      desc.setTranslation(0.0, offsetY, 0.0);
+    }
+    desc.setSensor(isSensor);
+    desc.setFriction(friction);
+    desc.setRestitution(restitution);
+    desc.setCollisionGroups(collisionGroups);
+    desc.setSolverGroups(solverGroups);
+
+    const newCollider = this.world.createCollider(desc, parentBody);
+    this.isBroadPhaseDirty = true;
+    return newCollider;
+  }
+
   public createGround(
     size: number = 100,
     thickness: number = 1.0,

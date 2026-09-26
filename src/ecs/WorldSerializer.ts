@@ -334,6 +334,14 @@ export class WorldSerializer {
       if (comps.physicsStats) {
         normalizeStat(comps.physicsStats.radius);
         normalizeStat(comps.physicsStats.weight);
+        if (comps.physicsStats.height === undefined) {
+          // Обратная совместимость для старых сохранений
+          const defaultH =
+            comps.tag?.archetype === 'item' ? comps.physicsStats.radius.base * 2 : 1.8;
+          comps.physicsStats.height = { base: defaultH, current: defaultH, modifiers: [] };
+        } else {
+          normalizeStat(comps.physicsStats.height as any);
+        }
       }
 
       if (comps.movementStats) {
@@ -453,7 +461,7 @@ export class WorldSerializer {
               }
               const width = Math.max(0.2, maxX - minX);
               const depth = Math.max(0.2, maxY - minY);
-              const height = comps.physicsStats?.height ?? 1.5;
+              const height = comps.physicsStats?.height?.current ?? 1.5;
 
               const hx = width / 2;
               const hy = height / 2;
@@ -486,6 +494,12 @@ export class WorldSerializer {
             if (archetype === 'item' || comps.physicsBody?.bodyType === 'dynamic') {
               const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0.2, z: trans?.z ?? 0 };
               rawBody = this.app.physics.createDynamicItemBody(this.app.world, ent.id, pos3D);
+
+              // Захватываем созданный коллайдер, чтобы нижележащий код не затер его в ECS
+              const newPhys = this.app.world.getComponent(ent.id, 'physicsBody');
+              if (newPhys) {
+                rawCollider = newPhys.rawCollider;
+              }
 
               if (rawBody && trans?.rotation) {
                 rawBody.setRotation(trans.rotation, true);

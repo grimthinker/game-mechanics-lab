@@ -141,6 +141,7 @@ export function assembleZone(
   // 5. Физические характеристики
   world.addComponent(id, 'physicsStats', {
     radius: createStat(radius),
+    height: createStat(2.0),
     weight: createStat(1),
     isSolid: false,
   });

@@ -165,29 +165,76 @@ export class EditorMutationsAPI {
 
   public updateEntityPhysics(
     id: string,
-    patch: { radius?: number; weight?: number; isSolid?: boolean }
+    patch: { radius?: number; height?: number; weight?: number; isSolid?: boolean }
   ): boolean {
     const physStats = this.world.getComponent(id, 'physicsStats');
     if (!physStats) return false;
     let changed = false;
 
+    const prevRadius = physStats.radius.base;
+    const prevHeight = physStats.height.base;
+
     if (patch.radius !== undefined && physStats.radius.base !== patch.radius) {
+      const oldRadius = physStats.radius.base;
       setBaseStat(physStats.radius, patch.radius);
       // Если это зона — синхронизируем радиус эффектора
       const effector = this.world.getComponent(id, 'areaEffector');
       if (effector && effector.radius !== patch.radius) {
         effector.radius = patch.radius;
       }
+      // Если это препятствие с полигоном точек — масштабируем точки от центра
+      if (physStats.points && oldRadius > 0) {
+        const ratio = patch.radius / oldRadius;
+        for (const p of physStats.points) {
+          p.x *= ratio;
+          p.y *= ratio;
+        }
+      }
       changed = true;
     }
-    if (patch.weight !== undefined && physStats.weight.base !== patch.weight) {
-      setBaseStat(physStats.weight, patch.weight);
+
+    if (patch.height !== undefined && physStats.height.base !== patch.height) {
+      setBaseStat(physStats.height, patch.height);
       changed = true;
     }
-    if (patch.isSolid !== undefined && physStats.isSolid !== patch.isSolid) {
-      physStats.isSolid = patch.isSolid;
-      changed = true;
+
+    // Если это составное существо — пропорционально масштабируем его дочерние части тела
+    const assembly = this.world.getComponent(id, 'assemblyRoot');
+    const tag = this.world.getComponent(id, 'tag');
+    if (changed && (tag?.archetype === 'creature' || assembly) && assembly?.partIds) {
+      const scaleDeltaXZ =
+        patch.radius !== undefined && prevRadius > 0 ? patch.radius / prevRadius : 1.0;
+      const scaleDeltaY =
+        patch.height !== undefined && prevHeight > 0 ? patch.height / prevHeight : 1.0;
+      const scaleDeltaVol = scaleDeltaXZ * scaleDeltaXZ * scaleDeltaY;
+
+      for (const partId of assembly.partIds) {
+        if (partId === id) continue;
+        const partPhys = this.world.getComponent(partId, 'physicsStats');
+        if (partPhys) {
+          if (scaleDeltaXZ !== 1.0)
+            setBaseStat(partPhys.radius, partPhys.radius.base * scaleDeltaXZ);
+          if (scaleDeltaY !== 1.0) setBaseStat(partPhys.height, partPhys.height.base * scaleDeltaY);
+          if (scaleDeltaVol !== 1.0) {
+            setBaseStat(partPhys.weight, partPhys.weight.base * scaleDeltaVol);
+            if (partPhys.size !== undefined) {
+              partPhys.size = Math.max(
+                1,
+                Math.round(partPhys.size * Math.max(scaleDeltaXZ, scaleDeltaY))
+              );
+            }
+          }
+        }
+      }
     }
+
+    if (changed) {
+      const transform = this.world.getComponent(id, 'transform');
+      if (transform) {
+        transform.isDirty = true;
+      }
+    }
+
     return changed;
   }
 

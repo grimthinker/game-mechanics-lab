@@ -18,6 +18,7 @@ import {
 import RAPIER from '@dimforge/rapier3d-compat';
 import { EventBus } from '../../core/EventBus';
 import { LOGIC_CONFIG } from '../../ai/config';
+import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
 export class InteractionSystem {
   public static requestPickup(world: World, entityId: EntityId, targetItemId: EntityId): boolean {
@@ -141,6 +142,7 @@ export class InteractionSystem {
         continue;
       }
 
+      // ... проверка на уже запущенные действия ...
       let isTargetAlreadyTargeted = false;
       const activeInteractions = world.getEntitiesWith('interactionAction');
       for (const [, { interactionAction }] of activeInteractions) {
@@ -156,10 +158,38 @@ export class InteractionSystem {
       }
       if (isTargetAlreadyTargeted) continue;
 
-      const dist = Math.hypot(targetTransform.x - transform.x, targetTransform.z - transform.z);
-      const myRadius = world.getComponent(id, 'physicsStats')?.radius.current ?? 0.4;
-      const targetRadius = targetPhysStats.radius.current;
-      const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
+      const dx = targetTransform.x - transform.x;
+      const dz = targetTransform.z - transform.z;
+      const distXZ = Math.hypot(dx, dz);
+
+      const myPhysStats = world.getComponent(id, 'physicsStats');
+      const myRadius = myPhysStats?.radius.current ?? 0.4;
+      const myBaseHeight = myPhysStats?.height.current ?? 1.8;
+
+      const targetRadius = targetPhysStats.radius.current ?? 0.15;
+      const distBetweenBorders = Math.max(0, distXZ - myRadius - targetRadius);
+
+      // --- ВЕРТИКАЛЬНАЯ ПРОВЕРКА ---
+      const meta = world.getComponent(id, 'meta');
+      const stance = meta?.stance ?? 'standing';
+      let stanceMult =
+        BALANCE_CONFIG.creature.stanceHeightMultipliers[
+          stance as keyof typeof BALANCE_CONFIG.creature.stanceHeightMultipliers
+        ] ?? 1.0;
+
+      if (stance.includes('stand_to_crouch') || stance.includes('crouch_to_stand'))
+        stanceMult = 0.82;
+      else if (stance.includes('stand_to_prone') || stance.includes('prone_to_stand'))
+        stanceMult = 0.62;
+      else if (stance.includes('crouch_to_prone') || stance.includes('prone_to_crouch'))
+        stanceMult = 0.45;
+
+      const currentHeight = myBaseHeight * stanceMult;
+
+      // Вертикальный цилиндр подбора: от уровня ниже стоп на 20% до 20% выше макушки
+      const yMin = transform.y - currentHeight * 0.2;
+      const yMax = transform.y + currentHeight * 1.2;
+      const isWithinVerticalReach = targetTransform.y >= yMin && targetTransform.y <= yMax;
 
       const aggSlots = getAggregatedInteractionSlots(world, id);
       let bestSlotInfo: AggregatedSlot | null = null;
@@ -169,7 +199,8 @@ export class InteractionSystem {
         if (
           !info.isBroken &&
           info.slot.itemId === null &&
-          distBetweenBorders <= info.slot.interactDist
+          distBetweenBorders <= info.slot.interactDist &&
+          isWithinVerticalReach
         ) {
           if (info.slot.strength > maxStrength) {
             maxStrength = info.slot.strength;

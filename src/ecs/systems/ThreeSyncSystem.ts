@@ -16,6 +16,7 @@ import {
 import { disposeObject, attachOutlines } from '../../rendering/renderUtils';
 import { AttackVisualsManager } from '../../rendering/attacks/AttackVisualsManager';
 import { GrassSyncSystem } from '../../rendering/grass/GrassSyncSystem';
+import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
 export class ThreeSyncSystem {
   public static disposeObject = disposeObject;
@@ -224,21 +225,55 @@ export class ThreeSyncSystem {
             );
           }
 
-          // Модульные существа масштабируются пропорционально метрическому радиусу коллизии (база = 0.4м)
+          // Модульные существа масштабируются непропорционально: по осям X/Z от радиуса, по оси Y от роста
           if (obj.userData.isModularRig) {
             const physStats = world.getComponent(id, 'physicsStats');
-            const radius = physStats ? physStats.radius.current : 0.4;
-            const baseRadius = 0.4;
-            const scaleFactor = radius / baseRadius;
-            obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
+            const animator = world.getComponent(id, 'animator');
+            const rigType = animator?.rigType as BodyStructureType;
+
+            let baseRadius = 0.4;
+            let baseHeight = 1.8;
+            if (rigType === 'quadruped') {
+              baseRadius = 0.35;
+              baseHeight = 0.8;
+            } else if (rigType === 'arachnid') {
+              baseRadius = 0.6;
+              baseHeight = 0.5;
+            }
+
+            const radius = physStats?.radius.current ?? baseRadius;
+            const height = physStats?.height.current ?? baseHeight;
+
+            const scaleXZ = radius / baseRadius;
+            const scaleY = height / baseHeight;
+            obj.scale.set(scaleXZ, scaleY, scaleXZ);
           } else if (obj.userData.isDetachedLimb) {
-            // Сохраняем анатомический масштаб гуманоида (0.3 / 0.4 = 0.75) для отсоединенных частей
-            obj.scale.set(0.75, 0.75, 0.75);
+            // Масштаб отрубленной конечности пропорционален ее реальному сохраненному радиусу
+            const physStats = world.getComponent(id, 'physicsStats');
+            const limbRadius = physStats?.radius.current ?? 0.3;
+            const limbScale = (limbRadius / 0.3) * 0.75;
+            obj.scale.set(limbScale, limbScale, limbScale);
           } else if (archetype === 'zone') {
             const effector = world.getComponent(id, 'areaEffector');
             const physStats = world.getComponent(id, 'physicsStats');
             const r = effector?.radius ?? physStats?.radius.current ?? 2.5;
             obj.scale.set(r, 1, r);
+          } else if (archetype === 'obstacle') {
+            const physStats = world.getComponent(id, 'physicsStats');
+            const visual = world.getComponent(id, 'visualModel');
+            if (visual?.modelId === 'proc://prop/tree') {
+              const r = physStats?.radius.current ?? 0.6;
+              const h = physStats?.height.current ?? 4.0;
+              obj.scale.set(r / 0.6, h / 4.0, r / 0.6);
+            } else {
+              const r = physStats?.radius.current ?? 1.0;
+              const h = physStats?.height.current ?? 1.5;
+              const baseW = (obj.userData.baseWidth as number) ?? 2.0;
+              const baseD = (obj.userData.baseDepth as number) ?? 2.0;
+              const baseH = (obj.userData.baseHeight as number) ?? 1.5;
+              const baseR = Math.max(baseW, baseD) / 2 || 1;
+              obj.scale.set(r / baseR, h / baseH, r / baseR);
+            }
           } else {
             obj.scale.set(1, 1, 1);
           }
@@ -352,27 +387,35 @@ export class ThreeSyncSystem {
             obj.scale.set(1, 0.1, 1);
             obj.position.y = 0.05;
           } else if (archetype === 'creature') {
-            const STANCE_HEIGHTS: Record<string, number> = {
-              standing: 1.8,
-              crouching: 1.2,
-              prone: 0.4,
-            };
+            const physStats = world.getComponent(id, 'physicsStats');
+            const baseH = physStats?.height.current ?? 1.8;
+            const radius = physStats?.radius.current ?? 0.4;
+            const scaleXZ = radius / 0.4; // базовая ширина "заглушки"
+
             const transition = world.getComponent(id, 'stanceTransition');
-            let currentHeight = 1.8;
+            let currentHeight = baseH;
+
+            const getH = (st: string) =>
+              baseH *
+              (BALANCE_CONFIG.creature.stanceHeightMultipliers[
+                st as keyof typeof BALANCE_CONFIG.creature.stanceHeightMultipliers
+              ] ?? 1.0);
 
             if (transition && transition.totalDuration > 0) {
               const progress = Math.min(
                 1,
                 Math.max(0, 1 - transition.timer / transition.totalDuration)
               );
-              const fromH = STANCE_HEIGHTS[transition.fromStance] || 1.8;
-              const toH = STANCE_HEIGHTS[transition.toStance] || 1.8;
+              const fromH = getH(transition.fromStance);
+              const toH = getH(transition.toStance);
               currentHeight = fromH + (toH - fromH) * progress;
             } else {
               const currentStance = world.getComponent(id, 'meta')?.stance || 'standing';
-              currentHeight = STANCE_HEIGHTS[currentStance] || 1.8;
+              currentHeight = getH(currentStance);
             }
-            obj.scale.set(1, currentHeight / 1.8, 1);
+
+            // Если фоллбэк - это CylinderGeometry, его оригинальная высота была 1.8
+            obj.scale.set(scaleXZ, currentHeight / 1.8, scaleXZ);
             obj.position.y = 0;
           }
 
@@ -576,7 +619,7 @@ export class ThreeSyncSystem {
       if (behavior === 'PlayerTree') mat = this.matPlayer;
       else if (behavior === 'AttackerTree') mat = this.matEnemy;
 
-      const h = 1.8;
+      const h = physStats?.height?.current ?? 1.8;
       const geo = new THREE.CylinderGeometry(radius, radius, h, 16);
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = h / 2;
@@ -602,10 +645,14 @@ export class ThreeSyncSystem {
         w = Math.max(0.2, maxX - minX);
         d = Math.max(0.2, maxY - minY);
       }
-      const h = 1.5;
+      const h = physStats?.height?.current ?? 1.5;
       const geo = new THREE.BoxGeometry(w, h, d);
       mainMesh = new THREE.Mesh(geo, this.matObstacle);
       mainMesh.position.y = h / 2;
+
+      group.userData.baseWidth = w;
+      group.userData.baseDepth = d;
+      group.userData.baseHeight = h;
     } else if (archetype === 'item' || archetype === 'bodyPart') {
       const item = world.getComponent(id, 'item');
       let mat = this.matWeapon;

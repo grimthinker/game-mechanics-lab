@@ -25,6 +25,8 @@ export interface BlueprintItemDef {
 export interface CreatureBodyBlueprint {
   id: BodyStructureType;
   name: string;
+  baseHeight?: number;
+  baseRadius?: number;
   rigAsset?: string;
   movement?: Partial<MovementConfig>;
   parts: BlueprintPartDef[];

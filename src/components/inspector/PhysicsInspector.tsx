@@ -22,6 +22,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
   const physStats = world.getComponent(targetId, 'physicsStats');
 
   const [radius, setRadius] = useState(physStats ? physStats.radius.base : 16);
+  const [height, setHeight] = useState(physStats?.height ? physStats.height.base : 1.8);
   const [weight, setWeight] = useState(physStats ? physStats.weight.base : 1);
   const [isSolid, setIsSolid] = useState(physStats ? physStats.isSolid : true);
   const isFocusedRef = useRef(false);
@@ -31,6 +32,7 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
     const comp = world.getComponent(targetId, 'physicsStats');
     if (comp) {
       setRadius(comp.radius.base);
+      if (comp.height) setHeight(comp.height.base);
       setWeight(comp.weight.base);
       setIsSolid(comp.isSolid);
     }
@@ -40,18 +42,26 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
 
   const totalWeight = physStats.totalWeight ?? calculateTotalEntityWeight(world, targetId);
 
-  const handleUpdate = (patch: { radius?: number; weight?: number; isSolid?: boolean }) => {
+  const handleUpdate = (patch: {
+    radius?: number;
+    height?: number;
+    weight?: number;
+    isSolid?: boolean;
+  }) => {
     const nextRadius = patch.radius ?? radius;
+    const nextHeight = patch.height ?? height;
     const nextWeight = patch.weight ?? weight;
     const nextIsSolid = patch.isSolid ?? isSolid;
 
     if (patch.radius !== undefined) setRadius(nextRadius);
+    if (patch.height !== undefined) setHeight(nextHeight);
     if (patch.weight !== undefined) setWeight(nextWeight);
     if (patch.isSolid !== undefined) setIsSolid(nextIsSolid);
 
     if (app) {
       app.mutations.updateEntityPhysics(targetId, {
         radius: nextRadius,
+        height: nextHeight,
         weight: nextWeight,
         isSolid: nextIsSolid,
       });
@@ -94,6 +104,25 @@ export const PhysicsInspector: React.FC<PhysicsInspectorProps> = ({
             isFocusedRef.current = false;
           }}
           onChange={(e) => handleUpdate({ radius: Math.max(0.05, Number(e.target.value)) })}
+        />
+      </label>
+
+      <label>
+        Рост / Высота (м):
+        <input
+          disabled={isReadOnly}
+          type="number"
+          value={height}
+          min={0.1}
+          max={20}
+          step={0.05}
+          onFocus={() => {
+            isFocusedRef.current = true;
+          }}
+          onBlur={() => {
+            isFocusedRef.current = false;
+          }}
+          onChange={(e) => handleUpdate({ height: Math.max(0.1, Number(e.target.value)) })}
         />
       </label>
 

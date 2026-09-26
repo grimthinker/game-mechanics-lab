@@ -74,7 +74,8 @@ export class EntityFactory {
           }
         : undefined,
       physics: {
-        radius: maxRadius,
+        radius: blueprint.baseRadius ?? maxRadius,
+        height: blueprint.baseHeight ?? 1.8,
         weight: initialWeight || 10,
         isSolid: true,
       },
@@ -139,12 +140,33 @@ export class EntityFactory {
       }
     }
 
-    // 4. Создание и сборка частей тела
+    // Масштабные коэффициенты частей относительно нативных размеров рига
+    const baseR = blueprint.baseRadius ?? 0.4;
+    const baseH = blueprint.baseHeight ?? 1.8;
+    const targetR = rootConfig.physics?.radius ?? baseR;
+    const targetH = rootConfig.physics?.height ?? baseH;
+    const scaleXZ = targetR / baseR;
+    const scaleY = targetH / baseH;
+    const scaleVol = scaleXZ * scaleXZ * scaleY;
+
+    // 4. Создание и сборка частей тела с пропорциональным масштабом
     for (const part of blueprint.parts) {
       const partId = partKeyToId.get(part.key)!;
       world.createEntity(partId);
 
       const partConfig: EntityConfig = fastClone(part.config);
+      if (partConfig.physics) {
+        partConfig.physics.radius = (partConfig.physics.radius ?? 0.2) * scaleXZ;
+        partConfig.physics.height = (partConfig.physics.height ?? 0.4) * scaleY;
+        partConfig.physics.weight = (partConfig.physics.weight ?? 1) * scaleVol;
+        if (partConfig.physics.size !== undefined) {
+          partConfig.physics.size = Math.max(
+            1,
+            Math.round(partConfig.physics.size * Math.max(scaleXZ, scaleY))
+          );
+        }
+      }
+
       partConfig.socketLink = {
         links: partSocketLinks.get(part.key) || {},
       };

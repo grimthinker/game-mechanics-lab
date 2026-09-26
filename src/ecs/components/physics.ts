@@ -28,6 +28,8 @@ export interface PhysicsBodyComponent {
   mask: number;
   isTrigger?: boolean;
   currentColliderStance?: string;
+  lastAppliedRadius?: number;
+  lastAppliedHeight?: number;
 }
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
@@ -57,9 +59,9 @@ export interface PhysicsConfig {
 export interface PhysicsStatsComponent {
   radius: StatValue<number>;
   weight: StatValue<number>;
+  height: StatValue<number>;
   totalWeight?: number;
   size?: number;
-  height?: number;
   isSolid: boolean;
   shape?: 'cuboid' | 'ball';
   restitution?: number;

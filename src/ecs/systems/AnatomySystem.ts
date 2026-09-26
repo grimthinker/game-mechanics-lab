@@ -295,12 +295,14 @@ export class AnatomySystem {
     if (!rootPhysStats) {
       world.addComponent(rootId, 'physicsStats', {
         radius: createStat(plan.maxRadius),
+        height: createStat(1.8),
         weight: createStat(plan.totalWeight),
         isSolid: true,
       });
       rootPhysStats = world.getComponent(rootId, 'physicsStats')!;
     } else {
-      setBaseStat(rootPhysStats.radius, plan.maxRadius);
+      // Обновляем только суммарный вес анатомической системы,
+      // НЕ затирая мастер-радиус и рост существа из чертежа/инспектора
       setBaseStat(rootPhysStats.weight, plan.totalWeight);
     }
 
@@ -315,8 +317,9 @@ export class AnatomySystem {
         { x: rootTransform.x, y: rootTransform.y, z: rootTransform.z },
         rootId
       );
-      const radius = plan.maxRadius;
-      const halfHeight = Math.max(0.01, (1.8 - 2 * radius) / 2);
+      const radius = rootPhysStats.radius.current;
+      const height = rootPhysStats.height.current;
+      const halfHeight = Math.max(0.01, (height - 2 * radius) / 2);
       const offsetY = halfHeight + radius;
       rawCollider = physics.driver.createCapsuleCollider(
         halfHeight,
@@ -327,6 +330,9 @@ export class AnatomySystem {
       );
     }
 
+    const radius = rootPhysStats.radius.current;
+    const height = rootPhysStats.height.current;
+
     if (!rootPhysBody) {
       world.addComponent(rootId, 'physicsBody', {
         rawBody,
@@ -336,12 +342,16 @@ export class AnatomySystem {
         category: CollisionCategory.CREATURE,
         mask: COLLISION_MASK_ALL,
         currentColliderStance: 'standing',
+        lastAppliedRadius: radius,
+        lastAppliedHeight: height,
       });
     } else {
       rootPhysBody.rawBody = rawBody;
       rootPhysBody.rawCollider = rawCollider;
       rootPhysBody.bodyType = 'kinematicPositionBased';
       rootPhysBody.currentColliderStance = 'standing';
+      rootPhysBody.lastAppliedRadius = radius;
+      rootPhysBody.lastAppliedHeight = height;
     }
 
     if (!currentLocomotion.canStand) {
@@ -470,6 +480,7 @@ export class AnatomySystem {
     if (!rootPhysStats) {
       world.addComponent(rootItemId, 'physicsStats', {
         radius: createStat(plan.maxRadius),
+        height: createStat(plan.maxRadius * 2),
         weight: createStat(plan.totalWeight),
         size: plan.calculatedSize,
         isSolid: true,

@@ -200,9 +200,9 @@ export interface EntityConfig {
   physics?: PhysicsConfig;
   health?: HealthConfig;
   functionalHealth?: FunctionalHealthConfig;
-  movement?: MovementConfig;
-  stealth?: StealthConfig;
-  ai?: AIConfig;
+  movement?: Partial<MovementConfig>;
+  stealth?: Partial<StealthConfig>;
+  ai?: Partial<AIConfig>;
   item?: ItemConfig;
   inventory?: InventorySetup;
   equip?: EquipmentComponent;

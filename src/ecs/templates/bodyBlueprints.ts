@@ -4,6 +4,8 @@ import { deg2Rad } from '../../utils';
 export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'humanoid',
   name: 'Гуманоид',
+  baseHeight: 1.8,
+  baseRadius: 0.4,
   rigAsset: 'proc://rig/humanoid',
   parts: [
     {
@@ -193,6 +195,8 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
 export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'quadruped',
   name: 'Четвероногий',
+  baseHeight: 0.8,
+  baseRadius: 0.35,
   rigAsset: 'proc://rig/quadruped',
   movement: {
     maxSpeed: 5.5, // Базовая скорость собаки (5.5 м/с против 4.5 м/с у человека)
@@ -368,6 +372,8 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
 export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'arachnid',
   name: 'Паукообразный',
+  baseHeight: 0.5,
+  baseRadius: 0.6,
   movement: {
     maxSpeed: 4.8,
     runSpeedMultiplier: 1.6,

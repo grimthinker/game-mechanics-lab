@@ -26,6 +26,7 @@ export function assembleBodyPart(
   // 3. Статы физики (само тело будет добавлено AnatomySystem, если часть окажется предметом)
   world.addComponent(id, 'physicsStats', {
     radius: createStat(config.physics?.radius || 10),
+    height: createStat(config.physics?.height || config.physics?.radius || 10),
     weight: createStat(config.physics?.weight || 1),
     size: config.physics?.size || 10,
     isSolid: true,

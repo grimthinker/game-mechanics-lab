@@ -178,11 +178,13 @@ export function assembleCreature(
 
   // 9. Физические свойства и тело коллизии
   const radius = config.physics?.radius ?? BALANCE_CONFIG.creature.radius;
+  const height = config.physics?.height ?? BALANCE_CONFIG.creature.height;
   const weight = config.physics?.weight ?? BALANCE_CONFIG.creature.weight;
   const isSolid = config.physics?.isSolid ?? true;
 
   world.addComponent(id, 'physicsStats', {
     radius: createStat(radius),
+    height: createStat(height),
     weight: createStat(weight),
     isSolid,
   });

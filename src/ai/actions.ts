@@ -810,18 +810,33 @@ export class BTActionPickup extends BTAction {
     const selfPos = entity.getPos();
     const dx = targetTrans.x - selfPos.x;
     const dz = targetTrans.z - selfPos.z;
-    const dist = Math.hypot(dx, dz);
+    const distXZ = Math.hypot(dx, dz);
 
     const freeSlot = aggSlots.find((s) => !s.isBroken && s.slot.itemId === null);
     if (!freeSlot) return NodeStatus.FAILURE;
 
-    const myRadius = entity.radius;
+    const physStats = entity.world.getComponent(entity.id, 'physicsStats');
+    const myRadius = physStats?.radius.current ?? 0.4;
+    const myBaseHeight = physStats?.height.current ?? 1.8;
+
     const targetPhysStats = entity.world.getComponent(targetId, 'physicsStats');
     const targetRadius = targetPhysStats?.radius.current ?? 0.15;
-    const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
-    const interactDist = freeSlot.slot.interactDist ?? 0.6;
+    const distBetweenBorders = Math.max(0, distXZ - myRadius - targetRadius);
 
-    if (distBetweenBorders <= interactDist + 0.1) {
+    // ВЕРТИКАЛЬНАЯ ПРОВЕРКА ЦИЛИНДРА
+    const meta = entity.world.getComponent(entity.id, 'meta');
+    const stance = meta?.stance ?? 'standing';
+    let stanceMult = 1.0;
+    if (stance === 'crouching') stanceMult = 0.65;
+    else if (stance === 'prone') stanceMult = 0.25;
+
+    const currentHeight = myBaseHeight * stanceMult;
+    const yMin = selfPos.y - currentHeight * 0.2;
+    const yMax = selfPos.y + currentHeight * 1.2;
+    const isWithinVerticalReach = targetTrans.y >= yMin && targetTrans.y <= yMax;
+
+    const interactDist = freeSlot.slot.interactDist ?? 0.6;
+    if (distBetweenBorders <= interactDist + 0.1 && isWithinVerticalReach) {
       if (entity.input) {
         entity.input.desiredMoveVector = null;
         entity.input.isMovingForward = false;

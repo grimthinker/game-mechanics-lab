@@ -230,10 +230,7 @@ export const useCanvasInteraction = ({
                 app.selection.selectEntity(rootId, !e.shiftKey);
                 EventBus.emit('inspector:navigate', {
                   rootEntityId: rootId,
-                  path: [
-                    { id: rootId, label: creatureName },
-                    { id: entityId, label: partName },
-                  ],
+                  path: [{ id: rootId, label: creatureName }],
                 });
               }
               syncPlayerControls();

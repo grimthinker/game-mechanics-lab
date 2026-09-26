@@ -135,9 +135,22 @@ export class PhysicsSystem {
               vel.vy = 0;
               vel.vz = 0;
             }
+            const physStats = world.getComponent(id, 'physicsStats');
+            const meta = world.getComponent(id, 'meta');
+            if (physStats) {
+              this.updateCreatureColliderStance(
+                world,
+                id,
+                meta?.stance || 'standing',
+                physStats.radius.current
+              );
+            }
           } else {
             physicsBody.rawBody.setTranslation(pos, true);
             physicsBody.rawBody.setRotation(rot, true);
+            if (physicsBody.bodyType === 'fixed') {
+              this.updateObstacleCollider(world, id);
+            }
             // При ручном перемещении гасим текущий импульс (останавливаем полет/падение)
             physicsBody.rawBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
             physicsBody.rawBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
@@ -164,29 +177,91 @@ export class PhysicsSystem {
     const phys = world.getComponent(id, 'physicsBody');
     if (!phys?.rawCollider) return;
 
-    if (phys.currentColliderStance === stance) return;
-    phys.currentColliderStance = stance;
+    const physStats = world.getComponent(id, 'physicsStats');
+    const baseHeight = physStats?.height.current ?? 1.8;
 
-    let targetHeight = 1.8;
+    let stanceMult =
+      BALANCE_CONFIG.creature.stanceHeightMultipliers[
+        stance as keyof typeof BALANCE_CONFIG.creature.stanceHeightMultipliers
+      ] ?? 1.0;
+
+    // Аппроксимация для переходных состояний
+    if (stance.includes('stand_to_crouch') || stance.includes('crouch_to_stand')) stanceMult = 0.82;
+    else if (stance.includes('stand_to_prone') || stance.includes('prone_to_stand'))
+      stanceMult = 0.62;
+    else if (stance.includes('crouch_to_prone') || stance.includes('prone_to_crouch'))
+      stanceMult = 0.45;
+
+    const targetHeight = baseHeight * stanceMult;
     let capRadius = radius;
 
-    if (stance === 'crouching' || stance === 'stand_to_crouch' || stance === 'crouch_to_stand') {
-      targetHeight = 1.2;
-    } else if (stance === 'prone' || stance.includes('prone')) {
-      targetHeight = 0.4;
-      capRadius = Math.min(radius, 0.2);
-    } else if (stance === 'airborne') {
-      targetHeight = 1.8;
-      capRadius = radius;
-    } else if (stance === 'sliding') {
-      targetHeight = 1.6; // Слегка заниженный центр тяжести для устойчивости на склоне
-      capRadius = radius;
+    // Защита: в позе лежа (prone) радиус капсулы не может быть больше её высоты
+    if (stance === 'prone' || stance.includes('prone')) {
+      capRadius = Math.min(radius, targetHeight / 2);
     }
 
     const halfHeight = Math.max(0.01, (targetHeight - 2 * capRadius) / 2);
     const offsetY = halfHeight + capRadius;
 
-    this.driver.updateCapsuleCollider(phys.rawCollider, halfHeight, capRadius, offsetY);
+    // Кэш-проверка: пропускаем пересчет, если стойка, радиус и рост не изменились
+    if (
+      phys.currentColliderStance === stance &&
+      phys.lastAppliedRadius === capRadius &&
+      phys.lastAppliedHeight === targetHeight
+    ) {
+      return;
+    }
+
+    phys.currentColliderStance = stance;
+    phys.lastAppliedRadius = capRadius;
+    phys.lastAppliedHeight = targetHeight;
+
+    phys.rawCollider = this.driver.updateCapsuleCollider(
+      phys.rawCollider,
+      halfHeight,
+      capRadius,
+      offsetY
+    );
+  }
+
+  public updateObstacleCollider(world: World, id: EntityId): void {
+    if (!this.driver || !this.driver.isReady) return;
+    const phys = world.getComponent(id, 'physicsBody');
+    const physStats = world.getComponent(id, 'physicsStats');
+    if (!phys?.rawCollider || !physStats) return;
+
+    const radius = physStats.radius.current;
+    const height = physStats.height.current;
+
+    if (phys.lastAppliedRadius === radius && phys.lastAppliedHeight === height) {
+      return;
+    }
+    phys.lastAppliedRadius = radius;
+    phys.lastAppliedHeight = height;
+
+    const points = physStats.points;
+    let width = radius * 2;
+    let depth = radius * 2;
+    if (points && points.length > 0) {
+      let minX = points[0].x,
+        maxX = points[0].x;
+      let minY = points[0].y,
+        maxY = points[0].y;
+      for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      width = Math.max(0.2, maxX - minX);
+      depth = Math.max(0.2, maxY - minY);
+    }
+
+    const hx = width / 2;
+    const hy = height / 2;
+    const hz = depth / 2;
+
+    phys.rawCollider = this.driver.updateCuboidCollider(phys.rawCollider, hx, hy, hz, hy);
   }
 
   public update(dt: number, world: World): void {

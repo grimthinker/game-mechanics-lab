@@ -54,6 +54,7 @@ export function assembleItem(
   // 4. Физические характеристики
   world.addComponent(id, 'physicsStats', {
     radius: createStat(radius),
+    height: createStat(config.physics?.height ?? radius * 2),
     weight: createStat(weight),
     isSolid,
     shape: config.physics?.shape,

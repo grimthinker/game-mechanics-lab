@@ -65,13 +65,13 @@ export interface IPhysicsDriver {
     offsetY?: number
   ): RAPIER.Collider;
 
-  /** Обновляет размеры и относительное смещение существующего капсульного коллайдера */
+  /** Обновляет размеры и относительное смещение капсульного коллайдера */
   updateCapsuleCollider(
     collider: RAPIER.Collider,
     halfHeight: number,
     radius: number,
     offsetY: number
-  ): void;
+  ): RAPIER.Collider;
 
   /** Вычисляет разрешенное движение кинематического персонажа через KCC с учетом препятствий и гравитации */
   computeCharacterMovement(
@@ -99,6 +99,16 @@ export interface IPhysicsDriver {
     mass?: number,
     offset?: Vec3 | number
   ): RAPIER.Collider;
+
+  /** Обновляет форму и вертикальное смещение коллайдера-кубоида */
+  updateCuboidCollider(
+    collider: RAPIER.Collider,
+    hx: number,
+    hy: number,
+    hz: number,
+    offsetY?: number
+  ): RAPIER.Collider;
+
   /** Создает статический пол (кубоид), верхняя грань которого находится на высоте y */
   createGround(
     size?: number,
