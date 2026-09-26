@@ -178,7 +178,8 @@ export class GameSimulation {
         const thrownObj = this.world.getComponent(id, 'thrownObject');
         if (thrownObj && thrownObj.isAirborne) {
           const speed = Math.hypot(linvel.x, linvel.y, linvel.z);
-          if (speed < 0.1) {
+          const ts = this.world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+          if (speed < 0.1 * ts) {
             thrownObj.isAirborne = false;
           }
         }

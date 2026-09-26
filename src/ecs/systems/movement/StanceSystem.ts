@@ -43,10 +43,13 @@ function getTransitionDuration(
 }
 
 export class StanceSystem {
-  public update(localDt: number, world: World, physics?: PhysicsSystem): void {
+  public update(dt: number, world: World, physics?: PhysicsSystem): void {
     const entities = world.getEntitiesWith('input', 'health', 'meta', 'movementStats');
 
     for (const [id, { input, health, meta, movementStats }] of entities) {
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const localDt = dt * ts;
+
       if (!health.isAlive) {
         world.removeComponent(id, 'stanceTransition');
         removeModifier(movementStats.maxSpeed, 'stance_speed');

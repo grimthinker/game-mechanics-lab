@@ -82,6 +82,9 @@ export function assembleItem(
     healFlashTimer: 0,
   });
 
+  // 4.7. Локальный масштаб времени
+  world.addComponent(id, 'timeScale', { multiplier: createStat(1.0) });
+
   const isPossessed = !!config.ownership;
 
   // 5. Специфические компоненты экипировки

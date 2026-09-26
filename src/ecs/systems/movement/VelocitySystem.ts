@@ -11,7 +11,7 @@ import {
 } from '../../types';
 
 export class VelocitySystem {
-  public update(dt: number, localDt: number, world: World): void {
+  public update(dt: number, world: World): void {
     const entities = world.getEntitiesWith(
       'transform',
       'velocity',
@@ -26,6 +26,9 @@ export class VelocitySystem {
       id,
       { transform, velocity, input, health, activeAttacks, meta, movementStats },
     ] of entities) {
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const localDt = dt * ts;
+
       if (!health.isAlive) {
         if (
           velocity.vx !== 0 ||

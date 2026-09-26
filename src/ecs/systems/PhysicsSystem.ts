@@ -14,6 +14,7 @@ import { getTerrainHeightAt } from '../components/terrain';
 export class PhysicsSystem {
   public obstaclesEnabled: boolean = true;
   public driver: IPhysicsDriver | null = null;
+  private dynamicBodyTimeScales: Map<EntityId, number> = new Map();
 
   constructor() {}
 
@@ -356,7 +357,38 @@ export class PhysicsSystem {
       }
     }
 
-    // 3. Шаг физической симуляции Rapier3D
+    // 3. Динамическое масштабирование физики в Rapier для тел с timeScale (палки, ящики, камни)
+    const dynamicBodies = world.getEntitiesWith('physicsBody');
+    const currentDynamicIds = new Set<string>();
+
+    for (const [id, { physicsBody }] of dynamicBodies) {
+      if (!physicsBody.rawBody || physicsBody.bodyType !== 'dynamic') continue;
+
+      currentDynamicIds.add(id);
+      const rawBody = physicsBody.rawBody;
+      const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
+      const prevTs = this.dynamicBodyTimeScales.get(id) ?? 1.0;
+
+      if (Math.abs(ts - prevTs) > 0.001) {
+        const ratio = prevTs > 0.0001 ? ts / prevTs : ts;
+        const linvel = rawBody.linvel();
+        const angvel = rawBody.angvel();
+
+        rawBody.setLinvel({ x: linvel.x * ratio, y: linvel.y * ratio, z: linvel.z * ratio }, true);
+        rawBody.setAngvel({ x: angvel.x * ratio, y: angvel.y * ratio, z: angvel.z * ratio }, true);
+        // Гравитация масштабируется квадратично: g' = g * S^2
+        rawBody.setGravityScale(ts * ts, true);
+        this.dynamicBodyTimeScales.set(id, ts);
+      }
+    }
+
+    for (const id of this.dynamicBodyTimeScales.keys()) {
+      if (!currentDynamicIds.has(id)) {
+        this.dynamicBodyTimeScales.delete(id);
+      }
+    }
+
+    // 4. Шаг физической симуляции Rapier3D
     if (this.driver && this.driver.isReady) {
       this.driver.step(dt);
     }

@@ -10,10 +10,8 @@ export class MovementSystem {
   private velocitySystem = new VelocitySystem();
 
   public update(dt: number, world: World, physics?: PhysicsSystem): void {
-    const localDt = dt;
-
-    this.stanceSystem.update(localDt, world, physics);
-    this.velocitySystem.update(dt, localDt, world);
+    this.stanceSystem.update(dt, world, physics);
+    this.velocitySystem.update(dt, world);
     this.movementModifierSystem.update(world);
   }
 }

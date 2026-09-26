@@ -2,7 +2,7 @@ import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, ModifierType } from '../types';
 import { applyDamage, applyHeal } from '../utils/health';
-import { addModifier } from '../stats/StatEvaluator';
+import { addModifier, createStat } from '../stats/StatEvaluator';
 import { applyZoneDamageToCreature, applyZoneJointDamageToCreature } from '../utils/anatomyDamage';
 import { EFFECTOR_CONFIG } from '../../config/effectorConfig';
 
@@ -61,7 +61,11 @@ export class AreaEffectorSystem {
 
         // Поле замедления/ускорения времени
         if (areaEffector.effect === 'time_dilation') {
-          const targetTimeScale = world.getComponent(targetId, 'timeScale');
+          let targetTimeScale = world.getComponent(targetId, 'timeScale');
+          if (!targetTimeScale) {
+            world.addComponent(targetId, 'timeScale', { multiplier: createStat(1.0) });
+            targetTimeScale = world.getComponent(targetId, 'timeScale');
+          }
           if (targetTimeScale) {
             let timeMultiplier = areaEffector.valuePerSec;
 
