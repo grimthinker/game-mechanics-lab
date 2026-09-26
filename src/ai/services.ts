@@ -210,6 +210,7 @@ export class BTServicePathUpdater extends BTService {
 }
 
 import { NodeBBSchema } from './schema';
+import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 
 export class BTServiceSyncStats extends BTService {
   public static readonly nodeName = 'Синхронизация параметров';
@@ -453,26 +454,173 @@ export class BTServiceInputController extends BTService {
   }
 }
 
-export class BTServiceFetchWatcher extends BTService {
-  public static readonly nodeName = 'Наблюдение за апортом';
-  public static readonly description = 'Следит за палками, брошенными хозяином';
+export class BTServiceEnforceWalkMode extends BTService {
+  public static readonly nodeName = 'Принудительный шаг';
+  public static readonly description =
+    'Всегда держит режим ходьбы (isSlowWalking = true, isRunning = false)';
+  public static readonly defaultParams = { interval: 0 };
+  protected override params = { interval: 0 };
 
-  public static readonly bbSchema: NodeBBSchema = {
-    reads: {
-      masterEntityId: { type: 'entityId', description: 'ID хозяина' },
-      fetchState: { type: 'string', description: 'Состояние апорта' },
-    },
-    writes: {
-      masterEntityId: { type: 'entityId' },
-      fetchTargetId: { type: 'entityId', description: 'ID брошенной палки' },
-      fetchState: { type: 'string' },
-    },
-  };
+  constructor(child: BTNode, params?: Partial<typeof BTServiceEnforceWalkMode.defaultParams>) {
+    super(child, params);
+    this.params = { ...BTServiceEnforceWalkMode.defaultParams, ...params };
+  }
+
+  protected tickService(entity: EntityAdapter): void {
+    if (entity.input) {
+      entity.input.isSlowWalking = true;
+      entity.input.isRunning = false;
+    }
+  }
+}
+
+export class BTServiceFetchMasterWatcher extends BTService {
+  public static readonly nodeName = 'Наблюдение хозяина за апортом';
+  public static readonly description =
+    'Отслеживает палки в руках, принесенные палки на земле, собак и границы зоны игры';
 
   public static readonly defaultParams = {
     ...BTService.defaultParams,
-    interval: 0.2,
+    interval: 0.1,
   };
+
+  protected override params: typeof BTServiceFetchMasterWatcher.defaultParams;
+
+  constructor(child: BTNode, params?: Partial<typeof BTServiceFetchMasterWatcher.defaultParams>) {
+    super(child, params);
+    this.params = { ...BTServiceFetchMasterWatcher.defaultParams, ...params };
+  }
+
+  protected override onOpen(entity: EntityAdapter): void {
+    super.onOpen(entity);
+    this.tickService(entity);
+  }
+
+  protected tickService(entity: EntityAdapter): void {
+    const bb = entity.brain!.blackboard;
+    const selfPos = entity.getPos();
+
+    let playZoneCenter = bb.get<Vec3>('playZoneCenter');
+    if (!playZoneCenter) {
+      playZoneCenter = { ...selfPos };
+      bb.set('playZoneCenter', playZoneCenter);
+    }
+    const playZoneRadius = bb.get<number>('playZoneRadius') || 30;
+
+    const distToCenter = Math.hypot(selfPos.x - playZoneCenter.x, selfPos.z - playZoneCenter.z);
+    bb.set('isOutsidePlayZone', distToCenter > 15.0);
+
+    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
+    const heldSticks = aggSlots.filter((s) => {
+      if (s.isBroken || !s.slot.itemId) return false;
+      return entity.world.getComponent(s.slot.itemId, 'fetchStick') !== undefined;
+    });
+    const freeSlots = aggSlots.filter((s) => !s.isBroken && s.slot.itemId === null);
+
+    bb.set('heldStickCount', heldSticks.length);
+    bb.set('freeSlotCount', freeSlots.length);
+
+    const detectDist = bb.get<number>('detectDist') || LOGIC_CONFIG.detectDist;
+    const deliveredStickEntities = entity.world.getEntitiesWith('fetchStick', 'transform');
+
+    let nearestDeliveredId: string | null = null;
+    let minStickDist = detectDist;
+
+    for (const [sId, comps] of deliveredStickEntities) {
+      if (comps.fetchStick.ownerMasterId !== entity.id) continue;
+      if (comps.fetchStick.state !== 'delivered') continue;
+      if (entity.world.getComponent(sId, 'ownership')) continue;
+
+      const d = Math.hypot(comps.transform.x - selfPos.x, comps.transform.z - selfPos.z);
+      if (d <= minStickDist) {
+        minStickDist = d;
+        nearestDeliveredId = sId;
+      }
+    }
+
+    if (nearestDeliveredId) {
+      bb.set('nearestDeliveredStickId', nearestDeliveredId);
+    } else {
+      bb.remove('nearestDeliveredStickId');
+    }
+
+    const shouldThrow = heldSticks.length > 0 && (freeSlots.length === 0 || !nearestDeliveredId);
+    bb.set('shouldThrow', shouldThrow);
+
+    const dogIds = bb.get<string[]>('dogIds') || [];
+    let hasReadyDogNearby = false;
+    let isAnyDogTooFar = false;
+    let priorityDogId: string | null = null;
+    let maxDistFromCenter = -1;
+
+    for (const dId of dogIds) {
+      const dog = entity.utils.getEntity(dId);
+      if (!dog || !dog.isAlive) continue;
+
+      const dPos = dog.getPos();
+      const distToMaster = Math.hypot(dPos.x - selfPos.x, dPos.z - selfPos.z);
+      const distFromCenter = Math.hypot(dPos.x - playZoneCenter.x, dPos.z - playZoneCenter.z);
+
+      const dogSlots = getAggregatedInteractionSlots(entity.world, dId);
+      const dogHasItem = dogSlots.some((s) => s.slot.itemId !== null);
+
+      if (distToMaster <= 6.0 && !dogHasItem) {
+        hasReadyDogNearby = true;
+      }
+
+      const dogFollowDistance = bb.get<number>('dogFollowDistance') || 15.0;
+      if (distToMaster > dogFollowDistance) {
+        isAnyDogTooFar = true;
+      }
+
+      const dogHoldsStick = dogSlots.some((s) => {
+        if (!s.slot.itemId) return false;
+        const stick = entity.world.getComponent(s.slot.itemId, 'fetchStick');
+        return stick?.state === 'held_by_dog';
+      });
+
+      if (dogHoldsStick) {
+        priorityDogId = dId;
+      } else if (!priorityDogId && distFromCenter > maxDistFromCenter) {
+        maxDistFromCenter = distFromCenter;
+        priorityDogId = dId;
+      }
+    }
+
+    bb.set('hasReadyDogNearby', hasReadyDogNearby);
+    bb.set('isAnyDogTooFar', isAnyDogTooFar);
+    if (priorityDogId) {
+      bb.set('priorityDogId', priorityDogId);
+    } else {
+      bb.remove('priorityDogId');
+    }
+
+    const localTime = bb.get<number>('localTime') || 0;
+    const lastThrowTime = bb.get<number>('lastThrowTime') || -999;
+    const canThrowCooldown = localTime - lastThrowTime >= 3.0;
+
+    const isOutsidePlayZone = bb.get<boolean>('isOutsidePlayZone');
+    const isReadyToThrow = shouldThrow && canThrowCooldown && hasReadyDogNearby;
+    bb.set('isReadyToThrow', isReadyToThrow);
+
+    const canThrowNow = isReadyToThrow && !isOutsidePlayZone;
+    bb.set('canThrowNow', canThrowNow);
+  }
+}
+
+export class BTServiceFetchWatcher extends BTService {
+  public static readonly nodeName = 'Наблюдение собаки за апортом';
+  public static readonly description =
+    'Следит за брошенными палками хозяина с учетом дальности обнаружения и гистерезиса';
+
+  public static readonly defaultParams = {
+    ...BTService.defaultParams,
+    interval: 0.1,
+  };
+
+  private chaseTimer: number = 0;
+  private retargetTimer: number = 0;
+  private unreachableSticks: Map<string, number> = new Map();
 
   protected override params: typeof BTServiceFetchWatcher.defaultParams;
 
@@ -483,47 +631,142 @@ export class BTServiceFetchWatcher extends BTService {
 
   protected override onOpen(entity: EntityAdapter): void {
     super.onOpen(entity);
+    this.chaseTimer = 0;
+    this.retargetTimer = 0;
+    this.unreachableSticks.clear();
     this.tickService(entity);
   }
 
   protected tickService(entity: EntityAdapter): void {
     const bb = entity.brain!.blackboard;
-    let masterId = bb.get<string>('masterEntityId');
+    const selfPos = entity.getPos();
+    const localTime = bb.get<number>('localTime') || 0;
 
-    // Ищем хозяина (игрока) напрямую в ECS, если еще не найден
-    if (!masterId) {
-      const playerEntry = entity.world
-        .getEntitiesWith('aiStats', 'health')
-        .find(([, comp]) => comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive);
+    this.retargetTimer -= this.params.interval;
 
-      if (playerEntry) {
-        masterId = playerEntry[0];
-        bb.set('masterEntityId', masterId);
-      } else {
-        return; // Хозяина нет, апорт не работает
+    for (const [stickId, expiry] of this.unreachableSticks.entries()) {
+      if (localTime >= expiry) {
+        this.unreachableSticks.delete(stickId);
       }
     }
 
-    const fetchState = bb.get<string>('fetchState') || 'idle';
+    let masterId = bb.get<string>('masterEntityId');
+    if (!masterId) {
+      const masterEntry = entity.world
+        .getEntitiesWith('aiStats', 'health')
+        .find(
+          ([, comp]) => comp.aiStats.behavior.current === 'MasterFetchTree' && comp.health.isAlive
+        );
+      if (masterEntry) {
+        masterId = masterEntry[0];
+        bb.set('masterEntityId', masterId);
+      }
+    }
 
-    // Ищем брошенную палку напрямую в ECS среди предметов, если собака свободна
-    if (fetchState === 'idle') {
-      const thrownEntities = entity.world.getEntitiesWith('thrownObject', 'item');
-      for (const [itemId, comps] of thrownEntities) {
-        const thrownObj = comps.thrownObject;
+    const detectDist = bb.get<number>('detectDist') || LOGIC_CONFIG.detectDist;
 
-        // Если предмет брошен хозяином и еще не взят на прицел
-        if (thrownObj && thrownObj.throwerId === masterId && !(thrownObj as any).isFetchTarget) {
-          const physStats = entity.world.getComponent(itemId, 'physicsStats');
-          const weight = physStats?.weight.current ?? 1;
+    let isMasterSpotted = false;
+    if (masterId) {
+      const master = entity.utils.getEntity(masterId);
+      if (master && master.isAlive) {
+        const mPos = master.getPos();
+        const distToMaster = Math.hypot(mPos.x - selfPos.x, mPos.z - selfPos.z);
+        if (distToMaster <= detectDist) {
+          isMasterSpotted = true;
+        }
+      }
+    }
 
-          if (weight <= 5) {
-            (thrownObj as any).isFetchTarget = true;
-            bb.set('fetchTargetId', itemId);
-            bb.set('fetchState', 'chasing_item');
-            break;
+    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
+    const heldStickSlot = aggSlots.find((s) => {
+      if (!s.slot.itemId) return false;
+      const stick = entity.world.getComponent(s.slot.itemId, 'fetchStick');
+      return stick !== undefined;
+    });
+    const hasStickInMouth = !!heldStickSlot;
+
+    if (hasStickInMouth) {
+      this.chaseTimer = 0;
+      bb.remove('fetchTargetId');
+      if (isMasterSpotted) {
+        bb.set('fetchState', 'returning_to_master');
+      } else {
+        bb.set('fetchState', 'returning_to_zone');
+      }
+      return;
+    }
+
+    const stickEntities = entity.world.getEntitiesWith('fetchStick', 'transform');
+    const validCandidates: { id: string; dist: number }[] = [];
+
+    for (const [sId, comps] of stickEntities) {
+      if (masterId && comps.fetchStick.ownerMasterId !== masterId) continue;
+      if (comps.fetchStick.state !== 'thrown') continue;
+      if (entity.world.getComponent(sId, 'ownership')) continue;
+      if (this.unreachableSticks.has(sId)) continue;
+
+      const d = Math.hypot(comps.transform.x - selfPos.x, comps.transform.z - selfPos.z);
+      if (d <= detectDist) {
+        validCandidates.push({ id: sId, dist: d });
+      }
+    }
+
+    validCandidates.sort((a, b) => a.dist - b.dist);
+
+    let currentTargetId = bb.get<string | null>('fetchTargetId');
+    if (currentTargetId) {
+      const targetTrans = entity.world.getComponent(currentTargetId, 'transform');
+      const targetStick = entity.world.getComponent(currentTargetId, 'fetchStick');
+      const targetOwnership = entity.world.getComponent(currentTargetId, 'ownership');
+
+      const isCurrentStillValid =
+        targetTrans &&
+        targetStick?.state === 'thrown' &&
+        !targetOwnership &&
+        !this.unreachableSticks.has(currentTargetId);
+
+      if (!isCurrentStillValid) {
+        currentTargetId = null;
+        this.chaseTimer = 0;
+      } else {
+        const curDist = Math.hypot(targetTrans.x - selfPos.x, targetTrans.z - selfPos.z);
+        if (curDist > detectDist) {
+          currentTargetId = null;
+          this.chaseTimer = 0;
+        } else if (validCandidates.length > 0 && validCandidates[0].id !== currentTargetId) {
+          if (this.retargetTimer <= 0 && validCandidates[0].dist < curDist - 3.0) {
+            currentTargetId = validCandidates[0].id;
+            this.retargetTimer = 0.6;
+            this.chaseTimer = 0;
           }
         }
+      }
+    }
+
+    if (!currentTargetId && validCandidates.length > 0) {
+      currentTargetId = validCandidates[0].id;
+      this.retargetTimer = 0.6;
+      this.chaseTimer = 0;
+    }
+
+    if (currentTargetId) {
+      this.chaseTimer += this.params.interval;
+      if (this.chaseTimer > 15.0) {
+        this.unreachableSticks.set(currentTargetId, localTime + 25.0);
+        currentTargetId = null;
+        this.chaseTimer = 0;
+      }
+    }
+
+    if (currentTargetId) {
+      bb.set('fetchTargetId', currentTargetId);
+      bb.set('fetchState', 'chasing_item');
+    } else {
+      bb.remove('fetchTargetId');
+      if (isMasterSpotted) {
+        bb.set('fetchState', 'following_master');
+      } else {
+        bb.set('fetchState', 'returning_to_zone');
       }
     }
   }

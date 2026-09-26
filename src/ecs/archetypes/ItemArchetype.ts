@@ -67,6 +67,10 @@ export function assembleItem(
     world.addComponent(id, 'ownership', config.ownership);
   }
 
+  if (config.fetchStick) {
+    world.addComponent(id, 'fetchStick', { ...config.fetchStick });
+  }
+
   // 4.6. Здоровье (Структурная прочность)
   const maxHp = config.health?.maxHp ?? BALANCE_CONFIG.items.defaultMaxHp;
   world.addComponent(id, 'health', {

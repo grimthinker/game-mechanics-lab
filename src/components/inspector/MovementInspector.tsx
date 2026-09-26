@@ -32,7 +32,7 @@ export const MovementInspector: React.FC<MovementInspectorProps> = ({
         runSpeedMultiplier: comp.runSpeedMultiplier,
         crouchSpeedMultiplier: comp.crouchSpeedMultiplier,
         proneSpeedMultiplier: comp.proneSpeedMultiplier ?? 0.2,
-        walkSpeedMultiplier: comp.walkSpeedMultiplier ?? 0.5,
+        walkSpeedMultiplier: comp.walkSpeedMultiplier ?? 0.4,
         runTurnMultiplier: comp.runTurnMultiplier ?? 0.7,
         crouchTurnMultiplier: comp.crouchTurnMultiplier,
         proneTurnMultiplier: comp.proneTurnMultiplier ?? 0.3,

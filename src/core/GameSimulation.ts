@@ -337,61 +337,122 @@ export class GameSimulation {
 
     this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
 
-    const playerId = this.entityFactory.spawnModularHumanoid(
+    // 1. Игрок (без палки в руке, не участвует в апорте)
+    this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx, y: by, z: bz },
+      { x: bx - 4.0, y: by, z: bz },
       'PlayerTree',
       'Игрок'
     );
 
-    // Выдаем игроку палку в правую руку для игры с собакой
-    const playerParts = getAnatomyParts(this.world, playerId);
-    const rightHandPartId = playerParts.find((pId) => {
+    // 2. Хозяин (центр игровой зоны)
+    const masterPos: Vec3 = { x: bx, y: by, z: bz };
+    const masterId = this.entityFactory.spawnModularHumanoid(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      masterPos,
+      'MasterFetchTree',
+      'Хозяин'
+    );
+
+    // 3. Выдаем Хозяину по одной палке в левую и в правую руку
+    const masterParts = getAnatomyParts(this.world, masterId);
+    const leftHandPartId = masterParts.find((pId) => {
+      const slot = this.world.getComponent(pId, 'interactionSlots');
+      return slot && slot.slotKind === 'left_hand';
+    });
+    const rightHandPartId = masterParts.find((pId) => {
       const slot = this.world.getComponent(pId, 'interactionSlots');
       return slot && slot.slotKind === 'right_hand';
     });
 
-    if (rightHandPartId) {
-      const stickId = this.spawnEntity(
-        {
-          tag: { archetype: 'item', subType: 'weapon' },
-          meta: { name: 'Палка для апорта', entityType: 'item' },
-          item: {
-            name: 'Палка для апорта',
-            type: 'weapon',
-            maxStack: 1,
-            count: 1,
-            size: 4,
-            equipTypes: [],
-            equippable: false,
-            equipTimeMultiplier: 1.0,
-          },
-          physics: { radius: 0.15, weight: 0.5, isSolid: true },
-          weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
-          weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
-          ownership: { ownerId: rightHandPartId, status: 'equipped' },
-        },
-        { x: bx, y: by, z: bz }
-      );
-      const slot = this.world.getComponent(rightHandPartId, 'interactionSlots');
-      if (slot) {
-        slot.itemId = stickId;
-      }
+    const createStickConfig = (ownerPartId: string, name: string): EntityConfig => ({
+      tag: { archetype: 'item', subType: 'weapon' },
+      meta: { name, entityType: 'item' },
+      item: {
+        name,
+        type: 'weapon',
+        maxStack: 1,
+        count: 1,
+        size: 4,
+        equipTypes: [],
+        equippable: false,
+        equipTimeMultiplier: 1.0,
+      },
+      physics: { radius: 0.15, weight: 0.5, isSolid: true },
+      weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
+      weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
+      ownership: { ownerId: ownerPartId, status: 'equipped' },
+      fetchStick: {
+        state: 'held_by_master',
+        ownerMasterId: masterId,
+        lastCarrierDogId: null,
+      },
+    });
+
+    if (leftHandPartId) {
+      const stickLeftId = this.spawnEntity(createStickConfig(leftHandPartId, 'Палка 1'), masterPos);
+      const slot = this.world.getComponent(leftHandPartId, 'interactionSlots');
+      if (slot) slot.itemId = stickLeftId;
     }
 
-    this.entityFactory.spawnModularCreature(
+    if (rightHandPartId) {
+      const stickRightId = this.spawnEntity(
+        createStickConfig(rightHandPartId, 'Палка 2'),
+        masterPos
+      );
+      const slot = this.world.getComponent(rightHandPartId, 'interactionSlots');
+      if (slot) slot.itemId = stickRightId;
+    }
+
+    // 4. Спавним 3 собак
+    const dog1Id = this.entityFactory.spawnModularCreature(
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx + 1.5, y: by, z: bz + 1.5 },
+      { x: bx + 2.0, y: by, z: bz + 1.5 },
       CREATURE_BLUEPRINTS.quadruped,
       'DogFetchTree',
-      'Собака'
+      'Собака 1'
     );
 
-    this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz });
+    const dog2Id = this.entityFactory.spawnModularCreature(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      { x: bx + 1.0, y: by, z: bz - 2.0 },
+      CREATURE_BLUEPRINTS.quadruped,
+      'DogFetchTree',
+      'Собака 2'
+    );
+
+    const dog3Id = this.entityFactory.spawnModularCreature(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      { x: bx - 1.5, y: by, z: bz + 2.5 },
+      CREATURE_BLUEPRINTS.quadruped,
+      'DogFetchTree',
+      'Собака 3'
+    );
+
+    const allDogIds = [dog1Id, dog2Id, dog3Id];
+
+    // 5. Связываем собак с хозяином и передаем параметры игровой зоны
+    this.app.updateEntityBlackboard(masterId, 'dogIds', allDogIds);
+    this.app.updateEntityBlackboard(masterId, 'playZoneCenter', masterPos);
+    this.app.updateEntityBlackboard(masterId, 'playZoneRadius', 30);
+
+    for (const dId of allDogIds) {
+      this.app.updateEntityBlackboard(dId, 'masterEntityId', masterId);
+      this.app.updateEntityBlackboard(dId, 'playZoneCenter', masterPos);
+      this.app.updateEntityBlackboard(dId, 'playZoneRadius', 30);
+    }
+
+    // this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz });
     this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx - 4.5, y: by, z: bz });
     this.spawnEntity(
       createZoneConfig('repel', 2.5, 20, 'Зона отталкивания', false, false, false, true, 50, 0),
@@ -426,26 +487,6 @@ export class GameSimulation {
         false
       ),
       { x: bx + 4.5, y: by, z: bz + 4.5 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'obstacle' },
-        meta: { name: 'Каменная стена', entityType: 'obstacle', destructible: true },
-        health: { hp: 100, maxHp: 100 },
-        physics: {
-          radius: 2.0,
-          weight: 1000,
-          isSolid: true,
-          points: [
-            { x: -2, y: -0.5 },
-            { x: 2, y: -0.5 },
-            { x: 2, y: 0.5 },
-            { x: -2, y: 0.5 },
-          ],
-        },
-      },
-      { x: bx, y: by, z: bz + 4.0 }
     );
 
     const itemsX = bx - 1.5;

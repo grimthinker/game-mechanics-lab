@@ -11,7 +11,9 @@ export * from './components/inventory';
 export * from './components/anatomy';
 export * from './components/rendering';
 export * from './components/terrain';
+export * from './components/fetch';
 
+import { FetchStickComponent } from './components/fetch';
 import { TerrainComponent } from './components/terrain';
 import {
   TagComponent,
@@ -133,6 +135,7 @@ export interface EntityComponents {
   locomotionState?: LocomotionStateComponent;
   terrain?: TerrainComponent;
   thrownObject?: ThrownObjectComponent;
+  fetchStick?: FetchStickComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -179,6 +182,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'locomotionState',
   'terrain',
   'thrownObject',
+  'fetchStick',
 ] as const;
 
 export interface EntityConfig {
@@ -217,4 +221,5 @@ export interface EntityConfig {
   perception?: PerceptionComponent;
   terrain?: TerrainComponent;
   thrownObject?: ThrownObjectComponent;
+  fetchStick?: FetchStickComponent;
 }

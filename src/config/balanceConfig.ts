@@ -23,9 +23,9 @@ export const BALANCE_CONFIG = {
     /** Множитель скорости передвижения при беге (спринте) */
     runSpeedMultiplier: 1.5,
     /** Множитель скорости передвижения в режиме присяда */
-    crouchSpeedMultiplier: 0.5,
+    crouchSpeedMultiplier: 0.45,
     /** Множитель скорости передвижения при замедленном шаге */
-    walkSpeedMultiplier: 0.5,
+    walkSpeedMultiplier: 0.4,
 
     /** Множитель скорости поворота корпуса при беге */
     runTurnMultiplier: 0.8,

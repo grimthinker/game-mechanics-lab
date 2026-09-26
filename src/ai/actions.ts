@@ -1,11 +1,12 @@
 import { EntityAdapter } from '../EntityAdapter';
-import { Point } from '../types';
+import { Point, Vec3 } from '../types';
 import { vec2_distance_to, Radians } from '../utils';
 import { LOGIC_CONFIG } from './config';
 import { NodeStatus, BTAction, PathKeys, BTSimpleAction } from './core';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
 
 import { NodeBBSchema } from './schema';
+import { getTerrainHeightAt } from '../ecs/types';
 
 export class BTConditionValidTarget extends BTSimpleAction {
   public static readonly nodeName = 'Проверка валидности цели';
@@ -65,14 +66,19 @@ export class BTConditionEngaged extends BTSimpleAction {
   protected onAbort() {}
 }
 
+type MovementGait = 'sprint' | 'jog' | 'walk';
+
 export class BTActionPursue extends BTAction {
   public static readonly defaultParams = {
     stopDist: LOGIC_CONFIG.followStopDist,
     sprintMinDistance: undefined as number | undefined,
+    walkDistance: undefined as number | undefined,
+    hysteresis: 1.0,
   };
   private params: typeof BTActionPursue.defaultParams;
   private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('currentPath');
   private stopDistSq: number;
+  private currentGait: MovementGait = 'jog';
 
   public static readonly nodeName = 'Преследовать цель';
   public static readonly description = 'Преследовать цель, если она есть и есть путь currentPath';
@@ -89,6 +95,60 @@ export class BTActionPursue extends BTAction {
     this.stopDistSq = this.params.stopDist ** 2;
   }
 
+  protected onOpen(_entity: EntityAdapter): void {
+    this.currentGait = 'jog';
+  }
+
+  private updateGait(dist: number): MovementGait {
+    const sprintMin = this.params.sprintMinDistance;
+    const walkDist = this.params.walkDistance;
+    const h = this.params.hysteresis ?? 1.0;
+
+    if (sprintMin !== undefined && walkDist !== undefined) {
+      if (this.currentGait === 'sprint') {
+        if (dist < walkDist - h) {
+          this.currentGait = 'walk';
+        } else if (dist < sprintMin - h) {
+          this.currentGait = 'jog';
+        }
+      } else if (this.currentGait === 'walk') {
+        if (dist > sprintMin + h) {
+          this.currentGait = 'sprint';
+        } else if (dist > walkDist + h) {
+          this.currentGait = 'jog';
+        }
+      } else {
+        if (dist > sprintMin + h) {
+          this.currentGait = 'sprint';
+        } else if (dist < walkDist - h) {
+          this.currentGait = 'walk';
+        }
+      }
+      return this.currentGait;
+    }
+
+    if (walkDist !== undefined) {
+      if (this.currentGait === 'walk') {
+        if (dist > walkDist + h) this.currentGait = 'jog';
+      } else {
+        if (dist < walkDist - h) this.currentGait = 'walk';
+      }
+      return this.currentGait;
+    }
+
+    if (sprintMin !== undefined) {
+      if (sprintMin === 0) return 'sprint';
+      if (this.currentGait === 'sprint') {
+        if (dist < sprintMin - h) this.currentGait = 'jog';
+      } else {
+        if (dist > sprintMin + h) this.currentGait = 'sprint';
+      }
+      return this.currentGait;
+    }
+
+    return 'jog';
+  }
+
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
     const targetId = bb.get('targetId');
@@ -103,13 +163,24 @@ export class BTActionPursue extends BTAction {
     const dx = targetPos.x - selfPos.x;
     const dz = targetPos.z - selfPos.z;
     const distSq = dx * dx + dz * dz;
+    const dist = Math.hypot(dx, dz);
 
     const input = entity.input;
+    const hasCustomGait =
+      this.params.sprintMinDistance !== undefined || this.params.walkDistance !== undefined;
 
-    if (this.params.sprintMinDistance !== undefined && input) {
-      const dist = Math.hypot(dx, dz);
-      input.isRunning =
-        this.params.sprintMinDistance === 0 ? true : dist > this.params.sprintMinDistance;
+    if (input && hasCustomGait) {
+      const gait = this.updateGait(dist);
+      if (gait === 'sprint') {
+        input.isRunning = true;
+        input.isSlowWalking = false;
+      } else if (gait === 'walk') {
+        input.isRunning = false;
+        input.isSlowWalking = true;
+      } else {
+        input.isRunning = false;
+        input.isSlowWalking = false;
+      }
     }
 
     if (distSq <= this.stopDistSq) {
@@ -121,8 +192,12 @@ export class BTActionPursue extends BTAction {
         input.turnDirection = 0;
         input.turnRatio = 0;
         input.targetLookAngle = undefined;
-        input.isRunning = false;
+        if (hasCustomGait) {
+          input.isRunning = false;
+          input.isSlowWalking = false;
+        }
       }
+      this.currentGait = 'jog';
       return NodeStatus.SUCCESS;
     }
 
@@ -130,7 +205,6 @@ export class BTActionPursue extends BTAction {
     if (path && path.length > 0) {
       this.movementNode.tick(entity);
     } else {
-      const dist = Math.hypot(dx, dz);
       if (dist > 0.001 && input && entity.isAlive) {
         input.desiredMoveVector = { x: dx / dist, z: dz / dist };
         input.targetLookAngle = Math.atan2(dz, dx) as Radians;
@@ -148,9 +222,13 @@ export class BTActionPursue extends BTAction {
   protected stopAction(entity: EntityAdapter): void {
     entity.brain!.blackboard.remove('currentPath');
     this.movementNode.abort(entity);
-    if (entity.input) {
+    const hasCustomGait =
+      this.params.sprintMinDistance !== undefined || this.params.walkDistance !== undefined;
+    if (entity.input && hasCustomGait) {
       entity.input.isRunning = false;
+      entity.input.isSlowWalking = false;
     }
+    this.currentGait = 'jog';
   }
 }
 
@@ -358,11 +436,16 @@ export class BTActionRotateToPos extends BTAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const targetId = bb.get('targetId');
-    if (targetId === undefined) return NodeStatus.FAILURE;
+    const targetId = bb.get<string | undefined>('targetId');
+    let targetPos: Vec3 | undefined;
 
-    const target = entity.utils.getEntity(targetId);
-    const targetPos = target?.getPos();
+    if (targetId !== undefined) {
+      const target = entity.utils.getEntity(targetId);
+      targetPos = target?.getPos();
+    } else {
+      targetPos = bb.get<Vec3>('throwTargetPos') ?? bb.get<Vec3>('targetPos');
+    }
+
     if (!targetPos) return NodeStatus.FAILURE;
 
     const selfPos = entity.getPos();
@@ -372,8 +455,8 @@ export class BTActionRotateToPos extends BTAction {
     if (dx === 0 && dz === 0) return NodeStatus.SUCCESS;
 
     const dist = Math.hypot(dx, dz);
-    // Если цель отдалилась за пределы дистанции боя — прерываем поворот и возвращаем FAILURE
-    if (dist > LOGIC_CONFIG.followUpDist) {
+    // Если цель-сущность отдалилась за пределы дистанции боя — прерываем поворот
+    if (targetId !== undefined && dist > LOGIC_CONFIG.followUpDist) {
       bb.set('isEngaged', false);
       this.stopAction(entity);
       return NodeStatus.FAILURE;
@@ -589,29 +672,62 @@ export class BTConditionFetchState extends BTSimpleAction {
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
     const currentState = bb.get<string>('fetchState') || 'idle';
-    if (currentState !== this.params.expectedState) {
-      return NodeStatus.FAILURE;
+    return currentState === this.params.expectedState ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTActionMoveToPos extends BTAction {
+  public static readonly nodeName = 'Двигаться к позиции';
+  public static readonly description = 'Движется к координатам Vec3 из блекборда';
+  public static readonly defaultParams = { posKey: 'playZoneCenter', stopDist: 2.0, sprint: false };
+
+  private params: typeof BTActionMoveToPos.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionMoveToPos.defaultParams>) {
+    super();
+    this.params = { ...BTActionMoveToPos.defaultParams, ...params };
+  }
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const targetPos = bb.get<Vec3>(this.params.posKey);
+    if (!targetPos) return NodeStatus.FAILURE;
+
+    const selfPos = entity.getPos();
+    const dx = targetPos.x - selfPos.x;
+    const dz = targetPos.z - selfPos.z;
+    const dist = Math.hypot(dx, dz);
+
+    if (dist <= this.params.stopDist) {
+      if (entity.input) {
+        entity.input.desiredMoveVector = null;
+        entity.input.moveForward = 0;
+        entity.input.moveStrafe = 0;
+        entity.input.isMovingForward = false;
+        entity.input.isRunning = false;
+      }
+      return NodeStatus.SUCCESS;
     }
 
-    if (this.params.expectedState === 'chasing_item') {
-      const targetId = bb.get<string>('fetchTargetId');
-      if (!targetId || !entity.world.getEntity(targetId)) {
-        bb.set('fetchState', 'idle');
-        bb.remove('fetchTargetId');
-        return NodeStatus.FAILURE;
-      }
-    } else if (this.params.expectedState === 'returning') {
-      const targetId = bb.get<string>('fetchTargetId');
-      const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
-      const hasItemInMouth = aggSlots.some((s) => s.slot.itemId === targetId);
-      if (!hasItemInMouth) {
-        bb.set('fetchState', 'idle');
-        bb.remove('fetchTargetId');
-        return NodeStatus.FAILURE;
+    if (entity.input && entity.isAlive) {
+      entity.input.desiredMoveVector = { x: dx / dist, z: dz / dist };
+      entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+      if (this.params.sprint) {
+        entity.input.isRunning = true;
       }
     }
 
-    return NodeStatus.SUCCESS;
+    return NodeStatus.RUNNING;
+  }
+
+  protected stopAction(entity: EntityAdapter): void {
+    if (entity.input) {
+      entity.input.desiredMoveVector = null;
+      entity.input.moveForward = 0;
+      entity.input.moveStrafe = 0;
+      entity.input.isMovingForward = false;
+      entity.input.isRunning = false;
+    }
   }
 }
 
@@ -654,12 +770,16 @@ export class BTActionFetchPickup extends BTAction {
     const bb = entity.brain!.blackboard;
     const targetId = bb.get<string>('fetchTargetId');
     if (!targetId || !entity.world.getEntity(targetId)) {
-      bb.set('fetchState', 'idle');
       bb.remove('fetchTargetId');
       return NodeStatus.FAILURE;
     }
 
-    // Ожидаем завершения очереди подбора в ECS
+    const ownership = entity.world.getComponent(targetId, 'ownership');
+    if (ownership && ownership.ownerId !== entity.id) {
+      bb.remove('fetchTargetId');
+      return NodeStatus.FAILURE;
+    }
+
     if (entity.world.getComponent(entity.id, 'pickupIntent')) {
       return NodeStatus.RUNNING;
     }
@@ -672,7 +792,11 @@ export class BTActionFetchPickup extends BTAction {
     const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
     const alreadyHeld = aggSlots.some((s) => s.slot.itemId === targetId);
     if (alreadyHeld) {
-      bb.set('fetchState', 'returning');
+      const fetchStick = entity.world.getComponent(targetId, 'fetchStick');
+      if (fetchStick) {
+        fetchStick.state = 'held_by_dog';
+        fetchStick.lastCarrierDogId = entity.id;
+      }
       return NodeStatus.SUCCESS;
     }
 
@@ -724,7 +848,6 @@ export class BTActionFetchDeliver extends BTAction {
     );
 
     if (!slotWithItem) {
-      bb.set('fetchState', 'idle');
       bb.remove('fetchTargetId');
       return NodeStatus.SUCCESS;
     }
@@ -747,10 +870,312 @@ export class BTActionFetchDeliver extends BTAction {
       slotIndex: slotWithItem.globalSlotIndex,
     });
 
-    return NodeStatus.RUNNING;
+    const itemEntityId = slotWithItem.slot.itemId;
+    if (itemEntityId) {
+      const fetchStick = entity.world.getComponent(itemEntityId, 'fetchStick');
+      if (fetchStick) {
+        fetchStick.state = 'delivered';
+      }
+    }
+
+    bb.remove('fetchTargetId');
+    return NodeStatus.SUCCESS;
   }
 
   protected stopAction(_entity: EntityAdapter): void {}
+}
+
+export class BTActionDogDropAtZone extends BTAction {
+  public static readonly nodeName = 'Положить палку в центре зоны';
+  public static readonly description = 'Сбрасывает палку на землю в зоне игры при потере хозяина';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
+    const slotWithItem = aggSlots.find((s) => s.slot.itemId !== null);
+
+    if (!slotWithItem) {
+      bb.remove('fetchTargetId');
+      return NodeStatus.SUCCESS;
+    }
+
+    if (entity.world.getComponent(entity.id, 'dropItemIntent')) {
+      return NodeStatus.RUNNING;
+    }
+
+    const currentAction = entity.world.getComponent(entity.id, 'interactionAction');
+    if (currentAction && currentAction.type === 'drop') {
+      return NodeStatus.RUNNING;
+    }
+
+    if (entity.input) {
+      entity.input.desiredMoveVector = null;
+      entity.input.isMovingForward = false;
+    }
+
+    entity.world.addComponent(entity.id, 'dropItemIntent', {
+      slotIndex: slotWithItem.globalSlotIndex,
+    });
+
+    const itemEntityId = slotWithItem.slot.itemId;
+    if (itemEntityId) {
+      const fetchStick = entity.world.getComponent(itemEntityId, 'fetchStick');
+      if (fetchStick) {
+        fetchStick.state = 'delivered';
+      }
+    }
+
+    bb.remove('fetchTargetId');
+    return NodeStatus.SUCCESS;
+  }
+
+  protected stopAction(_entity: EntityAdapter): void {}
+}
+
+export class BTConditionMasterShouldThrow extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: пора кидать';
+  public static readonly description =
+    'Проверяет, должен ли хозяин кидать палки (слоты полны или нет палок на земле)';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    return bb.get('shouldThrow') ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTConditionMasterOutsidePlayZone extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: вне зоны игры';
+  public static readonly description =
+    'Проверяет, находится ли хозяин слишком далеко от центра зоны';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    return bb.get('isOutsidePlayZone') ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTConditionMasterReadyToThrow extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: готов к броску с собакой';
+  public static readonly description =
+    'Проверяет наличие палки, кулдаун 3с и присутствие свободной собаки рядом';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    return bb.get('isReadyToThrow') ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTConditionMasterCanThrowNow extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: готов бросить';
+  public static readonly description = 'Проверяет кулдаун 3с и наличие свободной собаки рядом';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    return bb.get('canThrowNow') ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTActionMasterCalculateThrowTarget extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: расчет точки броска';
+  public static readonly description = 'Выбирает случайную точку на расстоянии 10..22м от хозяина';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const selfPos = entity.getPos();
+
+    const minR = 10.0;
+    const maxR = 22.0;
+    const r = minR + Math.random() * (maxR - minR);
+    const angle = Math.random() * Math.PI * 2;
+
+    const tx = selfPos.x + Math.cos(angle) * r;
+    const tz = selfPos.z + Math.sin(angle) * r;
+
+    let ty = selfPos.y;
+    const terrainEntities = entity.world.getEntitiesWith('terrain');
+    if (terrainEntities.length > 0) {
+      const terrainFloorY = getTerrainHeightAt(terrainEntities[0][1].terrain, tx, tz);
+      if (terrainFloorY !== null) {
+        ty = terrainFloorY;
+      }
+    }
+
+    const throwTarget: Vec3 = { x: tx, y: ty, z: tz };
+    bb.set('throwTargetPos', throwTarget);
+
+    if (entity.input) {
+      entity.input.targetLookAngle = angle as Radians;
+    }
+
+    return NodeStatus.SUCCESS;
+  }
+}
+
+export class BTActionMasterThrowStick extends BTAction {
+  public static readonly nodeName = 'Хозяин: бросок палки';
+  public static readonly description = 'Бросает палку из свободного слота в рассчитанную точку';
+
+  private hasStarted = false;
+
+  protected onOpen(entity: EntityAdapter): void {
+    this.hasStarted = false;
+  }
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const throwTargetPos = bb.get<Vec3>('throwTargetPos');
+    if (!throwTargetPos) return NodeStatus.FAILURE;
+
+    if (entity.world.getComponent(entity.id, 'throwItemIntent')) {
+      return NodeStatus.RUNNING;
+    }
+
+    const currentAction = entity.world.getComponent(entity.id, 'interactionAction');
+    if (currentAction && currentAction.type === 'throw') {
+      this.hasStarted = true;
+      return NodeStatus.RUNNING;
+    }
+
+    if (this.hasStarted) {
+      const localTime = bb.get<number>('localTime') || 0;
+      bb.set('lastThrowTime', localTime);
+      bb.remove('throwTargetPos');
+      return NodeStatus.SUCCESS;
+    }
+
+    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
+    const stickSlot = aggSlots.find((s) => {
+      if (s.isBroken || !s.slot.itemId) return false;
+      return entity.world.getComponent(s.slot.itemId, 'fetchStick') !== undefined;
+    });
+
+    if (!stickSlot || !stickSlot.slot.itemId) {
+      return NodeStatus.FAILURE;
+    }
+
+    entity.world.addComponent(entity.id, 'throwItemIntent', {
+      slotIndex: stickSlot.globalSlotIndex,
+      partId: stickSlot.partId,
+      targetPos: throwTargetPos,
+    });
+
+    return NodeStatus.RUNNING;
+  }
+
+  protected stopAction(entity: EntityAdapter): void {
+    this.hasStarted = false;
+  }
+}
+
+export class BTConditionMasterCanPickupDeliveredStick extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: есть палка для подбора';
+  public static readonly description = 'Проверяет свободные слоты и наличие доставленной палки';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const freeSlots = bb.get<number>('freeSlotCount') || 0;
+    const nearestStickId = bb.get<string>('nearestDeliveredStickId');
+    return freeSlots > 0 && !!nearestStickId ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTActionMasterPickupStick extends BTAction {
+  public static readonly nodeName = 'Хозяин: подбор палки';
+  public static readonly description = 'Подбирает принесенную палку в свободный слот';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const targetId = bb.get<string>('nearestDeliveredStickId');
+    if (!targetId || !entity.world.getEntity(targetId)) {
+      bb.remove('nearestDeliveredStickId');
+      return NodeStatus.FAILURE;
+    }
+
+    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
+    const isAlreadyHeld = aggSlots.some((s) => s.slot.itemId === targetId);
+    if (isAlreadyHeld) {
+      bb.remove('nearestDeliveredStickId');
+      return NodeStatus.SUCCESS;
+    }
+
+    if (entity.world.getComponent(entity.id, 'pickupIntent')) {
+      return NodeStatus.RUNNING;
+    }
+
+    const currentAction = entity.world.getComponent(entity.id, 'interactionAction');
+    if (currentAction && currentAction.type === 'pickup') {
+      return NodeStatus.RUNNING;
+    }
+
+    const targetTrans = entity.world.getComponent(targetId, 'transform');
+    if (!targetTrans) return NodeStatus.FAILURE;
+
+    const selfPos = entity.getPos();
+    const dist = Math.hypot(targetTrans.x - selfPos.x, targetTrans.z - selfPos.z);
+
+    const freeSlot = aggSlots.find((s) => !s.isBroken && s.slot.itemId === null);
+    if (!freeSlot) return NodeStatus.FAILURE;
+
+    const myRadius = entity.radius;
+    const targetPhysStats = entity.world.getComponent(targetId, 'physicsStats');
+    const targetRadius = targetPhysStats?.radius.current ?? 0.15;
+    const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
+    const interactDist = freeSlot.slot.interactDist ?? 0.6;
+
+    if (distBetweenBorders <= interactDist + 0.1) {
+      if (entity.input) {
+        entity.input.desiredMoveVector = null;
+        entity.input.isMovingForward = false;
+        const dx = targetTrans.x - selfPos.x;
+        const dz = targetTrans.z - selfPos.z;
+        if (Math.hypot(dx, dz) > 0.001) {
+          entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+        }
+      }
+      entity.world.addComponent(entity.id, 'pickupIntent', { targetItemId: targetId });
+      return NodeStatus.RUNNING;
+    }
+
+    return NodeStatus.FAILURE;
+  }
+
+  protected stopAction(_entity: EntityAdapter): void {}
+}
+
+export class BTConditionMasterShouldFollowDog extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: собака слишком далеко';
+  public static readonly description =
+    'Проверяет удаленность собаки более 30м при наличии приоритетной цели';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const isAnyDogTooFar = bb.get<boolean>('isAnyDogTooFar');
+    const priorityDogId = bb.get<string>('priorityDogId');
+    return isAnyDogTooFar && !!priorityDogId ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTActionMasterLookAtDog extends BTSimpleAction {
+  public static readonly nodeName = 'Хозяин: взгляд на собаку';
+  public static readonly description = 'Поворачивается в сторону приоритетной собаки';
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const dogId = bb.get<string>('priorityDogId');
+    if (!dogId) return NodeStatus.FAILURE;
+
+    const dogTrans = entity.world.getComponent(dogId, 'transform');
+    if (!dogTrans || !entity.input) return NodeStatus.FAILURE;
+
+    const selfPos = entity.getPos();
+    const dx = dogTrans.x - selfPos.x;
+    const dz = dogTrans.z - selfPos.z;
+
+    if (Math.hypot(dx, dz) > 0.001) {
+      entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+    }
+    return NodeStatus.SUCCESS;
+  }
 }
 
 export class BTConditionDistance extends BTSimpleAction {

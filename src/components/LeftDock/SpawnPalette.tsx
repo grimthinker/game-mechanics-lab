@@ -41,6 +41,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           onClick: () => onSelectModular('PlayerTree', t('palette.player'), 'humanoid'),
         },
         {
+          id: 'creature_master',
+          name: t('trees.MasterFetchTree'),
+          description: 'Гуманоид, играющий в апорт с собаками',
+          icon: '🚶',
+          onClick: () => onSelectModular('MasterFetchTree', 'Хозяин', 'humanoid'),
+        },
+        {
           id: 'creature_attacker',
           name: t('palette.attacker'),
           description: t('palette.attackerDesc'),

@@ -341,6 +341,7 @@ export const ru = {
     AttackerTree: 'Атакующий бот',
     FollowerTree: 'Бот-спутник',
     DogFetchTree: 'Собака (Апорт)',
+    MasterFetchTree: 'Хозяин (Апорт)',
     CombatTree: 'Боевой режим',
     IdleTree: 'Бездействие',
   },

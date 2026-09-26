@@ -1,4 +1,4 @@
-import { EntityConfig } from '../types';
+import { EntityConfig, MovementConfig } from '../types';
 
 export type BodyStructureType = 'humanoid' | 'quadruped' | 'arachnid';
 
@@ -26,6 +26,7 @@ export interface CreatureBodyBlueprint {
   id: BodyStructureType;
   name: string;
   rigAsset?: string;
+  movement?: Partial<MovementConfig>;
   parts: BlueprintPartDef[];
   connections: BlueprintConnectionDef[];
   defaultItems?: BlueprintItemDef[];

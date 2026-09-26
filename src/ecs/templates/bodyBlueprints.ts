@@ -75,7 +75,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'hand_left',
           name: 'Левая рука',
-          interactDist: 0.4,
+          interactDist: 0.6,
           strength: 15,
           itemId: null,
           rigSocketName: 'LeftHandSocket',
@@ -104,7 +104,7 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
         interactionSlots: {
           id: 'hand_right',
           name: 'Правая рука',
-          interactDist: 0.4,
+          interactDist: 0.6,
           strength: 15,
           itemId: null,
           rigSocketName: 'RightHandSocket',
@@ -194,6 +194,11 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'quadruped',
   name: 'Четвероногий',
   rigAsset: 'proc://rig/quadruped',
+  movement: {
+    maxSpeed: 5.5, // Базовая скорость собаки (5.5 м/с против 4.5 м/с у человека)
+    runSpeedMultiplier: 1.8, // Быстрый спринт (9.9 м/с)
+    walkSpeedMultiplier: 0.4, // Спокойный шаг (2.2 м/с)
+  },
   parts: [
     {
       key: 'torso',
@@ -363,6 +368,11 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
 export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
   id: 'arachnid',
   name: 'Паукообразный',
+  movement: {
+    maxSpeed: 4.8,
+    runSpeedMultiplier: 1.6,
+    walkSpeedMultiplier: 0.5,
+  },
   parts: [
     {
       key: 'prosoma',

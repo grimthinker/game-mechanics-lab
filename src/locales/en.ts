@@ -340,6 +340,7 @@ export const en = {
     AttackerTree: 'Attacker Bot',
     FollowerTree: 'Follower Bot',
     DogFetchTree: 'Dog (Fetch)',
+    MasterFetchTree: 'Master (Fetch)',
     CombatTree: 'Combat Mode',
     IdleTree: 'Idle',
   },

@@ -15,7 +15,19 @@ import {
   BTActionSetTarget,
   BTActionFetchPickup,
   BTActionFetchDeliver,
+  BTActionDogDropAtZone,
   BTConditionDistance,
+  BTActionMoveToPos,
+  BTConditionMasterShouldThrow,
+  BTConditionMasterReadyToThrow,
+  BTConditionMasterOutsidePlayZone,
+  BTConditionMasterCanThrowNow,
+  BTActionMasterCalculateThrowTarget,
+  BTActionMasterThrowStick,
+  BTConditionMasterCanPickupDeliveredStick,
+  BTActionMasterPickupStick,
+  BTConditionMasterShouldFollowDog,
+  BTActionMasterLookAtDog,
 } from './actions';
 import { BTSelector, BTReactiveSelector, BTSequence } from './composites';
 import { LOGIC_CONFIG } from './config';
@@ -27,6 +39,8 @@ import {
   BTServiceInputListener,
   BTServiceInputController,
   BTServiceFetchWatcher,
+  BTServiceEnforceWalkMode,
+  BTServiceFetchMasterWatcher,
 } from './services';
 import { t } from '../locales';
 
@@ -35,6 +49,7 @@ export const BEHAVIOR_TREES: Record<string, () => BTNode> = {
   AttackerTree: () => AttackerTree(),
   FollowerTree: () => FollowerTree(),
   DogFetchTree: () => DogFetchTree(),
+  MasterFetchTree: () => MasterFetchTree(),
   CombatTree: () => CombatTree(),
   IdleTree: () => new BTWait({ duration: 1 }),
 };
@@ -51,6 +66,9 @@ export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
   },
   get DogFetchTree() {
     return t('trees.DogFetchTree');
+  },
+  get MasterFetchTree() {
+    return t('trees.MasterFetchTree');
   },
   get CombatTree() {
     return t('trees.CombatTree');
@@ -129,21 +147,35 @@ export function DogFetchTree(): BTNode {
   return new BTServiceSyncStats(
     new BTServiceFetchWatcher(
       new BTReactiveSelector([
-        // ВЕТКА 1: Доставка палки хозяину и сброс под ноги
+        // ВЕТКА 1: Доставка палки хозяину (спринт издалека -> бег -> шаг рядом с хозяином)
         new BTSequence([
-          new BTConditionFetchState({ expectedState: 'returning' }),
+          new BTConditionFetchState({ expectedState: 'returning_to_master' }),
           new BTActionSetTarget({ sourceKey: 'masterEntityId' }),
           new BTServicePathUpdater(
             new BTSequence([
-              new BTActionPursue({ stopDist: 1.5, sprintMinDistance: 10 }),
-              new BTConditionDistance({ maxDistance: 2.2 }),
+              new BTActionPursue({
+                stopDist: 2.2,
+                walkDistance: 5.0,
+                sprintMinDistance: 12.0,
+                hysteresis: 1.0,
+              }),
+              new BTConditionDistance({ maxDistance: 2.8 }),
               new BTActionRotateToPos(),
               new BTActionFetchDeliver(),
             ])
           ),
         ]),
 
-        // ВЕТКА 2: Погоня за брошенной палкой и взятие в челюсти
+        // ВЕТКА 2: Доставка палки в центр игровой зоны (хозяин потерян)
+        new BTSequence([
+          new BTConditionFetchState({ expectedState: 'returning_to_zone' }),
+          new BTSequence([
+            new BTActionMoveToPos({ posKey: 'playZoneCenter', stopDist: 4.0, sprint: false }),
+            new BTActionDogDropAtZone(),
+          ]),
+        ]),
+
+        // ВЕТКА 3: Погоня за брошенной палкой (спринт)
         new BTSequence([
           new BTConditionFetchState({ expectedState: 'chasing_item' }),
           new BTActionSetTarget({ sourceKey: 'fetchTargetId' }),
@@ -155,20 +187,84 @@ export function DogFetchTree(): BTNode {
           ),
         ]),
 
-        // ВЕТКА 3: Обычное следование за хозяином
+        // ВЕТКА 4: Следование за хозяином без палки (шаг рядом с хозяином)
         new BTSequence([
+          new BTConditionFetchState({ expectedState: 'following_master' }),
           new BTActionSetTarget({ sourceKey: 'masterEntityId' }),
           new BTServicePathUpdater(
             new BTSelector([
               new BTSequence([new BTConditionEngaged(), new BTActionRotateToPos()]),
-              new BTActionPursue({ sprintMinDistance: 10 }),
+              new BTActionPursue({
+                stopDist: 2.5,
+                walkDistance: 5.5,
+                sprintMinDistance: 12.0,
+                hysteresis: 1.0,
+              }),
             ])
           ),
         ]),
 
-        new BTWait({ duration: 1 }),
+        // ВЕТКА 5: Возврат без палки в центр игровой зоны (хозяин потерян)
+        new BTSequence([
+          new BTActionMoveToPos({ posKey: 'playZoneCenter', stopDist: 5.0, sprint: false }),
+        ]),
+
+        new BTWait({ duration: 0.5 }),
       ]),
       { interval: 0.1 }
+    ),
+    { interval: 0.5 }
+  );
+}
+
+export function MasterFetchTree(): BTNode {
+  return new BTServiceSyncStats(
+    new BTServiceEnforceWalkMode(
+      new BTServiceFetchMasterWatcher(
+        new BTReactiveSelector([
+          // ВЕТКА 1: Подбор принесенных палок (Высший приоритет — собираем все доступные палки в любой точке карты)
+          new BTSequence([
+            new BTConditionMasterCanPickupDeliveredStick(),
+            new BTActionSetTarget({ sourceKey: 'nearestDeliveredStickId' }),
+            new BTServicePathUpdater(
+              new BTSequence([
+                new BTActionPursue({ stopDist: 0.6, sprintMinDistance: undefined }),
+                new BTActionMasterPickupStick(),
+              ])
+            ),
+          ]),
+
+          // ВЕТКА 2: Бросок палок (или возврат в центр зоны вместе с собакой перед броском, когда всё собрано)
+          new BTSequence([
+            new BTConditionMasterReadyToThrow(),
+            new BTSelector([
+              // 2.1: Собака рядом, но мы вне зоны — возвращаемся в центр перед броском
+              new BTSequence([
+                new BTConditionMasterOutsidePlayZone(),
+                new BTActionMoveToPos({ posKey: 'playZoneCenter', stopDist: 3.0, sprint: false }),
+              ]),
+              // 2.2: Мы в зоне игры и собака рядом — бросаем палку
+              new BTSequence([
+                new BTActionMasterCalculateThrowTarget(),
+                new BTActionMasterThrowStick(),
+              ]),
+            ]),
+          ]),
+
+          // ВЕТКА 3: Следование за убежавшей собакой (в том числе с палками в руках)
+          new BTSequence([
+            new BTConditionMasterShouldFollowDog(),
+            new BTActionSetTarget({ sourceKey: 'priorityDogId' }),
+            new BTServicePathUpdater(
+              new BTActionPursue({ stopDist: 5.0, sprintMinDistance: undefined })
+            ),
+          ]),
+
+          // ВЕТКА 4: Ожидание / Поворот к собакам в зоне
+          new BTSequence([new BTActionMasterLookAtDog(), new BTWait({ duration: 0.5 })]),
+        ]),
+        { interval: 0.1 }
+      )
     ),
     { interval: 0.5 }
   );

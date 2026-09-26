@@ -63,6 +63,7 @@ export class EntityFactory {
     const rootConfig: EntityConfig = {
       ai: { behavior },
       meta: { name: creatureName, entityType: 'creature' },
+      movement: blueprint.movement ? fastClone(blueprint.movement) : undefined,
       visualModel: blueprint.rigAsset ? { modelId: blueprint.rigAsset } : undefined,
       animator: blueprint.rigAsset
         ? {

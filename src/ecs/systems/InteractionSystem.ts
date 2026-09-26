@@ -602,6 +602,17 @@ export class InteractionSystem {
             const ownerPartId = interactionAction.partId || id;
             world.addComponent(targetId, 'ownership', { ownerId: ownerPartId, status: 'equipped' });
             world.removeComponent(targetId, 'thrownObject');
+
+            const fetchStick = world.getComponent(targetId, 'fetchStick');
+            if (fetchStick) {
+              if (id === fetchStick.ownerMasterId) {
+                fetchStick.state = 'held_by_master';
+              } else {
+                fetchStick.state = 'held_by_dog';
+                fetchStick.lastCarrierDogId = id;
+              }
+            }
+
             EventBus.emit('inventory:updated');
 
             const physBody = world.getComponent(targetId, 'physicsBody');
@@ -763,6 +774,14 @@ export class InteractionSystem {
     slot.itemId = null;
 
     world.removeComponent(itemId, 'ownership');
+
+    const fetchStick = world.getComponent(itemId, 'fetchStick');
+    if (fetchStick) {
+      if (fetchStick.state === 'held_by_dog') {
+        fetchStick.state = 'delivered';
+      }
+    }
+
     EventBus.emit('inventory:updated');
 
     const renderable = world.getComponent(itemId, 'renderable');
@@ -893,6 +912,12 @@ export class InteractionSystem {
     slot.itemId = null;
 
     world.removeComponent(itemId, 'ownership');
+
+    const fetchStick = world.getComponent(itemId, 'fetchStick');
+    if (fetchStick) {
+      fetchStick.state = 'thrown';
+    }
+
     EventBus.emit('inventory:updated');
 
     const renderable = world.getComponent(itemId, 'renderable');
