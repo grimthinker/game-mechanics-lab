@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { IRenderer, RenderContext } from './IRenderer';
 import { Camera } from '../Camera';
+import { EnvironmentManager } from './environment/EnvironmentManager';
 import { Point, Vec3 } from '../types';
 import { EntityId } from '../ecs/types';
 import { World } from '../ecs/World';
@@ -25,6 +26,7 @@ export class ThreeRenderer implements IRenderer {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
   public transformControl: TransformControls;
+  public environmentManager: EnvironmentManager;
   private isDraggingGizmo = false;
   private brushCursor: THREE.Mesh;
 
@@ -44,8 +46,11 @@ export class ThreeRenderer implements IRenderer {
   constructor(container: HTMLDivElement) {
     this.container = container;
 
-    // Создаем WebGL рендерер
+    // Создаем WebGL рендерер с включенными мягкими тенями
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
     this.canvas = this.renderer.domElement;
     this.canvas.style.display = 'block';
     this.canvas.style.width = '100%';
@@ -69,18 +74,12 @@ export class ThreeRenderer implements IRenderer {
 
     // Инициализируем сцену
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#1e1e1e');
 
     // Настраиваем камеру
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
 
-    // Добавляем освещение
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(200, 500, 300);
-    this.scene.add(dirLight);
+    // Менеджер окружения (скайбокс, солнце, луна, звезды, тени и туман)
+    this.environmentManager = new EnvironmentManager(this.scene);
 
     // Метрическая сетка: 50x50 метров, шаг 1 метр
     const grid = new THREE.GridHelper(50, 50, 0x555555, 0x333333);
@@ -190,14 +189,16 @@ export class ThreeRenderer implements IRenderer {
 
     this.raycaster.setFromCamera(this.mouseNDC, this.camera);
 
-    // Исключаем тяжелый меш террейна, траву (~18 000 инстансов), сетку и служебные объекты ДО вызова трассировки на CPU
+    // Исключаем купол неба, террейн, траву, сетку и служебные объекты ДО вызова трассировки на CPU
     const pickableObjects: THREE.Object3D[] = [];
     for (let i = 0; i < this.scene.children.length; i++) {
       const child = this.scene.children[i];
       if (
+        child.userData.isSkyDome ||
         child.userData.isTerrainMesh ||
         child.userData.isGrassMesh ||
         child.userData.entityId === 'terrain' ||
+        child.userData.entityId === 'environment' ||
         child instanceof THREE.GridHelper ||
         child === this.brushCursor ||
         child === this.transformControl.getHelper()
@@ -238,6 +239,9 @@ export class ThreeRenderer implements IRenderer {
   }
 
   public destroy(): void {
+    if (this.environmentManager) {
+      this.environmentManager.destroy();
+    }
     if (this.scene) {
       this.scene.traverse((child) => {
         if (child instanceof THREE.Mesh) {
@@ -335,6 +339,26 @@ export class ThreeRenderer implements IRenderer {
     } else {
       this.brushCursor.visible = false;
     }
+
+    // Синхронизация небесного купола, положения светил, теней и тумана
+    const envEntities = context.world.getEntitiesWith('environment');
+    const env =
+      envEntities.length > 0
+        ? envEntities[0][1].environment
+        : {
+            timeOfDay: 12.0,
+            dayDuration: 600,
+            azimuth: 0,
+            axialTilt: 0.41,
+            fogDensity: 0.007,
+          };
+
+    this.environmentManager.update(
+      this.scene,
+      this.camera,
+      { x: centerX, y: centerY, z: centerZ },
+      env
+    );
 
     this.renderer.render(this.scene, this.camera);
 

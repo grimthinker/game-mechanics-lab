@@ -12,6 +12,7 @@ import { AnimationSyncSystem } from '../ecs/systems/AnimationSyncSystem';
 import { ModifierSystem } from '../ecs/systems/ModifierSystem';
 import { AttachmentSystem } from '../ecs/systems/AttachmentSystem';
 import { ThreeSyncSystem } from '../ecs/systems/ThreeSyncSystem';
+import { EnvironmentSystem } from '../ecs/systems/EnvironmentSystem';
 import { EntityFactory } from '../ecs/EntityFactory';
 import { WorldSerializer, SerializedWorldData } from '../ecs/WorldSerializer';
 import { IPhysicsDriver } from '../physics/IPhysicsDriver';
@@ -22,6 +23,7 @@ import { Vec3 } from '../types';
 import { EntityConfig } from '../ecs/types';
 import { createZoneConfig } from '../ecs/archetypes/ZoneArchetype';
 import { createDefaultTerrainConfig } from '../ecs/archetypes/TerrainArchetype';
+import { createDefaultEnvironmentConfig } from '../ecs/archetypes/EnvironmentArchetype';
 import { getAnatomyParts, getAllContainedItems } from '../ecs/utils/hierarchy';
 import { CREATURE_BLUEPRINTS } from '../ecs/templates';
 import { Radians, deg2Rad, createRectanglePoints } from '../utils';
@@ -43,6 +45,7 @@ export class GameSimulation {
   public animationSyncSystem: AnimationSyncSystem;
   public modifierSystem: ModifierSystem;
   public attachmentSystem: AttachmentSystem;
+  public environmentSystem: EnvironmentSystem;
 
   public entityFactory: EntityFactory;
   public serializer: WorldSerializer;
@@ -66,6 +69,7 @@ export class GameSimulation {
     this.animationSyncSystem = new AnimationSyncSystem();
     this.modifierSystem = new ModifierSystem();
     this.attachmentSystem = new AttachmentSystem();
+    this.environmentSystem = new EnvironmentSystem();
     this.entityFactory = new EntityFactory();
     this.serializer = new WorldSerializer(app);
 
@@ -84,6 +88,7 @@ export class GameSimulation {
       this.updatePlayerAim(worldPoint);
     }
 
+    this.environmentSystem.update(dt, this.world);
     this.anatomySystem.update(dt, this.world, this.physics);
     this.modifierSystem.update(dt, this.world);
     this.aiSystem.update(dt, this.world);
@@ -337,6 +342,7 @@ export class GameSimulation {
     const { x: bx, y: by, z: bz } = center ?? { x: 0, y: 0, z: 0 };
 
     this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
+    this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
 
     // 1. Игрок (без палки в руке, не участвует в апорте)
     this.entityFactory.spawnModularHumanoid(

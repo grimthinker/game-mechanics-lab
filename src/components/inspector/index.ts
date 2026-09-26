@@ -17,3 +17,4 @@ export * from './AnatomyInspector';
 export * from './InteractionSlotsInspector';
 export * from './EquipmentInspector';
 export * from './InventoryInspector';
+export * from './EnvironmentInspector';

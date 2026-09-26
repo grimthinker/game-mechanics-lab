@@ -24,6 +24,7 @@ import {
   InteractionSlotsInspector,
   EquipmentInspector,
   InventoryInspector,
+  EnvironmentInspector,
 } from './inspector/index';
 import { getAnatomyParts } from '../ecs/utils/hierarchy';
 import { EDITOR_CONFIG } from '../config/editorConfig';
@@ -135,6 +136,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     slots: false,
     equip: false,
     inventory: false,
+    environment: true,
   });
 
   const toggleSection = (key: string) => {
@@ -306,6 +308,13 @@ export const Inspector: React.FC<InspectorProps> = ({
         style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}
       >
         <form className="modal-form" key={targetId} onSubmit={(e) => e.preventDefault()}>
+          {world.getComponent(targetId, 'environment') &&
+            renderSection(
+              'environment',
+              t('inspector.environment'),
+              <EnvironmentInspector {...commonProps} />
+            )}
+
           {renderSection('meta', t('inspector.meta'), <MetaInspector {...commonProps} />)}
 
           {world.getComponent(targetId, 'physicsStats') &&

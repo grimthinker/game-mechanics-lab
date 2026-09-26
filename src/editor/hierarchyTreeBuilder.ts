@@ -13,7 +13,8 @@ export type HierarchyNodeType =
   | 'inventoryGrid'
   | 'obstacle'
   | 'zone'
-  | 'marker';
+  | 'marker'
+  | 'environment';
 
 export interface HierarchyTreeNode {
   id: string;
@@ -361,6 +362,7 @@ export function buildHierarchyTree(
     if (arch === 'obstacle') icon = '🧱';
     else if (arch === 'zone') icon = '🌀';
     else if (arch === 'marker') icon = '📍';
+    else if (arch === 'environment') icon = '🌤️';
 
     const badges: any[] = [];
     if (comp.areaEffector) {
@@ -395,7 +397,7 @@ export function buildHierarchyTree(
   for (const [id, comp] of allEntities) {
     const arch = comp.tag?.archetype ?? comp.meta?.entityType ?? 'creature';
 
-    if (arch === 'creature' || arch === 'obstacle' || arch === 'marker') {
+    if (arch === 'creature' || arch === 'obstacle' || arch === 'marker' || arch === 'environment') {
       topLevelIds.add(id);
     } else if (arch === 'zone') {
       if (!comp.attachment?.parentId) topLevelIds.add(id);

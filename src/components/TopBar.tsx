@@ -258,22 +258,28 @@ export const TopBar: React.FC<TopBarProps> = ({
           {t('topbar.game')}
         </button>
 
-        <div style={{ width: '1px', height: '20px', backgroundColor: '#444', margin: '0 4px' }} />
+        {mode !== GameMode.EDITOR && (
+          <>
+            <div
+              style={{ width: '1px', height: '20px', backgroundColor: '#444', margin: '0 4px' }}
+            />
 
-        <button
-          className="btn btn-sm"
-          style={{
-            backgroundColor: isPaused ? '#e74c3c' : 'transparent',
-            color: isPaused ? '#fff' : '#e74c3c',
-            border: '1px solid #e74c3c',
-            padding: '4px 12px',
-          }}
-          onClick={togglePause}
-          disabled={mode === GameMode.GAME}
-          title="Space"
-        >
-          {isPaused ? t('topbar.pause') : t('topbar.running')}
-        </button>
+            <button
+              className="btn btn-sm"
+              style={{
+                backgroundColor: isPaused ? '#e74c3c' : 'transparent',
+                color: isPaused ? '#fff' : '#e74c3c',
+                border: '1px solid #e74c3c',
+                padding: '4px 12px',
+              }}
+              onClick={togglePause}
+              disabled={mode === GameMode.GAME}
+              title="Space"
+            >
+              {isPaused ? t('topbar.pause') : t('topbar.running')}
+            </button>
+          </>
+        )}
 
         {mode === GameMode.SIMULATION && (
           <div

@@ -7,6 +7,7 @@ import { assembleZone } from './ZoneArchetype';
 import { assembleObstacle } from './ObstacleArchetype';
 import { assembleBodyPart } from './BodyPartArchetype';
 import { assembleTerrain } from './TerrainArchetype';
+import { assembleEnvironment } from './EnvironmentArchetype';
 
 export * from './types';
 export * from './CreatureArchetype';
@@ -16,6 +17,7 @@ export * from './ZoneArchetype';
 export * from './ObstacleArchetype';
 export * from './BodyPartArchetype';
 export * from './TerrainArchetype';
+export * from './EnvironmentArchetype';
 
 export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   creature: assembleCreature,
@@ -27,10 +29,12 @@ export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   particles: assembleMarker,
   bodyPart: assembleBodyPart,
   terrain: assembleTerrain,
+  environment: assembleEnvironment,
 };
 
 export function detectArchetype(config: EntityConfig): EntityArchetype {
   if (config.tag?.archetype) return config.tag.archetype;
+  if (config.environment) return 'environment';
   if (config.terrain) return 'terrain';
   if (config.areaEffector || (config as any).zoneTrigger) return 'zone';
   if (config.item) return 'item';

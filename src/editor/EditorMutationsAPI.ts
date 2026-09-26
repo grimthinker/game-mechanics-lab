@@ -2,6 +2,7 @@ import { setBaseStat } from '../ecs/stats/StatEvaluator';
 import { deg2Rad } from '../utils';
 import { HitZoneType, ZoneEffectType } from '../ecs/types';
 import { World } from '../ecs/World';
+import { EnvironmentComponent } from '../ecs/components/environment';
 
 export interface MovementStatsPatch {
   maxSpeed?: number;
@@ -735,6 +736,13 @@ export class EditorMutationsAPI {
     if (slot.itemId !== null) return false;
 
     this.world.removeComponent(partId, 'interactionSlots');
+    return true;
+  }
+
+  public updateEntityEnvironment(id: string, patch: Partial<EnvironmentComponent>): boolean {
+    const env = this.world.getComponent(id, 'environment');
+    if (!env) return false;
+    Object.assign(env, patch);
     return true;
   }
 }

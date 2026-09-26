@@ -12,9 +12,11 @@ export * from './components/anatomy';
 export * from './components/rendering';
 export * from './components/terrain';
 export * from './components/fetch';
+export * from './components/environment';
 
 import { FetchStickComponent } from './components/fetch';
 import { TerrainComponent } from './components/terrain';
+import { EnvironmentComponent } from './components/environment';
 import {
   TagComponent,
   RenderableComponent,
@@ -136,6 +138,7 @@ export interface EntityComponents {
   terrain?: TerrainComponent;
   thrownObject?: ThrownObjectComponent;
   fetchStick?: FetchStickComponent;
+  environment?: EnvironmentComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -183,6 +186,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'terrain',
   'thrownObject',
   'fetchStick',
+  'environment',
 ] as const;
 
 export interface EntityConfig {
@@ -222,4 +226,5 @@ export interface EntityConfig {
   terrain?: TerrainComponent;
   thrownObject?: ThrownObjectComponent;
   fetchStick?: FetchStickComponent;
+  environment?: EnvironmentComponent;
 }

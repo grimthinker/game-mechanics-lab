@@ -163,13 +163,13 @@ export class SelectionController {
       // 1. Приоритетный клик по мешам Three.js (позволяет выбирать конкретные части тела partId)
       if (this.app.renderer.pickEntity) {
         const picked = this.app.renderer.pickEntity(clientX, clientY);
-        if (picked) return picked;
+        if (picked && picked !== 'terrain' && picked !== 'environment') return picked;
       }
 
       // 2. Физический рейкаст Rapier3D (страховка при промахе сквозь меш или клике по коллайдерам)
       if (this.app.raycastPhysics) {
         const hit = this.app.raycastPhysics(clientX, clientY);
-        if (hit && hit.entityId) {
+        if (hit && hit.entityId && hit.entityId !== 'terrain' && hit.entityId !== 'environment') {
           return hit.entityId;
         }
       }
