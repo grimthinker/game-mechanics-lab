@@ -211,6 +211,7 @@ export class BTServicePathUpdater extends BTService {
 
 import { NodeBBSchema } from './schema';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
+import { getTerrainHeightAt } from '../ecs/types';
 
 export class BTServiceSyncStats extends BTService {
   public static readonly nodeName = 'Синхронизация параметров';
@@ -479,9 +480,34 @@ export class BTServiceFetchMasterWatcher extends BTService {
   public static readonly description =
     'Отслеживает палки в руках, принесенные палки на земле, собак и границы зоны игры';
 
+  public static readonly bbSchema: NodeBBSchema = {
+    reads: {
+      dogIds: { type: 'any', description: 'Список ID привязанных собак' },
+      playZoneCenter: { type: 'point', description: 'Центр зоны игры' },
+      playZoneRadius: { type: 'number', description: 'Радиус зоны игры' },
+      dogFollowDistance: { type: 'number', description: 'Дистанция старта следования за собакой' },
+      detectDist: { type: 'number', description: 'Радиус восприятия' },
+    },
+    writes: {
+      playZoneCenter: { type: 'point', description: 'Центр зоны игры' },
+      isOutsidePlayZone: { type: 'boolean', description: 'Хозяин за пределами зоны игры' },
+      heldStickCount: { type: 'number', description: 'Количество удерживаемых палок' },
+      freeSlotCount: { type: 'number', description: 'Количество свободных слотов' },
+      nearestDeliveredStickId: { type: 'entityId', description: 'Ближайшая доставленная палка' },
+      shouldThrow: { type: 'boolean', description: 'Пора бросать палку' },
+      hasReadyDogNearby: { type: 'boolean', description: 'Рядом есть свободная собака' },
+      isAnyDogTooFar: { type: 'boolean', description: 'Собака убежала далеко' },
+      priorityDogId: { type: 'entityId', description: 'Приоритетная собака' },
+      isReadyToThrow: { type: 'boolean', description: 'Готовность к броску' },
+      canThrowNow: { type: 'boolean', description: 'Возможность бросить прямо сейчас' },
+    },
+  };
+
   public static readonly defaultParams = {
     ...BTService.defaultParams,
     interval: 0.1,
+    throwCooldown: 3.0,
+    dogFollowDistance: 20.0,
   };
 
   protected override params: typeof BTServiceFetchMasterWatcher.defaultParams;
@@ -505,7 +531,6 @@ export class BTServiceFetchMasterWatcher extends BTService {
       playZoneCenter = { ...selfPos };
       bb.set('playZoneCenter', playZoneCenter);
     }
-    const playZoneRadius = bb.get<number>('playZoneRadius') || 30;
 
     const distToCenter = Math.hypot(selfPos.x - playZoneCenter.x, selfPos.z - playZoneCenter.z);
     bb.set('isOutsidePlayZone', distToCenter > 15.0);
@@ -553,6 +578,9 @@ export class BTServiceFetchMasterWatcher extends BTService {
     let priorityDogId: string | null = null;
     let maxDistFromCenter = -1;
 
+    const followDistanceThreshold =
+      bb.get<number>('dogFollowDistance') ?? this.params.dogFollowDistance;
+
     for (const dId of dogIds) {
       const dog = entity.utils.getEntity(dId);
       if (!dog || !dog.isAlive) continue;
@@ -568,8 +596,7 @@ export class BTServiceFetchMasterWatcher extends BTService {
         hasReadyDogNearby = true;
       }
 
-      const dogFollowDistance = bb.get<number>('dogFollowDistance') || 15.0;
-      if (distToMaster > dogFollowDistance) {
+      if (distToMaster > followDistanceThreshold) {
         isAnyDogTooFar = true;
       }
 
@@ -597,7 +624,7 @@ export class BTServiceFetchMasterWatcher extends BTService {
 
     const localTime = bb.get<number>('localTime') || 0;
     const lastThrowTime = bb.get<number>('lastThrowTime') || -999;
-    const canThrowCooldown = localTime - lastThrowTime >= 3.0;
+    const canThrowCooldown = localTime - lastThrowTime >= this.params.throwCooldown;
 
     const isOutsidePlayZone = bb.get<boolean>('isOutsidePlayZone');
     const isReadyToThrow = shouldThrow && canThrowCooldown && hasReadyDogNearby;
@@ -613,9 +640,26 @@ export class BTServiceFetchWatcher extends BTService {
   public static readonly description =
     'Следит за брошенными палками хозяина с учетом дальности обнаружения и гистерезиса';
 
+  public static readonly bbSchema: NodeBBSchema = {
+    reads: {
+      masterEntityId: { type: 'entityId', description: 'ID хозяина' },
+      detectDist: { type: 'number', description: 'Радиус обнаружения' },
+      playZoneCenter: { type: 'point', description: 'Центр зоны игры' },
+    },
+    writes: {
+      masterEntityId: { type: 'entityId', description: 'ID хозяина' },
+      fetchTargetId: { type: 'entityId', description: 'Целевая палка' },
+      fetchState: { type: 'string', description: 'Состояние апорта' },
+      dogZoneWaitPos: { type: 'point', description: 'Точка ожидания в зоне игры' },
+    },
+  };
+
   public static readonly defaultParams = {
     ...BTService.defaultParams,
     interval: 0.1,
+    unreachableTimeout: 15.0,
+    hysteresisDistance: 3.0,
+    retargetCooldown: 0.6,
   };
 
   private chaseTimer: number = 0;
@@ -634,6 +678,7 @@ export class BTServiceFetchWatcher extends BTService {
     this.chaseTimer = 0;
     this.retargetTimer = 0;
     this.unreachableSticks.clear();
+    entity.brain!.blackboard.remove('dogZoneWaitPos');
     this.tickService(entity);
   }
 
@@ -688,10 +733,11 @@ export class BTServiceFetchWatcher extends BTService {
     if (hasStickInMouth) {
       this.chaseTimer = 0;
       bb.remove('fetchTargetId');
+      bb.remove('dogZoneWaitPos');
       if (isMasterSpotted) {
         bb.set('fetchState', 'returning_to_master');
       } else {
-        bb.set('fetchState', 'returning_to_zone');
+        bb.set('fetchState', 'delivering_to_zone');
       }
       return;
     }
@@ -734,9 +780,12 @@ export class BTServiceFetchWatcher extends BTService {
           currentTargetId = null;
           this.chaseTimer = 0;
         } else if (validCandidates.length > 0 && validCandidates[0].id !== currentTargetId) {
-          if (this.retargetTimer <= 0 && validCandidates[0].dist < curDist - 3.0) {
+          if (
+            this.retargetTimer <= 0 &&
+            validCandidates[0].dist < curDist - this.params.hysteresisDistance
+          ) {
             currentTargetId = validCandidates[0].id;
-            this.retargetTimer = 0.6;
+            this.retargetTimer = this.params.retargetCooldown;
             this.chaseTimer = 0;
           }
         }
@@ -745,13 +794,13 @@ export class BTServiceFetchWatcher extends BTService {
 
     if (!currentTargetId && validCandidates.length > 0) {
       currentTargetId = validCandidates[0].id;
-      this.retargetTimer = 0.6;
+      this.retargetTimer = this.params.retargetCooldown;
       this.chaseTimer = 0;
     }
 
     if (currentTargetId) {
       this.chaseTimer += this.params.interval;
-      if (this.chaseTimer > 15.0) {
+      if (this.chaseTimer > this.params.unreachableTimeout) {
         this.unreachableSticks.set(currentTargetId, localTime + 25.0);
         currentTargetId = null;
         this.chaseTimer = 0;
@@ -759,14 +808,36 @@ export class BTServiceFetchWatcher extends BTService {
     }
 
     if (currentTargetId) {
+      bb.remove('dogZoneWaitPos');
       bb.set('fetchTargetId', currentTargetId);
       bb.set('fetchState', 'chasing_item');
     } else {
       bb.remove('fetchTargetId');
       if (isMasterSpotted) {
+        bb.remove('dogZoneWaitPos');
         bb.set('fetchState', 'following_master');
       } else {
         bb.set('fetchState', 'returning_to_zone');
+
+        // Рассредоточение собак: вычисляем персональную случайную точку в радиусе 3..8м от центра зоны
+        if (!bb.has('dogZoneWaitPos')) {
+          let playCenter = bb.get<Vec3>('playZoneCenter');
+          if (!playCenter) {
+            playCenter = { ...selfPos };
+          }
+          const angle = Math.random() * Math.PI * 2;
+          const r = 3.0 + Math.random() * 5.0;
+          const wx = playCenter.x + Math.cos(angle) * r;
+          const wz = playCenter.z + Math.sin(angle) * r;
+
+          let wy = playCenter.y;
+          const terrainEntities = entity.world.getEntitiesWith('terrain');
+          if (terrainEntities.length > 0) {
+            const h = getTerrainHeightAt(terrainEntities[0][1].terrain, wx, wz);
+            if (h !== null) wy = h;
+          }
+          bb.set('dogZoneWaitPos', { x: wx, y: wy, z: wz });
+        }
       }
     }
   }

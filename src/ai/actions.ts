@@ -657,24 +657,26 @@ export class BTActionPickupItem extends BTSimpleAction {
   }
 }
 
-export class BTConditionFetchState extends BTSimpleAction {
-  public static readonly nodeName = 'Проверка состояния апорта';
-  public static readonly description = 'Проверяет текущую фазу апорта в памяти (fetchState)';
-  public static readonly defaultParams = { expectedState: 'chasing_item' };
+export class BTConditionStringState extends BTSimpleAction {
+  public static readonly nodeName = 'Проверка состояния (строка)';
+  public static readonly description = 'Проверяет строковое значение указанного ключа в памяти';
+  public static readonly defaultParams = { stateKey: 'fetchState', expectedState: 'chasing_item' };
 
-  private params: typeof BTConditionFetchState.defaultParams;
+  private params: typeof BTConditionStringState.defaultParams;
 
-  constructor(params?: Partial<typeof BTConditionFetchState.defaultParams>) {
+  constructor(params?: Partial<typeof BTConditionStringState.defaultParams>) {
     super();
-    this.params = { ...BTConditionFetchState.defaultParams, ...params };
+    this.params = { ...BTConditionStringState.defaultParams, ...params };
   }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const currentState = bb.get<string>('fetchState') || 'idle';
+    const currentState = bb.get<string>(this.params.stateKey) || 'idle';
     return currentState === this.params.expectedState ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
   }
 }
+
+export const BTConditionFetchState = BTConditionStringState;
 
 export class BTActionMoveToPos extends BTAction {
   public static readonly nodeName = 'Двигаться к позиции';
@@ -761,23 +763,37 @@ export class BTActionSetTarget extends BTSimpleAction {
   }
 }
 
-export class BTActionFetchPickup extends BTAction {
-  public static readonly nodeName = 'Взять апорт в пасть';
+export class BTActionPickup extends BTAction {
+  public static readonly nodeName = 'Поднять предмет';
   public static readonly description =
-    'Подбирает предмет апорта в челюсти и переводит состояние в возврат';
+    'Инициирует физический подбор предмета в свободный слот взаимодействия и ожидает завершения анимации';
+  public static readonly defaultParams = {
+    targetKey: 'targetId',
+  };
+
+  private params: typeof BTActionPickup.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionPickup.defaultParams>) {
+    super();
+    this.params = { ...BTActionPickup.defaultParams, ...params };
+  }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const targetId = bb.get<string>('fetchTargetId');
+    const targetId = bb.get<string>(this.params.targetKey);
     if (!targetId || !entity.world.getEntity(targetId)) {
-      bb.remove('fetchTargetId');
       return NodeStatus.FAILURE;
     }
 
     const ownership = entity.world.getComponent(targetId, 'ownership');
     if (ownership && ownership.ownerId !== entity.id) {
-      bb.remove('fetchTargetId');
       return NodeStatus.FAILURE;
+    }
+
+    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
+    const isAlreadyHeld = aggSlots.some((s) => s.slot.itemId === targetId);
+    if (isAlreadyHeld) {
+      return NodeStatus.SUCCESS;
     }
 
     if (entity.world.getComponent(entity.id, 'pickupIntent')) {
@@ -789,42 +805,32 @@ export class BTActionFetchPickup extends BTAction {
       return NodeStatus.RUNNING;
     }
 
-    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
-    const alreadyHeld = aggSlots.some((s) => s.slot.itemId === targetId);
-    if (alreadyHeld) {
-      const fetchStick = entity.world.getComponent(targetId, 'fetchStick');
-      if (fetchStick) {
-        fetchStick.state = 'held_by_dog';
-        fetchStick.lastCarrierDogId = entity.id;
-      }
-      return NodeStatus.SUCCESS;
-    }
-
     const targetTrans = entity.world.getComponent(targetId, 'transform');
     if (!targetTrans) return NodeStatus.FAILURE;
 
     const selfPos = entity.getPos();
-    const dist = Math.hypot(targetTrans.x - selfPos.x, targetTrans.z - selfPos.z);
+    const dx = targetTrans.x - selfPos.x;
+    const dz = targetTrans.z - selfPos.z;
+    const dist = Math.hypot(dx, dz);
 
-    const bestSlot = aggSlots.find((s) => !s.isBroken && s.slot.itemId === null);
-    if (!bestSlot) {
-      return NodeStatus.FAILURE;
-    }
+    const freeSlot = aggSlots.find((s) => !s.isBroken && s.slot.itemId === null);
+    if (!freeSlot) return NodeStatus.FAILURE;
 
-    const interactDist = bestSlot.slot.interactDist ?? 1.2;
-    if (dist <= interactDist + 0.6) {
+    const myRadius = entity.radius;
+    const targetPhysStats = entity.world.getComponent(targetId, 'physicsStats');
+    const targetRadius = targetPhysStats?.radius.current ?? 0.15;
+    const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
+    const interactDist = freeSlot.slot.interactDist ?? 0.6;
+
+    if (distBetweenBorders <= interactDist + 0.1) {
       if (entity.input) {
         entity.input.desiredMoveVector = null;
         entity.input.isMovingForward = false;
-        const dx = targetTrans.x - selfPos.x;
-        const dz = targetTrans.z - selfPos.z;
         if (Math.hypot(dx, dz) > 0.001) {
           entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
         }
       }
-      if (!entity.world.getComponent(entity.id, 'pickupIntent')) {
-        entity.world.addComponent(entity.id, 'pickupIntent', { targetItemId: targetId });
-      }
+      entity.world.addComponent(entity.id, 'pickupIntent', { targetItemId: targetId });
       return NodeStatus.RUNNING;
     }
 
@@ -834,23 +840,42 @@ export class BTActionFetchPickup extends BTAction {
   protected stopAction(_entity: EntityAdapter): void {}
 }
 
-export class BTActionFetchDeliver extends BTAction {
-  public static readonly nodeName = 'Отдать апорт хозяину';
-  public static readonly description = 'Сбрасывает палку под ноги хозяину и завершает цикл апорта';
+export class BTActionDrop extends BTAction {
+  public static readonly nodeName = 'Сбросить предмет';
+  public static readonly description =
+    'Сбрасывает удерживаемый предмет под ноги и ожидает завершения анимации';
+  public static readonly defaultParams = {
+    slotIndex: undefined as number | undefined,
+    itemKey: undefined as string | undefined,
+  };
+
+  private hasStarted: boolean = false;
+  private params: typeof BTActionDrop.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionDrop.defaultParams>) {
+    super();
+    this.params = { ...BTActionDrop.defaultParams, ...params };
+  }
+
+  protected onOpen(_entity: EntityAdapter): void {
+    this.hasStarted = false;
+  }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const targetId = bb.get<string>('fetchTargetId');
+    const targetItemId = this.params.itemKey ? bb.get<string>(this.params.itemKey) : undefined;
 
     const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
-    const slotWithItem = aggSlots.find((s) =>
-      targetId ? s.slot.itemId === targetId : s.slot.itemId !== null
-    );
-
-    if (!slotWithItem) {
-      bb.remove('fetchTargetId');
-      return NodeStatus.SUCCESS;
-    }
+    const slotWithItem = aggSlots.find((s) => {
+      if (s.slot.itemId === null) return false;
+      if (this.params.slotIndex !== undefined && s.globalSlotIndex !== this.params.slotIndex) {
+        return false;
+      }
+      if (targetItemId !== undefined && s.slot.itemId !== targetItemId) {
+        return false;
+      }
+      return true;
+    });
 
     if (entity.world.getComponent(entity.id, 'dropItemIntent')) {
       return NodeStatus.RUNNING;
@@ -858,7 +883,17 @@ export class BTActionFetchDeliver extends BTAction {
 
     const currentAction = entity.world.getComponent(entity.id, 'interactionAction');
     if (currentAction && currentAction.type === 'drop') {
+      this.hasStarted = true;
       return NodeStatus.RUNNING;
+    }
+
+    if (this.hasStarted) {
+      this.hasStarted = false;
+      return NodeStatus.SUCCESS;
+    }
+
+    if (!slotWithItem) {
+      return NodeStatus.SUCCESS;
     }
 
     if (entity.input) {
@@ -870,67 +905,18 @@ export class BTActionFetchDeliver extends BTAction {
       slotIndex: slotWithItem.globalSlotIndex,
     });
 
-    const itemEntityId = slotWithItem.slot.itemId;
-    if (itemEntityId) {
-      const fetchStick = entity.world.getComponent(itemEntityId, 'fetchStick');
-      if (fetchStick) {
-        fetchStick.state = 'delivered';
-      }
-    }
-
-    bb.remove('fetchTargetId');
-    return NodeStatus.SUCCESS;
+    return NodeStatus.RUNNING;
   }
 
-  protected stopAction(_entity: EntityAdapter): void {}
-}
-
-export class BTActionDogDropAtZone extends BTAction {
-  public static readonly nodeName = 'Положить палку в центре зоны';
-  public static readonly description = 'Сбрасывает палку на землю в зоне игры при потере хозяина';
-
-  protected onTick(entity: EntityAdapter): NodeStatus {
-    const bb = entity.brain!.blackboard;
-    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
-    const slotWithItem = aggSlots.find((s) => s.slot.itemId !== null);
-
-    if (!slotWithItem) {
-      bb.remove('fetchTargetId');
-      return NodeStatus.SUCCESS;
-    }
-
-    if (entity.world.getComponent(entity.id, 'dropItemIntent')) {
-      return NodeStatus.RUNNING;
-    }
-
-    const currentAction = entity.world.getComponent(entity.id, 'interactionAction');
-    if (currentAction && currentAction.type === 'drop') {
-      return NodeStatus.RUNNING;
-    }
-
-    if (entity.input) {
-      entity.input.desiredMoveVector = null;
-      entity.input.isMovingForward = false;
-    }
-
-    entity.world.addComponent(entity.id, 'dropItemIntent', {
-      slotIndex: slotWithItem.globalSlotIndex,
-    });
-
-    const itemEntityId = slotWithItem.slot.itemId;
-    if (itemEntityId) {
-      const fetchStick = entity.world.getComponent(itemEntityId, 'fetchStick');
-      if (fetchStick) {
-        fetchStick.state = 'delivered';
-      }
-    }
-
-    bb.remove('fetchTargetId');
-    return NodeStatus.SUCCESS;
+  protected stopAction(_entity: EntityAdapter): void {
+    this.hasStarted = false;
   }
-
-  protected stopAction(_entity: EntityAdapter): void {}
 }
+
+export const BTActionFetchPickup = BTActionPickup;
+export const BTActionMasterPickupStick = BTActionPickup;
+export const BTActionFetchDeliver = BTActionDrop;
+export const BTActionDogDropAtZone = BTActionDrop;
 
 export class BTConditionMasterShouldThrow extends BTSimpleAction {
   public static readonly nodeName = 'Хозяин: пора кидать';
@@ -975,16 +961,30 @@ export class BTConditionMasterCanThrowNow extends BTSimpleAction {
   }
 }
 
-export class BTActionMasterCalculateThrowTarget extends BTSimpleAction {
-  public static readonly nodeName = 'Хозяин: расчет точки броска';
-  public static readonly description = 'Выбирает случайную точку на расстоянии 10..22м от хозяина';
+export class BTActionCalculateRandomPositionInRange extends BTSimpleAction {
+  public static readonly nodeName = 'Расчет случайной точки в радиусе';
+  public static readonly description =
+    'Выбирает случайную точку на заданном расстоянии от сущности с учетом рельефа';
+  public static readonly defaultParams = {
+    minDistance: 10.0,
+    maxDistance: 22.0,
+    targetPosKey: 'throwTargetPos',
+    setLookAngle: true,
+  };
+
+  private params: typeof BTActionCalculateRandomPositionInRange.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionCalculateRandomPositionInRange.defaultParams>) {
+    super();
+    this.params = { ...BTActionCalculateRandomPositionInRange.defaultParams, ...params };
+  }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
     const selfPos = entity.getPos();
 
-    const minR = 10.0;
-    const maxR = 22.0;
+    const minR = this.params.minDistance;
+    const maxR = this.params.maxDistance;
     const r = minR + Math.random() * (maxR - minR);
     const angle = Math.random() * Math.PI * 2;
 
@@ -1000,10 +1000,10 @@ export class BTActionMasterCalculateThrowTarget extends BTSimpleAction {
       }
     }
 
-    const throwTarget: Vec3 = { x: tx, y: ty, z: tz };
-    bb.set('throwTargetPos', throwTarget);
+    const targetPos: Vec3 = { x: tx, y: ty, z: tz };
+    bb.set(this.params.targetPosKey, targetPos);
 
-    if (entity.input) {
+    if (this.params.setLookAngle && entity.input) {
       entity.input.targetLookAngle = angle as Radians;
     }
 
@@ -1011,20 +1011,33 @@ export class BTActionMasterCalculateThrowTarget extends BTSimpleAction {
   }
 }
 
-export class BTActionMasterThrowStick extends BTAction {
-  public static readonly nodeName = 'Хозяин: бросок палки';
-  public static readonly description = 'Бросает палку из свободного слота в рассчитанную точку';
+export class BTActionThrow extends BTAction {
+  public static readonly nodeName = 'Бросить предмет';
+  public static readonly description =
+    'Бросает предмет из слота взаимодействия в указанную 3D-точку из блекборда';
+  public static readonly defaultParams = {
+    targetPosKey: 'throwTargetPos',
+    slotIndex: undefined as number | undefined,
+    itemKey: undefined as string | undefined,
+    cooldownKey: 'lastThrowTime',
+  };
 
   private hasStarted = false;
+  private params: typeof BTActionThrow.defaultParams;
 
-  protected onOpen(entity: EntityAdapter): void {
+  constructor(params?: Partial<typeof BTActionThrow.defaultParams>) {
+    super();
+    this.params = { ...BTActionThrow.defaultParams, ...params };
+  }
+
+  protected onOpen(_entity: EntityAdapter): void {
     this.hasStarted = false;
   }
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const throwTargetPos = bb.get<Vec3>('throwTargetPos');
-    if (!throwTargetPos) return NodeStatus.FAILURE;
+    const targetPos = bb.get<Vec3>(this.params.targetPosKey);
+    if (!targetPos) return NodeStatus.FAILURE;
 
     if (entity.world.getComponent(entity.id, 'throwItemIntent')) {
       return NodeStatus.RUNNING;
@@ -1037,32 +1050,42 @@ export class BTActionMasterThrowStick extends BTAction {
     }
 
     if (this.hasStarted) {
-      const localTime = bb.get<number>('localTime') || 0;
-      bb.set('lastThrowTime', localTime);
-      bb.remove('throwTargetPos');
+      this.hasStarted = false;
+      if (this.params.cooldownKey) {
+        const localTime = bb.get<number>('localTime') || 0;
+        bb.set(this.params.cooldownKey, localTime);
+      }
+      bb.remove(this.params.targetPosKey);
       return NodeStatus.SUCCESS;
     }
 
+    const targetItemId = this.params.itemKey ? bb.get<string>(this.params.itemKey) : undefined;
     const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
-    const stickSlot = aggSlots.find((s) => {
+    const slotWithItem = aggSlots.find((s) => {
       if (s.isBroken || !s.slot.itemId) return false;
-      return entity.world.getComponent(s.slot.itemId, 'fetchStick') !== undefined;
+      if (this.params.slotIndex !== undefined && s.globalSlotIndex !== this.params.slotIndex) {
+        return false;
+      }
+      if (targetItemId !== undefined && s.slot.itemId !== targetItemId) {
+        return false;
+      }
+      return true;
     });
 
-    if (!stickSlot || !stickSlot.slot.itemId) {
+    if (!slotWithItem || !slotWithItem.slot.itemId) {
       return NodeStatus.FAILURE;
     }
 
     entity.world.addComponent(entity.id, 'throwItemIntent', {
-      slotIndex: stickSlot.globalSlotIndex,
-      partId: stickSlot.partId,
-      targetPos: throwTargetPos,
+      slotIndex: slotWithItem.globalSlotIndex,
+      partId: slotWithItem.partId,
+      targetPos,
     });
 
     return NodeStatus.RUNNING;
   }
 
-  protected stopAction(entity: EntityAdapter): void {
+  protected stopAction(_entity: EntityAdapter): void {
     this.hasStarted = false;
   }
 }
@@ -1079,68 +1102,8 @@ export class BTConditionMasterCanPickupDeliveredStick extends BTSimpleAction {
   }
 }
 
-export class BTActionMasterPickupStick extends BTAction {
-  public static readonly nodeName = 'Хозяин: подбор палки';
-  public static readonly description = 'Подбирает принесенную палку в свободный слот';
-
-  protected onTick(entity: EntityAdapter): NodeStatus {
-    const bb = entity.brain!.blackboard;
-    const targetId = bb.get<string>('nearestDeliveredStickId');
-    if (!targetId || !entity.world.getEntity(targetId)) {
-      bb.remove('nearestDeliveredStickId');
-      return NodeStatus.FAILURE;
-    }
-
-    const aggSlots = getAggregatedInteractionSlots(entity.world, entity.id);
-    const isAlreadyHeld = aggSlots.some((s) => s.slot.itemId === targetId);
-    if (isAlreadyHeld) {
-      bb.remove('nearestDeliveredStickId');
-      return NodeStatus.SUCCESS;
-    }
-
-    if (entity.world.getComponent(entity.id, 'pickupIntent')) {
-      return NodeStatus.RUNNING;
-    }
-
-    const currentAction = entity.world.getComponent(entity.id, 'interactionAction');
-    if (currentAction && currentAction.type === 'pickup') {
-      return NodeStatus.RUNNING;
-    }
-
-    const targetTrans = entity.world.getComponent(targetId, 'transform');
-    if (!targetTrans) return NodeStatus.FAILURE;
-
-    const selfPos = entity.getPos();
-    const dist = Math.hypot(targetTrans.x - selfPos.x, targetTrans.z - selfPos.z);
-
-    const freeSlot = aggSlots.find((s) => !s.isBroken && s.slot.itemId === null);
-    if (!freeSlot) return NodeStatus.FAILURE;
-
-    const myRadius = entity.radius;
-    const targetPhysStats = entity.world.getComponent(targetId, 'physicsStats');
-    const targetRadius = targetPhysStats?.radius.current ?? 0.15;
-    const distBetweenBorders = Math.max(0, dist - myRadius - targetRadius);
-    const interactDist = freeSlot.slot.interactDist ?? 0.6;
-
-    if (distBetweenBorders <= interactDist + 0.1) {
-      if (entity.input) {
-        entity.input.desiredMoveVector = null;
-        entity.input.isMovingForward = false;
-        const dx = targetTrans.x - selfPos.x;
-        const dz = targetTrans.z - selfPos.z;
-        if (Math.hypot(dx, dz) > 0.001) {
-          entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
-        }
-      }
-      entity.world.addComponent(entity.id, 'pickupIntent', { targetItemId: targetId });
-      return NodeStatus.RUNNING;
-    }
-
-    return NodeStatus.FAILURE;
-  }
-
-  protected stopAction(_entity: EntityAdapter): void {}
-}
+export const BTActionMasterCalculateThrowTarget = BTActionCalculateRandomPositionInRange;
+export const BTActionMasterThrowStick = BTActionThrow;
 
 export class BTConditionMasterShouldFollowDog extends BTSimpleAction {
   public static readonly nodeName = 'Хозяин: собака слишком далеко';
