@@ -4,10 +4,9 @@ import { EntityId, CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE } 
 import { getAnatomyParts, getRootOwner } from './hierarchy';
 import { findActiveBrain } from './anatomy';
 import { getPartArmor, getConnectionArmor, selectDamageTarget } from './combat';
-import { killEntity } from './health';
-import { evaluateConsciousness, getPartStatus, PartStatus } from './anatomyStatus';
+import { DeathService } from '../services/DeathService';
+import { evaluateConsciousness } from './anatomyStatus';
 import { ConsciousnessState } from '../types';
-import { BEHAVIOR_TREES } from '../../ai/trees_library';
 import { EventBus } from '../../core/EventBus';
 
 export function forceDropItemFromPart(
@@ -238,100 +237,7 @@ function handleDeadEndOverflow(
 }
 
 export function checkCreatureDeath(world: World, rootEntityId: EntityId): void {
-  const state = evaluateConsciousness(world, rootEntityId);
-
-  if (state === ConsciousnessState.DEAD) {
-    killCreature(world, rootEntityId);
-    return;
-  }
-
-  const parts = getAnatomyParts(world, rootEntityId);
-
-  // Стирание дерева поведения (Brain Wipe) при полном разрушении мозга (ФП <= -max)
-  for (const partId of parts) {
-    const brainComp = world.getComponent(partId, 'bodyBrain');
-    if (brainComp) {
-      const brainStatus = getPartStatus(world, partId);
-      if (brainStatus === PartStatus.DESTROYED) {
-        const logicBrain = world.getComponent(partId, 'brain');
-        if (logicBrain) {
-          logicBrain.root_node = BEHAVIOR_TREES['IdleTree']();
-          const bb = logicBrain.blackboard;
-          if (bb) {
-            const localTime = bb.get('localTime');
-            const data = bb.getData();
-            for (const key of Object.keys(data)) {
-              bb.remove(key as any);
-            }
-            if (localTime !== undefined) {
-              bb.set('localTime', localTime);
-            }
-          }
-        }
-        const aiStats = world.getComponent(rootEntityId, 'aiStats');
-        if (aiStats) {
-          aiStats.behavior.current = 'IdleTree';
-        }
-      }
-    }
-  }
-
-  // Потеря сознания (UNCONSCIOUS)
-  if (state === ConsciousnessState.UNCONSCIOUS) {
-    for (const partId of parts) {
-      const logicBrain = world.getComponent(partId, 'brain');
-      if (logicBrain) {
-        const bb = logicBrain.blackboard;
-        if (bb) {
-          const localTime = bb.get('localTime');
-          const data = bb.getData();
-          for (const key of Object.keys(data)) {
-            bb.remove(key as any);
-          }
-          if (localTime !== undefined) {
-            bb.set('localTime', localTime);
-          }
-        }
-      }
-    }
-
-    const input = world.getComponent(rootEntityId, 'input');
-    if (input) {
-      input.desiredMoveVector = null;
-      input.moveForward = 0;
-      input.moveStrafe = 0;
-      input.isMovingForward = false;
-      input.turnDirection = 0;
-      input.turnRatio = 0;
-      input.isRunning = false;
-      input.wantsAttack = false;
-      input.attackSlotIndex = undefined;
-    }
-
-    const activeAttacks = world.getComponent(rootEntityId, 'activeAttacks');
-    if (activeAttacks) {
-      activeAttacks.attacks = [];
-    }
-
-    const meta = world.getComponent(rootEntityId, 'meta');
-    if (meta) {
-      meta.actionMode = 'idle';
-    }
-  }
-}
-
-function killCreature(world: World, rootEntityId: EntityId): void {
-  const health = world.getComponent(rootEntityId, 'health');
-  if (health && health.isAlive) {
-    health.isAlive = false;
-    health.current = 0;
-    const parts = getAnatomyParts(world, rootEntityId);
-    for (const pId of parts) {
-      const b = world.getComponent(pId, 'bodyBrain');
-      if (b) b.isActive = false;
-    }
-    killEntity(world, rootEntityId);
-  }
+  DeathService.checkCreatureDeath(world, rootEntityId);
 }
 
 export function applyWeaponDamageToCreature(

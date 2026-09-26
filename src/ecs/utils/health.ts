@@ -1,88 +1,12 @@
 import { World } from '../World';
 import { EntityId } from '../types';
-import { Radians } from '../../utils';
-import { removeModifier } from '../stats/StatEvaluator';
+import { DeathService } from '../services/DeathService';
 
 /**
- * Немедленно переводит сущность в состояние смерти с очисткой всех активных действий,
- * скоростей и модификаторов передвижения.
+ * Переводит сущность в состояние смерти через DeathService.
  */
 export function killEntity(world: World, id: EntityId): void {
-  const health = world.getComponent(id, 'health');
-  if (health) {
-    health.isAlive = false;
-    health.current = 0;
-  }
-
-  const input = world.getComponent(id, 'input');
-  if (input) {
-    input.desiredMoveVector = null;
-    input.moveForward = 0;
-    input.moveStrafe = 0;
-    input.targetLookAngle = undefined;
-    input.isMovingForward = false;
-    input.turnDirection = 0;
-    input.turnRatio = 0;
-    input.isRunning = false;
-    input.isCrouching = false;
-    input.isSlowWalking = false;
-    input.wantsAttack = false;
-    input.attackSlotIndex = undefined;
-  }
-
-  const velocity = world.getComponent(id, 'velocity');
-  if (velocity) {
-    velocity.vx = 0;
-    velocity.vy = 0;
-    velocity.currentSpeed = 0;
-    velocity.currentTurnSpeed = 0 as Radians;
-  }
-
-  world.removeComponent(id, 'stanceTransition');
-
-  const movementStats = world.getComponent(id, 'movementStats');
-  if (movementStats) {
-    removeModifier(movementStats.maxSpeed, 'stance_speed');
-    removeModifier(movementStats.maxSpeed, 'state_run_speed');
-    removeModifier(movementStats.maxSpeed, 'state_crouch_speed');
-    removeModifier(movementStats.maxSpeed, 'attack_slow_move');
-    removeModifier(movementStats.maxSpeed, 'pickup_slow_move');
-    removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
-    removeModifier(movementStats.maxTurnSpeed, 'state_run_turn');
-    removeModifier(movementStats.maxTurnSpeed, 'state_crouch_turn');
-    removeModifier(movementStats.maxTurnSpeed, 'attack_slow_turn');
-    removeModifier(movementStats.maxTurnSpeed, 'pickup_slow_turn');
-  }
-
-  const stealthStats = world.getComponent(id, 'stealthStats');
-  if (stealthStats) {
-    removeModifier(stealthStats.stealthPower, 'stance_stealth');
-  }
-
-  const activeAttacks = world.getComponent(id, 'activeAttacks');
-  if (activeAttacks) {
-    activeAttacks.attacks = [];
-  }
-
-  const meta = world.getComponent(id, 'meta');
-  if (meta) {
-    meta.stance = 'prone';
-    meta.movementMode = 'immobile';
-    meta.directionMode = 'immobile';
-    meta.actionMode = 'idle';
-  }
-
-  const tag = world.getComponent(id, 'tag');
-  if (tag?.archetype === 'obstacle') {
-    const phys = world.getComponent(id, 'physicsBody');
-    if (phys) {
-      phys.mask = 0;
-    }
-    const physStats = world.getComponent(id, 'physicsStats');
-    if (physStats) {
-      physStats.isSolid = false;
-    }
-  }
+  DeathService.kill(world, id);
 }
 
 /**

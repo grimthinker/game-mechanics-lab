@@ -1,5 +1,5 @@
 import { World } from '../World';
-import { killEntity } from '../utils/health';
+import { DeathService } from '../services/DeathService';
 
 export class DamageSystem {
   public update(dt: number, world: World): void {
@@ -26,7 +26,7 @@ export class DamageSystem {
 
       // Страховочная синхронизация на случай внешних модификаций
       if (health.current <= 0 && health.isAlive) {
-        killEntity(world, id);
+        DeathService.kill(world, id);
       }
     }
   }
