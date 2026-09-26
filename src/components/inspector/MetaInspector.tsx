@@ -123,9 +123,17 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
         <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
           Координаты (метры)
         </span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-          <label style={{ fontSize: '10px', color: '#e74c3c' }}>
-            X:
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#e74c3c',
+            }}
+          >
+            <span>Позиция X:</span>
             <input
               disabled={isReadOnly}
               type="number"
@@ -139,15 +147,24 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
               }}
               onChange={(e) => handleTransformChange({ x: parseFloat(e.target.value) || 0 })}
               style={{
-                width: '100%',
-                padding: '2px 4px',
+                width: '110px',
+                padding: '2px 6px',
                 fontSize: '11px',
+                textAlign: 'right',
                 boxSizing: 'border-box',
               }}
             />
           </label>
-          <label style={{ fontSize: '10px', color: '#2ecc71' }}>
-            Y (Высота):
+          <label
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#2ecc71',
+            }}
+          >
+            <span>Высота Y:</span>
             <input
               disabled={isReadOnly}
               type="number"
@@ -161,15 +178,24 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
               }}
               onChange={(e) => handleTransformChange({ y: parseFloat(e.target.value) || 0 })}
               style={{
-                width: '100%',
-                padding: '2px 4px',
+                width: '110px',
+                padding: '2px 6px',
                 fontSize: '11px',
+                textAlign: 'right',
                 boxSizing: 'border-box',
               }}
             />
           </label>
-          <label style={{ fontSize: '10px', color: '#3498db' }}>
-            Z:
+          <label
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#3498db',
+            }}
+          >
+            <span>Позиция Z:</span>
             <input
               disabled={isReadOnly}
               type="number"
@@ -183,9 +209,10 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
               }}
               onChange={(e) => handleTransformChange({ z: parseFloat(e.target.value) || 0 })}
               style={{
-                width: '100%',
-                padding: '2px 4px',
+                width: '110px',
+                padding: '2px 6px',
                 fontSize: '11px',
+                textAlign: 'right',
                 boxSizing: 'border-box',
               }}
             />
@@ -193,15 +220,15 @@ export const MetaInspector: React.FC<MetaInspectorProps> = ({
         </div>
         <label
           style={{
-            fontSize: '10px',
+            fontSize: '11px',
             color: '#f1c40f',
-            marginTop: '4px',
+            marginTop: '2px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
-          Поворот Yaw (°):
+          <span>Поворот Yaw (°):</span>
           <input
             disabled={isReadOnly}
             type="number"

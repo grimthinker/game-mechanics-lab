@@ -56,6 +56,7 @@ export function assembleItem(
     radius: createStat(radius),
     weight: createStat(weight),
     isSolid,
+    shape: config.physics?.shape,
     halfExtents: config.physics?.halfExtents ? { ...config.physics.halfExtents } : undefined,
     colliderOffset: config.physics?.colliderOffset
       ? { ...config.physics.colliderOffset }
@@ -164,24 +165,29 @@ export function assembleItem(
       const pos3D = { x: posX, y: posY, z: posZ };
       rawBody = physics.driver.createDynamicBody(pos3D, id);
 
-      const size = radius * 0.8; // Уменьшенный в 2 раза куб по умолчанию
-      const hx = config.physics?.halfExtents?.x ?? size / 2;
-      const hy = config.physics?.halfExtents?.y ?? size / 2;
-      const hz = config.physics?.halfExtents?.z ?? size / 2;
+      if (config.physics?.shape === 'ball') {
+        rawCollider = physics.driver.createBallCollider(radius, rawBody, weight);
+        rawCollider.setRestitution(0.72);
+        rawBody.setLinearDamping(config.physics?.linearDamping ?? 0.1);
+        rawBody.setAngularDamping(config.physics?.angularDamping ?? 0.1);
+      } else {
+        const size = radius * 0.8;
+        const hx = config.physics?.halfExtents?.x ?? size / 2;
+        const hy = config.physics?.halfExtents?.y ?? size / 2;
+        const hz = config.physics?.halfExtents?.z ?? size / 2;
 
-      rawCollider = physics.driver.createCuboidCollider(
-        hx,
-        hy,
-        hz,
-        rawBody,
-        weight,
-        config.physics?.colliderOffset
-      );
-      rawCollider.setRestitution(0.3);
-
-      // Применяем демпфирование для реалистичного затухания полета и вращения
-      rawBody.setLinearDamping(config.physics?.linearDamping ?? 0.95);
-      rawBody.setAngularDamping(config.physics?.angularDamping ?? 0.95);
+        rawCollider = physics.driver.createCuboidCollider(
+          hx,
+          hy,
+          hz,
+          rawBody,
+          weight,
+          config.physics?.colliderOffset
+        );
+        rawCollider.setRestitution(0.3);
+        rawBody.setLinearDamping(config.physics?.linearDamping ?? 0.95);
+        rawBody.setAngularDamping(config.physics?.angularDamping ?? 0.95);
+      }
     }
 
     world.addComponent(id, 'physicsBody', {

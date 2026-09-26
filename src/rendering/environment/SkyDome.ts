@@ -4,6 +4,7 @@ export interface SkyColors {
   zenith: THREE.Color;
   horizon: THREE.Color;
   haze: THREE.Color;
+  sunset: THREE.Color;
   sunDisk: THREE.Color;
   moonDisk: THREE.Color;
   ambient: THREE.Color;
@@ -34,6 +35,7 @@ const fragmentShader = `
   uniform vec3 uZenithColor;
   uniform vec3 uHorizonColor;
   uniform vec3 uHazeColor;
+  uniform vec3 uSunsetColor;
   uniform vec3 uSunColor;
   uniform vec3 uMoonColor;
   uniform float uStarFade;
@@ -48,29 +50,28 @@ const fragmentShader = `
     vec3 dir = normalize(vWorldDirection);
     float h = clamp(dir.y, 0.0, 1.0);
 
-    // 1. Направленность заката: восток (сторона луны) прохладнее запада (стороны солнца)
-    vec2 flatDir = normalize(dir.xz);
-    vec2 flatSun = length(uSunDirection.xz) > 0.01 ? normalize(uSunDirection.xz) : vec2(1.0, 0.0);
-    float sunAzimuth = dot(flatDir, flatSun);
-    float duskTransition = smoothstep(0.25, -0.15, uSunDirection.y);
-    float antiSunFactor = clamp((1.0 - sunAzimuth) * 0.5, 0.0, 1.0);
-
-    vec3 twilightHorizon = mix(uHorizonColor, uZenithColor * 1.5 + vec3(0.08, 0.06, 0.12), antiSunFactor * duskTransition * 0.7);
-    vec3 horizonColor = mix(uHorizonColor, twilightHorizon, 0.8);
-    vec3 hazeColor = mix(uHazeColor, twilightHorizon * 1.05, 0.7);
-
-    // Градиент неба: горизонт -> зенит
+    // 1. Базовый вертикальный градиент атмосферы (360° вокруг наблюдателя)
     float skyCurve = pow(h, 0.45);
-    vec3 skyColor = mix(horizonColor, uZenithColor, skyCurve);
+    vec3 skyColor = mix(uHorizonColor, uZenithColor, skyCurve);
 
-    // Дымка у горизонта
-    float hazeFactor = 1.0 - smoothstep(0.0, 0.25, h);
-    skyColor = mix(skyColor, hazeColor, hazeFactor * 0.75);
+    // 2. Направленный закат/рассвет (появляется СТРОГО со стороны солнца)
+    vec2 flatDir = normalize(dir.xz);
+    vec2 flatSun = length(uSunDirection.xz) > 0.001 ? normalize(uSunDirection.xz) : vec2(1.0, 0.0);
+    float sunAlignment = dot(flatDir, flatSun); // +1 прямо на солнце, -1 в противоположную сторону
+    float sunsetCone = pow(clamp(sunAlignment * 0.5 + 0.5, 0.0, 1.0), 3.0);
+    float sunsetAltitude = 1.0 - smoothstep(0.0, 0.35, h);
+    vec3 sunsetGlow = uSunsetColor * (sunsetCone * sunsetAltitude);
+    skyColor += sunsetGlow;
+
+    // 3. Дымка у горизонта (мягкое слияние с туманом сцены)
+    float hazeFactor = 1.0 - smoothstep(0.0, 0.22, h);
+    vec3 effectiveHaze = uHazeColor + uSunsetColor * (sunsetCone * 0.5);
+    skyColor = mix(skyColor, effectiveHaze, hazeFactor * 0.75);
 
     float sunDot = dot(dir, uSunDirection);
     float moonDot = dot(dir, uMoonDirection);
 
-    // 2. Процедурные звезды (рисуются СТРОГО под светилами и не перекрывают их)
+    // 4. Процедурные звезды (рисуются СТРОГО под светилами и не перекрывают их)
     if (uStarFade > 0.01 && dir.y > 0.02 && sunDot < 0.998 && moonDot < 0.998) {
       vec3 starDir = normalize(vCelestialCoords);
       vec3 grid = floor(starDir * 180.0);
@@ -148,6 +149,7 @@ export class SkyDome {
         uZenithColor: { value: new THREE.Color() },
         uHorizonColor: { value: new THREE.Color() },
         uHazeColor: { value: new THREE.Color() },
+        uSunsetColor: { value: new THREE.Color() },
         uSunColor: { value: new THREE.Color() },
         uMoonColor: { value: new THREE.Color() },
         uStarFade: { value: 0.0 },
@@ -182,6 +184,7 @@ export class SkyDome {
     u.uZenithColor.value.copy(colors.zenith);
     u.uHorizonColor.value.copy(colors.horizon);
     u.uHazeColor.value.copy(colors.haze);
+    u.uSunsetColor.value.copy(colors.sunset);
     u.uSunColor.value.copy(colors.sunDisk);
     u.uMoonColor.value.copy(colors.moonDisk);
     u.uStarFade.value = starFade;

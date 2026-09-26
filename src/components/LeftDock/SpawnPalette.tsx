@@ -82,14 +82,15 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
       items: [
         {
           id: 'weapon_stick',
-          name: 'Палка для апорта',
-          description: 'Легкая деревянная палка',
-          icon: '🪵',
+          name: 'Мячик для апорта',
+          description: 'Упругий спортивный мячик для собак',
+          icon: '🎾',
           createConfig: () => ({
             tag: { archetype: 'item', subType: 'weapon' },
-            meta: { name: 'Палка для апорта', entityType: 'item' },
+            meta: { name: 'Мячик для апорта', entityType: 'item' },
+            visualModel: { modelId: 'proc://prop/ball' },
             item: {
-              name: 'Палка для апорта',
+              name: 'Мячик для апорта',
               type: 'weapon',
               maxStack: 1,
               size: 4,
@@ -97,7 +98,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               equippable: false,
               equipTimeMultiplier: 1.0,
             },
-            physics: { radius: 0.15, weight: 0.5, isSolid: true },
+            physics: { radius: 0.15, weight: 0.5, isSolid: true, shape: 'ball' },
             weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
             weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
           }),

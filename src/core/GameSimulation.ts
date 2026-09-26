@@ -341,7 +341,7 @@ export class GameSimulation {
 
     const { x: bx, y: by, z: bz } = center ?? { x: 0, y: 0, z: 0 };
 
-    this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 });
+    this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 }, 'terrain');
     this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
 
     // 1. Игрок (без палки в руке, не участвует в апорте)
@@ -365,7 +365,7 @@ export class GameSimulation {
       'Хозяин'
     );
 
-    // 3. Выдаем Хозяину по одной палке в левую и в правую руку
+    // 3. Выдаем Хозяину по одному мячику в левую и в правую руку
     const masterParts = getAnatomyParts(this.world, masterId);
     const leftHandPartId = masterParts.find((pId) => {
       const slot = this.world.getComponent(pId, 'interactionSlots');
@@ -376,9 +376,10 @@ export class GameSimulation {
       return slot && slot.slotKind === 'right_hand';
     });
 
-    const createStickConfig = (ownerPartId: string, name: string): EntityConfig => ({
+    const createBallConfig = (ownerPartId: string, name: string): EntityConfig => ({
       tag: { archetype: 'item', subType: 'weapon' },
       meta: { name, entityType: 'item' },
+      visualModel: { modelId: 'proc://prop/ball' },
       item: {
         name,
         type: 'weapon',
@@ -389,7 +390,7 @@ export class GameSimulation {
         equippable: false,
         equipTimeMultiplier: 1.0,
       },
-      physics: { radius: 0.15, weight: 0.5, isSolid: true },
+      physics: { radius: 0.15, weight: 0.5, isSolid: true, shape: 'ball' },
       weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
       weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
       ownership: { ownerId: ownerPartId, status: 'equipped' },
@@ -401,18 +402,15 @@ export class GameSimulation {
     });
 
     if (leftHandPartId) {
-      const stickLeftId = this.spawnEntity(createStickConfig(leftHandPartId, 'Палка 1'), masterPos);
+      const ballLeftId = this.spawnEntity(createBallConfig(leftHandPartId, 'Мячик 1'), masterPos);
       const slot = this.world.getComponent(leftHandPartId, 'interactionSlots');
-      if (slot) slot.itemId = stickLeftId;
+      if (slot) slot.itemId = ballLeftId;
     }
 
     if (rightHandPartId) {
-      const stickRightId = this.spawnEntity(
-        createStickConfig(rightHandPartId, 'Палка 2'),
-        masterPos
-      );
+      const ballRightId = this.spawnEntity(createBallConfig(rightHandPartId, 'Мячик 2'), masterPos);
       const slot = this.world.getComponent(rightHandPartId, 'interactionSlots');
-      if (slot) slot.itemId = stickRightId;
+      if (slot) slot.itemId = ballRightId;
     }
 
     // 4. Спавним 3 собак
@@ -642,7 +640,7 @@ export class GameSimulation {
       { x: bx + 1.0, y: by + 0.2, z: bz + 1.0 }
     );
 
-    // Спавн леса (45 деревьев)
+    // Спавн леса (45 деревьев) со случайным углом поворота кроны
     const treeCount = 45;
     for (let i = 0; i < treeCount; i++) {
       const tx = bx + (Math.random() - 0.5) * 80;
@@ -652,11 +650,25 @@ export class GameSimulation {
       const distToCenter = Math.hypot(tx - bx, tz - bz);
       if (distToCenter < 8) continue;
 
+      const randomAngle = (Math.random() * Math.PI * 2) as Radians;
+
       this.spawnEntity(
         {
           tag: { archetype: 'obstacle' },
           meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
           visualModel: { modelId: 'proc://prop/tree' },
+          transform: {
+            x: tx,
+            y: by,
+            z: tz,
+            rotation: {
+              x: 0,
+              y: Math.sin(randomAngle * 0.5),
+              z: 0,
+              w: Math.cos(randomAngle * 0.5),
+            },
+            angle: randomAngle,
+          },
           physics: {
             radius: 0.6,
             weight: 5000,

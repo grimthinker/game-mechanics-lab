@@ -81,10 +81,6 @@ export class ThreeRenderer implements IRenderer {
     // Менеджер окружения (скайбокс, солнце, луна, звезды, тени и туман)
     this.environmentManager = new EnvironmentManager(this.scene);
 
-    // Метрическая сетка: 50x50 метров, шаг 1 метр
-    const grid = new THREE.GridHelper(50, 50, 0x555555, 0x333333);
-    this.scene.add(grid);
-
     // 3D-оси координат (Красная: X, Зеленая: Y (Вверх), Синяя: Z)
     const axes = new THREE.AxesHelper(3);
     this.scene.add(axes);

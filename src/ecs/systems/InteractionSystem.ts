@@ -860,23 +860,31 @@ export class InteractionSystem {
 
       if (physics.driver && physics.driver.isReady) {
         rawBody = physics.driver.createDynamicBody({ x: endX, y: dropY, z: endZ }, itemId);
-        const size = itemRadius * 0.8;
         const weight = physStats.weight.current ?? 1;
-        const hx = physStats.halfExtents?.x ?? size / 2;
-        const hy = physStats.halfExtents?.y ?? size / 2;
-        const hz = physStats.halfExtents?.z ?? size / 2;
 
-        rawCollider = physics.driver.createCuboidCollider(
-          hx,
-          hy,
-          hz,
-          rawBody,
-          weight,
-          physStats.colliderOffset
-        );
-        rawCollider.setRestitution(0.3);
-        rawBody.setLinearDamping(0.95);
-        rawBody.setAngularDamping(0.95);
+        if (physStats.shape === 'ball') {
+          rawCollider = physics.driver.createBallCollider(itemRadius, rawBody, weight);
+          rawCollider.setRestitution(0.72);
+          rawBody.setLinearDamping(0.1);
+          rawBody.setAngularDamping(0.1);
+        } else {
+          const size = itemRadius * 0.8;
+          const hx = physStats.halfExtents?.x ?? size / 2;
+          const hy = physStats.halfExtents?.y ?? size / 2;
+          const hz = physStats.halfExtents?.z ?? size / 2;
+
+          rawCollider = physics.driver.createCuboidCollider(
+            hx,
+            hy,
+            hz,
+            rawBody,
+            weight,
+            physStats.colliderOffset
+          );
+          rawCollider.setRestitution(0.3);
+          rawBody.setLinearDamping(0.95);
+          rawBody.setAngularDamping(0.95);
+        }
 
         // Прикладываем горизонтальный импульс броска только в свободном пространстве
         if (!isConstrainedByObstacle) {
@@ -995,23 +1003,31 @@ export class InteractionSystem {
 
       if (physics.driver && physics.driver.isReady) {
         rawBody = physics.driver.createDynamicBody({ x: endX, y: spawnY, z: endZ }, itemId);
-        const size = itemRadius * 0.8;
         const weight = physStats.weight.current ?? 1;
-        const hx = physStats.halfExtents?.x ?? size / 2;
-        const hy = physStats.halfExtents?.y ?? size / 2;
-        const hz = physStats.halfExtents?.z ?? size / 2;
 
-        rawCollider = physics.driver.createCuboidCollider(
-          hx,
-          hy,
-          hz,
-          rawBody,
-          weight,
-          physStats.colliderOffset
-        );
-        rawCollider.setRestitution(0.3);
-        rawBody.setLinearDamping(0.05); // Минимальное сопротивление воздуха для честной параболы
-        rawBody.setAngularDamping(0.1);
+        if (physStats.shape === 'ball') {
+          rawCollider = physics.driver.createBallCollider(itemRadius, rawBody, weight);
+          rawCollider.setRestitution(0.75);
+          rawBody.setLinearDamping(0.02);
+          rawBody.setAngularDamping(0.05);
+        } else {
+          const size = itemRadius * 0.8;
+          const hx = physStats.halfExtents?.x ?? size / 2;
+          const hy = physStats.halfExtents?.y ?? size / 2;
+          const hz = physStats.halfExtents?.z ?? size / 2;
+
+          rawCollider = physics.driver.createCuboidCollider(
+            hx,
+            hy,
+            hz,
+            rawBody,
+            weight,
+            physStats.colliderOffset
+          );
+          rawCollider.setRestitution(0.3);
+          rawBody.setLinearDamping(0.05);
+          rawBody.setAngularDamping(0.1);
+        }
 
         // Если в упор нет препятствия — передаем баллистическую скорость
         if (!isConstrainedByObstacle) {

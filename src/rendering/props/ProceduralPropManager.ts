@@ -27,6 +27,8 @@ export class ProceduralPropManager {
       prop = this.buildSword();
     } else if (name === 'tree') {
       prop = this.buildTree();
+    } else if (name === 'ball') {
+      prop = this.buildBall();
     }
 
     if (prop) {
@@ -125,6 +127,61 @@ export class ProceduralPropManager {
     const crown3 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), leafMat);
     crown3.position.set(-0.7, 2.8, 0.5);
     group.add(crown3);
+
+    return group;
+  }
+
+  private buildBall(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'BallRoot';
+
+    const radius = 0.15;
+    const geometry = new THREE.SphereGeometry(radius, 24, 18);
+
+    // Процедурная текстура спортивного мяча со швами
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d')!;
+
+    // Яркий спортивный лаймово-желтый цвет
+    ctx.fillStyle = '#bfe228';
+    ctx.fillRect(0, 0, 256, 128);
+
+    // Белые фигурные швы
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    for (let x = 0; x <= 256; x += 4) {
+      const y = 64 + Math.sin((x / 256) * Math.PI * 2) * 36;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    ctx.beginPath();
+    for (let x = 0; x <= 256; x += 4) {
+      const y = 64 + Math.cos((x / 256) * Math.PI * 2) * 36;
+      if (x === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    const material = new THREE.MeshStandardMaterial({
+      map: texture,
+      roughness: 0.75,
+      metalness: 0.05,
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
 
     return group;
   }

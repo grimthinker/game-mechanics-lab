@@ -37,13 +37,13 @@ export class EnvironmentManager {
 
   private setupShadowCamera(light: THREE.DirectionalLight): void {
     light.castShadow = false;
-    light.shadow.mapSize.width = 2048;
-    light.shadow.mapSize.height = 2048;
-    light.shadow.bias = -0.0004;
-    light.shadow.normalBias = 0.02;
+    light.shadow.mapSize.width = 4096;
+    light.shadow.mapSize.height = 4096;
+    light.shadow.bias = -0.0002;
+    light.shadow.normalBias = 0.015;
 
     const cam = light.shadow.camera;
-    const bounds = 38;
+    const bounds = 36;
     cam.left = -bounds;
     cam.right = bounds;
     cam.top = bounds;
@@ -130,6 +130,7 @@ export class EnvironmentManager {
       zenith: new THREE.Color(),
       horizon: new THREE.Color(),
       haze: new THREE.Color(),
+      sunset: new THREE.Color(),
       sunDisk: new THREE.Color(0xfff5d0),
       moonDisk: new THREE.Color(0xecf0f1),
       ambient: new THREE.Color(),
@@ -137,26 +138,75 @@ export class EnvironmentManager {
       moonLight: new THREE.Color(0x8faee0),
     };
 
-    if (sunY > 0.15) {
-      const t = Math.min(1.0, (sunY - 0.15) / 0.5);
-      colors.zenith.setRGB(0.18, 0.48, 0.92).lerp(new THREE.Color(0.12, 0.42, 0.88), t);
-      colors.horizon.setRGB(0.68, 0.82, 0.96);
-      colors.haze.setRGB(0.72, 0.85, 0.98);
-      colors.ambient.setRGB(0.42, 0.45, 0.52);
-      colors.sunLight.setRGB(1.0, 0.97, 0.88);
-    } else if (sunY > -0.1) {
-      const t = (sunY + 0.1) / 0.25;
-      colors.zenith.setRGB(0.12, 0.16, 0.38).lerp(new THREE.Color(0.18, 0.48, 0.92), t);
-      colors.horizon.setRGB(0.96, 0.44, 0.18).lerp(new THREE.Color(0.68, 0.82, 0.96), t);
-      colors.haze.setRGB(0.92, 0.52, 0.32).lerp(new THREE.Color(0.72, 0.85, 0.98), t);
-      colors.ambient.setRGB(0.35, 0.28, 0.32).lerp(new THREE.Color(0.42, 0.45, 0.52), t);
-      colors.sunLight.setRGB(1.0, 0.58, 0.25).lerp(new THREE.Color(1.0, 0.97, 0.88), t);
-    } else {
-      colors.zenith.setRGB(0.015, 0.025, 0.06);
-      colors.horizon.setRGB(0.04, 0.06, 0.12);
-      colors.haze.setRGB(0.05, 0.07, 0.14);
-      colors.ambient.setRGB(0.08, 0.1, 0.16);
+    // Опорные цветовые состояния атмосферы
+    const cDayZenith = new THREE.Color(0.15, 0.42, 0.88);
+    const cDayHorizon = new THREE.Color(0.65, 0.8, 0.95);
+    const cDayHaze = new THREE.Color(0.7, 0.84, 0.96);
+    const cDaySunLight = new THREE.Color(1.0, 0.98, 0.9);
+    const cDayAmbient = new THREE.Color(0.42, 0.46, 0.52);
+
+    const cSunsetZenith = new THREE.Color(0.1, 0.16, 0.4);
+    const cSunsetHorizon = new THREE.Color(0.38, 0.36, 0.52); // Сумеречный лавандовый тыл
+    const cSunsetHaze = new THREE.Color(0.42, 0.38, 0.5);
+    const cSunsetGlow = new THREE.Color(1.0, 0.45, 0.14); // Огненно-золотой закатный сектор
+    const cSunsetLight = new THREE.Color(1.0, 0.55, 0.22);
+    const cSunsetAmbient = new THREE.Color(0.28, 0.22, 0.28);
+
+    const cDuskZenith = new THREE.Color(0.03, 0.05, 0.14);
+    const cDuskHorizon = new THREE.Color(0.1, 0.09, 0.18);
+    const cDuskHaze = new THREE.Color(0.12, 0.1, 0.2);
+    const cDuskSunsetGlow = new THREE.Color(0.45, 0.12, 0.16); // Догорающий пурпурный сектор
+    const cDuskAmbient = new THREE.Color(0.13, 0.12, 0.18);
+
+    const cNightZenith = new THREE.Color(0.015, 0.025, 0.06);
+    const cNightHorizon = new THREE.Color(0.035, 0.05, 0.11);
+    const cNightHaze = new THREE.Color(0.045, 0.065, 0.13);
+    const cNightAmbient = new THREE.Color(0.08, 0.1, 0.16);
+
+    // Непрерывная 5-фазная шкала высоты солнца (sunY)
+    if (sunY >= 0.2) {
+      // 1. Полный день
+      colors.zenith.copy(cDayZenith);
+      colors.horizon.copy(cDayHorizon);
+      colors.haze.copy(cDayHaze);
+      colors.sunset.setRGB(0, 0, 0);
+      colors.sunLight.copy(cDaySunLight);
+      colors.ambient.copy(cDayAmbient);
+    } else if (sunY >= 0.05) {
+      // 2. День -> Золотой час / Закат у горизонта
+      const t = (sunY - 0.05) / 0.15; // 0..1
+      colors.zenith.lerpColors(cSunsetZenith, cDayZenith, t);
+      colors.horizon.lerpColors(cSunsetHorizon, cDayHorizon, t);
+      colors.haze.lerpColors(cSunsetHaze, cDayHaze, t);
+      colors.sunset.lerpColors(cSunsetGlow, new THREE.Color(0, 0, 0), t);
+      colors.sunLight.lerpColors(cSunsetLight, cDaySunLight, t);
+      colors.ambient.lerpColors(cSunsetAmbient, cDayAmbient, t);
+    } else if (sunY >= -0.08) {
+      // 3. Закат у горизонта -> Ранние сумерки (солнце садится под горизонт)
+      const t = (sunY - -0.08) / 0.13; // 0..1
+      colors.zenith.lerpColors(cDuskZenith, cSunsetZenith, t);
+      colors.horizon.lerpColors(cDuskHorizon, cSunsetHorizon, t);
+      colors.haze.lerpColors(cDuskHaze, cSunsetHaze, t);
+      colors.sunset.lerpColors(cDuskSunsetGlow, cSunsetGlow, t);
+      colors.sunLight.lerpColors(new THREE.Color(0.5, 0.18, 0.1), cSunsetLight, t);
+      colors.ambient.lerpColors(cDuskAmbient, cSunsetAmbient, t);
+    } else if (sunY >= -0.22) {
+      // 4. Глубокие сумерки -> Наступление ночи
+      const t = (sunY - -0.22) / 0.14; // 0..1
+      colors.zenith.lerpColors(cNightZenith, cDuskZenith, t);
+      colors.horizon.lerpColors(cNightHorizon, cDuskHorizon, t);
+      colors.haze.lerpColors(cNightHaze, cDuskHaze, t);
+      colors.sunset.lerpColors(new THREE.Color(0, 0, 0), cDuskSunsetGlow, t);
       colors.sunLight.setRGB(0, 0, 0);
+      colors.ambient.lerpColors(cNightAmbient, cDuskAmbient, t);
+    } else {
+      // 5. Полная ночь
+      colors.zenith.copy(cNightZenith);
+      colors.horizon.copy(cNightHorizon);
+      colors.haze.copy(cNightHaze);
+      colors.sunset.setRGB(0, 0, 0);
+      colors.sunLight.setRGB(0, 0, 0);
+      colors.ambient.copy(cNightAmbient);
     }
 
     return colors;

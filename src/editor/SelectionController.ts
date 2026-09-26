@@ -159,17 +159,27 @@ export class SelectionController {
   }
 
   public pickEntityAt(worldPoint: Vec3, clientX?: number, clientY?: number): string | null {
+    const isUnpickable = (id: string | null | undefined): boolean => {
+      if (!id) return true;
+      if (id === 'terrain' || id === 'environment') return true;
+      const entity = this.app.world.getEntity(id);
+      if (!entity) return false;
+      if (entity.terrain !== undefined || entity.environment !== undefined) return true;
+      const arch = entity.tag?.archetype ?? entity.meta?.entityType;
+      return arch === 'terrain' || arch === 'environment';
+    };
+
     if (clientX !== undefined && clientY !== undefined) {
       // 1. Приоритетный клик по мешам Three.js (позволяет выбирать конкретные части тела partId)
       if (this.app.renderer.pickEntity) {
         const picked = this.app.renderer.pickEntity(clientX, clientY);
-        if (picked && picked !== 'terrain' && picked !== 'environment') return picked;
+        if (picked && !isUnpickable(picked)) return picked;
       }
 
       // 2. Физический рейкаст Rapier3D (страховка при промахе сквозь меш или клике по коллайдерам)
       if (this.app.raycastPhysics) {
         const hit = this.app.raycastPhysics(clientX, clientY);
-        if (hit && hit.entityId && hit.entityId !== 'terrain' && hit.entityId !== 'environment') {
+        if (hit && hit.entityId && !isUnpickable(hit.entityId)) {
           return hit.entityId;
         }
       }
