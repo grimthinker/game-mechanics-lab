@@ -108,6 +108,7 @@ export class GameSimulation {
     if (this.playerEntityId && this.world.hasEntity(this.playerEntityId)) {
       const health = this.world.getComponent(this.playerEntityId, 'health');
       if (health?.isAlive) return this.playerEntityId;
+      this.playerEntityId = null;
     }
     const entities = this.world.getEntitiesWith('aiStats', 'health');
     for (const [id, comp] of entities) {
@@ -116,6 +117,7 @@ export class GameSimulation {
         return id;
       }
     }
+    this.playerEntityId = null;
     return null;
   }
 
@@ -345,7 +347,7 @@ export class GameSimulation {
     this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
 
     // 1. Игрок (без палки в руке, не участвует в апорте)
-    this.entityFactory.spawnModularHumanoid(
+    this.playerEntityId = this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
       this.aiSystem,
@@ -390,7 +392,16 @@ export class GameSimulation {
         equippable: false,
         equipTimeMultiplier: 1.0,
       },
-      physics: { radius: 0.15, weight: 0.5, isSolid: true, shape: 'ball' },
+      physics: {
+        radius: 0.15,
+        weight: 0.5,
+        isSolid: true,
+        shape: 'ball',
+        restitution: 0.88,
+        friction: 0.85,
+        linearDamping: 0.25,
+        angularDamping: 2.0,
+      },
       weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
       weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
       ownership: { ownerId: ownerPartId, status: 'equipped' },

@@ -329,6 +329,12 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
 
+    const playerId = app.getPlayerEntityId();
+    if (!playerId) {
+      alert(t('app.noPlayerToPlay'));
+      return;
+    }
+
     if (app.gameMode === GameMode.EDITOR) {
       app.editorSnapshot = app.serializeWorld();
     }

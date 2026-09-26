@@ -2,7 +2,7 @@ import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
 import { CollisionCategory, EntityId, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
 import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
-import { Radians, calculateThrowVelocity } from '../../utils';
+import { Radians, calculateThrowVelocity, angleDifference } from '../../utils';
 import {
   calculateTotalEntityWeight,
   getAggregatedInteractionSlots,
@@ -256,39 +256,7 @@ export class InteractionSystem {
             renderable.isVisible = true;
           }
 
-          const physStats = world.getComponent(targetId, 'physicsStats');
-          if (physStats && physics.driver && physics.driver.isReady) {
-            const radius = physStats.radius.current ?? 0.3;
-            const weight = physStats.weight.current ?? 1;
-            const size = radius * 0.8;
-            const hx = physStats.halfExtents?.x ?? size / 2;
-            const hy = physStats.halfExtents?.y ?? size / 2;
-            const hz = physStats.halfExtents?.z ?? size / 2;
-            const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-
-            const rawBody = physics.driver.createDynamicBody(
-              { x: dropX, y: dropY + 0.5, z: dropZ },
-              targetId
-            );
-            const rawCollider = physics.driver.createCuboidCollider(
-              hx,
-              hy,
-              hz,
-              rawBody,
-              weight,
-              physStats.colliderOffset
-            );
-            rawCollider.setRestitution(0.3);
-
-            world.addComponent(targetId, 'physicsBody', {
-              rawBody,
-              rawCollider,
-              bodyType: 'dynamic',
-              isStatic: false,
-              category: CollisionCategory.ITEM,
-              mask,
-            });
-          }
+          physics.createDynamicItemBody(world, targetId, { x: dropX, y: dropY + 0.5, z: dropZ });
         }
 
         const remainingTime = action.timer;
@@ -448,12 +416,7 @@ export class InteractionSystem {
             const dx = interactionAction.targetItemPos.x - transform.x;
             const dz = interactionAction.targetItemPos.z - transform.z;
             const targetAngle = Math.atan2(dz, dx);
-            let diff = Math.abs(
-              Math.atan2(
-                Math.sin(targetAngle - transform.angle),
-                Math.cos(targetAngle - transform.angle)
-              )
-            );
+            const diff = Math.abs(angleDifference(targetAngle, transform.angle));
 
             const tolerance = LOGIC_CONFIG.throwTurnTolerance ?? Math.PI / 12;
 
@@ -593,9 +556,7 @@ export class InteractionSystem {
               const dz = targetTransformEntity.z - selfTransform.z;
               relativeDist = Math.hypot(dx, dz);
               const worldAngle = Math.atan2(dz, dx);
-              let relAngle = worldAngle - selfTransform.angle;
-              relAngle = Math.atan2(Math.sin(relAngle), Math.cos(relAngle));
-              relativeAngle = relAngle as Radians;
+              relativeAngle = angleDifference(worldAngle, selfTransform.angle);
             }
 
             slot.itemId = targetId;
@@ -846,62 +807,14 @@ export class InteractionSystem {
       itemTransform.z = endZ;
       itemTransform.isDirty = false;
 
-      const mask = physStats.isSolid
-        ? CollisionCategory.OBSTACLE |
-          CollisionCategory.CREATURE |
-          CollisionCategory.ITEM |
-          CollisionCategory.PROJECTILE |
-          CollisionCategory.TRIGGER_ZONE |
-          CollisionCategory.PARTICLE
-        : 0;
+      const rawBody = physics.createDynamicItemBody(world, itemId, { x: endX, y: dropY, z: endZ });
 
-      let rawBody: RAPIER.RigidBody | undefined;
-      let rawCollider: RAPIER.Collider | undefined;
-
-      if (physics.driver && physics.driver.isReady) {
-        rawBody = physics.driver.createDynamicBody({ x: endX, y: dropY, z: endZ }, itemId);
+      if (rawBody && !isConstrainedByObstacle) {
         const weight = physStats.weight.current ?? 1;
-
-        if (physStats.shape === 'ball') {
-          rawCollider = physics.driver.createBallCollider(itemRadius, rawBody, weight);
-          rawCollider.setRestitution(0.72);
-          rawBody.setLinearDamping(0.1);
-          rawBody.setAngularDamping(0.1);
-        } else {
-          const size = itemRadius * 0.8;
-          const hx = physStats.halfExtents?.x ?? size / 2;
-          const hy = physStats.halfExtents?.y ?? size / 2;
-          const hz = physStats.halfExtents?.z ?? size / 2;
-
-          rawCollider = physics.driver.createCuboidCollider(
-            hx,
-            hy,
-            hz,
-            rawBody,
-            weight,
-            physStats.colliderOffset
-          );
-          rawCollider.setRestitution(0.3);
-          rawBody.setLinearDamping(0.95);
-          rawBody.setAngularDamping(0.95);
-        }
-
-        // Прикладываем горизонтальный импульс броска только в свободном пространстве
-        if (!isConstrainedByObstacle) {
-          const targetVelocity = 0.5;
-          const impulseMag = weight * targetVelocity;
-          rawBody.applyImpulse({ x: dir.x * impulseMag, y: 0, z: dir.z * impulseMag }, true);
-        }
+        const targetVelocity = 0.5;
+        const impulseMag = weight * targetVelocity;
+        rawBody.applyImpulse({ x: dir.x * impulseMag, y: 0, z: dir.z * impulseMag }, true);
       }
-
-      world.addComponent(itemId, 'physicsBody', {
-        rawBody,
-        rawCollider,
-        bodyType: 'dynamic',
-        isStatic: false,
-        category: CollisionCategory.ITEM,
-        mask,
-      });
     }
   }
 
@@ -989,73 +902,23 @@ export class InteractionSystem {
       // ВАЖНО: не выставляем isDirty = true, иначе syncDirtyTransforms обнулит скорость броска в setLinvel(0,0,0)
       itemTransform.isDirty = false;
 
-      const mask = physStats.isSolid
-        ? CollisionCategory.OBSTACLE |
-          CollisionCategory.CREATURE |
-          CollisionCategory.ITEM |
-          CollisionCategory.PROJECTILE |
-          CollisionCategory.TRIGGER_ZONE |
-          CollisionCategory.PARTICLE
-        : 0;
+      const rawBody = physics.createDynamicItemBody(world, itemId, { x: endX, y: spawnY, z: endZ });
 
-      let rawBody: RAPIER.RigidBody | undefined;
-      let rawCollider: RAPIER.Collider | undefined;
-
-      if (physics.driver && physics.driver.isReady) {
-        rawBody = physics.driver.createDynamicBody({ x: endX, y: spawnY, z: endZ }, itemId);
+      if (rawBody && !isConstrainedByObstacle) {
+        const startPos = { x: endX, y: spawnY, z: endZ };
+        const strength = slot.strength ?? 15;
         const weight = physStats.weight.current ?? 1;
+        const vel = calculateThrowVelocity(startPos, targetPos, strength, weight);
 
-        if (physStats.shape === 'ball') {
-          rawCollider = physics.driver.createBallCollider(itemRadius, rawBody, weight);
-          rawCollider.setRestitution(0.75);
-          rawBody.setLinearDamping(0.02);
-          rawBody.setAngularDamping(0.05);
-        } else {
-          const size = itemRadius * 0.8;
-          const hx = physStats.halfExtents?.x ?? size / 2;
-          const hy = physStats.halfExtents?.y ?? size / 2;
-          const hz = physStats.halfExtents?.z ?? size / 2;
+        rawBody.applyImpulse({ x: vel.x * weight, y: vel.y * weight, z: vel.z * weight }, true);
+        rawBody.setLinvel({ x: vel.x, y: vel.y, z: vel.z }, true);
+        rawBody.wakeUp();
 
-          rawCollider = physics.driver.createCuboidCollider(
-            hx,
-            hy,
-            hz,
-            rawBody,
-            weight,
-            physStats.colliderOffset
-          );
-          rawCollider.setRestitution(0.3);
-          rawBody.setLinearDamping(0.05);
-          rawBody.setAngularDamping(0.1);
-        }
-
-        // Если в упор нет препятствия — передаем баллистическую скорость
-        if (!isConstrainedByObstacle) {
-          const startPos = { x: endX, y: spawnY, z: endZ };
-          const strength = slot.strength ?? 15;
-          const vel = calculateThrowVelocity(startPos, targetPos, strength, weight);
-
-          // Задаем импульс массы (J = m * v) и пробуждаем тело в физическом мире
-          rawBody.applyImpulse({ x: vel.x * weight, y: vel.y * weight, z: vel.z * weight }, true);
-          rawBody.setLinvel({ x: vel.x, y: vel.y, z: vel.z }, true);
-          rawBody.wakeUp();
-
-          // Легкое случайное вращение предмета в полете
-          rawBody.setAngvel(
-            { x: (Math.random() - 0.5) * 4, y: 2.0, z: (Math.random() - 0.5) * 4 },
-            true
-          );
-        }
+        rawBody.setAngvel(
+          { x: (Math.random() - 0.5) * 4, y: 2.0, z: (Math.random() - 0.5) * 4 },
+          true
+        );
       }
-
-      world.addComponent(itemId, 'physicsBody', {
-        rawBody,
-        rawCollider,
-        bodyType: 'dynamic',
-        isStatic: false,
-        category: CollisionCategory.ITEM,
-        mask,
-      });
 
       world.addComponent(itemId, 'thrownObject', {
         throwerId: entityId,

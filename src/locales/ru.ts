@@ -14,6 +14,7 @@ export const ru = {
     jsonReadError: 'Ошибка при чтении JSON файла мира!',
     placementPrompt: 'Выберите место для спавна на поле',
     pieQuickSpawn: 'Быстрый спавн',
+    noPlayerToPlay: 'Невозможно войти в режим игры: на карте отсутствует живой игрок!',
   },
   topbar: {
     file: 'Файл',

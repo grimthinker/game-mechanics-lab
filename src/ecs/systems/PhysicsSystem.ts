@@ -1,3 +1,4 @@
+import RAPIER from '@dimforge/rapier3d-compat';
 import { World } from '../World';
 import {
   EntityId,
@@ -6,10 +7,12 @@ import {
   COLLISION_MASK_ALL,
   COLLISION_MASK_NONE,
 } from '../types';
+import { Vec3 } from '../../types';
 import { calculateTotalEntityWeight } from '../utils/hierarchy';
 import { IPhysicsDriver } from '../../physics/IPhysicsDriver';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 import { getTerrainHeightAt } from '../components/terrain';
+import { angleDifference } from '../../utils';
 
 export class PhysicsSystem {
   public obstaclesEnabled: boolean = true;
@@ -17,9 +20,75 @@ export class PhysicsSystem {
   private dynamicBodyTimeScales: Map<EntityId, number> = new Map();
 
   constructor() {}
-
   public setObstaclesEnabled(enabled: boolean): void {
     this.obstaclesEnabled = enabled;
+  }
+
+  /**
+   * Единая точка создания и настройки динамического физического тела предмета на основе его PhysicsStatsComponent.
+   */
+  public createDynamicItemBody(
+    world: World,
+    itemId: EntityId,
+    pos: Vec3
+  ): RAPIER.RigidBody | undefined {
+    if (!this.driver || !this.driver.isReady) return undefined;
+
+    const physStats = world.getComponent(itemId, 'physicsStats');
+    if (!physStats) return undefined;
+
+    const radius = physStats.radius.current ?? 0.3;
+    const weight = physStats.weight.current ?? 1;
+
+    const rawBody = this.driver.createDynamicBody(pos, itemId);
+    const isBall = physStats.shape === 'ball';
+
+    const linDamping = physStats.linearDamping ?? (isBall ? 0.25 : 0.95);
+    const angDamping = physStats.angularDamping ?? (isBall ? 2.0 : 0.95);
+    rawBody.setLinearDamping(linDamping);
+    rawBody.setAngularDamping(angDamping);
+
+    let rawCollider: RAPIER.Collider;
+    if (isBall) {
+      rawCollider = this.driver.createBallCollider(radius, rawBody, weight);
+      const restitution = physStats.restitution ?? 0.88;
+      const friction = physStats.friction ?? 0.85;
+      rawCollider.setRestitution(restitution);
+      rawCollider.setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Max);
+      rawCollider.setFriction(friction);
+      rawCollider.setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max);
+    } else {
+      const size = radius * 0.8;
+      const hx = physStats.halfExtents?.x ?? size / 2;
+      const hy = physStats.halfExtents?.y ?? size / 2;
+      const hz = physStats.halfExtents?.z ?? size / 2;
+
+      rawCollider = this.driver.createCuboidCollider(
+        hx,
+        hy,
+        hz,
+        rawBody,
+        weight,
+        physStats.colliderOffset
+      );
+      const restitution = physStats.restitution ?? 0.3;
+      const friction = physStats.friction ?? 0.5;
+      rawCollider.setRestitution(restitution);
+      rawCollider.setFriction(friction);
+    }
+
+    const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
+
+    world.addComponent(itemId, 'physicsBody', {
+      rawBody,
+      rawCollider,
+      bodyType: 'dynamic',
+      isStatic: false,
+      category: CollisionCategory.ITEM,
+      mask,
+    });
+
+    return rawBody;
   }
 
   /**
@@ -438,10 +507,7 @@ export class PhysicsSystem {
         if (zone.hitZoneType === 'angle') {
           const maxAngle = (zone.angle ?? Math.PI / 6) / 2;
           const targetAngle = Math.atan2(transform.z - pos.z, transform.x - pos.x);
-
-          let diff = Math.abs(
-            Math.atan2(Math.sin(targetAngle - angle), Math.cos(targetAngle - angle))
-          );
+          const diff = Math.abs(angleDifference(targetAngle, angle));
 
           const physStats = world.getComponent(targetId, 'physicsStats');
           const targetRadius = physStats?.radius.current ?? 0.4;

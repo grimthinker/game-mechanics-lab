@@ -14,6 +14,7 @@ export const en = {
     jsonReadError: 'Error parsing world JSON file!',
     placementPrompt: 'Click on the map to place the entity',
     pieQuickSpawn: 'Quick Spawn',
+    noPlayerToPlay: 'Cannot enter Game mode: player entity is not found or dead!',
   },
   topbar: {
     file: 'File',

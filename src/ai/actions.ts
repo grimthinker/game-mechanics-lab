@@ -1,6 +1,6 @@
 import { EntityAdapter } from '../EntityAdapter';
 import { Point, Vec3 } from '../types';
-import { vec2_distance_to, Radians } from '../utils';
+import { vec2_distance_to, Radians, angleDifference } from '../utils';
 import { LOGIC_CONFIG } from './config';
 import { NodeStatus, BTAction, PathKeys, BTSimpleAction } from './core';
 import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
@@ -466,8 +466,7 @@ export class BTActionRotateToPos extends BTAction {
     const currentAngle = entity.angle;
 
     // Нормализация разницы углов в диапазон [-PI, PI]
-    let diff = targetAngle - currentAngle;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    const diff = angleDifference(targetAngle, currentAngle);
 
     // Если угол в пределах погрешности — завершаем поворот
     if (Math.abs(diff) <= this.params.tolerance) {

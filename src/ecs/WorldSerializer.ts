@@ -484,44 +484,21 @@ export class WorldSerializer {
             let rawCollider: RAPIER.Collider | undefined = undefined;
 
             if (archetype === 'item' || comps.physicsBody?.bodyType === 'dynamic') {
-              category = CollisionCategory.ITEM;
+              const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0.2, z: trans?.z ?? 0 };
+              rawBody = this.app.physics.createDynamicItemBody(this.app.world, ent.id, pos3D);
 
-              // Восстанавливаем 3D тело Rapier для динамических предметов и оторванных частей
-              if (this.app.physicsDriver?.isReady) {
-                const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0.2, z: trans?.z ?? 0 };
-                rawBody = this.app.physicsDriver.createDynamicBody(pos3D, ent.id);
-                if (trans?.rotation) {
-                  rawBody.setRotation(trans.rotation, true);
-                }
-                const r = comps.physicsStats?.radius?.current ?? 0.3;
-                const w = comps.physicsStats?.weight?.current ?? 1;
+              if (rawBody && trans?.rotation) {
+                rawBody.setRotation(trans.rotation, true);
+              }
 
-                const size = r * 0.8;
-                const hx = comps.physicsStats?.halfExtents?.x ?? size / 2;
-                const hy = comps.physicsStats?.halfExtents?.y ?? size / 2;
-                const hz = comps.physicsStats?.halfExtents?.z ?? size / 2;
-
-                rawCollider = this.app.physicsDriver.createCuboidCollider(
-                  hx,
-                  hy,
-                  hz,
-                  rawBody,
-                  w,
-                  comps.physicsStats?.colliderOffset
+              // Восстановление физического импульса (например, при Undo во время полета предмета)
+              if (rawBody && comps.velocity) {
+                rawBody.setLinvel(
+                  { x: comps.velocity.vx, y: comps.velocity.vy, z: comps.velocity.vz },
+                  true
                 );
-                rawCollider.setRestitution(0.3);
-                rawBody.setLinearDamping(0.95);
-                rawBody.setAngularDamping(0.95);
-
-                // Восстановление физического импульса (например, при Undo во время полета предмета)
-                if (comps.velocity) {
-                  rawBody.setLinvel(
-                    { x: comps.velocity.vx, y: comps.velocity.vy, z: comps.velocity.vz },
-                    true
-                  );
-                  if (comps.velocity.angvel) {
-                    rawBody.setAngvel(comps.velocity.angvel, true);
-                  }
+                if (comps.velocity.angvel) {
+                  rawBody.setAngvel(comps.velocity.angvel, true);
                 }
               }
             } else if (archetype === 'zone') {

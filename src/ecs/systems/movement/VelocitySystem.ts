@@ -1,7 +1,7 @@
 import { LOGIC_CONFIG } from '../../../ai/config';
 import { GAMEPLAY_CONFIG } from '../../../config/gameplayConfig';
 import { BALANCE_CONFIG } from '../../../config/balanceConfig';
-import { Radians } from '../../../utils';
+import { Radians, normalizeAngle, angleDifference } from '../../../utils';
 import { World } from '../../World';
 import {
   CreatureDirectionMode,
@@ -114,8 +114,7 @@ export class VelocitySystem {
 
       // Вращение / Угол взгляда
       if (input.targetLookAngle !== undefined) {
-        let diff = input.targetLookAngle - transform.angle;
-        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        const diff = angleDifference(input.targetLookAngle, transform.angle);
 
         if (Math.abs(diff) <= LOGIC_CONFIG.angleDiffTolerance) {
           transform.angle = input.targetLookAngle;
@@ -146,7 +145,7 @@ export class VelocitySystem {
           transform.angle = (transform.angle + velocity.currentTurnSpeed * localDt) as Radians;
         }
       }
-      transform.angle = Math.atan2(Math.sin(transform.angle), Math.cos(transform.angle)) as Radians;
+      transform.angle = normalizeAngle(transform.angle);
 
       // Синхронизируем 3D-кватернион с рысканием
       // Минус добавлен, так как ось Y в 3D направлена вверх, а в 2D - вниз
@@ -209,12 +208,7 @@ export class VelocitySystem {
 
       if (hasMoveInput) {
         const desiredMoveAngle = Math.atan2(moveVecZ, moveVecX);
-        const angleDiff = Math.abs(
-          Math.atan2(
-            Math.sin(desiredMoveAngle - transform.angle),
-            Math.cos(desiredMoveAngle - transform.angle)
-          )
-        );
+        const angleDiff = Math.abs(angleDifference(desiredMoveAngle, transform.angle));
 
         if (angleDiff <= forwardThreshold) {
           directionMode = 'forward';
@@ -225,12 +219,7 @@ export class VelocitySystem {
         }
       } else if (velocity.currentSpeed > 0.1) {
         const actualMoveAngle = Math.atan2(velocity.vz, velocity.vx);
-        const angleDiff = Math.abs(
-          Math.atan2(
-            Math.sin(actualMoveAngle - transform.angle),
-            Math.cos(actualMoveAngle - transform.angle)
-          )
-        );
+        const angleDiff = Math.abs(angleDifference(actualMoveAngle, transform.angle));
 
         if (angleDiff <= forwardThreshold) {
           directionMode = 'forward';

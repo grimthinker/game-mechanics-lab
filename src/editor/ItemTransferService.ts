@@ -231,43 +231,8 @@ export class ItemTransferService {
 
       const physStats = world.getComponent(itemId, 'physicsStats');
       if (physStats) {
-        const radius = physStats.radius.current ?? 0.3;
-        const weight = physStats.weight.current ?? 1;
-
-        const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-
-        // Нативное 3D Dynamic тело Rapier
-        let rawBody: RAPIER.RigidBody | undefined;
-        let rawCollider: RAPIER.Collider | undefined;
-
-        if (this.app.physicsDriver && this.app.physicsDriver.isReady) {
-          const pos3D = { x: posX, y: posY ?? 1.5, z: posZ };
-          rawBody = this.app.physicsDriver.createDynamicBody(pos3D, itemId);
-
-          const size = radius * 0.8;
-          const hx = physStats.halfExtents?.x ?? size / 2;
-          const hy = physStats.halfExtents?.y ?? size / 2;
-          const hz = physStats.halfExtents?.z ?? size / 2;
-
-          rawCollider = this.app.physicsDriver.createCuboidCollider(
-            hx,
-            hy,
-            hz,
-            rawBody,
-            weight,
-            physStats.colliderOffset
-          );
-          rawCollider.setRestitution(0.3);
-        }
-
-        world.addComponent(itemId, 'physicsBody', {
-          rawBody,
-          rawCollider,
-          bodyType: 'dynamic',
-          isStatic: false,
-          category: CollisionCategory.ITEM,
-          mask,
-        });
+        const pos3D = { x: posX, y: posY ?? 1.5, z: posZ };
+        this.app.physics.createDynamicItemBody(world, itemId, pos3D);
       }
       const renderable = world.getComponent(itemId, 'renderable');
       if (renderable) renderable.isVisible = true;

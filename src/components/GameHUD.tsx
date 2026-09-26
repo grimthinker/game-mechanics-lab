@@ -31,17 +31,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
   if (!world) return null;
 
-  // Поиск сущности игрока (PlayerTree)
-  const entities = world.getEntitiesWith('aiStats', 'health', 'transform');
-  const playerEntry = entities.find(
-    ([, comp]) => comp.aiStats.behavior.current === 'PlayerTree' && comp.health.isAlive
-  );
+  const playerId = app ? app.getPlayerEntityId() : null;
+  const playerComp = playerId ? world.getEntity(playerId) : null;
 
-  const playerComp = playerEntry ? playerEntry[1] : null;
-  const playerId = playerEntry ? playerEntry[0] : null;
-
-  const currentHp = playerComp ? Math.round(playerComp.health.current) : 0;
-  const maxHp = playerComp ? Math.round(playerComp.health.max.current) : 100;
+  const currentHp = playerComp?.health ? Math.round(playerComp.health.current) : 0;
+  const maxHp = playerComp?.health?.max ? Math.round(playerComp.health.max.current) : 100;
   const hpPercent = Math.max(0, Math.min(100, (currentHp / (maxHp || 1)) * 100));
 
   // Определение экипированного оружия

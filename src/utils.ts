@@ -11,6 +11,16 @@ export function rad2Deg(rad: Radians | number): Degrees {
   return ((rad * 180) / Math.PI) as Degrees;
 }
 
+/** Нормализует угол в радианах к диапазону [-PI, PI] */
+export function normalizeAngle(rad: number): Radians {
+  return Math.atan2(Math.sin(rad), Math.cos(rad)) as Radians;
+}
+
+/** Вычисляет кратчайшую разницу между углами в радианах в диапазоне [-PI, PI] */
+export function angleDifference(target: number, current: number): Radians {
+  return normalizeAngle(target - current);
+}
+
 /** Вычисляет расстояние на горизонтальной плоскости пола XZ между двумя 3D-точками */
 export function distanceXZ(start: { x: number; z: number }, end: { x: number; z: number }): number {
   const dx = end.x - start.x;

@@ -57,6 +57,10 @@ export function assembleItem(
     weight: createStat(weight),
     isSolid,
     shape: config.physics?.shape,
+    restitution: config.physics?.restitution,
+    friction: config.physics?.friction,
+    linearDamping: config.physics?.linearDamping,
+    angularDamping: config.physics?.angularDamping,
     halfExtents: config.physics?.halfExtents ? { ...config.physics.halfExtents } : undefined,
     colliderOffset: config.physics?.colliderOffset
       ? { ...config.physics.colliderOffset }
@@ -154,50 +158,7 @@ export function assembleItem(
   });
 
   if (!isPossessed) {
-    const category = CollisionCategory.ITEM;
-    const mask = isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-
-    // Нативное динамическое тело Rapier3D с гравитацией
-    let rawBody: import('@dimforge/rapier3d-compat').default.RigidBody | undefined;
-    let rawCollider: import('@dimforge/rapier3d-compat').default.Collider | undefined;
-
-    if (physics.driver && physics.driver.isReady) {
-      const pos3D = { x: posX, y: posY, z: posZ };
-      rawBody = physics.driver.createDynamicBody(pos3D, id);
-
-      if (config.physics?.shape === 'ball') {
-        rawCollider = physics.driver.createBallCollider(radius, rawBody, weight);
-        rawCollider.setRestitution(0.72);
-        rawBody.setLinearDamping(config.physics?.linearDamping ?? 0.1);
-        rawBody.setAngularDamping(config.physics?.angularDamping ?? 0.1);
-      } else {
-        const size = radius * 0.8;
-        const hx = config.physics?.halfExtents?.x ?? size / 2;
-        const hy = config.physics?.halfExtents?.y ?? size / 2;
-        const hz = config.physics?.halfExtents?.z ?? size / 2;
-
-        rawCollider = physics.driver.createCuboidCollider(
-          hx,
-          hy,
-          hz,
-          rawBody,
-          weight,
-          config.physics?.colliderOffset
-        );
-        rawCollider.setRestitution(0.3);
-        rawBody.setLinearDamping(config.physics?.linearDamping ?? 0.95);
-        rawBody.setAngularDamping(config.physics?.angularDamping ?? 0.95);
-      }
-    }
-
-    world.addComponent(id, 'physicsBody', {
-      rawBody,
-      rawCollider,
-      bodyType: 'dynamic',
-      isStatic: false,
-      category,
-      mask,
-    });
+    physics.createDynamicItemBody(world, id, { x: posX, y: posY, z: posZ });
   }
 
   // 7. Компонент видимости и визуальная модель

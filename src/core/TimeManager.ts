@@ -60,12 +60,8 @@ export class TimeManager {
       this.app.simulation.syncDynamicBodiesToTransforms();
 
       if (this.app.gameMode === GameMode.GAME) {
-        const isAnyPlayerAlive = this.app.world
-          .getAllEntities()
-          .some(
-            ([_, comp]) => comp.aiStats?.behavior?.current === 'PlayerTree' && comp.health?.isAlive
-          );
-        if (!isAnyPlayerAlive) {
+        const playerId = this.app.getPlayerEntityId();
+        if (!playerId) {
           EventBus.emit('game:playerDied');
         }
       }

@@ -45,6 +45,8 @@ export interface PhysicsConfig {
   height?: number;
   isSolid?: boolean;
   shape?: 'cuboid' | 'ball';
+  restitution?: number;
+  friction?: number;
   points?: Point[];
   linearDamping?: number;
   angularDamping?: number;
@@ -60,6 +62,10 @@ export interface PhysicsStatsComponent {
   height?: number;
   isSolid: boolean;
   shape?: 'cuboid' | 'ball';
+  restitution?: number;
+  friction?: number;
+  linearDamping?: number;
+  angularDamping?: number;
   points?: Point[];
   halfExtents?: Vec3;
   colliderOffset?: Vec3;

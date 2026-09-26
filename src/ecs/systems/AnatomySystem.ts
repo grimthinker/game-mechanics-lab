@@ -485,42 +485,11 @@ export class AnatomySystem {
     const ownership = world.getComponent(rootItemId, 'ownership');
 
     if (!ownership) {
-      let rootPhysBody = world.getComponent(rootItemId, 'physicsBody');
-      let rawBody = rootPhysBody?.rawBody;
-      let rawCollider = rootPhysBody?.rawCollider;
-
-      if (!rawBody && physics.driver && physics.driver.isReady) {
-        rawBody = physics.driver.createDynamicBody(
-          { x: rootItemTransform.x, y: rootItemTransform.y + 0.5, z: rootItemTransform.z },
-          rootItemId
-        );
-        const size = plan.maxRadius * 0.8;
-        rawCollider = physics.driver.createCuboidCollider(
-          size / 2,
-          size / 2,
-          size / 2,
-          rawBody,
-          plan.totalWeight
-        );
-        rawCollider.setRestitution(0.3);
-        rawBody.setLinearDamping(0.95);
-        rawBody.setAngularDamping(0.95);
-      }
-
-      if (!rootPhysBody) {
-        world.addComponent(rootItemId, 'physicsBody', {
-          rawBody,
-          rawCollider,
-          bodyType: 'dynamic',
-          isStatic: false,
-          category: CollisionCategory.ITEM,
-          mask: COLLISION_MASK_ALL,
-        });
-      } else {
-        rootPhysBody.rawBody = rawBody;
-        rootPhysBody.rawCollider = rawCollider;
-        rootPhysBody.bodyType = 'dynamic';
-      }
+      physics.createDynamicItemBody(world, rootItemId, {
+        x: rootItemTransform.x,
+        y: rootItemTransform.y + 0.5,
+        z: rootItemTransform.z,
+      });
 
       let renderable = world.getComponent(rootItemId, 'renderable');
       if (!renderable) {

@@ -41,43 +41,7 @@ export function forceDropItemFromPart(
     renderable.isVisible = true;
   }
 
-  const physStats = world.getComponent(itemId, 'physicsStats');
-  if (physStats) {
-    const mask = physStats.isSolid ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
-
-    let rawBody: any;
-    let rawCollider: any;
-
-    if (physics.driver && physics.driver.isReady) {
-      rawBody = physics.driver.createDynamicBody({ x: dropX, y: dropY + 0.5, z: dropZ }, itemId);
-      const radius = physStats.radius.current ?? 0.3;
-      const size = radius * 0.8;
-      const hx = physStats.halfExtents?.x ?? size / 2;
-      const hy = physStats.halfExtents?.y ?? size / 2;
-      const hz = physStats.halfExtents?.z ?? size / 2;
-
-      rawCollider = physics.driver.createCuboidCollider(
-        hx,
-        hy,
-        hz,
-        rawBody,
-        physStats.weight.current,
-        physStats.colliderOffset
-      );
-      rawCollider.setRestitution(0.3);
-      rawBody.setLinearDamping(0.95);
-      rawBody.setAngularDamping(0.95);
-    }
-
-    world.addComponent(itemId, 'physicsBody', {
-      rawBody,
-      rawCollider,
-      bodyType: 'dynamic',
-      isStatic: false,
-      category: CollisionCategory.ITEM,
-      mask,
-    });
-  }
+  physics.createDynamicItemBody(world, itemId, { x: dropX, y: dropY + 0.5, z: dropZ });
 }
 
 export function destroyPartRecursive(world: World, physics: PhysicsSystem, partId: EntityId): void {
