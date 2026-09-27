@@ -11,7 +11,7 @@ import { createRectanglePoints } from './utils';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
-import { CreatureWizardModal } from './components/modals/CreatureWizardModal';
+import { CreatureWizardModal, NewWorldModal } from './components/modals';
 import { GameHUD } from './components/GameHUD';
 import { BodyStructureType } from './ecs/templates';
 import { ModularPlacementOptions, Vec3 } from './types';
@@ -38,14 +38,20 @@ export const App: React.FC = () => {
   const worldFileInputRef = useRef<HTMLInputElement | null>(null);
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const [engineState, setEngineState] = useState({
+  const [engineState, setEngineState] = useState(() => ({
     mode: GameMode.EDITOR,
     isPaused: true,
     timeScale: 1.0,
     showUIOverlays: true,
-    showAIDebug: false,
-    celShading: false,
-  });
+    showAIDebug:
+      localStorage.getItem('engine_show_ai_debug') !== null
+        ? localStorage.getItem('engine_show_ai_debug') === 'true'
+        : true,
+    celShading:
+      localStorage.getItem('engine_cel_shading') !== null
+        ? localStorage.getItem('engine_cel_shading') === 'true'
+        : true,
+  }));
 
   const [isWasmReady, setIsWasmReady] = useState<boolean>(false);
   const [isEngineReady, setIsEngineReady] = useState<boolean>(false);
@@ -80,6 +86,7 @@ export const App: React.FC = () => {
   const [btSchema, setBtSchema] = useState<TreeBBSchema | null>(null);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   const [isCreatureWizardOpen, setIsCreatureWizardOpen] = useState(false);
+  const [isNewWorldModalOpen, setIsNewWorldModalOpen] = useState(false);
 
   const { setApp } = useDragDrop();
 
@@ -189,7 +196,22 @@ export const App: React.FC = () => {
     saveWorldToStorage(app, app.editorSnapshot);
   }, [closePieMenu, updateStats]);
 
-  const createNewWorld = useCallback(() => {
+  const createEmptyWorld = useCallback(
+    (width: number, length: number) => {
+      closePieMenu();
+      const app = appRef.current;
+      if (!app) return;
+
+      app.editorSnapshot = null;
+      app.initEmptyWorld(width, length);
+      saveWorldToStorage(app);
+      syncPlayerControls();
+      updateStats();
+    },
+    [closePieMenu, syncPlayerControls, updateStats]
+  );
+
+  const loadDemoWorld = useCallback(() => {
     closePieMenu();
     const app = appRef.current;
     if (!app) return;
@@ -503,7 +525,8 @@ export const App: React.FC = () => {
             appRef.current?.physics.setObstaclesEnabled(val);
           }}
           worldFileInputRef={worldFileInputRef}
-          onNewWorld={createNewWorld}
+          onNewWorld={() => setIsNewWorldModalOpen(true)}
+          onDemoWorld={loadDemoWorld}
           onSaveWorld={() => {
             const app = appRef.current;
             if (!app) return;
@@ -998,6 +1021,11 @@ export const App: React.FC = () => {
             options,
           });
         }}
+      />
+      <NewWorldModal
+        isOpen={isNewWorldModalOpen}
+        onClose={() => setIsNewWorldModalOpen(false)}
+        onConfirm={createEmptyWorld}
       />
       <DragGhostOverlay />
     </div>

@@ -11,6 +11,7 @@ export interface TopBarProps {
   setObstaclesEnabled: (val: boolean) => void;
   worldFileInputRef: React.RefObject<HTMLInputElement | null>;
   onNewWorld: () => void;
+  onDemoWorld: () => void;
   onSaveWorld: () => void;
   onLoadWorldFile: (file: File) => void;
   isPaused: boolean;
@@ -39,6 +40,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   setObstaclesEnabled,
   worldFileInputRef,
   onNewWorld,
+  onDemoWorld,
   onSaveWorld,
   onLoadWorldFile,
   isPaused,
@@ -162,6 +164,24 @@ export const TopBar: React.FC<TopBarProps> = ({
                   onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                 >
                   {t('topbar.loadJson')}
+                </button>
+                <button
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#f39c12',
+                    padding: '8px 16px',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    onDemoWorld();
+                    setIsFileMenuOpen(false);
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#333')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  {t('topbar.demoWorld')}
                 </button>
                 <input
                   type="file"

@@ -5,7 +5,10 @@ export interface GrassMaterialUniforms {
   uWindSpeed: { value: number };
   uWindStrength: { value: number };
   uTrampleMap: { value: THREE.Texture | null };
-  uTerrainSize: { value: number };
+  uTerrainSize: { value: THREE.Vector2 };
+  uCameraPos: { value: THREE.Vector3 };
+  uFadeStart: { value: number };
+  uFadeEnd: { value: number };
 }
 
 export function createGrassMaterial(): THREE.MeshStandardMaterial {
@@ -24,14 +27,17 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
   };
 
   material.userData.isSharedMaterial = true;
-  material.customProgramCacheKey = () => 'InteractiveGrassMaterial_v4';
+  material.customProgramCacheKey = () => 'InteractiveGrassMaterial_v5';
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = { value: 0 };
     shader.uniforms.uWindSpeed = { value: 1.8 };
     shader.uniforms.uWindStrength = { value: 0.14 };
     shader.uniforms.uTrampleMap = { value: defaultTrampleTexture };
-    shader.uniforms.uTerrainSize = { value: 100.0 };
+    shader.uniforms.uTerrainSize = { value: new THREE.Vector2(100.0, 100.0) };
+    shader.uniforms.uCameraPos = { value: new THREE.Vector3(0, 0, 0) };
+    shader.uniforms.uFadeStart = { value: 35.0 };
+    shader.uniforms.uFadeEnd = { value: 45.0 };
 
     material.userData.shader = shader;
 
@@ -40,7 +46,10 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
       uniform float uWindSpeed;
       uniform float uWindStrength;
       uniform sampler2D uTrampleMap;
-      uniform float uTerrainSize;
+      uniform vec2 uTerrainSize;
+      uniform vec3 uCameraPos;
+      uniform float uFadeStart;
+      uniform float uFadeEnd;
       ${shader.vertexShader}
     `;
 
@@ -115,11 +124,31 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
       bladeOffset.xz += bendDir * (forwardOffset * compression);
       bladeOffset.y = newY * compression;
 
+      // 3. Бесшовное затухание высоты по расстоянию до фокуса камеры (Distance Fade)
+      float distToCam = length(instanceRoot.xz - uCameraPos.xz);
+      float distFactor = clamp((uFadeEnd - distToCam) / max(0.001, uFadeEnd - uFadeStart), 0.0, 1.0);
+      float distanceScale = distFactor * distFactor * (3.0 - 2.0 * distFactor);
+      bladeOffset *= distanceScale;
+
       // Итоговая позиция: корень куста + скорректированный по дуге вектор травинки
       vec4 worldPos = vec4(instanceRoot.xyz + bladeOffset, 1.0);
 
       vec4 mvPosition = viewMatrix * worldPos;
       gl_Position = projectionMatrix * mvPosition;
+      `
+    );
+
+    // Устраняем инверсию нормалей Three.js для двусторонней растительности:
+    // Обе стороны травинки находятся под открытым небом и должны ловить свет сверху, а не смотреть в землю.
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <normal_fragment_begin>',
+      `
+      #include <normal_fragment_begin>
+      #ifdef DOUBLE_SIDED
+        if ( ! gl_FrontFacing ) {
+          normal = - normal;
+        }
+      #endif
       `
     );
   };

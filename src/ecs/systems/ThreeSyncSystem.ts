@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { World } from '../World';
 import { EntityId, AnimatorComponent } from '../types';
+import { IPhysicsDriver } from '../../physics/IPhysicsDriver';
 import { GameMode } from '../../config/gameConfig';
 import { AssetManager } from '../../rendering/AssetManager';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
@@ -23,6 +24,17 @@ import { GrassSyncSystem } from '../../rendering/grass/GrassSyncSystem';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 import { ToonMaterialManager } from '../../rendering/materials/ToonMaterialManager';
 
+const PROCEDURAL_PROP_SCALES: Record<string, { baseRadius: number; baseHeight: number }> = {
+  'proc://prop/tree': { baseRadius: 0.6, baseHeight: 4.0 },
+  'proc://prop/house': { baseRadius: 2.7, baseHeight: 5.5 },
+  'proc://prop/fence': { baseRadius: 1.2, baseHeight: 1.15 },
+  'proc://prop/rock_1': { baseRadius: 1.1, baseHeight: 1.25 },
+  'proc://prop/rock_2': { baseRadius: 1.2, baseHeight: 0.75 },
+  'proc://prop/rock_3': { baseRadius: 1.2, baseHeight: 1.5 },
+  'proc://prop/rock_4': { baseRadius: 1.2, baseHeight: 1.6 },
+  'proc://prop/rock_5': { baseRadius: 1.1, baseHeight: 1.45 },
+};
+
 export class ThreeSyncSystem {
   public static disposeObject = disposeObject;
   public static attachOutlines = attachOutlines;
@@ -36,6 +48,7 @@ export class ThreeSyncSystem {
   private animators: Map<EntityId, AnimatorState> = new Map();
 
   // Делегированные подсистемы
+  public physicsDriver: IPhysicsDriver | null = null;
   private attackVisualsManager: AttackVisualsManager;
   private terrainSync: TerrainSyncSystem;
   private creatureAssembler: CreatureMeshAssembler;
@@ -152,7 +165,9 @@ export class ThreeSyncSystem {
     world: World,
     _gameMode: GameMode,
     selectedIds: Set<EntityId>,
-    celShading: boolean = false
+    celShading: boolean = false,
+    cameraTargetX: number = 0,
+    cameraTargetZ: number = 0
   ): void {
     if (celShading !== this.isCelShading) {
       this.isCelShading = celShading;
@@ -287,10 +302,16 @@ export class ThreeSyncSystem {
           } else if (archetype === 'obstacle') {
             const physStats = world.getComponent(id, 'physicsStats');
             const visual = world.getComponent(id, 'visualModel');
-            if (visual?.modelId === 'proc://prop/tree') {
-              const r = physStats?.radius.current ?? 0.6;
-              const h = physStats?.height.current ?? 4.0;
-              obj.scale.set(r / 0.6, h / 4.0, r / 0.6);
+            const propScale = visual?.modelId ? PROCEDURAL_PROP_SCALES[visual.modelId] : undefined;
+
+            if (propScale) {
+              const r = physStats?.radius.current ?? propScale.baseRadius;
+              const h = physStats?.height.current ?? propScale.baseHeight;
+              obj.scale.set(
+                r / propScale.baseRadius,
+                h / propScale.baseHeight,
+                r / propScale.baseRadius
+              );
             } else {
               const r = physStats?.radius.current ?? 1.0;
               const h = physStats?.height.current ?? 1.5;
@@ -497,10 +518,10 @@ export class ThreeSyncSystem {
     // Синхронизация 3D зон атак в активных фазах prep и cast через менеджер
     this.attackVisualsManager.update(world);
 
-    // Синхронизация процедурной интерактивной травы
+    // Синхронизация процедурной интерактивной травы с поддержкой многоуровневых мешей
     const terrainEntities = world.getEntitiesWith('terrain');
     const terrainComp = terrainEntities.length > 0 ? terrainEntities[0][1].terrain : undefined;
-    this.grassSync.update(dt, world, terrainComp);
+    this.grassSync.update(dt, world, this.physicsDriver, terrainComp, cameraTargetX, cameraTargetZ);
   }
 
   private async playAnimation(

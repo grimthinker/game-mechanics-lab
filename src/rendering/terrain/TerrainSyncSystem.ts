@@ -10,9 +10,10 @@ export class TerrainSyncSystem {
     group.userData.entityId = id;
 
     const res = terrainComp.resolution;
-    const size = terrainComp.size;
+    const width = terrainComp.width;
+    const depth = terrainComp.depth;
 
-    const geo = new THREE.PlaneGeometry(size, size, res - 1, res - 1);
+    const geo = new THREE.PlaneGeometry(width, depth, res - 1, res - 1);
     geo.rotateX(-Math.PI / 2); // Ориентируем плоскость горизонтально в плоскости XZ
 
     // Задаем начальные высоты вершин

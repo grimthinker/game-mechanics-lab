@@ -118,7 +118,8 @@ export interface IPhysicsDriver {
 
   /** Создает или обновляет физический Heightfield-коллайдер ландшафта в Rapier3D */
   createOrUpdateTerrain(
-    size: number,
+    width: number,
+    depth: number,
     resolution: number,
     heights: Float32Array,
     entityId?: string

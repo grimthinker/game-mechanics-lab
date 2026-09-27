@@ -1,3 +1,4 @@
+import RAPIER from '@dimforge/rapier3d-compat';
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
@@ -20,6 +21,121 @@ import {
 import { createStat } from '../stats/StatEvaluator';
 import { fastClone } from '../utils/clone';
 
+export function createHouseConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const width = 5.0;
+  const depth = 5.4;
+  const height = 5.5;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'house' },
+    meta: { name: 'Дом', entityType: 'obstacle', destructible: false },
+    visualModel: { modelId: 'proc://prop/house' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: 2.7,
+      height,
+      weight: 50000,
+      isSolid: true,
+      points: createRectanglePoints(width, depth),
+    },
+    health: {
+      maxHp: 5000,
+      hp: 5000,
+      destructible: false,
+    },
+  };
+}
+
+export function createFenceConfig(
+  length: number = 2.4,
+  position?: Vec3,
+  angle: Radians = 0 as Radians
+): EntityConfig {
+  const depth = 0.25;
+  const height = 1.15;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'fence' },
+    meta: { name: 'Забор', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/fence' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: length / 2,
+      height,
+      weight: 80,
+      isSolid: true,
+      points: createRectanglePoints(length, depth),
+    },
+    health: {
+      maxHp: 80,
+      hp: 80,
+      destructible: true,
+    },
+  };
+}
+
+const ROCK_PRESETS: Record<
+  number,
+  { width: number; depth: number; height: number; radius: number; weight: number }
+> = {
+  1: { width: 2.0, depth: 1.4, height: 1.25, radius: 1.1, weight: 2500 },
+  2: { width: 2.2, depth: 1.7, height: 0.75, radius: 1.2, weight: 2200 },
+  3: { width: 2.3, depth: 2.1, height: 1.5, radius: 1.2, weight: 3200 },
+  4: { width: 2.2, depth: 2.0, height: 1.6, radius: 1.2, weight: 3000 },
+  5: { width: 2.1, depth: 1.7, height: 1.45, radius: 1.1, weight: 2800 },
+};
+
+export function createRockConfig(
+  variant: 1 | 2 | 3 | 4 | 5 = 1,
+  scale: number = 1.0,
+  position?: Vec3,
+  angle: Radians = 0 as Radians
+): EntityConfig {
+  const p = ROCK_PRESETS[variant] || ROCK_PRESETS[1];
+  const width = p.width * scale;
+  const depth = p.depth * scale;
+  const height = p.height * scale;
+  const radius = p.radius * scale;
+  const weight = Math.round(p.weight * Math.pow(scale, 3));
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'rock' },
+    meta: { name: `Камень ${variant}`, entityType: 'obstacle', destructible: false },
+    visualModel: { modelId: `proc://prop/rock_${variant}` },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius,
+      height,
+      weight,
+      isSolid: true,
+      points: createRectanglePoints(width, depth),
+    },
+    health: {
+      maxHp: 2000,
+      hp: 2000,
+      destructible: false,
+    },
+  };
+}
+
 export function assembleObstacle(
   world: World,
   physics: PhysicsSystem,
@@ -28,7 +144,9 @@ export function assembleObstacle(
   config: EntityConfig,
   position?: Vec3
 ): void {
-  const points = config.physics?.points ?? createRectanglePoints(100, 40);
+  const defaultRadius = config.physics?.radius ?? 1.0;
+  const points =
+    config.physics?.points ?? createRectanglePoints(defaultRadius * 2, defaultRadius * 2);
 
   // Валидация выпуклости полигона
   if (!isConvexPolygon(points)) {
@@ -48,7 +166,7 @@ export function assembleObstacle(
   const boundingRadius = calculateBoundingRadius(points);
 
   // 1. Тег архетипа
-  world.addComponent(id, 'tag', { archetype: 'obstacle' });
+  world.addComponent(id, 'tag', { archetype: 'obstacle', subType: config.tag?.subType });
 
   // 2. Мета-информация
   world.addComponent(id, 'meta', {
@@ -61,7 +179,7 @@ export function assembleObstacle(
   world.addComponent(id, 'physicsStats', {
     radius: createStat(boundingRadius),
     height: createStat(config.physics?.height ?? 1.5),
-    weight: createStat(1000),
+    weight: createStat(config.physics?.weight ?? 1000),
     isSolid,
     points: fastClone(points),
   });
@@ -78,14 +196,18 @@ export function assembleObstacle(
   });
 
   // 5. Трансформация в 3D
-  const posX = position?.x ?? 0;
-  const posY = position?.y ?? 0;
-  const posZ = position?.z ?? 0;
+  const posX = position?.x ?? config.transform?.x ?? 0;
+  const posY = position?.y ?? config.transform?.y ?? 0;
+  const posZ = position?.z ?? config.transform?.z ?? 0;
+  const rotation = config.transform?.rotation
+    ? { ...config.transform.rotation }
+    : { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) };
+
   world.addComponent(id, 'transform', {
     x: posX,
     y: posY,
     z: posZ,
-    rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+    rotation,
     angle,
   });
 
@@ -112,13 +234,13 @@ export function assembleObstacle(
   const hy = height / 2;
   const hz = depth / 2;
 
-  let rawBody: import('@dimforge/rapier3d-compat').default.RigidBody | undefined;
-  let rawCollider: import('@dimforge/rapier3d-compat').default.Collider | undefined;
+  let rawBody: RAPIER.RigidBody | undefined;
+  let rawCollider: RAPIER.Collider | undefined;
 
   if (physics.driver && physics.driver.isReady) {
     const pos3D = { x: posX, y: posY, z: posZ };
     rawBody = physics.driver.createFixedBody(pos3D, id);
-    rawBody.setRotation({ x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) }, false);
+    rawBody.setRotation(rotation, false);
 
     // Смещаем коллайдер вверх на hy, чтобы основание стояло на плоскости Y=0
     rawCollider = physics.driver.createCuboidCollider(hx, hy, hz, rawBody, 0, {

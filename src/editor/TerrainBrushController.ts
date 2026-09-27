@@ -10,17 +10,18 @@ export class TerrainBrushController {
     dt: number,
     flattenTarget?: number
   ): number | undefined {
-    const { size, resolution, heights, splatData } = terrainComp;
+    const { width, depth, resolution, heights, splatData } = terrainComp;
     const radius = state.radius;
     const strength = state.strength;
 
     // --- РЕЖИМ 1: ПОКРАСКА ТЕКСТУРНОЙ МАСКИ ВЫСОКОЙ ПЛОТНОСТИ (512x512) ---
     if (state.tool === 'paint') {
       const splatRes = terrainComp.splatResolution || 512;
-      const splatCellSize = size / (splatRes - 1);
-      const gridX = Math.round((worldX + size / 2) / splatCellSize);
-      const gridZ = Math.round((worldZ + size / 2) / splatCellSize);
-      const cellRadius = Math.ceil(radius / splatCellSize);
+      const splatCellSizeX = width / (splatRes - 1);
+      const splatCellSizeZ = depth / (splatRes - 1);
+      const gridX = Math.round((worldX + width / 2) / splatCellSizeX);
+      const gridZ = Math.round((worldZ + depth / 2) / splatCellSizeZ);
+      const cellRadius = Math.ceil(Math.max(radius / splatCellSizeX, radius / splatCellSizeZ));
 
       let modified = false;
 
@@ -28,8 +29,8 @@ export class TerrainBrushController {
         for (let x = gridX - cellRadius; x <= gridX + cellRadius; x++) {
           if (x < 0 || x >= splatRes || z < 0 || z >= splatRes) continue;
 
-          const wX = x * splatCellSize - size / 2;
-          const wZ = z * splatCellSize - size / 2;
+          const wX = x * splatCellSizeX - width / 2;
+          const wZ = z * splatCellSizeZ - depth / 2;
           const dist = Math.hypot(wX - worldX, wZ - worldZ);
 
           if (dist <= radius) {
@@ -87,10 +88,11 @@ export class TerrainBrushController {
     }
 
     // --- РЕЖИМ 2: СКУЛЬПТИНГ ГЕОМЕТРИИ (128x128) ---
-    const cellSize = size / (resolution - 1);
-    const gridX = Math.round((worldX + size / 2) / cellSize);
-    const gridZ = Math.round((worldZ + size / 2) / cellSize);
-    const cellRadius = Math.ceil(radius / cellSize);
+    const cellSizeX = width / (resolution - 1);
+    const cellSizeZ = depth / (resolution - 1);
+    const gridX = Math.round((worldX + width / 2) / cellSizeX);
+    const gridZ = Math.round((worldZ + depth / 2) / cellSizeZ);
+    const cellRadius = Math.ceil(Math.max(radius / cellSizeX, radius / cellSizeZ));
 
     let modified = false;
 
@@ -107,8 +109,8 @@ export class TerrainBrushController {
       for (let x = gridX - cellRadius; x <= gridX + cellRadius; x++) {
         if (x < 0 || x >= resolution || z < 0 || z >= resolution) continue;
 
-        const wX = x * cellSize - size / 2;
-        const wZ = z * cellSize - size / 2;
+        const wX = x * cellSizeX - width / 2;
+        const wZ = z * cellSizeZ - depth / 2;
         const dist = Math.hypot(wX - worldX, wZ - worldZ);
 
         if (dist <= radius) {

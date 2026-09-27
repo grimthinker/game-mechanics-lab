@@ -5,6 +5,7 @@ import { TransferTarget } from '../ecs/utils/itemValidation';
 import { t } from '../locales';
 
 export type HierarchyNodeType =
+  | 'group'
   | 'creature'
   | 'bodyPart'
   | 'interactionSlot'
@@ -397,7 +398,13 @@ export function buildHierarchyTree(
   for (const [id, comp] of allEntities) {
     const arch = comp.tag?.archetype ?? comp.meta?.entityType ?? 'creature';
 
-    if (arch === 'creature' || arch === 'obstacle' || arch === 'marker' || arch === 'environment') {
+    if (
+      arch === 'creature' ||
+      arch === 'obstacle' ||
+      arch === 'marker' ||
+      arch === 'environment' ||
+      arch === 'terrain'
+    ) {
       topLevelIds.add(id);
     } else if (arch === 'zone') {
       if (!comp.attachment?.parentId) topLevelIds.add(id);
@@ -406,23 +413,84 @@ export function buildHierarchyTree(
     }
   }
 
+  const creatureNodes: HierarchyTreeNode[] = [];
+  const obstacleNodes: HierarchyTreeNode[] = [];
+  const itemNodes: HierarchyTreeNode[] = [];
+  const zoneNodes: HierarchyTreeNode[] = [];
+  const envNodes: HierarchyTreeNode[] = [];
+  const markerNodes: HierarchyTreeNode[] = [];
+
   for (const id of topLevelIds) {
     const comp = world.getEntity(id);
     const arch = comp?.tag?.archetype ?? comp?.meta?.entityType ?? 'creature';
 
-    let res;
     if (arch === 'creature') {
-      res = buildCreatureNode(id);
+      const res = buildCreatureNode(id);
+      if (res?.node) creatureNodes.push(res.node);
     } else if (arch === 'item' || arch === 'bodyPart') {
-      res = buildItemNode(id, [], id);
+      const res = buildItemNode(id, [], id);
+      if (res?.node) itemNodes.push(res.node);
+    } else if (arch === 'obstacle') {
+      const res = buildStandardNode(id);
+      if (res?.node) obstacleNodes.push(res.node);
+    } else if (arch === 'zone') {
+      const res = buildStandardNode(id);
+      if (res?.node) zoneNodes.push(res.node);
+    } else if (arch === 'environment' || arch === 'terrain') {
+      const res = buildStandardNode(id);
+      if (res?.node) envNodes.push(res.node);
+    } else if (arch === 'marker') {
+      const res = buildStandardNode(id);
+      if (res?.node) markerNodes.push(res.node);
     } else {
-      res = buildStandardNode(id);
-    }
-
-    if (res && res.node) {
-      tree.push(res.node);
+      const res = buildStandardNode(id);
+      if (res?.node) obstacleNodes.push(res.node);
     }
   }
+
+  const addGroup = (
+    groupId: string,
+    title: string,
+    icon: string,
+    children: HierarchyTreeNode[]
+  ) => {
+    if (children.length === 0) return;
+
+    const groupName = `${title} (${children.length})`;
+    const isGroupSelfMatched = checkMatch(title, groupId);
+
+    const hasAnyChildMatched = (nodes: HierarchyTreeNode[]): boolean => {
+      for (const n of nodes) {
+        if (matchedIds.has(n.entityId || n.id)) return true;
+        if (n.children && hasAnyChildMatched(n.children)) return true;
+      }
+      return false;
+    };
+
+    const anyChildMatched = hasAnyChildMatched(children);
+
+    if (!q || isGroupSelfMatched || anyChildMatched) {
+      if (anyChildMatched || isGroupSelfMatched) {
+        matchedIds.add(groupId);
+      }
+      tree.push({
+        id: groupId,
+        type: 'group',
+        name: groupName,
+        icon,
+        badges: [],
+        children,
+        isVirtual: true,
+      });
+    }
+  };
+
+  addGroup('group_creatures', t('selectionDrawer.creatures'), '👤', creatureNodes);
+  addGroup('group_items', t('selectionDrawer.items'), '📦', itemNodes);
+  addGroup('group_obstacles', t('selectionDrawer.obstacles'), '🧱', obstacleNodes);
+  addGroup('group_zones', t('selectionDrawer.zones'), '🌀', zoneNodes);
+  addGroup('group_environment', t('inspector.environment'), '🌤️', envNodes);
+  addGroup('group_markers', t('selectionDrawer.markers'), '📍', markerNodes);
 
   return { tree, matchedIds };
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { getTerrainTextures } from './proceduralTextures';
+import { TERRAIN_CONFIG } from '../../config/terrainConfig';
 
 export function createTerrainMaterial(
   splatTexture: THREE.DataTexture,
@@ -19,7 +20,7 @@ export function createTerrainMaterial(
   };
 
   material.userData.isSharedMaterial = true;
-  material.customProgramCacheKey = () => 'TerrainSplatMaterial_v5';
+  material.customProgramCacheKey = () => 'TerrainSplatMaterial_v7'; // Обновлен ключ кэша для рекомпиляции
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.tSplat = { value: splatTexture };
@@ -28,6 +29,23 @@ export function createTerrainMaterial(
     shader.uniforms.tDirt = { value: textures.dirt };
     shader.uniforms.tSand = { value: textures.sand };
     shader.uniforms.uTiling = { value: textureTiling };
+    shader.uniforms.uSplatBlur = { value: TERRAIN_CONFIG.splatBlurFactor };
+
+    // Проброс локальных/мировых координат и нормалей во фрагментный шейдер
+    shader.vertexShader = `
+      varying vec3 vTriPos;
+      varying vec3 vTriNormal;
+      ${shader.vertexShader}
+    `;
+
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <project_vertex>',
+      `
+      #include <project_vertex>
+      vTriPos = (modelMatrix * vec4(position, 1.0)).xyz;
+      vTriNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+      `
+    );
 
     shader.fragmentShader = `
       uniform sampler2D tSplat;
@@ -36,6 +54,10 @@ export function createTerrainMaterial(
       uniform sampler2D tDirt;
       uniform sampler2D tSand;
       uniform float uTiling;
+      uniform float uSplatBlur;
+      
+      varying vec3 vTriPos;
+      varying vec3 vTriNormal;
       ${shader.fragmentShader}
     `;
 
@@ -50,8 +72,8 @@ export function createTerrainMaterial(
       float jitter = (sin(vUv.x * 250.0) * cos(vUv.y * 250.0)) * 0.0025;
       vec2 splatUv = baseUv + vec2(jitter, -jitter);
 
-      // 5-точечный мультисэмплинг: расширяет физическое размытие на ~1 метр вокруг границы
-      vec2 texel = vec2(1.0 / 512.0) * 1.8;
+      // 5-точечный мультисэмплинг с настраиваемым коэффициентом размытия границ
+      vec2 texel = vec2(1.0 / 512.0) * uSplatBlur;
       vec4 splat = texture2D(tSplat, splatUv) * 0.36;
       splat += texture2D(tSplat, splatUv + vec2(texel.x, 0.0)) * 0.16;
       splat += texture2D(tSplat, splatUv - vec2(texel.x, 0.0)) * 0.16;
@@ -60,10 +82,33 @@ export function createTerrainMaterial(
 
       vec2 tiledUv = vUv * uTiling;
 
+      // === ТРИПЛАНАРНЫЙ МАППИНГ (Только Скала и Почва) ===
+      
+      // 1. Вычисляем веса смешивания осей на основе нормали
+      vec3 blend = abs(vTriNormal);
+      blend = pow(blend, vec3(4.0)); // Увеличиваем резкость перехода между гранями
+      blend /= dot(blend, vec3(1.0)); // Нормализуем веса (сумма = 1.0)
+
+      // 2. Координаты для боковых проекций (масшабируем с учетом общего Tiling)
+      vec2 uvX = vTriPos.zy * (uTiling / 100.0);
+      vec2 uvZ = vTriPos.xy * (uTiling / 100.0);
+
+      // 3. Выборка текстур
+      // Трава и Песок (остаются планарными)
       vec4 colGrass = texture2D(tGrass, tiledUv);
-      vec4 colRock  = texture2D(tRock, tiledUv);
-      vec4 colDirt  = texture2D(tDirt, tiledUv);
       vec4 colSand  = texture2D(tSand, tiledUv);
+
+      // Скала (Трипланар)
+      vec4 cxRock = texture2D(tRock, uvX);
+      vec4 cyRock = texture2D(tRock, tiledUv); // Для крыши используем UV оригинала для идеального тайлинга
+      vec4 czRock = texture2D(tRock, uvZ);
+      vec4 colRock = cxRock * blend.x + cyRock * blend.y + czRock * blend.z;
+
+      // Почва (Трипланар)
+      vec4 cxDirt = texture2D(tDirt, uvX);
+      vec4 cyDirt = texture2D(tDirt, tiledUv);
+      vec4 czDirt = texture2D(tDirt, uvZ);
+      vec4 colDirt = cxDirt * blend.x + cyDirt * blend.y + czDirt * blend.z;
 
       float weightSum = splat.r + splat.g + splat.b + splat.a;
       if (weightSum <= 0.0001) weightSum = 1.0;

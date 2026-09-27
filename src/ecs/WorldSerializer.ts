@@ -13,7 +13,9 @@ import { evaluateStat } from './stats/StatEvaluator';
 import { fastClone } from './utils/clone';
 
 export interface SerializedTerrainData {
-  size: number;
+  width?: number;
+  depth?: number;
+  size?: number; // Для обратной совместимости со старыми сохранениями
   resolution: number;
   splatResolution: number;
   textureTiling: number;
@@ -60,7 +62,8 @@ export class WorldSerializer {
           if (key === 'terrain') {
             const t = componentValue as import('./components/terrain').TerrainComponent;
             data.components[key] = {
-              size: t.size,
+              width: t.width,
+              depth: t.depth,
               resolution: t.resolution,
               splatResolution: t.splatResolution || 512,
               textureTiling: t.textureTiling,
@@ -242,7 +245,8 @@ export class WorldSerializer {
             }
 
             this.app.world.addComponent(ent.id, 'terrain', {
-              size: rawT.size || 100,
+              width: rawT.width || rawT.size || 100,
+              depth: rawT.depth || rawT.size || 100,
               resolution: res,
               splatResolution: splatRes,
               heights,

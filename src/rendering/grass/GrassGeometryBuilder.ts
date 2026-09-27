@@ -100,10 +100,11 @@ export class GrassGeometryBuilder {
         positions[rightIdx + 1] = y;
         positions[rightIdx + 2] = centerZ + perpZ * currentHalfWidth;
 
-        // Мягкая усредненная нормаль: направлена наружу пучка и приподнята вверх (0.6) для красивого рассеивания света
-        const normX = dirX * 0.6;
-        const normY = 0.6;
-        const normZ = dirZ * 0.6;
+        // Полусферическая нормаль для листвы: преимущественно смотрит в небо к солнцу (0.85)
+        // с умеренным радиальным раскрытием наружу (0.35) для мягкого объемного градиента
+        const normX = dirX * 0.35;
+        const normY = 0.85;
+        const normZ = dirZ * 0.35;
         const nLen = Math.hypot(normX, normY, normZ) || 1.0;
 
         normals[leftIdx] = normX / nLen;
@@ -146,15 +147,15 @@ export class GrassGeometryBuilder {
         const tl = bl + 2;
         const tr = bl + 3;
 
-        // Первый треугольник квада (изменен порядок обхода CCW для корректных нормалей)
+        // Первый треугольник квада (ПРАВИЛЬНЫЙ обход против часовой стрелки - CCW)
         indices[iOffset++] = bl;
-        indices[iOffset++] = tl;
         indices[iOffset++] = br;
+        indices[iOffset++] = tl;
 
-        // Второй треугольник квада (изменен порядок обхода CCW)
+        // Второй треугольник квада
         indices[iOffset++] = br;
-        indices[iOffset++] = tl;
         indices[iOffset++] = tr;
+        indices[iOffset++] = tl;
       }
     }
 

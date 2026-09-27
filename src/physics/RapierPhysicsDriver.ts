@@ -414,7 +414,8 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
   }
 
   public createOrUpdateTerrain(
-    size: number,
+    width: number,
+    depth: number,
     resolution: number,
     heights: Float32Array,
     entityId?: string
@@ -422,7 +423,8 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     if (!this.world) return null;
 
     const safeRes = Math.max(2, Math.round(Number(resolution) || 128));
-    const safeSize = Math.max(1, Number(size) || 100);
+    const safeW = Math.max(1, Number(width) || 100);
+    const safeD = Math.max(1, Number(depth) || 100);
 
     // Удаляем предыдущий статический коллайдер пола / террейна
     if (this.groundBody) {
@@ -437,17 +439,19 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     // 1. Генерация 3D вершин (X, Y, Z) террейна в мировых координатах
     const numVerts = safeRes * safeRes;
     const vertices = new Float32Array(numVerts * 3);
-    const step = safeSize / (safeRes - 1);
-    const halfSize = safeSize / 2;
+    const stepX = safeW / (safeRes - 1);
+    const stepZ = safeD / (safeRes - 1);
+    const halfW = safeW / 2;
+    const halfD = safeD / 2;
 
     for (let z = 0; z < safeRes; z++) {
       for (let x = 0; x < safeRes; x++) {
         const idx = z * safeRes + x;
         const vIdx = idx * 3;
         const h = heights[idx];
-        vertices[vIdx] = x * step - halfSize;
+        vertices[vIdx] = x * stepX - halfW;
         vertices[vIdx + 1] = typeof h === 'number' && Number.isFinite(h) ? h : 0;
-        vertices[vIdx + 2] = z * step - halfSize;
+        vertices[vIdx + 2] = z * stepZ - halfD;
       }
     }
 

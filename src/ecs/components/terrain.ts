@@ -1,6 +1,8 @@
 export interface TerrainComponent {
-  /** Физический размер террейна в метрах по осям X и Z */
-  size: number;
+  /** Физический размер террейна в метрах по оси X */
+  width: number;
+  /** Физический размер террейна в метрах по оси Z */
+  depth: number;
   /** Количество вершин по одной стороне сетки геометрии (например, 128 -> 128x128 вершин) */
   resolution: number;
   /** Разрешение текстурной карты смешивания Splatmap (например, 512 -> 512x512 пикселей) */
@@ -35,16 +37,18 @@ export function getTerrainHeightAt(
   worldX: number,
   worldZ: number
 ): number | null {
-  const halfSize = terrain.size / 2;
-  if (worldX < -halfSize || worldX > halfSize || worldZ < -halfSize || worldZ > halfSize) {
+  const halfW = terrain.width / 2;
+  const halfD = terrain.depth / 2;
+  if (worldX < -halfW || worldX > halfW || worldZ < -halfD || worldZ > halfD) {
     return null;
   }
 
   const res = terrain.resolution;
-  const step = terrain.size / (res - 1);
+  const stepX = terrain.width / (res - 1);
+  const stepZ = terrain.depth / (res - 1);
 
-  const u = (worldX + halfSize) / step;
-  const v = (worldZ + halfSize) / step;
+  const u = (worldX + halfW) / stepX;
+  const v = (worldZ + halfD) / stepZ;
 
   const x0 = Math.floor(u);
   const z0 = Math.floor(v);
@@ -63,4 +67,35 @@ export function getTerrainHeightAt(
   const hBottom = h01 * (1 - fx) + h11 * fx;
 
   return hTop * (1 - fz) + hBottom * fz;
+}
+
+/**
+ * Вычисляет точный вектор нормали поверхности террейна в точке (worldX, worldZ) методом конечных разностей.
+ */
+export function getTerrainNormalAt(
+  terrain: TerrainComponent,
+  worldX: number,
+  worldZ: number
+): { x: number; y: number; z: number } {
+  const halfW = terrain.width / 2;
+  const halfD = terrain.depth / 2;
+  if (worldX < -halfW || worldX > halfW || worldZ < -halfD || worldZ > halfD) {
+    return { x: 0, y: 1, z: 0 };
+  }
+
+  const step = Math.max(0.1, terrain.width / (terrain.resolution - 1));
+  const hL = getTerrainHeightAt(terrain, worldX - step, worldZ) ?? 0;
+  const hR = getTerrainHeightAt(terrain, worldX + step, worldZ) ?? 0;
+  const hD = getTerrainHeightAt(terrain, worldX, worldZ - step) ?? 0;
+  const hU = getTerrainHeightAt(terrain, worldX, worldZ + step) ?? 0;
+
+  const dx = (hR - hL) / (2 * step);
+  const dz = (hU - hD) / (2 * step);
+
+  const len = Math.hypot(-dx, 1.0, -dz) || 1.0;
+  return {
+    x: -dx / len,
+    y: 1.0 / len,
+    z: -dz / len,
+  };
 }

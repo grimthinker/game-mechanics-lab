@@ -100,7 +100,13 @@ export class PhysicsSystem {
     const terrainEntities = world.getEntitiesWith('terrain');
     for (const [id, { terrain }] of terrainEntities) {
       if (terrain.isPhysicsDirty) {
-        this.driver.createOrUpdateTerrain(terrain.size, terrain.resolution, terrain.heights, id);
+        this.driver.createOrUpdateTerrain(
+          terrain.width,
+          terrain.depth,
+          terrain.resolution,
+          terrain.heights,
+          id
+        );
         terrain.isPhysicsDirty = false;
       }
     }

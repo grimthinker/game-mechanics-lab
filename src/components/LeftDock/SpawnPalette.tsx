@@ -2,6 +2,11 @@ import React from 'react';
 import { EntityConfig } from '../../ecs/types';
 import { BodyStructureType } from '../../ecs/templates';
 import { createZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
+import {
+  createHouseConfig,
+  createFenceConfig,
+  createRockConfig,
+} from '../../ecs/archetypes/ObstacleArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
 import { t } from '../../locales';
 
@@ -331,6 +336,55 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
     {
       title: t('palette.categoryObstacles'),
       items: [
+        {
+          id: 'obstacle_house',
+          name: t('palette.house'),
+          description: t('palette.houseDesc'),
+          icon: '🏠',
+          createConfig: () => createHouseConfig(),
+        },
+        {
+          id: 'obstacle_fence',
+          name: t('palette.fence'),
+          description: t('palette.fenceDesc'),
+          icon: '🪵',
+          createConfig: () => createFenceConfig(2.4),
+        },
+        {
+          id: 'obstacle_rock_1',
+          name: t('palette.rock1'),
+          description: t('palette.rockDesc'),
+          icon: '🪨',
+          createConfig: () => createRockConfig(1, 1.0),
+        },
+        {
+          id: 'obstacle_rock_2',
+          name: t('palette.rock2'),
+          description: t('palette.rockDesc'),
+          icon: '🪨',
+          createConfig: () => createRockConfig(2, 1.0),
+        },
+        {
+          id: 'obstacle_rock_3',
+          name: t('palette.rock3'),
+          description: t('palette.rockDesc'),
+          icon: '🪨',
+          createConfig: () => createRockConfig(3, 1.0),
+        },
+        {
+          id: 'obstacle_rock_4',
+          name: t('palette.rock4'),
+          description: t('palette.rockDesc'),
+          icon: '🪨',
+          createConfig: () => createRockConfig(4, 1.0),
+        },
+        {
+          id: 'obstacle_rock_5',
+          name: t('palette.rock5'),
+          description: t('palette.rockDesc'),
+          icon: '🪨',
+          createConfig: () => createRockConfig(5, 1.0),
+        },
         {
           id: 'obstacle_tree',
           name: 'Дерево',

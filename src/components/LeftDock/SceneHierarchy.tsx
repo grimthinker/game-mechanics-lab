@@ -308,7 +308,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
       const saved = localStorage.getItem('scene_hierarchy_expanded_nodes');
       if (saved) return new Set(JSON.parse(saved));
     } catch {}
-    return new Set();
+    return new Set(['group_creatures', 'group_items', 'group_zones']);
   });
 
   useEffect(() => {
@@ -390,6 +390,11 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
   };
 
   const handleSelect = (node: HierarchyTreeNode) => {
+    if (node.type === 'group') {
+      toggleExpand(node.id, false, node);
+      return;
+    }
+
     const rootId = node.inspectorRootId || node.entityId;
     if (!rootId) return;
 

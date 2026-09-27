@@ -22,8 +22,17 @@ import { GameMode } from '../config/gameConfig';
 import { Vec3 } from '../types';
 import { EntityConfig } from '../ecs/types';
 import { createZoneConfig } from '../ecs/archetypes/ZoneArchetype';
-import { createDefaultTerrainConfig } from '../ecs/archetypes/TerrainArchetype';
+import {
+  createDefaultTerrainConfig,
+  createFlatTerrainConfig,
+} from '../ecs/archetypes/TerrainArchetype';
 import { createDefaultEnvironmentConfig } from '../ecs/archetypes/EnvironmentArchetype';
+import {
+  createHouseConfig,
+  createFenceConfig,
+  createRockConfig,
+} from '../ecs/archetypes/ObstacleArchetype';
+import { getTerrainHeightAt } from '../ecs/components/terrain';
 import { getAnatomyParts, getAllContainedItems } from '../ecs/utils/hierarchy';
 import { CREATURE_BLUEPRINTS } from '../ecs/templates';
 import { Radians, deg2Rad, createRectanglePoints } from '../utils';
@@ -78,6 +87,7 @@ export class GameSimulation {
       (app.renderer as any).scene,
       (app.renderer as any).renderer
     );
+    this.threeSyncSystem.physicsDriver = this.physicsDriver;
   }
 
   public fixedUpdate(dt: number): void {
@@ -337,27 +347,211 @@ export class GameSimulation {
     EventBus.emit('world:updated');
   }
 
+  public initEmptyWorld(width: number, depth: number): void {
+    this.clearWorld();
+    this.app.editor.commandHistory.clear();
+
+    this.spawnEntity(createFlatTerrainConfig(width, depth, 128), { x: 0, y: 0, z: 0 }, 'terrain');
+    this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
+
+    this.playerEntityId = this.entityFactory.spawnModularHumanoid(
+      this.world,
+      this.physics,
+      this.aiSystem,
+      { x: 0, y: 0, z: 0 },
+      'PlayerTree',
+      'Игрок'
+    );
+
+    this.syncPhysicsStructures();
+  }
+
   public initDefaultWorld(center?: Vec3): void {
     this.clearWorld();
     this.app.editor.commandHistory.clear();
 
     const { x: bx, y: by, z: bz } = center ?? { x: 0, y: 0, z: 0 };
 
-    this.spawnEntity(createDefaultTerrainConfig(100, 128), { x: 0, y: 0, z: 0 }, 'terrain');
+    // 1. Спавн процедурного террейна и окружения по новой схеме
+    this.spawnEntity(createDefaultTerrainConfig(100, 100, 128), { x: 0, y: 0, z: 0 }, 'terrain');
     this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
 
-    // 1. Игрок (без палки в руке, не участвует в апорте)
+    const terrainComp = this.world.getComponent('terrain', 'terrain');
+    const getHeight = (x: number, z: number): number => {
+      if (!terrainComp) return by;
+      return getTerrainHeightAt(terrainComp, x, z) ?? by;
+    };
+
+    // 2. Спавн дома в центре двора (фасад ориентирован на запад к подъездной дорожке)
+    const houseX = bx + 1.0;
+    const houseZ = bz + 0.0;
+    const houseY = getHeight(houseX, houseZ);
+    // Поворот на -90 градусов направляет крыльцо и дверь строго на запад (-X)
+    this.spawnEntity(
+      createHouseConfig({ x: houseX, y: houseY, z: houseZ }, (-Math.PI / 2) as Radians)
+    );
+
+    // 3. Сборка периметра деревянного забора вокруг двора дома с проемом для ворот
+    const spawnFenceSegment = (x: number, z: number, angle: Radians) => {
+      const gy = getHeight(x, z);
+      this.spawnEntity(createFenceConfig(2.4, { x, y: gy, z }, angle));
+    };
+
+    const spawnFenceLine = (ax: number, az: number, bxCoord: number, bzCoord: number) => {
+      const dx = bxCoord - ax;
+      const dz = bzCoord - az;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.5) return;
+
+      const angle = Math.atan2(dz, dx) as Radians;
+      const segLen = 2.35;
+      const count = Math.max(1, Math.round(len / segLen));
+      const step = len / count;
+      const dirX = dx / len;
+      const dirZ = dz / len;
+
+      for (let i = 0; i < count; i++) {
+        const d = (i + 0.5) * step;
+        spawnFenceSegment(ax + dirX * d, az + dirZ * d, angle);
+      }
+    };
+
+    // Узловые точки периметра забора усадьбы по схеме (Image 3):
+    // Северная стена:
+    spawnFenceLine(bx - 6.0, bz - 8.5, bx + 7.0, bz - 8.5);
+    // Восточная стена:
+    spawnFenceLine(bx + 7.0, bz - 8.5, bx + 7.0, bz + 8.5);
+    // Южная стена:
+    spawnFenceLine(bx + 7.0, bz + 8.5, bx - 6.0, bz + 8.5);
+    // Юго-западный скос:
+    spawnFenceLine(bx - 6.0, bz + 8.5, bx - 9.0, bz + 3.2);
+    // Северо-западный скос:
+    spawnFenceLine(bx - 6.0, bz - 8.5, bx - 9.0, bz - 2.8);
+    // (Между z = -2.8 и z = +3.2 на x = -9.0 оставлен открытый проем для въезда с дороги)
+
+    // 4. Спавн лесных массивов (по референсу 3):
+    const spawnTree = (tx: number, tz: number) => {
+      const ty = getHeight(tx, tz);
+      const randomAngle = (Math.random() * Math.PI * 2) as Radians;
+      this.spawnEntity(
+        {
+          tag: { archetype: 'obstacle' },
+          meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
+          visualModel: { modelId: 'proc://prop/tree' },
+          transform: {
+            x: tx,
+            y: ty,
+            z: tz,
+            rotation: {
+              x: 0,
+              y: Math.sin(randomAngle * 0.5),
+              z: 0,
+              w: Math.cos(randomAngle * 0.5),
+            },
+            angle: randomAngle,
+          },
+          physics: {
+            radius: 0.6,
+            weight: 5000,
+            isSolid: true,
+            height: 4.0,
+            points: createRectanglePoints(0.6, 0.6),
+          },
+        },
+        { x: tx, y: ty, z: tz }
+      );
+    };
+
+    // А. Северная плотная роща (к северу от усадьбы)
+    for (let i = 0; i < 28; i++) {
+      const tx = bx + (Math.random() - 0.3) * 26;
+      const tz = bz - 20 - Math.random() * 24;
+      spawnTree(tx, tz);
+    }
+
+    // Б. Южный лесной массив (к югу от усадьбы и тракта)
+    for (let i = 0; i < 34; i++) {
+      const tx = bx + (Math.random() - 0.4) * 36;
+      const tz = bz + 18 + Math.random() * 26;
+      spawnTree(tx, tz);
+    }
+
+    // В. Деревья вдоль обочин главного тракта
+    const roadTreePositions = [
+      { x: -7, z: -42 },
+      { x: -8, z: -32 },
+      { x: -10, z: -20 },
+      { x: -13, z: -10 },
+      { x: -14, z: 8 },
+      { x: -16, z: 18 },
+      { x: -19, z: 28 },
+      { x: -25, z: 38 },
+      { x: -33, z: 46 },
+    ];
+    roadTreePositions.forEach((pt) => spawnTree(bx + pt.x, bz + pt.z));
+
+    // Г. Деревья на восточной поляне и вокруг песчаного овала
+    const eastTreePositions = [
+      { x: 30, z: -16 },
+      { x: 33, z: -10 },
+      { x: 34, z: -2 },
+      { x: 33, z: 8 },
+      { x: 30, z: 16 },
+      { x: 26, z: 22 },
+      { x: 42, z: -25 },
+    ];
+    eastTreePositions.forEach((pt) => spawnTree(bx + pt.x, bz + pt.z));
+
+    // Д. Деревья внутри двора усадьбы (по схеме)
+    spawnTree(bx - 2.5, bz - 6.5);
+    spawnTree(bx + 4.5, bz + 4.5);
+
+    // 5. Россыпи камней (все 5 вариантов по референсу 2)
+    const rockSpawns = [
+      // Вдоль границы западного песчаного хребта
+      { x: -18, z: 12, v: 1 as const, s: 1.2 },
+      { x: -24, z: 25, v: 4 as const, s: 1.4 },
+      { x: -15, z: -24, v: 5 as const, s: 1.1 },
+      { x: -28, z: 40, v: 2 as const, s: 1.3 },
+      { x: -17, z: -38, v: 1 as const, s: 1.0 },
+
+      // Вокруг восточной песчаной поляны
+      { x: 13, z: -14, v: 3 as const, s: 1.3 },
+      { x: 29, z: -8, v: 2 as const, s: 1.5 },
+      { x: 28, z: 10, v: 4 as const, s: 1.2 },
+      { x: 14, z: 8, v: 1 as const, s: 1.0 },
+
+      // У ворот двора и на перекрестке подъездной дорожки
+      { x: -12, z: -4, v: 5 as const, s: 0.9 },
+      { x: -11, z: 5, v: 2 as const, s: 1.0 },
+    ];
+
+    rockSpawns.forEach((r, idx) => {
+      const rx = bx + r.x;
+      const rz = bz + r.z;
+      const ry = getHeight(rx, rz);
+      const angle = ((idx * 1.37) % (Math.PI * 2)) as Radians;
+      this.spawnEntity(createRockConfig(r.v, r.s, { x: rx, y: ry, z: rz }, angle));
+    });
+
+    // 6. Игрок: начинает перед воротами на подъездной дорожке, глядя во двор
+    const playerX = bx - 11.5;
+    const playerZ = bz + 0.5;
+    const playerY = getHeight(playerX, playerZ);
     this.playerEntityId = this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx - 4.0, y: by, z: bz },
+      { x: playerX, y: playerY, z: playerZ },
       'PlayerTree',
       'Игрок'
     );
 
-    // 2. Хозяин (центр игровой зоны)
-    const masterPos: Vec3 = { x: bx, y: by, z: bz };
+    // 7. Хозяин: стоит во дворе перед крыльцом дома
+    const masterX = bx - 2.5;
+    const masterZ = bz + 0.5;
+    const masterY = getHeight(masterX, masterZ);
+    const masterPos: Vec3 = { x: masterX, y: masterY, z: masterZ };
     const masterId = this.entityFactory.spawnModularHumanoid(
       this.world,
       this.physics,
@@ -367,7 +561,14 @@ export class GameSimulation {
       'Хозяин'
     );
 
-    // 3. Выдаем Хозяину по одному мячику в левую и в правую руку
+    // Поворачиваем хозяина лицом к воротам на запад
+    const masterTrans = this.world.getComponent(masterId, 'transform');
+    if (masterTrans) {
+      masterTrans.angle = Math.PI as Radians;
+      masterTrans.rotation = { x: 0, y: 1, z: 0, w: 0 };
+    }
+
+    // Выдаем хозяину мячики в обе руки
     const masterParts = getAnatomyParts(this.world, masterId);
     const leftHandPartId = masterParts.find((pId) => {
       const slot = this.world.getComponent(pId, 'interactionSlots');
@@ -424,12 +625,16 @@ export class GameSimulation {
       if (slot) slot.itemId = ballRightId;
     }
 
-    // 4. Спавним 3 собак
+    // 8. Собаки: 3 собаки резвятся во дворе
+    const dog1Pos = { x: bx - 1.5, y: getHeight(bx - 1.5, bz + 3.0), z: bz + 3.0 };
+    const dog2Pos = { x: bx + 2.0, y: getHeight(bx + 2.0, bz - 3.0), z: bz - 3.0 };
+    const dog3Pos = { x: bx - 4.5, y: getHeight(bx - 4.5, bz - 2.5), z: bz - 2.5 };
+
     const dog1Id = this.entityFactory.spawnModularCreature(
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx + 2.0, y: by, z: bz + 1.5 },
+      dog1Pos,
       CREATURE_BLUEPRINTS.quadruped,
       'DogFetchTree',
       'Собака 1'
@@ -439,7 +644,7 @@ export class GameSimulation {
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx + 1.0, y: by, z: bz - 2.0 },
+      dog2Pos,
       CREATURE_BLUEPRINTS.quadruped,
       'DogFetchTree',
       'Собака 2'
@@ -449,118 +654,29 @@ export class GameSimulation {
       this.world,
       this.physics,
       this.aiSystem,
-      { x: bx - 1.5, y: by, z: bz + 2.5 },
+      dog3Pos,
       CREATURE_BLUEPRINTS.quadruped,
       'DogFetchTree',
       'Собака 3'
     );
 
     const allDogIds = [dog1Id, dog2Id, dog3Id];
-
-    // 5. Связываем собак с хозяином и передаем параметры игровой зоны
     this.app.updateEntityBlackboard(masterId, 'dogIds', allDogIds);
     this.app.updateEntityBlackboard(masterId, 'playZoneCenter', masterPos);
-    this.app.updateEntityBlackboard(masterId, 'playZoneRadius', 30);
+    this.app.updateEntityBlackboard(masterId, 'playZoneRadius', 35);
 
     for (const dId of allDogIds) {
       this.app.updateEntityBlackboard(dId, 'masterEntityId', masterId);
       this.app.updateEntityBlackboard(dId, 'playZoneCenter', masterPos);
-      this.app.updateEntityBlackboard(dId, 'playZoneRadius', 30);
+      this.app.updateEntityBlackboard(dId, 'playZoneRadius', 35);
     }
 
-    // this.spawnEntity(createZoneConfig('damage', 2.5, 15), { x: bx + 4.5, y: by, z: bz });
-    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx - 4.5, y: by, z: bz });
-    this.spawnEntity(
-      createZoneConfig('repel', 2.5, 20, 'Зона отталкивания', false, false, false, true, 50, 0),
-      { x: bx - 4.5, y: by, z: bz - 4.5 }
-    );
-    this.spawnEntity(
-      createZoneConfig('attract', 2.5, 20, 'Зона притягивания', false, false, false, true, 50, 0),
-      { x: bx + 4.5, y: by, z: bz - 4.5 }
-    );
-    this.spawnEntity(
-      createZoneConfig(
-        'time_dilation',
-        2.5,
-        0.4,
-        'Зона замедления (0.4x)',
-        false,
-        false,
-        false,
-        false
-      ),
-      { x: bx - 4.5, y: by, z: bz + 4.5 }
-    );
-    this.spawnEntity(
-      createZoneConfig(
-        'time_dilation',
-        2.5,
-        1.8,
-        'Зона ускорения (1.8x)',
-        false,
-        false,
-        false,
-        false
-      ),
-      { x: bx + 4.5, y: by, z: bz + 4.5 }
-    );
+    // 9. Зоны эффекторов
+    const healY = getHeight(bx + 4.0, bz - 4.5);
+    this.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx + 4.0, y: healY, z: bz - 4.5 });
 
-    const itemsX = bx - 1.5;
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'weapon' },
-        item: {
-          name: 'Аура разрушения',
-          type: 'weapon',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.4, weight: 1, isSolid: true },
-        weaponStats: { baseDamage: 30, prepTime: 0.3, castTime: 0, recoveryTime: 0.4 },
-        weaponZone: {
-          hitZoneType: 'radius',
-          radius: 2.0,
-          pierceObstacles: false,
-          pierceCreatures: false,
-          pierceItems: false,
-        },
-      },
-      { x: itemsX, y: by + 1.0, z: bz - 2.0 }
-    );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'weapon' },
-        item: {
-          name: 'Шрапнельный дробовик',
-          type: 'weapon',
-          maxStack: 1,
-          count: 1,
-          size: 10,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.4, weight: 2, isSolid: true },
-        weaponStats: { baseDamage: 15, prepTime: 0.4, castTime: 0, recoveryTime: 0.5 },
-        weaponZone: {
-          hitZoneType: 'shrapnel',
-          length: 4.0,
-          angle: deg2Rad(60),
-          rayCount: 5,
-          pierceObstacles: false,
-          pierceCreatures: false,
-          pierceItems: false,
-        },
-      },
-      { x: itemsX, y: by + 0.5, z: bz - 1.0 }
-    );
-
+    // 10. Предметы экипировки и оружие во дворе
+    const yardItemY = getHeight(bx - 2.5, bz + 2.2);
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'weapon' },
@@ -593,7 +709,7 @@ export class GameSimulation {
           pierceItems: false,
         },
       },
-      { x: itemsX, y: by + 1.5, z: bz + 0.0 }
+      { x: bx - 2.5, y: yardItemY + 0.2, z: bz + 2.2 }
     );
 
     this.spawnEntity(
@@ -612,8 +728,9 @@ export class GameSimulation {
         physics: { radius: 0.4, weight: 20, isSolid: true },
         armorStats: { defense: 25, flatReduction: 5 },
       },
-      { x: itemsX, y: by + 0.2, z: bz + 1.0 }
+      { x: bx - 2.5, y: yardItemY + 0.2, z: bz + 3.0 }
     );
+
     this.spawnEntity(
       {
         tag: { archetype: 'item', subType: 'armor' },
@@ -630,67 +747,8 @@ export class GameSimulation {
         physics: { radius: 0.3, weight: 10, isSolid: true },
         armorStats: { defense: 15, flatReduction: 2 },
       },
-      { x: bx, y: by + 1.5, z: bz + 4.0 } as any
+      { x: bx - 2.5, y: yardItemY + 0.2, z: bz + 3.8 }
     );
-
-    this.spawnEntity(
-      {
-        tag: { archetype: 'item', subType: 'resource' },
-        item: {
-          name: 'Камень',
-          type: 'resource',
-          maxStack: 10,
-          count: 1,
-          size: 2,
-          equipTypes: [],
-          equippable: false,
-          equipTimeMultiplier: 1.0,
-        },
-        physics: { radius: 0.2, weight: 0.8, isSolid: true },
-      },
-      { x: bx + 1.0, y: by + 0.2, z: bz + 1.0 }
-    );
-
-    // Спавн леса (45 деревьев) со случайным углом поворота кроны
-    const treeCount = 45;
-    for (let i = 0; i < treeCount; i++) {
-      const tx = bx + (Math.random() - 0.5) * 80;
-      const tz = bz + (Math.random() - 0.5) * 80;
-
-      // Не спавним деревья слишком близко к центру (поляне)
-      const distToCenter = Math.hypot(tx - bx, tz - bz);
-      if (distToCenter < 8) continue;
-
-      const randomAngle = (Math.random() * Math.PI * 2) as Radians;
-
-      this.spawnEntity(
-        {
-          tag: { archetype: 'obstacle' },
-          meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
-          visualModel: { modelId: 'proc://prop/tree' },
-          transform: {
-            x: tx,
-            y: by,
-            z: tz,
-            rotation: {
-              x: 0,
-              y: Math.sin(randomAngle * 0.5),
-              z: 0,
-              w: Math.cos(randomAngle * 0.5),
-            },
-            angle: randomAngle,
-          },
-          physics: {
-            radius: 0.6,
-            weight: 5000,
-            isSolid: true,
-            height: 4.0,
-            points: createRectanglePoints(0.6, 0.6),
-          },
-        },
-        { x: tx, y: by, z: tz }
-      );
-    }
 
     this.syncPhysicsStructures();
   }

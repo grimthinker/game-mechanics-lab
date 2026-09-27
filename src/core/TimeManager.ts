@@ -85,7 +85,9 @@ export class TimeManager {
       this.app.world,
       this.app.gameMode,
       this.app.selection.selectedEntityIds,
-      this.app.celShading
+      this.app.celShading,
+      this.app.camera.targetX,
+      this.app.camera.targetZ
     );
 
     this.app.renderFrame();

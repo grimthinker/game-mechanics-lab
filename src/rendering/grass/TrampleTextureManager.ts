@@ -193,7 +193,8 @@ export class TrampleTextureManager {
     renderer: THREE.WebGLRenderer,
     dt: number,
     stamps: TrampleStamp[],
-    terrainSize: number
+    terrainWidth: number,
+    terrainDepth: number
   ): void {
     this.simMaterial.uniforms.uDeltaTime.value = dt;
     this.simMaterial.uniforms.uRecoverySpeed.value = this.recoverySpeed;
@@ -202,14 +203,17 @@ export class TrampleTextureManager {
     this.simMaterial.uniforms.tPrev.value = this.readTarget.texture;
 
     const count = Math.min(32, stamps.length);
-    const halfSize = terrainSize * 0.5;
+    const halfW = terrainWidth * 0.5;
+    const halfD = terrainDepth * 0.5;
 
     for (let i = 0; i < 32; i++) {
       if (i < count) {
         const s = stamps[i];
-        const uvX = (s.x + halfSize) / terrainSize;
-        const uvY = (s.z + halfSize) / terrainSize;
-        const uvRadius = s.radius / terrainSize;
+        const uvX = (s.x + halfW) / terrainWidth;
+        const uvY = (s.z + halfD) / terrainDepth;
+        // Упрощенно берем средний радиус по большей стороне
+        const maxDim = Math.max(terrainWidth, terrainDepth);
+        const uvRadius = s.radius / maxDim;
         this.stampsUniform[i].set(uvX, uvY, uvRadius, s.strength);
         this.dirsUniform[i].set(s.dirX, s.dirZ);
       } else {

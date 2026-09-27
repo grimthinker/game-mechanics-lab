@@ -178,12 +178,12 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
         style={{
           display: 'flex',
           flexDirection: 'column',
-          gap: '12px',
+          gap: '14px',
           opacity: active ? 1 : 0.5,
           pointerEvents: active ? 'auto' : 'none',
         }}
       >
-        <label
+        <div
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -192,22 +192,53 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
             color: '#bdc3c7',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{t('terrain.radius')}</span>
-            <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>{radius.toFixed(1)} м</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <input
+                type="number"
+                min="0.2"
+                max="30.0"
+                step="0.1"
+                value={Number(radius.toFixed(1))}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setRadius(isNaN(val) ? 0.2 : val);
+                }}
+                onBlur={() => setRadius((prev) => Math.max(0.2, Math.min(30.0, prev)))}
+                style={{
+                  width: '56px',
+                  backgroundColor: '#111',
+                  border: '1px solid #444',
+                  borderRadius: '3px',
+                  color: '#2ecc71',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '2px 4px',
+                  textAlign: 'right',
+                }}
+              />
+              <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>м</span>
+            </div>
           </div>
           <input
             type="range"
-            min="0.5"
-            max="25.0"
-            step="0.5"
-            value={radius}
+            min="0.2"
+            max="30.0"
+            step="0.1"
+            value={Math.max(0.2, Math.min(30.0, radius))}
             onChange={(e) => setRadius(Number(e.target.value))}
-            style={{ accentColor: '#2ecc71', cursor: 'pointer' }}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              accentColor: '#2ecc71',
+              cursor: 'pointer',
+              margin: 0,
+            }}
           />
-        </label>
+        </div>
 
-        <label
+        <div
           style={{
             display: 'flex',
             flexDirection: 'column',
@@ -216,20 +247,51 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
             color: '#bdc3c7',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span>{t('terrain.strength')}</span>
-            <span style={{ color: '#3498db', fontWeight: 'bold' }}>{strength.toFixed(2)}x</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <input
+                type="number"
+                min="0.1"
+                max="25.0"
+                step="0.1"
+                value={Number(strength.toFixed(2))}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setStrength(isNaN(val) ? 0.1 : val);
+                }}
+                onBlur={() => setStrength((prev) => Math.max(0.1, Math.min(25.0, prev)))}
+                style={{
+                  width: '56px',
+                  backgroundColor: '#111',
+                  border: '1px solid #444',
+                  borderRadius: '3px',
+                  color: '#3498db',
+                  fontWeight: 'bold',
+                  fontSize: '11px',
+                  padding: '2px 4px',
+                  textAlign: 'right',
+                }}
+              />
+              <span style={{ color: '#3498db', fontWeight: 'bold' }}>x</span>
+            </div>
           </div>
           <input
             type="range"
             min="0.1"
-            max="15.0"
+            max="25.0"
             step="0.1"
-            value={strength}
+            value={Math.max(0.1, Math.min(25.0, strength))}
             onChange={(e) => setStrength(Number(e.target.value))}
-            style={{ accentColor: '#3498db', cursor: 'pointer' }}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              accentColor: '#3498db',
+              cursor: 'pointer',
+              margin: 0,
+            }}
           />
-        </label>
+        </div>
       </div>
     </div>
   );

@@ -41,23 +41,31 @@ export class GameApp {
     this.emitState();
   }
 
-  private _showAIDebug: boolean = false;
+  private _showAIDebug: boolean = (() => {
+    const saved = localStorage.getItem('engine_show_ai_debug');
+    return saved !== null ? saved === 'true' : true;
+  })();
   public get showAIDebug() {
     return this._showAIDebug;
   }
   public set showAIDebug(val: boolean) {
     if (this._showAIDebug === val) return;
     this._showAIDebug = val;
+    localStorage.setItem('engine_show_ai_debug', String(val));
     this.emitState();
   }
 
-  private _celShading: boolean = false;
+  private _celShading: boolean = (() => {
+    const saved = localStorage.getItem('engine_cel_shading');
+    return saved !== null ? saved === 'true' : true;
+  })();
   public get celShading() {
     return this._celShading;
   }
   public set celShading(val: boolean) {
     if (this._celShading === val) return;
     this._celShading = val;
+    localStorage.setItem('engine_cel_shading', String(val));
     this.emitState();
   }
 
@@ -249,6 +257,9 @@ export class GameApp {
   }
   public clearWorld(): void {
     this.simulation.clearWorld();
+  }
+  public initEmptyWorld(width: number, depth: number): void {
+    this.simulation.initEmptyWorld(width, depth);
   }
   public initDefaultWorld(center?: Vec3): void {
     this.simulation.initDefaultWorld(center);
