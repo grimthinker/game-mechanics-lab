@@ -15,6 +15,7 @@ import { getRootOwner } from '../ecs/utils/hierarchy';
 import { LOGIC_CONFIG } from '../ai/config';
 import { IModelPreview } from './IModelPreview';
 import { ThreeModelPreview } from './ThreeModelPreview';
+import { TERRAIN_CONFIG } from '../config/terrainConfig';
 
 export class ThreeRenderer implements IRenderer {
   private container: HTMLDivElement;
@@ -45,6 +46,22 @@ export class ThreeRenderer implements IRenderer {
 
   constructor(container: HTMLDivElement) {
     this.container = container;
+
+    // Глобальная настройка атмосферного тумана с отсечкой ближнего плана и ограничением максимальной дымки
+    THREE.ShaderChunk.fog_fragment = `
+    #ifdef USE_FOG
+      #ifdef FOG_EXP2
+        float fogDist = max(0.0, vFogDepth - ${TERRAIN_CONFIG.skirt.fogStartDistance.toFixed(1)});
+        float ramp = 1.0 - exp(-fogDist * 0.006);
+        float maxCap = clamp(fogDensity * 320.0, 0.15, ${TERRAIN_CONFIG.skirt.maxFogCap.toFixed(2)});
+        float fogFactor = ramp * maxCap;
+      #else
+        float fogDist = max(0.0, vFogDepth - fogNear);
+        float fogFactor = clamp((fogDist / max(1.0, fogFar - fogNear)) * ${TERRAIN_CONFIG.skirt.maxFogCap.toFixed(2)}, 0.0, ${TERRAIN_CONFIG.skirt.maxFogCap.toFixed(2)});
+      #endif
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );
+    #endif
+    `;
 
     // Создаем WebGL рендерер с включенными мягкими тенями
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -192,6 +209,7 @@ export class ThreeRenderer implements IRenderer {
       if (
         child.userData.isSkyDome ||
         child.userData.isTerrainMesh ||
+        child.userData.isTerrainSkirt ||
         child.userData.isGrassMesh ||
         child.userData.entityId === 'terrain' ||
         child.userData.entityId === 'environment' ||
@@ -201,8 +219,11 @@ export class ThreeRenderer implements IRenderer {
       ) {
         continue;
       }
-      // Если это группа террейна с дочерним тяжелым мешем
-      if (child.children && child.children.some((c) => c.userData.isTerrainMesh)) {
+      // Если это группа террейна с дочерним тяжелым мешем или юбкой
+      if (
+        child.children &&
+        child.children.some((c) => c.userData.isTerrainMesh || c.userData.isTerrainSkirt)
+      ) {
         continue;
       }
       pickableObjects.push(child);
@@ -211,7 +232,7 @@ export class ThreeRenderer implements IRenderer {
     const intersects = this.raycaster.intersectObjects(pickableObjects, true);
 
     for (const hit of intersects) {
-      if (hit.object.userData.isSelectionOutline) {
+      if (hit.object.userData.isSelectionOutline || hit.object.userData.isTerrainSkirt) {
         continue;
       }
       let curr: THREE.Object3D | null = hit.object;
@@ -346,7 +367,7 @@ export class ThreeRenderer implements IRenderer {
             dayDuration: 600,
             azimuth: 0,
             axialTilt: 0.41,
-            fogDensity: 0.007,
+            fogDensity: 0.2,
           };
 
     this.environmentManager.update(

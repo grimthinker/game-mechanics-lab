@@ -12,7 +12,7 @@ export function createDefaultEnvironmentConfig(): EntityConfig {
     dayDuration: 600,
     azimuth: deg2Rad(45),
     axialTilt: deg2Rad(23.5),
-    fogDensity: 0.007,
+    fogDensity: 0.0012,
   };
 
   return {

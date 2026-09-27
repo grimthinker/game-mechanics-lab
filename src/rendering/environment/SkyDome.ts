@@ -138,7 +138,7 @@ export class SkyDome {
   private material: THREE.ShaderMaterial;
 
   constructor() {
-    const geometry = new THREE.SphereGeometry(600, 32, 24);
+    const geometry = new THREE.SphereGeometry(3500, 32, 24);
 
     this.material = new THREE.ShaderMaterial({
       vertexShader,

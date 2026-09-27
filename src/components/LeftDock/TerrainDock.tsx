@@ -7,8 +7,22 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
   const [active, setActive] = useState(false);
   const [tool, setTool] = useState<TerrainToolType>('raise');
   const [texture, setTexture] = useState<TerrainTextureChannel>(0);
-  const [radius, setRadius] = useState(3.0);
-  const [strength, setStrength] = useState(2.0);
+  const [radius, setRadius] = useState(() => {
+    const saved = localStorage.getItem('terrain_brush_radius');
+    return saved !== null ? Number(saved) : 3.0;
+  });
+  const [strength, setStrength] = useState(() => {
+    const saved = localStorage.getItem('terrain_brush_strength');
+    return saved !== null ? Number(saved) : 2.0;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_radius', radius.toString());
+  }, [radius]);
+
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_strength', strength.toString());
+  }, [strength]);
 
   // Синхронизация локального состояния React со стейтом кисти движка
   useEffect(() => {

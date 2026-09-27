@@ -79,6 +79,7 @@ export class ToonMaterialManager {
         !child.userData.isSelectionOutline &&
         !child.userData.isSkyDome &&
         !child.userData.isTerrainMesh &&
+        !child.userData.isTerrainSkirt &&
         !child.userData.isGrassMesh
       ) {
         if (!child.userData.originalMaterial) {

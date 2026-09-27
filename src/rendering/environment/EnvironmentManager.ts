@@ -32,7 +32,7 @@ export class EnvironmentManager {
     this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     scene.add(this.ambientLight);
 
-    scene.fog = new THREE.FogExp2(0xd6e5f5, 0.007);
+    scene.fog = new THREE.FogExp2(0xd6e5f5, 0.0012);
   }
 
   private setupShadowCamera(light: THREE.DirectionalLight): void {

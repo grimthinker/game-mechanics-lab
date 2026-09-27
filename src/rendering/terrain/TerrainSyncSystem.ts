@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { TerrainComponent } from '../../ecs/components/terrain';
 import { EntityId } from '../../ecs/types';
 import { createTerrainMaterial } from './TerrainMaterial';
+import { createTerrainSkirtMaterial } from './TerrainSkirtMaterial';
+import { TerrainSkirtGeometryBuilder } from './TerrainSkirtGeometryBuilder';
 import { disposeObject } from '../renderUtils';
 
 export class TerrainSyncSystem {
@@ -46,10 +48,18 @@ export class TerrainSyncSystem {
     mainMesh.userData.isTerrainMesh = true;
     mainMesh.userData.splatTexture = splatTexture;
 
+    // Создаем процедурную юбку горизонта под размеры активного мира
+    const skirtGeo = TerrainSkirtGeometryBuilder.buildGeometry(terrainComp);
+    const skirtMat = createTerrainSkirtMaterial();
+    const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
+    skirtMesh.receiveShadow = true;
+    skirtMesh.userData.isTerrainSkirt = true;
+
     terrainComp.isGeometryDirty = false;
     terrainComp.isSplatDirty = false;
 
     group.add(mainMesh);
+    group.add(skirtMesh);
     return group;
   }
 
@@ -65,6 +75,12 @@ export class TerrainSyncSystem {
       }
       posAttr.needsUpdate = true;
       terrainMesh.geometry.computeVertexNormals();
+
+      const skirtMesh = obj.children.find((c) => c.userData.isTerrainSkirt) as THREE.Mesh;
+      if (skirtMesh && skirtMesh.geometry) {
+        TerrainSkirtGeometryBuilder.updateEdgeHeights(skirtMesh.geometry, terrainComp);
+      }
+
       terrainComp.isGeometryDirty = false;
     }
 
@@ -81,6 +97,17 @@ export class TerrainSyncSystem {
         terrainMesh.userData.splatTexture.dispose();
       }
     }
+
+    const skirtMesh = obj.children.find((c) => c.userData.isTerrainSkirt) as THREE.Mesh;
+    if (skirtMesh) {
+      skirtMesh.geometry?.dispose();
+      if (Array.isArray(skirtMesh.material)) {
+        skirtMesh.material.forEach((m) => m.dispose());
+      } else if (skirtMesh.material) {
+        skirtMesh.material.dispose();
+      }
+    }
+
     disposeObject(obj);
   }
 }
