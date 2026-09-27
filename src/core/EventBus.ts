@@ -9,6 +9,7 @@ export interface EventMap {
     timeScale: number;
     showUIOverlays: boolean;
     showAIDebug: boolean;
+    celShading: boolean;
   };
   'selection:changed': {
     selectedEntityId: string | null;

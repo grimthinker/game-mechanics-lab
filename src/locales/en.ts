@@ -32,6 +32,7 @@ export const en = {
     namesAndHp: 'Names & HP',
     collisions: 'Collisions',
     aiDebug: 'AI Debug',
+    celShading: 'Cel Shading',
     hotkeysTitle: 'Hotkeys',
   },
   hud: {

@@ -13,10 +13,15 @@ import {
   CreatureMeshAssembler,
   RigAnimatorState as AnimatorState,
 } from '../../rendering/creatures/CreatureMeshAssembler';
-import { disposeObject, attachOutlines } from '../../rendering/renderUtils';
+import {
+  disposeObject,
+  attachOutlines,
+  createOutlineShaderMaterial,
+} from '../../rendering/renderUtils';
 import { AttackVisualsManager } from '../../rendering/attacks/AttackVisualsManager';
 import { GrassSyncSystem } from '../../rendering/grass/GrassSyncSystem';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
+import { ToonMaterialManager } from '../../rendering/materials/ToonMaterialManager';
 
 export class ThreeSyncSystem {
   public static disposeObject = disposeObject;
@@ -35,6 +40,8 @@ export class ThreeSyncSystem {
   private terrainSync: TerrainSyncSystem;
   private creatureAssembler: CreatureMeshAssembler;
   private grassSync: GrassSyncSystem;
+  private toonManager = ToonMaterialManager.getInstance();
+  private isCelShading: boolean = false;
 
   // Кэшированные материалы для производительности (фоллбэк)
   private matPlayer = new THREE.MeshLambertMaterial({ color: 0x2980b9 });
@@ -82,10 +89,8 @@ export class ThreeSyncSystem {
     side: THREE.DoubleSide,
   });
   private matSelection = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
-  private matSilhouetteOutline = new THREE.MeshBasicMaterial({
-    color: 0x2ecc71,
-    side: THREE.BackSide,
-  });
+  private matSilhouetteOutline = createOutlineShaderMaterial(0x2ecc71, 3.2);
+  private matCelOutline = createOutlineShaderMaterial(0x151515, 2.0);
 
   constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
     this.scene = scene;
@@ -121,6 +126,7 @@ export class ThreeSyncSystem {
     this.clearMeshes();
     this.attackVisualsManager.destroy();
     this.grassSync.destroy();
+    this.toonManager.clear();
 
     // Очищаем кэшированные фоллбэк-материалы
     this.matPlayer.dispose();
@@ -138,9 +144,29 @@ export class ThreeSyncSystem {
     this.matZoneFast.dispose();
     this.matSelection.dispose();
     this.matSilhouetteOutline.dispose();
+    this.matCelOutline.dispose();
   }
 
-  public update(dt: number, world: World, _gameMode: GameMode, selectedIds: Set<EntityId>): void {
+  public update(
+    dt: number,
+    world: World,
+    _gameMode: GameMode,
+    selectedIds: Set<EntityId>,
+    celShading: boolean = false
+  ): void {
+    if (celShading !== this.isCelShading) {
+      this.isCelShading = celShading;
+      for (const [, obj] of this.meshes.entries()) {
+        if (this.isCelShading) {
+          this.toonManager.applyToon(obj);
+          obj.userData.isToonApplied = true;
+        } else {
+          this.toonManager.restoreOriginal(obj);
+          delete obj.userData.isToonApplied;
+        }
+      }
+    }
+
     const activeIds = new Set<EntityId>();
     const renderables = world.getEntitiesWith('transform', 'renderable');
 
@@ -290,6 +316,14 @@ export class ThreeSyncSystem {
           obj.scale.set(1, 1, 1);
         }
 
+        // Применение Cel Shading к новым и асинхронно загруженным моделям
+        if (this.isCelShading && !obj.userData.isToonApplied) {
+          this.toonManager.applyToon(obj);
+          if (!this.loadingMeshes.has(id)) {
+            obj.userData.isToonApplied = true;
+          }
+        }
+
         // Синхронизация геометрии и текстурных масок террейна
         if (archetype === 'terrain') {
           const terrainComp = world.getComponent(id, 'terrain');
@@ -300,8 +334,16 @@ export class ThreeSyncSystem {
 
         const isSelected = selectedIds.has(id);
         obj.traverse((child) => {
-          if (child instanceof THREE.Mesh && child.userData.isSelectionOutline !== undefined) {
-            child.visible = isSelected;
+          if (child instanceof THREE.Mesh && child.userData.isSelectionOutline) {
+            if (isSelected) {
+              child.material = this.matSilhouetteOutline;
+              child.visible = true;
+            } else if (this.isCelShading) {
+              child.material = this.matCelOutline;
+              child.visible = true;
+            } else {
+              child.visible = false;
+            }
           }
         });
 
@@ -586,14 +628,7 @@ export class ThreeSyncSystem {
               group.userData.gripTransform = computeItemGrip(group, itemComp?.type);
             }
 
-            const physStats = world.getComponent(id, 'physicsStats');
-            const radius = physStats ? physStats.radius.current : 16;
-            const outlineGeo = new THREE.BoxGeometry(radius * 1.5, radius * 1.5, radius * 1.5);
-            const outline = new THREE.Mesh(outlineGeo, this.matSelection);
-            outline.userData.isSelectionOutline = true;
-            outline.userData.isSharedMaterial = true;
-            outline.visible = false;
-            group.add(outline);
+            ThreeSyncSystem.attachOutlines(group, this.matSilhouetteOutline);
           }
         })
         .catch(console.error)

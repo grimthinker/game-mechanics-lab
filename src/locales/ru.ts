@@ -32,6 +32,7 @@ export const ru = {
     namesAndHp: 'Имена и HP',
     collisions: 'Коллизии',
     aiDebug: 'AI Debug',
+    celShading: 'Cel Shading',
     hotkeysTitle: 'Горячие клавиши',
   },
   hud: {

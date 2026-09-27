@@ -51,6 +51,16 @@ export class GameApp {
     this.emitState();
   }
 
+  private _celShading: boolean = false;
+  public get celShading() {
+    return this._celShading;
+  }
+  public set celShading(val: boolean) {
+    if (this._celShading === val) return;
+    this._celShading = val;
+    this.emitState();
+  }
+
   private _gameMode: GameMode = GameMode.EDITOR;
   public get gameMode() {
     return this._gameMode;
@@ -191,6 +201,7 @@ export class GameApp {
       timeScale: this.globalTimeScale,
       showUIOverlays: this._showUIOverlays,
       showAIDebug: this._showAIDebug,
+      celShading: this._celShading,
     });
   }
 

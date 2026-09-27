@@ -39,8 +39,8 @@ export class EnvironmentManager {
     light.castShadow = false;
     light.shadow.mapSize.width = 4096;
     light.shadow.mapSize.height = 4096;
-    light.shadow.bias = -0.0002;
-    light.shadow.normalBias = 0.015;
+    light.shadow.bias = -0.00003;
+    light.shadow.normalBias = 0.025;
 
     const cam = light.shadow.camera;
     const bounds = 36;

@@ -26,6 +26,8 @@ export interface TopBarProps {
   setShowUIOverlays: (val: boolean) => void;
   showAIDebug: boolean;
   setShowAIDebug: (val: boolean) => void;
+  celShading: boolean;
+  setCelShading: (val: boolean) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -52,6 +54,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   setShowUIOverlays,
   showAIDebug,
   setShowAIDebug,
+  celShading,
+  setCelShading,
 }) => {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const locale = useLocale();
@@ -364,6 +368,25 @@ export const TopBar: React.FC<TopBarProps> = ({
             style={{ accentColor: '#f39c12' }}
           />
           {t('topbar.aiDebug')}
+        </label>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            color: '#9b59b6',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={celShading}
+            onChange={(e) => setCelShading(e.target.checked)}
+            style={{ accentColor: '#9b59b6' }}
+          />
+          {t('topbar.celShading')}
         </label>
 
         {/* Переключатель языка RU / EN */}

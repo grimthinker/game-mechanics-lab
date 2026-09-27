@@ -44,6 +44,7 @@ export const App: React.FC = () => {
     timeScale: 1.0,
     showUIOverlays: true,
     showAIDebug: false,
+    celShading: false,
   });
 
   const [isWasmReady, setIsWasmReady] = useState<boolean>(false);
@@ -553,6 +554,10 @@ export const App: React.FC = () => {
           showAIDebug={engineState.showAIDebug}
           setShowAIDebug={(val) => {
             if (appRef.current) appRef.current.showAIDebug = val;
+          }}
+          celShading={engineState.celShading}
+          setCelShading={(val) => {
+            if (appRef.current) appRef.current.celShading = val;
           }}
         />
       )}
