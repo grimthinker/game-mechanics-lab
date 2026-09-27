@@ -1065,10 +1065,6 @@ export class BTActionThrow extends BTAction {
 
     if (this.hasStarted) {
       this.hasStarted = false;
-      if (this.params.cooldownKey) {
-        const localTime = bb.get<number>('localTime') || 0;
-        bb.set(this.params.cooldownKey, localTime);
-      }
       bb.remove(this.params.targetPosKey);
       return NodeStatus.SUCCESS;
     }
@@ -1095,6 +1091,11 @@ export class BTActionThrow extends BTAction {
       partId: slotWithItem.partId,
       targetPos,
     });
+
+    if (this.params.cooldownKey) {
+      const localTime = bb.get<number>('localTime') || 0;
+      bb.set(this.params.cooldownKey, localTime);
+    }
 
     return NodeStatus.RUNNING;
   }
