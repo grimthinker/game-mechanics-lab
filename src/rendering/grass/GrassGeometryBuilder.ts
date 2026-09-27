@@ -146,15 +146,15 @@ export class GrassGeometryBuilder {
         const tl = bl + 2;
         const tr = bl + 3;
 
-        // Первый треугольник квада
+        // Первый треугольник квада (изменен порядок обхода CCW для корректных нормалей)
         indices[iOffset++] = bl;
-        indices[iOffset++] = br;
         indices[iOffset++] = tl;
+        indices[iOffset++] = br;
 
-        // Второй треугольник квада
+        // Второй треугольник квада (изменен порядок обхода CCW)
         indices[iOffset++] = br;
-        indices[iOffset++] = tr;
         indices[iOffset++] = tl;
+        indices[iOffset++] = tr;
       }
     }
 
