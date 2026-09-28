@@ -32,6 +32,7 @@ import { t } from './locales';
 import { EventBus } from './core/EventBus';
 import { initRapier } from './physics/rapierLoader';
 import { TreeBBSchema } from './ai/schema';
+import { spawnFetchGroup } from './ecs/prefabs/fetchGroupPrefab';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -604,6 +605,13 @@ export const App: React.FC = () => {
                 options: { structureType, behavior, name },
               })
             }
+            onSelectPrefab={(prefabId, name) =>
+              setPlacementMode({
+                kind: 'prefab',
+                prefabId,
+                name,
+              })
+            }
             onOpenWizard={() => setIsCreatureWizardOpen(true)}
             btData={btData}
             btBlackboard={btBlackboard}
@@ -826,171 +834,587 @@ export const App: React.FC = () => {
                     ]
                   : [
                       {
-                        id: 'spawn_player',
-                        label: t('pieMenu.player'),
-                        icon: '🎮',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          app.executeTransaction(t('history.spawnPlayer'), () => {
-                            const spawnPos: Vec3 = {
-                              x: pieMenuState.worldPos.x,
-                              y: pieMenuState.worldPos.y + 0.15,
-                              z: pieMenuState.worldPos.z,
-                            };
-                            const id = app.entityFactory.spawnModularHumanoid(
-                              app.world,
-                              app.physics,
-                              app.aiSystem,
-                              spawnPos,
-                              'PlayerTree',
-                              t('palette.player')
-                            );
-                            app.selection.selectEntity(id, true);
-                            return id;
-                          });
-                          syncPlayerControls();
-                        },
+                        id: 'category_creatures',
+                        label: t('pieMenu.creatures'),
+                        icon: '👤',
+                        color: '#2980b9',
+                        children: [
+                          {
+                            id: 'spawn_player',
+                            label: t('pieMenu.player'),
+                            icon: '🎮',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnPlayer'), () => {
+                                const spawnPos: Vec3 = {
+                                  x: pieMenuState.worldPos.x,
+                                  y: pieMenuState.worldPos.y + 0.15,
+                                  z: pieMenuState.worldPos.z,
+                                };
+                                const id = app.entityFactory.spawnModularHumanoid(
+                                  app.world,
+                                  app.physics,
+                                  app.aiSystem,
+                                  spawnPos,
+                                  'PlayerTree',
+                                  t('palette.player')
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_attacker',
+                            label: t('pieMenu.attacker'),
+                            icon: '⚔️',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnAttacker'), () => {
+                                const spawnPos: Vec3 = {
+                                  x: pieMenuState.worldPos.x,
+                                  y: pieMenuState.worldPos.y + 0.15,
+                                  z: pieMenuState.worldPos.z,
+                                };
+                                const id = app.entityFactory.spawnModularHumanoid(
+                                  app.world,
+                                  app.physics,
+                                  app.aiSystem,
+                                  spawnPos,
+                                  'AttackerTree',
+                                  t('palette.attacker')
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_quadruped',
+                            label: t('palette.quadrupedBot'),
+                            icon: '🐕',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnModular'), () => {
+                                const spawnPos: Vec3 = {
+                                  x: pieMenuState.worldPos.x,
+                                  y: pieMenuState.worldPos.y + 0.15,
+                                  z: pieMenuState.worldPos.z,
+                                };
+                                const id = app.entityFactory.spawnModularCreature(
+                                  app.world,
+                                  app.physics,
+                                  app.aiSystem,
+                                  spawnPos,
+                                  CREATURE_BLUEPRINTS.quadruped,
+                                  'AttackerTree',
+                                  t('palette.quadrupedBot')
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_arachnid',
+                            label: t('palette.arachnidBot'),
+                            icon: '🕷️',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnModular'), () => {
+                                const spawnPos: Vec3 = {
+                                  x: pieMenuState.worldPos.x,
+                                  y: pieMenuState.worldPos.y + 0.15,
+                                  z: pieMenuState.worldPos.z,
+                                };
+                                const id = app.entityFactory.spawnModularCreature(
+                                  app.world,
+                                  app.physics,
+                                  app.aiSystem,
+                                  spawnPos,
+                                  CREATURE_BLUEPRINTS.arachnid,
+                                  'AttackerTree',
+                                  t('palette.arachnidBot')
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_idle',
+                            label: t('palette.idleBot'),
+                            icon: '👤',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnModular'), () => {
+                                const spawnPos: Vec3 = {
+                                  x: pieMenuState.worldPos.x,
+                                  y: pieMenuState.worldPos.y + 0.15,
+                                  z: pieMenuState.worldPos.z,
+                                };
+                                const id = app.entityFactory.spawnModularHumanoid(
+                                  app.world,
+                                  app.physics,
+                                  app.aiSystem,
+                                  spawnPos,
+                                  'IdleTree',
+                                  t('palette.idleBot')
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_master_single',
+                            label: t('pieMenu.master'),
+                            icon: '🚶',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnModular'), () => {
+                                const spawnPos: Vec3 = {
+                                  x: pieMenuState.worldPos.x,
+                                  y: pieMenuState.worldPos.y + 0.15,
+                                  z: pieMenuState.worldPos.z,
+                                };
+                                const id = app.entityFactory.spawnModularHumanoid(
+                                  app.world,
+                                  app.physics,
+                                  app.aiSystem,
+                                  spawnPos,
+                                  'MasterFetchTree',
+                                  t('palette.master')
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                        ],
                       },
                       {
-                        id: 'spawn_attacker',
-                        label: t('pieMenu.attacker'),
+                        id: 'category_weapons',
+                        label: t('pieMenu.weapons'),
                         icon: '⚔️',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          app.executeTransaction(t('history.spawnAttacker'), () => {
-                            const spawnPos: Vec3 = {
-                              x: pieMenuState.worldPos.x,
-                              y: pieMenuState.worldPos.y + 0.15,
-                              z: pieMenuState.worldPos.z,
-                            };
-                            const id = app.entityFactory.spawnModularHumanoid(
-                              app.world,
-                              app.physics,
-                              app.aiSystem,
-                              spawnPos,
-                              'AttackerTree',
-                              t('palette.attacker')
-                            );
-                            app.selection.selectEntity(id, true);
-                            return id;
-                          });
-                          syncPlayerControls();
-                        },
+                        color: '#f39c12',
+                        children: [
+                          {
+                            id: 'spawn_spear',
+                            label: t('pieMenu.spear'),
+                            icon: '🗡️',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnSpear'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'weapon' },
+                                    item: {
+                                      name: t('palette.spear'),
+                                      type: 'weapon',
+                                      maxStack: 1,
+                                      size: 10,
+                                      equipTypes: [],
+                                      equippable: false,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: { radius: 0.4, weight: 1, isSolid: true },
+                                    weaponStats: {
+                                      baseDamage: 25,
+                                      prepTime: 0.2,
+                                      recoveryTime: 0.3,
+                                    },
+                                    weaponZone: { hitZoneType: 'forward_line', length: 4.5 },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_sword',
+                            label: 'Меч',
+                            icon: '🗡️',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnSpear'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'weapon' },
+                                    meta: { name: 'Меч', entityType: 'item' },
+                                    visualModel: { modelId: 'proc://prop/sword' },
+                                    item: {
+                                      name: 'Меч',
+                                      type: 'weapon',
+                                      maxStack: 1,
+                                      size: 10,
+                                      equipTypes: [],
+                                      equippable: false,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: {
+                                      radius: 0.4,
+                                      weight: 2,
+                                      isSolid: true,
+                                      halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
+                                      colliderOffset: { x: 0, y: 0.36, z: 0 },
+                                    },
+                                    weaponStats: {
+                                      baseDamage: 25,
+                                      prepTime: 0.2,
+                                      recoveryTime: 0.3,
+                                    },
+                                    weaponZone: {
+                                      hitZoneType: 'angle',
+                                      radius: 2.5,
+                                      angle: deg2Rad(90),
+                                    },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_shotgun',
+                            label: t('palette.shotgun'),
+                            icon: '💥',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnSpear'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'weapon' },
+                                    item: {
+                                      name: t('palette.shotgun'),
+                                      type: 'weapon',
+                                      maxStack: 1,
+                                      size: 10,
+                                      equipTypes: [],
+                                      equippable: false,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: { radius: 0.4, weight: 1, isSolid: true },
+                                    weaponStats: {
+                                      baseDamage: 15,
+                                      prepTime: 0.4,
+                                      recoveryTime: 0.5,
+                                    },
+                                    weaponZone: {
+                                      hitZoneType: 'shrapnel',
+                                      length: 4.0,
+                                      angle: deg2Rad(60),
+                                      rayCount: 5,
+                                    },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_aura',
+                            label: t('palette.auraWeapon'),
+                            icon: '✨',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnSpear'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'weapon' },
+                                    item: {
+                                      name: t('palette.auraWeapon'),
+                                      type: 'weapon',
+                                      maxStack: 1,
+                                      size: 10,
+                                      equipTypes: [],
+                                      equippable: false,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: { radius: 0.4, weight: 1, isSolid: true },
+                                    weaponStats: {
+                                      baseDamage: 30,
+                                      prepTime: 0.3,
+                                      recoveryTime: 0.4,
+                                    },
+                                    weaponZone: { hitZoneType: 'radius', radius: 2.0 },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_ball',
+                            label: 'Мячик',
+                            icon: '🎾',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnSpear'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'weapon' },
+                                    meta: { name: 'Мячик', entityType: 'item' },
+                                    visualModel: { modelId: 'proc://prop/ball' },
+                                    item: {
+                                      name: 'Мячик',
+                                      type: 'weapon',
+                                      maxStack: 1,
+                                      size: 4,
+                                      equipTypes: [],
+                                      equippable: false,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: {
+                                      radius: 0.15,
+                                      weight: 0.5,
+                                      isSolid: true,
+                                      shape: 'ball',
+                                      restitution: 0.88,
+                                      friction: 0.85,
+                                      linearDamping: 0.25,
+                                      angularDamping: 2.0,
+                                    },
+                                    weaponStats: {
+                                      baseDamage: 5,
+                                      prepTime: 0.2,
+                                      recoveryTime: 0.3,
+                                    },
+                                    weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                        ],
                       },
                       {
-                        id: 'spawn_wall',
-                        label: t('pieMenu.wall'),
-                        icon: '🧱',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          app.executeTransaction(t('history.spawnWall'), () => {
-                            const id = app.spawnEntity(
-                              {
-                                tag: { archetype: 'obstacle' },
-                                meta: {
-                                  name: t('palette.wall'),
-                                  entityType: 'obstacle',
-                                  destructible: false,
-                                },
-                                physics: {
-                                  radius: 2.0,
-                                  weight: 1000,
-                                  isSolid: true,
-                                  points: createRectanglePoints(4.0, 1.0),
-                                },
-                              },
-                              pieMenuState.worldPos
-                            );
-                            app.selection.selectEntity(id, true);
-                            return id;
-                          });
-                          syncPlayerControls();
-                        },
-                      },
-                      {
-                        id: 'spawn_crate',
-                        label: t('pieMenu.crate'),
+                        id: 'category_items',
+                        label: t('pieMenu.items'),
                         icon: '📦',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          app.executeTransaction(t('history.spawnCrate'), () => {
-                            const id = app.spawnEntity(
-                              {
-                                tag: { archetype: 'obstacle' },
-                                meta: {
-                                  name: t('palette.crate'),
-                                  entityType: 'obstacle',
-                                  destructible: true,
-                                },
-                                health: { hp: 100, maxHp: 100 },
-                                physics: {
-                                  radius: 0.8,
-                                  weight: 50,
-                                  isSolid: true,
-                                  points: createRectanglePoints(1.5, 1.5),
-                                },
-                              },
-                              pieMenuState.worldPos
-                            );
-                            app.selection.selectEntity(id, true);
-                            return id;
-                          });
-                          syncPlayerControls();
-                        },
+                        color: '#27ae60',
+                        children: [
+                          {
+                            id: 'spawn_wall',
+                            label: t('pieMenu.wall'),
+                            icon: '🧱',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnWall'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'obstacle' },
+                                    meta: {
+                                      name: t('palette.wall'),
+                                      entityType: 'obstacle',
+                                      destructible: false,
+                                    },
+                                    physics: {
+                                      radius: 2.0,
+                                      weight: 1000,
+                                      isSolid: true,
+                                      points: createRectanglePoints(4.0, 1.0),
+                                    },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_crate',
+                            label: t('pieMenu.crate'),
+                            icon: '📦',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnCrate'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'obstacle' },
+                                    meta: {
+                                      name: t('palette.crate'),
+                                      entityType: 'obstacle',
+                                      destructible: true,
+                                    },
+                                    health: { hp: 100, maxHp: 100 },
+                                    physics: {
+                                      radius: 0.8,
+                                      weight: 50,
+                                      isSolid: true,
+                                      points: createRectanglePoints(1.5, 1.5),
+                                    },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_fire_zone',
+                            label: t('pieMenu.fireZone'),
+                            icon: '🔥',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnFireZone'), () => {
+                                const id = app.spawnEntity(
+                                  createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_heal_zone',
+                            label: t('palette.zoneHeal'),
+                            icon: '💚',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnFireZone'), () => {
+                                const id = app.spawnEntity(
+                                  createZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_backpack',
+                            label: t('palette.backpack'),
+                            icon: '🎒',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnObject'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'bag' },
+                                    item: {
+                                      name: t('palette.backpack'),
+                                      type: 'bag',
+                                      maxStack: 1,
+                                      size: 10,
+                                      equipTypes: ['torso', 'sling'],
+                                      equippable: true,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: { radius: 0.4, weight: 1, isSolid: true },
+                                    inventory: { size: { width: 6, height: 4 } },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                          {
+                            id: 'spawn_chestplate',
+                            label: t('palette.chestplate'),
+                            icon: '🛡️',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnObject'), () => {
+                                const id = app.spawnEntity(
+                                  {
+                                    tag: { archetype: 'item', subType: 'armor' },
+                                    item: {
+                                      name: t('palette.chestplate'),
+                                      type: 'armor',
+                                      maxStack: 1,
+                                      size: 20,
+                                      equipTypes: ['torso'],
+                                      equippable: true,
+                                      equipTimeMultiplier: 1.0,
+                                    },
+                                    physics: { radius: 0.4, weight: 20, isSolid: true },
+                                    armorStats: { defense: 25, flatReduction: 5 },
+                                  },
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntity(id, true);
+                                return id;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                        ],
                       },
                       {
-                        id: 'spawn_fire_zone',
-                        label: t('pieMenu.fireZone'),
-                        icon: '🔥',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          app.executeTransaction(t('history.spawnFireZone'), () => {
-                            const id = app.spawnEntity(
-                              createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
-                              pieMenuState.worldPos
-                            );
-                            app.selection.selectEntity(id, true);
-                            return id;
-                          });
-                          syncPlayerControls();
-                        },
-                      },
-                      {
-                        id: 'spawn_spear',
-                        label: t('pieMenu.spear'),
-                        icon: '🗡️',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          app.executeTransaction(t('history.spawnSpear'), () => {
-                            const id = app.spawnEntity(
-                              {
-                                tag: { archetype: 'item', subType: 'weapon' },
-                                item: {
-                                  name: t('palette.spear'),
-                                  type: 'weapon',
-                                  maxStack: 1,
-                                  size: 10,
-                                  equipTypes: [],
-                                  equippable: false,
-                                  equipTimeMultiplier: 1.0,
-                                },
-                                physics: { radius: 0.4, weight: 1, isSolid: true },
-                                weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
-                                weaponZone: { hitZoneType: 'forward_line', length: 4.5 },
-                              },
-                              pieMenuState.worldPos
-                            );
-                            app.selection.selectEntity(id, true);
-                            return id;
-                          });
-                          syncPlayerControls();
-                        },
+                        id: 'category_groups',
+                        label: t('pieMenu.groups'),
+                        icon: '👥',
+                        color: '#9b59b6',
+                        children: [
+                          {
+                            id: 'spawn_group_fetch',
+                            label: t('pieMenu.fetchGroup'),
+                            icon: '🐕',
+                            onSelect: () => {
+                              const app = appRef.current;
+                              if (!app) return;
+                              app.executeTransaction(t('history.spawnFetchGroup'), () => {
+                                const result = spawnFetchGroup(
+                                  app.simulation,
+                                  pieMenuState.worldPos
+                                );
+                                app.selection.selectEntities([result.masterId, ...result.dogIds]);
+                                return result.masterId;
+                              });
+                              syncPlayerControls();
+                            },
+                          },
+                        ],
                       },
                     ]
               }

@@ -23,6 +23,7 @@ export interface LeftDockProps {
   onFocusEntity: (id: string) => void;
   onSelectSpawnPreset: (config: EntityConfig) => void;
   onSelectModular: (behavior: string, name: string, structureType?: BodyStructureType) => void;
+  onSelectPrefab?: (prefabId: string, name: string) => void;
   onOpenWizard: () => void;
   btData: BTNodeDTO | null;
   btBlackboard: Record<string, any> | null;
@@ -441,6 +442,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
   onFocusEntity,
   onSelectSpawnPreset,
   onSelectModular,
+  onSelectPrefab,
   onOpenWizard,
   btData,
   btBlackboard,
@@ -616,6 +618,7 @@ export const LeftDock: React.FC<LeftDockProps> = ({
           <SpawnPalette
             onSelectPreset={onSelectSpawnPreset}
             onSelectModular={onSelectModular}
+            onSelectPrefab={onSelectPrefab}
             onOpenWizard={onOpenWizard}
           />
         )}

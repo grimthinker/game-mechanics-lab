@@ -13,6 +13,7 @@ import { t } from '../../locales';
 interface SpawnPaletteProps {
   onSelectPreset: (config: EntityConfig) => void;
   onSelectModular: (behavior: string, name: string, structureType?: BodyStructureType) => void;
+  onSelectPrefab?: (prefabId: string, name: string) => void;
   onOpenWizard: () => void;
 }
 
@@ -32,9 +33,26 @@ interface PaletteCategory {
 export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
   onSelectPreset,
   onSelectModular,
+  onSelectPrefab,
   onOpenWizard,
 }) => {
   const categories: PaletteCategory[] = [
+    {
+      title: t('palette.categoryGroups'),
+      items: [
+        {
+          id: 'group_fetch',
+          name: t('palette.fetchGroup'),
+          description: t('palette.fetchGroupDesc'),
+          icon: '🐕',
+          onClick: () => {
+            if (onSelectPrefab) {
+              onSelectPrefab('fetch_group', t('palette.fetchGroup'));
+            }
+          },
+        },
+      ],
+    },
     {
       title: t('palette.categoryCreatures'),
       items: [

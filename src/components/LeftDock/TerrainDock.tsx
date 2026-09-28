@@ -7,7 +7,22 @@ import { FoliageZoneChannel } from '../../types';
 
 export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
   const [active, setActive] = useState(false);
-  const [tool, setTool] = useState<TerrainToolType>('raise');
+  const [tool, setTool] = useState<TerrainToolType>(() => {
+    const saved = localStorage.getItem('terrain_brush_tool');
+    const validTools: TerrainToolType[] = [
+      'raise',
+      'lower',
+      'flatten',
+      'smooth',
+      'hills',
+      'paint',
+      'foliage',
+      'clear_foliage',
+    ];
+    return saved && validTools.includes(saved as TerrainToolType)
+      ? (saved as TerrainToolType)
+      : 'raise';
+  });
   const [texture, setTexture] = useState<TerrainTextureChannel>(0);
   const [foliageZone, setFoliageZone] = useState<FoliageZoneChannel>(0);
   const [radius, setRadius] = useState(() => {
@@ -18,6 +33,10 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     const saved = localStorage.getItem('terrain_brush_strength');
     return saved !== null ? Number(saved) : 2.0;
   });
+
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_tool', tool);
+  }, [tool]);
 
   useEffect(() => {
     localStorage.setItem('terrain_brush_radius', radius.toString());
@@ -52,6 +71,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     { id: 'lower', icon: '📉', label: t('terrain.tool_lower') },
     { id: 'flatten', icon: '📏', label: t('terrain.tool_flatten') },
     { id: 'smooth', icon: '🌊', label: t('terrain.tool_smooth') },
+    { id: 'hills', icon: '⛰️', label: t('terrain.tool_hills') },
     { id: 'paint', icon: '🎨', label: t('terrain.tool_paint') },
     { id: 'foliage', icon: '🌱', label: 'Посадка трав' },
     { id: 'clear_foliage', icon: '🧹', label: 'Очистка трав' },
@@ -108,13 +128,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
       </label>
 
       {/* Выбор инструмента */}
-      <div
-        style={{
-          opacity: active ? 1 : 0.5,
-          pointerEvents: active ? 'auto' : 'none',
-          transition: 'opacity 0.2s',
-        }}
-      >
+      <div>
         <div
           style={{
             fontSize: '11px',
@@ -155,7 +169,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
 
       {/* Выбор текстуры грунта */}
       {tool === 'paint' && (
-        <div style={{ opacity: active ? 1 : 0.5, pointerEvents: active ? 'auto' : 'none' }}>
+        <div>
           <div
             style={{
               fontSize: '11px',
@@ -202,7 +216,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
 
       {/* Выбор зоны растительности (Посадка / Очистка) */}
       {(tool === 'foliage' || tool === 'clear_foliage') && (
-        <div style={{ opacity: active ? 1 : 0.5, pointerEvents: active ? 'auto' : 'none' }}>
+        <div>
           <div
             style={{
               fontSize: '11px',
@@ -247,8 +261,6 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
           display: 'flex',
           flexDirection: 'column',
           gap: '14px',
-          opacity: active ? 1 : 0.5,
-          pointerEvents: active ? 'auto' : 'none',
         }}
       >
         <div

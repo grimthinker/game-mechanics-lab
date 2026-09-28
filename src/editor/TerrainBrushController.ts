@@ -1,5 +1,6 @@
 import { TerrainComponent } from '../ecs/components/terrain';
 import { TerrainBrushState } from '../types';
+import { TERRAIN_CONFIG } from '../config/terrainConfig';
 
 export class TerrainBrushController {
   public static applyBrush(
@@ -197,6 +198,17 @@ export class TerrainBrushController {
             }
             const avg = sum / count;
             heights[idx] += (avg - heights[idx]) * Math.min(1, amount * 2);
+            modified = true;
+          } else if (state.tool === 'hills') {
+            const freq = TERRAIN_CONFIG.hills.frequency;
+            const n1 = Math.sin(wX * freq + 1.2) * Math.cos(wZ * freq + 2.3);
+            const n2 = Math.sin(wX * freq * 2.2 - 0.7) * Math.sin(wZ * freq * 2.0 + 1.1) * 0.5;
+            const n3 = Math.cos(wX * freq * 4.1 + 3.1) * Math.cos(wZ * freq * 3.7 - 1.9) * 0.25;
+            const ridge = 1.0 - Math.abs(Math.sin(wX * freq * 1.3 + wZ * freq * 1.1));
+            const ridgeH = ridge * ridge * 0.6;
+            const hillFactor = n1 + n2 + n3 + ridgeH - 0.2;
+
+            heights[idx] += hillFactor * amount;
             modified = true;
           }
         }

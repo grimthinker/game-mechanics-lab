@@ -37,6 +37,7 @@ import { getAnatomyParts, getAllContainedItems } from '../ecs/utils/hierarchy';
 import { CREATURE_BLUEPRINTS } from '../ecs/templates';
 import { Radians, deg2Rad, createRectanglePoints } from '../utils';
 import { EventBus } from './EventBus';
+import { spawnFetchGroup } from '../ecs/prefabs/fetchGroupPrefab';
 
 export class GameSimulation {
   public world: World;
@@ -547,129 +548,11 @@ export class GameSimulation {
       'Игрок'
     );
 
-    // 7. Хозяин: стоит во дворе перед крыльцом дома
+    // 7. Спавн связки «Хозяин и собаки (Апорт)» через переиспользуемую фабрику префаба
     const masterX = bx - 2.5;
     const masterZ = bz + 0.5;
     const masterY = getHeight(masterX, masterZ);
-    const masterPos: Vec3 = { x: masterX, y: masterY, z: masterZ };
-    const masterId = this.entityFactory.spawnModularHumanoid(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      masterPos,
-      'MasterFetchTree',
-      'Хозяин'
-    );
-
-    // Поворачиваем хозяина лицом к воротам на запад
-    const masterTrans = this.world.getComponent(masterId, 'transform');
-    if (masterTrans) {
-      masterTrans.angle = Math.PI as Radians;
-      masterTrans.rotation = { x: 0, y: 1, z: 0, w: 0 };
-    }
-
-    // Выдаем хозяину мячики в обе руки
-    const masterParts = getAnatomyParts(this.world, masterId);
-    const leftHandPartId = masterParts.find((pId) => {
-      const slot = this.world.getComponent(pId, 'interactionSlots');
-      return slot && slot.slotKind === 'left_hand';
-    });
-    const rightHandPartId = masterParts.find((pId) => {
-      const slot = this.world.getComponent(pId, 'interactionSlots');
-      return slot && slot.slotKind === 'right_hand';
-    });
-
-    const createBallConfig = (ownerPartId: string, name: string): EntityConfig => ({
-      tag: { archetype: 'item', subType: 'weapon' },
-      meta: { name, entityType: 'item' },
-      visualModel: { modelId: 'proc://prop/ball' },
-      item: {
-        name,
-        type: 'weapon',
-        maxStack: 1,
-        count: 1,
-        size: 4,
-        equipTypes: [],
-        equippable: false,
-        equipTimeMultiplier: 1.0,
-      },
-      physics: {
-        radius: 0.15,
-        weight: 0.5,
-        isSolid: true,
-        shape: 'ball',
-        restitution: 0.88,
-        friction: 0.85,
-        linearDamping: 0.25,
-        angularDamping: 2.0,
-      },
-      weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
-      weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
-      ownership: { ownerId: ownerPartId, status: 'equipped' },
-      fetchStick: {
-        state: 'held_by_master',
-        ownerMasterId: masterId,
-        lastCarrierDogId: null,
-      },
-    });
-
-    if (leftHandPartId) {
-      const ballLeftId = this.spawnEntity(createBallConfig(leftHandPartId, 'Мячик 1'), masterPos);
-      const slot = this.world.getComponent(leftHandPartId, 'interactionSlots');
-      if (slot) slot.itemId = ballLeftId;
-    }
-
-    if (rightHandPartId) {
-      const ballRightId = this.spawnEntity(createBallConfig(rightHandPartId, 'Мячик 2'), masterPos);
-      const slot = this.world.getComponent(rightHandPartId, 'interactionSlots');
-      if (slot) slot.itemId = ballRightId;
-    }
-
-    // 8. Собаки: 3 собаки резвятся во дворе
-    const dog1Pos = { x: bx - 1.5, y: getHeight(bx - 1.5, bz + 3.0), z: bz + 3.0 };
-    const dog2Pos = { x: bx + 2.0, y: getHeight(bx + 2.0, bz - 3.0), z: bz - 3.0 };
-    const dog3Pos = { x: bx - 4.5, y: getHeight(bx - 4.5, bz - 2.5), z: bz - 2.5 };
-
-    const dog1Id = this.entityFactory.spawnModularCreature(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      dog1Pos,
-      CREATURE_BLUEPRINTS.quadruped,
-      'DogFetchTree',
-      'Собака 1'
-    );
-
-    const dog2Id = this.entityFactory.spawnModularCreature(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      dog2Pos,
-      CREATURE_BLUEPRINTS.quadruped,
-      'DogFetchTree',
-      'Собака 2'
-    );
-
-    const dog3Id = this.entityFactory.spawnModularCreature(
-      this.world,
-      this.physics,
-      this.aiSystem,
-      dog3Pos,
-      CREATURE_BLUEPRINTS.quadruped,
-      'DogFetchTree',
-      'Собака 3'
-    );
-
-    const allDogIds = [dog1Id, dog2Id, dog3Id];
-    this.app.updateEntityBlackboard(masterId, 'dogIds', allDogIds);
-    this.app.updateEntityBlackboard(masterId, 'playZoneCenter', masterPos);
-    this.app.updateEntityBlackboard(masterId, 'playZoneRadius', 35);
-
-    for (const dId of allDogIds) {
-      this.app.updateEntityBlackboard(dId, 'masterEntityId', masterId);
-      this.app.updateEntityBlackboard(dId, 'playZoneCenter', masterPos);
-      this.app.updateEntityBlackboard(dId, 'playZoneRadius', 35);
-    }
+    spawnFetchGroup(this, { x: masterX, y: masterY, z: masterZ });
 
     // 9. Зоны эффекторов
     const healY = getHeight(bx + 4.0, bz - 4.5);

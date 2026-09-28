@@ -6,7 +6,8 @@ export interface PieMenuItem {
   icon: string;
   color?: string;
   danger?: boolean;
-  onSelect: () => void;
+  onSelect?: () => void;
+  children?: PieMenuItem[];
 }
 
 export interface PieMenuState {

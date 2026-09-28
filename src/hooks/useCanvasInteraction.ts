@@ -18,6 +18,7 @@ import { getRootOwner } from '../ecs/utils/hierarchy';
 import { EventBus } from '../core/EventBus';
 import { TerrainBrushController } from '../editor/TerrainBrushController';
 import { TerrainModifyCommand } from '../history/commands/TerrainModifyCommand';
+import { t } from '../locales';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -393,7 +394,8 @@ export const useCanvasInteraction = ({
           app.terrainBrush.tool === 'raise' ||
           app.terrainBrush.tool === 'lower' ||
           app.terrainBrush.tool === 'flatten' ||
-          app.terrainBrush.tool === 'smooth';
+          app.terrainBrush.tool === 'smooth' ||
+          app.terrainBrush.tool === 'hills';
 
         if (isHeightTool) {
           tComp.terrain.isPhysicsDirty = true;
@@ -475,13 +477,13 @@ export const useCanvasInteraction = ({
       }
 
       if (placementMode.kind === 'entity') {
-        app.executeTransaction('Спавн объекта', () => {
+        app.executeTransaction(t('history.spawnObject'), () => {
           const spawnedId = app.spawnEntity(placementMode.config, spawnPos);
           app.selection.selectEntity(spawnedId, true);
           return spawnedId;
         });
       } else if (placementMode.kind === 'modular') {
-        app.executeTransaction('Спавн составного существа', () => {
+        app.executeTransaction(t('history.spawnModular'), () => {
           const blueprint = CREATURE_BLUEPRINTS[placementMode.options.structureType];
           const spawnedId = app.entityFactory.spawnModularCreature(
             app.world,
@@ -495,6 +497,15 @@ export const useCanvasInteraction = ({
           app.selection.selectEntity(spawnedId, true);
           return spawnedId;
         });
+      } else if (placementMode.kind === 'prefab') {
+        if (placementMode.prefabId === 'fetch_group') {
+          app.executeTransaction(t('history.spawnFetchGroup'), () => {
+            const { spawnFetchGroup } = require('../ecs/prefabs/fetchGroupPrefab');
+            const result = spawnFetchGroup(app.simulation, spawnPos);
+            app.selection.selectEntities([result.masterId, ...result.dogIds]);
+            return result.masterId;
+          });
+        }
       }
       setPlacementMode(null);
       syncPlayerControls();
