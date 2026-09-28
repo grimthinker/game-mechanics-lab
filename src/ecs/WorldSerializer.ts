@@ -300,6 +300,7 @@ export class WorldSerializer {
               splatData,
               foliageData,
               textureTiling: rawT.textureTiling || 24,
+              dirtyChunks: new Set<string>(),
               geometryVersion: 1,
               splatVersion: 1,
               foliageVersion: 1,

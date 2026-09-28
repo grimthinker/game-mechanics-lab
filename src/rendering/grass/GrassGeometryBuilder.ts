@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GRASS_CONFIG } from '../../config/grassConfig';
 
 export interface GrassClusterOptions {
   bladeCount?: number;
@@ -49,7 +50,7 @@ export class GrassGeometryBuilder {
     return GrassGeometryBuilder.generateBladeGeometry(
       4,
       3,
-      0.48,
+      GRASS_CONFIG.heights.dryGrass,
       0.05,
       0.01,
       0.16,
@@ -63,7 +64,7 @@ export class GrassGeometryBuilder {
   /** Пшеничный кустик из 3 золотистых колосков с полусферическими нормалями листвы */
   public static createWheatGeometry(): THREE.BufferGeometry {
     const stalkCount = 3;
-    const baseHeight = 0.82;
+    const baseHeight = GRASS_CONFIG.heights.wheat;
     const earHeight = 0.28;
     const earWidth = 0.052;
 
@@ -180,8 +181,8 @@ export class GrassGeometryBuilder {
 
   /** Камыш / Рогоз: яркие сочные листья и бархатный каштановый початок */
   public static createReedsGeometry(): THREE.BufferGeometry {
-    const height = 1.35;
-    const headBaseY = 0.88;
+    const height = GRASS_CONFIG.heights.reeds;
+    const headBaseY = height * 0.65;
     const headHeight = 0.3;
     const headRadius = 0.048;
 
@@ -309,7 +310,7 @@ export class GrassGeometryBuilder {
 
   /** Полевые цветы: яркие насыщенные лепестки с верным зенитным освещением */
   public static createFlowerGeometry(type: FlowerType): THREE.BufferGeometry {
-    const stemHeight = 0.48;
+    const stemHeight = GRASS_CONFIG.heights.flowers;
     const flowerRadius = 0.11;
     const stemColor = new THREE.Color(0x689f38); // свежий салатово-зеленый
 

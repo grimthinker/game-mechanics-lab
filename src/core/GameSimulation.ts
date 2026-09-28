@@ -352,7 +352,7 @@ export class GameSimulation {
     this.clearWorld();
     this.app.editor.commandHistory.clear();
 
-    this.spawnEntity(createFlatTerrainConfig(width, depth, 128), { x: 0, y: 0, z: 0 }, 'terrain');
+    this.spawnEntity(createFlatTerrainConfig(width, depth), { x: 0, y: 0, z: 0 }, 'terrain');
     this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
 
     this.playerEntityId = this.entityFactory.spawnModularHumanoid(
@@ -374,7 +374,7 @@ export class GameSimulation {
     const { x: bx, y: by, z: bz } = center ?? { x: 0, y: 0, z: 0 };
 
     // 1. Спавн процедурного террейна и окружения по новой схеме
-    this.spawnEntity(createDefaultTerrainConfig(100, 100, 128), { x: 0, y: 0, z: 0 }, 'terrain');
+    this.spawnEntity(createDefaultTerrainConfig(100, 100), { x: 0, y: 0, z: 0 }, 'terrain');
     this.spawnEntity(createDefaultEnvironmentConfig(), { x: 0, y: 0, z: 0 }, 'environment');
 
     const terrainComp = this.world.getComponent('terrain', 'terrain');

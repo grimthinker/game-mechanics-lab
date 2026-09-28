@@ -98,18 +98,78 @@ export class PhysicsSystem {
   public syncTerrainPhysics(world: World): void {
     if (!this.driver || !this.driver.isReady) return;
     const terrainEntities = world.getEntitiesWith('terrain');
+
     for (const [id, { terrain }] of terrainEntities) {
       if (terrain.isPhysicsDirty) {
-        this.driver.createOrUpdateTerrain(
-          terrain.width,
-          terrain.depth,
-          terrain.resolution,
-          terrain.heights,
-          id
-        );
+        // Защитная инициализация для случаев восстановления из старых сейвов или Undo/Redo
+        if (!terrain.dirtyChunks) terrain.dirtyChunks = new Set<string>();
+
+        // Если это первый спавн террейна — физика нужна для всех чанков
+        const chunksToUpdate =
+          terrain.dirtyChunks.size > 0 ? terrain.dirtyChunks : this.getAllChunkIds(terrain);
+
+        const size = 32; // TERRAIN_CONFIG.chunkSize
+        const halfW = terrain.width / 2;
+        const halfD = terrain.depth / 2;
+        const globalRes = terrain.resolution;
+
+        for (const chunkId of chunksToUpdate) {
+          const [cx, cz] = chunkId.split('_').map(Number);
+          const startX = cx * size;
+          const startZ = cz * size;
+
+          // Валидация выхода за границы массива
+          if (startX >= terrain.width || startZ >= terrain.depth) continue;
+
+          // 1. Формируем вершины в ЛОКАЛЬНЫХ координатах чанка
+          const verts = new Float32Array((size + 1) * (size + 1) * 3);
+          let vIdx = 0;
+          for (let z = 0; z <= size; z++) {
+            for (let x = 0; x <= size; x++) {
+              verts[vIdx++] = x; // local X
+              verts[vIdx++] = terrain.heights[(startZ + z) * globalRes + (startX + x)] || 0; // global Y
+              verts[vIdx++] = z; // local Z
+            }
+          }
+
+          // 2. Формируем индексы (локальные)
+          const indices = new Uint32Array(size * size * 6);
+          let iPtr = 0;
+          for (let z = 0; z < size; z++) {
+            for (let x = 0; x < size; x++) {
+              const a = z * (size + 1) + x;
+              const b = a + 1;
+              const c = (z + 1) * (size + 1) + x;
+              const d = c + 1;
+              // Rapier ожидает обход CCW (против часовой стрелки)
+              indices[iPtr++] = a;
+              indices[iPtr++] = c;
+              indices[iPtr++] = b;
+              indices[iPtr++] = b;
+              indices[iPtr++] = c;
+              indices[iPtr++] = d;
+            }
+          }
+
+          // 3. Отправляем в Rapier с глобальным смещением
+          const pos = { x: startX - halfW, y: 0, z: startZ - halfD };
+          this.driver.createOrUpdateTerrainChunk(chunkId, verts, indices, pos, id);
+        }
         terrain.isPhysicsDirty = false;
       }
     }
+  }
+
+  private getAllChunkIds(terrain: import('../components/terrain').TerrainComponent): string[] {
+    const ids: string[] = [];
+    const chunksX = Math.ceil(terrain.width / 32);
+    const chunksZ = Math.ceil(terrain.depth / 32);
+    for (let z = 0; z < chunksZ; z++) {
+      for (let x = 0; x < chunksX; x++) {
+        ids.push(`${x}_${z}`);
+      }
+    }
+    return ids;
   }
 
   public syncDirtyTransforms(world: World): void {

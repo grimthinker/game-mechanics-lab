@@ -10,12 +10,11 @@ interface CachedTerrainTextures {
 let cachedTextures: CachedTerrainTextures | null = null;
 
 /**
- * Быстрый псевдослучайный целочисленный хеш
+ * Классический псевдослучайный хэш без проблем с 32-битным переполнением
  */
 function fastHash(x: number, y: number, seed: number): number {
-  let h = (seed + x * 374761393 + y * 668265263) | 0;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+  const h = Math.sin(x * 12.9898 + y * 78.233 + seed * 137.719) * 43758.5453123;
+  return h - Math.floor(h);
 }
 
 /**

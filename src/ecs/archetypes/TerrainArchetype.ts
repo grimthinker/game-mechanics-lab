@@ -4,6 +4,7 @@ import { AISystem } from '../systems/AISystem';
 import { EntityId, EntityConfig } from '../types';
 import { Point, Vec3 } from '../../types';
 import { TerrainComponent } from '../components/terrain';
+import { TERRAIN_CONFIG } from '../../config/terrainConfig';
 
 // Точки траектории главного тракта (север -> юго-запад)
 const ROAD_MAIN_PATH: Array<{ x: number; z: number }> = [
@@ -75,17 +76,30 @@ function smoothStep(edge0: number, edge1: number, x: number): number {
 }
 
 export function createDefaultTerrainConfig(
-  width: number = 100,
-  depth: number = 100,
-  resolution: number = 128,
-  splatResolution: number = 512
+  requestedWidth: number = 100,
+  requestedDepth: number = 100
 ): EntityConfig {
+  // Выравниваем размеры по сетке чанков (кратны 32м) для идеальной геометрии
+  const width = Math.max(
+    TERRAIN_CONFIG.chunkSize,
+    Math.ceil(requestedWidth / TERRAIN_CONFIG.chunkSize) * TERRAIN_CONFIG.chunkSize
+  );
+  const depth = Math.max(
+    TERRAIN_CONFIG.chunkSize,
+    Math.ceil(requestedDepth / TERRAIN_CONFIG.chunkSize) * TERRAIN_CONFIG.chunkSize
+  );
+
+  // При 1 метре на полигон количество вершин равно размеру в метрах + 1
+  const resolution = Math.max(width, depth) + 1;
+  // Жестко ограничиваем разрешение 512 пикселями, чтобы избежать переполнения localStorage (QuotaExceededError)
+  const splatResolution = Math.min(512, (Math.max(width, depth) / TERRAIN_CONFIG.chunkSize) * 128);
+
   const totalVerts = resolution * resolution;
   const heights = new Float32Array(totalVerts);
   const halfW = width / 2;
   const halfD = depth / 2;
 
-  // 1. Инициализация высот геометрической сетки (128x128)
+  // 1. Инициализация высот геометрической сетки
   for (let z = 0; z < resolution; z++) {
     for (let x = 0; x < resolution; x++) {
       const idx = z * resolution + x;
@@ -252,7 +266,8 @@ export function createDefaultTerrainConfig(
     heights,
     splatData,
     foliageData,
-    textureTiling: 24,
+    textureTiling: 24 * (Math.max(width, depth) / 100),
+    dirtyChunks: new Set<string>(),
     geometryVersion: 1,
     splatVersion: 1,
     foliageVersion: 1,
@@ -275,11 +290,21 @@ export function createDefaultTerrainConfig(
 }
 
 export function createFlatTerrainConfig(
-  width: number = 100,
-  depth: number = 100,
-  resolution: number = 128,
-  splatResolution: number = 512
+  requestedWidth: number = 100,
+  requestedDepth: number = 100
 ): EntityConfig {
+  const width = Math.max(
+    TERRAIN_CONFIG.chunkSize,
+    Math.ceil(requestedWidth / TERRAIN_CONFIG.chunkSize) * TERRAIN_CONFIG.chunkSize
+  );
+  const depth = Math.max(
+    TERRAIN_CONFIG.chunkSize,
+    Math.ceil(requestedDepth / TERRAIN_CONFIG.chunkSize) * TERRAIN_CONFIG.chunkSize
+  );
+
+  const resolution = Math.max(width, depth) + 1;
+  const splatResolution = Math.min(512, (Math.max(width, depth) / TERRAIN_CONFIG.chunkSize) * 128);
+
   const totalVerts = resolution * resolution;
   const heights = new Float32Array(totalVerts);
 
@@ -310,6 +335,7 @@ export function createFlatTerrainConfig(
       splatData,
       foliageData,
       textureTiling: 24 * (Math.max(width, depth) / 100),
+      dirtyChunks: new Set<string>(),
       geometryVersion: 1,
       splatVersion: 1,
       foliageVersion: 1,

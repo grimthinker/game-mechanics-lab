@@ -7,13 +7,13 @@ import { BTNodeDTO } from './ai/core';
 import { LeftDock, DockTab } from './components/LeftDock/LeftDock';
 import { PieMenu } from './components/PieMenu/PieMenu';
 import { PieMenuState } from './components/PieMenu/types';
-import { createRectanglePoints } from './utils';
+import { createRectanglePoints, deg2Rad } from './utils';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
 import { CreatureWizardModal, NewWorldModal } from './components/modals';
 import { GameHUD } from './components/GameHUD';
-import { BodyStructureType } from './ecs/templates';
+import { BodyStructureType, CREATURE_BLUEPRINTS } from './ecs/templates';
 import { ModularPlacementOptions, Vec3 } from './types';
 import { CanvasHUD } from './components/CanvasHUD';
 import { useDragDrop } from './dnd/DragDropContext';
@@ -350,6 +350,12 @@ export const App: React.FC = () => {
 
   const goToGame = useCallback(() => {
     GlobalInput.keys.clear();
+
+    // Сбрасываем фокус с UI-кнопок, чтобы клавиатура (WASD, Space) сразу работала в игре
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
     const app = appRef.current;
     if (!app) return;
 

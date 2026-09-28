@@ -15,6 +15,20 @@ export class TerrainBrushController {
     const radius = state.radius;
     const strength = state.strength;
 
+    if (!terrainComp.dirtyChunks) terrainComp.dirtyChunks = new Set<string>();
+
+    // Добавление затронутых чанков в сет для инкрементального обновления
+    const minCX = Math.floor((worldX - radius + width / 2) / 32);
+    const maxCX = Math.floor((worldX + radius + width / 2) / 32);
+    const minCZ = Math.floor((worldZ - radius + depth / 2) / 32);
+    const maxCZ = Math.floor((worldZ + radius + depth / 2) / 32);
+
+    for (let cz = minCZ; cz <= maxCZ; cz++) {
+      for (let cx = minCX; cx <= maxCX; cx++) {
+        terrainComp.dirtyChunks.add(`${cx}_${cz}`);
+      }
+    }
+
     // --- РЕЖИМ: ПОСАДКА И ОЧИСТКА ЗОН РАСТИТЕЛЬНОСТИ (FOLIAGE DENSITY MAP) ---
     if (state.tool === 'foliage' || state.tool === 'clear_foliage') {
       const splatRes = terrainComp.splatResolution || 512;
@@ -141,12 +155,13 @@ export class TerrainBrushController {
       return undefined;
     }
 
-    // --- РЕЖИМ 2: СКУЛЬПТИНГ ГЕОМЕТРИИ (128x128) ---
-    const cellSizeX = width / (resolution - 1);
-    const cellSizeZ = depth / (resolution - 1);
+    // --- РЕЖИМ 2: СКУЛЬПТИНГ ГЕОМЕТРИИ ---
+    // Так как resolution = width + 1, шаг сетки строго 1 метр
+    const cellSizeX = 1.0;
+    const cellSizeZ = 1.0;
     const gridX = Math.round((worldX + width / 2) / cellSizeX);
     const gridZ = Math.round((worldZ + depth / 2) / cellSizeZ);
-    const cellRadius = Math.ceil(Math.max(radius / cellSizeX, radius / cellSizeZ));
+    const cellRadius = Math.ceil(radius);
 
     let modified = false;
 

@@ -170,7 +170,11 @@ export abstract class BTService extends BTDecorator {
     this.timeSinceLastTick += ctx.dt;
     if (this.timeSinceLastTick >= this.params.interval) {
       this.tickService(ctx);
-      this.timeSinceLastTick = 0;
+      if (this.params.interval > 0) {
+        this.timeSinceLastTick = this.timeSinceLastTick % this.params.interval;
+      } else {
+        this.timeSinceLastTick = 0;
+      }
     }
     return this.child.tick(ctx);
   }

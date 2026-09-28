@@ -116,14 +116,17 @@ export interface IPhysicsDriver {
     y?: number
   ): { body: RAPIER.RigidBody; collider: RAPIER.Collider };
 
-  /** Создает или обновляет физический Heightfield-коллайдер ландшафта в Rapier3D */
-  createOrUpdateTerrain(
-    width: number,
-    depth: number,
-    resolution: number,
-    heights: Float32Array,
+  /** Создает или обновляет отдельный чанк физического ландшафта (TriMesh) */
+  createOrUpdateTerrainChunk(
+    chunkId: string,
+    vertices: Float32Array,
+    indices: Uint32Array,
+    position: Vec3,
     entityId?: string
-  ): { body: RAPIER.RigidBody; collider: RAPIER.Collider } | null;
+  ): void;
+
+  /** Удаляет физический чанк ландшафта из мира */
+  removeTerrainChunk(chunkId: string): void;
 
   /** Запрашивает все сущности в радиусе (сферическое перекрытие в 3D) */
   queryEntitiesInSphere(center: Vec3, radius: number): string[];

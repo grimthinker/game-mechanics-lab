@@ -17,6 +17,10 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
   private groundBody: RAPIER.RigidBody | null = null;
   private groundCollider: RAPIER.Collider | null = null;
 
+  // Кэш физических чанков террейна
+  private terrainChunks: Map<string, { body: RAPIER.RigidBody; collider: RAPIER.Collider }> =
+    new Map();
+
   // Переиспользуемый инстанс KCC
   private characterController: RAPIER.KinematicCharacterController | null = null;
 
@@ -413,89 +417,44 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     return { body, collider };
   }
 
-  public createOrUpdateTerrain(
-    width: number,
-    depth: number,
-    resolution: number,
-    heights: Float32Array,
+  public createOrUpdateTerrainChunk(
+    chunkId: string,
+    vertices: Float32Array,
+    indices: Uint32Array,
+    position: Vec3,
     entityId?: string
-  ): { body: RAPIER.RigidBody; collider: RAPIER.Collider } | null {
-    if (!this.world) return null;
+  ): void {
+    if (!this.world) return;
 
-    const safeRes = Math.max(2, Math.round(Number(resolution) || 128));
-    const safeW = Math.max(1, Number(width) || 100);
-    const safeD = Math.max(1, Number(depth) || 100);
-
-    // Удаляем предыдущий статический коллайдер пола / террейна
-    if (this.groundBody) {
-      this.removeRigidBody(this.groundBody);
-      this.groundBody = null;
-      this.groundCollider = null;
+    let existing = this.terrainChunks.get(chunkId);
+    if (existing) {
+      this.removeRigidBody(existing.body);
     }
 
-    const groundBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0.0, 0.0, 0.0);
-    const body = this.createRigidBody(groundBodyDesc, entityId);
-
-    // 1. Генерация 3D вершин (X, Y, Z) террейна в мировых координатах
-    const numVerts = safeRes * safeRes;
-    const vertices = new Float32Array(numVerts * 3);
-    const stepX = safeW / (safeRes - 1);
-    const stepZ = safeD / (safeRes - 1);
-    const halfW = safeW / 2;
-    const halfD = safeD / 2;
-
-    for (let z = 0; z < safeRes; z++) {
-      for (let x = 0; x < safeRes; x++) {
-        const idx = z * safeRes + x;
-        const vIdx = idx * 3;
-        const h = heights[idx];
-        vertices[vIdx] = x * stepX - halfW;
-        vertices[vIdx + 1] = typeof h === 'number' && Number.isFinite(h) ? h : 0;
-        vertices[vIdx + 2] = z * stepZ - halfD;
-      }
-    }
-
-    // 2. Генерация треугольников (индексов), полностью совпадающих с геометрией Three.js PlaneGeometry
-    const numQuads = (safeRes - 1) * (safeRes - 1);
-    const indices = new Uint32Array(numQuads * 6);
-    let iPtr = 0;
-
-    for (let z = 0; z < safeRes - 1; z++) {
-      for (let x = 0; x < safeRes - 1; x++) {
-        const row1 = z * safeRes;
-        const row2 = (z + 1) * safeRes;
-
-        const a = row1 + x;
-        const b = row1 + x + 1;
-        const c = row2 + x;
-        const d = row2 + x + 1;
-
-        indices[iPtr++] = a;
-        indices[iPtr++] = c;
-        indices[iPtr++] = b;
-
-        indices[iPtr++] = b;
-        indices[iPtr++] = c;
-        indices[iPtr++] = d;
-      }
-    }
+    const desc = RAPIER.RigidBodyDesc.fixed().setTranslation(position.x, position.y, position.z);
+    const body = this.createRigidBody(desc, entityId);
 
     try {
-      // trimesh в Rapier3D работает абсолютно стабильно, исключая паники WASM ядра
-      const colliderDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
-      colliderDesc.setRestitution(0.0);
-      colliderDesc.setFriction(0.8);
+      const colDesc = RAPIER.ColliderDesc.trimesh(vertices, indices);
+      colDesc.setRestitution(0.0);
+      colDesc.setFriction(0.8);
 
-      const collider = this.createCollider(colliderDesc, body);
-
-      this.groundBody = body;
-      this.groundCollider = collider;
+      const collider = this.createCollider(colDesc, body);
+      this.terrainChunks.set(chunkId, { body, collider });
       this.isBroadPhaseDirty = true;
-
-      return { body, collider };
     } catch (err) {
-      console.error('[RapierPhysicsDriver] Ошибка создания физической коллизии террейна:', err);
-      return null;
+      console.error(`[RapierPhysicsDriver] Ошибка создания физики чанка ${chunkId}:`, err);
+      this.removeRigidBody(body);
+    }
+  }
+
+  public removeTerrainChunk(chunkId: string): void {
+    if (!this.world) return;
+    const existing = this.terrainChunks.get(chunkId);
+    if (existing) {
+      this.removeRigidBody(existing.body);
+      this.terrainChunks.delete(chunkId);
+      this.isBroadPhaseDirty = true;
     }
   }
 
@@ -706,6 +665,7 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     this.entityToBodyMap.clear();
     this.groundBody = null;
     this.groundCollider = null;
+    this.terrainChunks.clear();
 
     if (this.characterController) {
       this.characterController.free();

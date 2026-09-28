@@ -92,6 +92,14 @@ export class TimeManager {
 
     this.app.renderFrame();
 
+    // Очистка грязных чанков террейна после отработки всех систем
+    const terrains = this.app.world.getEntitiesWith('terrain');
+    for (const [, { terrain }] of terrains) {
+      if (terrain.dirtyChunks && terrain.dirtyChunks.size > 0) {
+        terrain.dirtyChunks.clear();
+      }
+    }
+
     if (this.app.onFrame) this.app.onFrame();
 
     requestAnimationFrame((t) => this.loop(t));
