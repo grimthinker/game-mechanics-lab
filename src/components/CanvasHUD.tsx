@@ -25,6 +25,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
 
   const scalePercent = camera ? Math.round(camera.scale * 100) : 100;
   const cameraX = camera ? camera.targetX.toFixed(1) : '0.0';
+  const cameraY = camera ? camera.targetY.toFixed(1) : '0.0';
   const cameraZ = camera ? camera.targetZ.toFixed(1) : '0.0';
 
   return (
@@ -86,7 +87,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
         <div style={{ borderLeft: '1px solid #333', paddingLeft: '8px' }}>
           <span style={{ color: '#888' }}>{t('hud.camera')} </span>
           <span style={{ color: '#3498db' }}>
-            X:{cameraX}m Z:{cameraZ}m
+            X:{cameraX}m Y:{cameraY}m Z:{cameraZ}m
           </span>
         </div>
 

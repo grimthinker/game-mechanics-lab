@@ -110,6 +110,12 @@ export class Camera {
     this.scale = Math.min(this.maxScale, Math.max(this.minScale, this.scale * factor));
   }
 
+  public adjustHeight(deltaY: number): void {
+    const speed = 0.5 * (1 / this.scale);
+    const step = deltaY < 0 ? speed : -speed;
+    this.targetY = Math.max(-50, Math.min(200, this.targetY + step));
+  }
+
   public lookAt(worldX: number, worldZ: number, _canvas?: HTMLCanvasElement): void {
     this.targetX = worldX;
     this.targetZ = worldZ;

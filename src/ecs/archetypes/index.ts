@@ -8,6 +8,7 @@ import { assembleObstacle } from './ObstacleArchetype';
 import { assembleBodyPart } from './BodyPartArchetype';
 import { assembleTerrain } from './TerrainArchetype';
 import { assembleEnvironment } from './EnvironmentArchetype';
+import { assembleWater, createWaterConfig } from './WaterArchetype';
 
 export * from './types';
 export * from './CreatureArchetype';
@@ -18,6 +19,7 @@ export * from './ObstacleArchetype';
 export * from './BodyPartArchetype';
 export * from './TerrainArchetype';
 export * from './EnvironmentArchetype';
+export * from './WaterArchetype';
 
 export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   creature: assembleCreature,
@@ -30,10 +32,12 @@ export const ARCHETYPE_ASSEMBLERS: Record<EntityArchetype, EntityAssembler> = {
   bodyPart: assembleBodyPart,
   terrain: assembleTerrain,
   environment: assembleEnvironment,
+  water: assembleWater,
 };
 
 export function detectArchetype(config: EntityConfig): EntityArchetype {
   if (config.tag?.archetype) return config.tag.archetype;
+  if (config.water) return 'water';
   if (config.environment) return 'environment';
   if (config.terrain) return 'terrain';
   if (config.areaEffector || (config as any).zoneTrigger) return 'zone';

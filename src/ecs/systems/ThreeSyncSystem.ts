@@ -24,6 +24,7 @@ import { AttackVisualsManager } from '../../rendering/attacks/AttackVisualsManag
 import { GrassSyncSystem } from '../../rendering/grass/GrassSyncSystem';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 import { ToonMaterialManager } from '../../rendering/materials/ToonMaterialManager';
+import { createWaterMaterial } from '../../rendering/materials/WaterMaterial';
 
 const PROCEDURAL_PROP_SCALES: Record<string, { baseRadius: number; baseHeight: number }> = {
   'proc://prop/tree': { baseRadius: 0.6, baseHeight: 4.0 },
@@ -352,6 +353,87 @@ export class ThreeSyncSystem {
           const terrainComp = world.getComponent(id, 'terrain');
           if (terrainComp) {
             this.terrainSync.syncTerrain(obj, terrainComp);
+          }
+        }
+
+        // Анимация волн воды, динамическое освещение и реактивная синхронизация инспектора
+        if (archetype === 'water') {
+          const waterComp = world.getComponent(id, 'water');
+          if (waterComp) {
+            // 1. Динамическая перестройка сетки геометрии при изменении размеров X/Z в инспекторе
+            if (
+              obj.userData.currentWidth !== waterComp.width ||
+              obj.userData.currentDepth !== waterComp.depth
+            ) {
+              obj.userData.currentWidth = waterComp.width;
+              obj.userData.currentDepth = waterComp.depth;
+
+              const segsX = Math.max(4, Math.ceil(waterComp.width * 1.5));
+              const segsZ = Math.max(4, Math.ceil(waterComp.depth * 1.5));
+              const newGeo = new THREE.PlaneGeometry(
+                waterComp.width,
+                waterComp.depth,
+                segsX,
+                segsZ
+              );
+              newGeo.rotateX(-Math.PI / 2);
+
+              obj.traverse((child) => {
+                if (child instanceof THREE.Mesh && child.userData.isWaterMesh) {
+                  child.geometry.dispose();
+                  child.geometry = newGeo;
+                }
+              });
+            }
+
+            // 2. Получение параметров активного источника света сцены (солнце / луна)
+            const sunDir = new THREE.Vector3(0.5, 0.8, 0.3).normalize();
+            const sunColor = new THREE.Color(1.0, 0.95, 0.85);
+            const ambientColor = new THREE.Color(0.25, 0.3, 0.4);
+
+            for (let i = 0; i < this.scene.children.length; i++) {
+              const child = this.scene.children[i];
+              if (child instanceof THREE.DirectionalLight && child.castShadow) {
+                sunColor.copy(child.color).multiplyScalar(child.intensity);
+                sunDir.copy(child.position).sub(child.target.position).normalize();
+              } else if (child instanceof THREE.AmbientLight) {
+                ambientColor.copy(child.color).multiplyScalar(child.intensity);
+              }
+            }
+
+            // 3. Синхронизация юниформов шейдера
+            obj.traverse((child) => {
+              if (
+                child instanceof THREE.Mesh &&
+                child.material &&
+                (child.material as any).uniforms?.uTime
+              ) {
+                const u = (child.material as any).uniforms;
+
+                u.uTime.value += dt;
+
+                // Передача параметров света
+                u.uSunDirection.value.copy(sunDir);
+                u.uSunColor.value.copy(sunColor);
+                u.uAmbientColor.value.copy(ambientColor);
+
+                // Реактивные параметры из Инспектора
+                if (waterComp.color) {
+                  u.uColor.value.set(waterComp.color);
+                  u.uDeepColor.value.set(waterComp.color).multiplyScalar(0.65);
+                }
+                u.uOpacity.value = waterComp.opacity ?? 0.8;
+                u.uWaveSpeed.value = waterComp.waveSpeed ?? 1.2;
+                u.uWaveHeight.value = waterComp.waveHeight ?? 0.12;
+                u.uFlowSpeed.value = waterComp.flowSpeed ?? 0.0;
+                if (waterComp.flowDirection) {
+                  u.uFlowDirection.value.set(waterComp.flowDirection.x, waterComp.flowDirection.z);
+                  if (u.uFlowDirection.value.lengthSq() > 0.001) {
+                    u.uFlowDirection.value.normalize();
+                  }
+                }
+              }
+            });
           }
         }
 
@@ -694,6 +776,27 @@ export class ThreeSyncSystem {
       const terrainComp = world.getComponent(id, 'terrain');
       if (terrainComp) {
         return this.terrainSync.createTerrainMesh(id, terrainComp);
+      }
+    } else if (archetype === 'water') {
+      const waterComp = world.getComponent(id, 'water');
+      if (waterComp) {
+        const segsX = Math.max(4, Math.ceil(waterComp.width * 1.5));
+        const segsZ = Math.max(4, Math.ceil(waterComp.depth * 1.5));
+        const geo = new THREE.PlaneGeometry(waterComp.width, waterComp.depth, segsX, segsZ);
+        geo.rotateX(-Math.PI / 2);
+
+        const mat = createWaterMaterial(waterComp);
+        const waterMesh = new THREE.Mesh(geo, mat);
+        waterMesh.receiveShadow = true;
+        waterMesh.userData.isWaterMesh = true;
+        waterMesh.userData.entityId = id;
+
+        group.add(waterMesh);
+        group.userData.isWater = true;
+        group.userData.entityId = id;
+        group.userData.currentWidth = waterComp.width;
+        group.userData.currentDepth = waterComp.depth;
+        return group;
       }
     }
 

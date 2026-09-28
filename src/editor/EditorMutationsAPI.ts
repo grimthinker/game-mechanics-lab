@@ -1,6 +1,6 @@
 import { setBaseStat } from '../ecs/stats/StatEvaluator';
-import { deg2Rad } from '../utils';
-import { HitZoneType, ZoneEffectType } from '../ecs/types';
+import { createRectanglePoints, deg2Rad } from '../utils';
+import { HitZoneType, WaterComponent, ZoneEffectType } from '../ecs/types';
 import { World } from '../ecs/World';
 import { EnvironmentComponent } from '../ecs/components/environment';
 
@@ -790,6 +790,27 @@ export class EditorMutationsAPI {
     const env = this.world.getComponent(id, 'environment');
     if (!env) return false;
     Object.assign(env, patch);
+    return true;
+  }
+
+  public updateEntityWater(id: string, patch: Partial<WaterComponent>): boolean {
+    const water = this.world.getComponent(id, 'water');
+    const physStats = this.world.getComponent(id, 'physicsStats');
+    if (!water) return false;
+
+    Object.assign(water, patch);
+
+    if (patch.width !== undefined || patch.depth !== undefined) {
+      const w = water.width;
+      const d = water.depth;
+      const r = Math.max(w, d) / 2;
+      if (physStats) {
+        setBaseStat(physStats.radius, r);
+        if (physStats.points) {
+          physStats.points = createRectanglePoints(w, d);
+        }
+      }
+    }
     return true;
   }
 }

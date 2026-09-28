@@ -80,7 +80,8 @@ export class ToonMaterialManager {
         !child.userData.isSkyDome &&
         !child.userData.isTerrainMesh &&
         !child.userData.isTerrainSkirt &&
-        !child.userData.isGrassMesh
+        !child.userData.isGrassMesh &&
+        !child.userData.isWaterMesh
       ) {
         if (!child.userData.originalMaterial) {
           child.userData.originalMaterial = child.material;

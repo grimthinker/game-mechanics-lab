@@ -7,6 +7,7 @@ import {
   createFenceConfig,
   createRockConfig,
 } from '../../ecs/archetypes/ObstacleArchetype';
+import { createWaterConfig } from '../../ecs/archetypes/WaterArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
 import { t } from '../../locales';
 
@@ -571,6 +572,25 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
               0.2,
               1.0
             ),
+        },
+      ],
+    },
+    {
+      title: t('palette.categoryWater'),
+      items: [
+        {
+          id: 'water_lake',
+          name: t('palette.lake'),
+          description: t('palette.lakeDesc'),
+          icon: '🏞️',
+          createConfig: () => createWaterConfig('lake', 20, 20),
+        },
+        {
+          id: 'water_river',
+          name: t('palette.river'),
+          description: t('palette.riverDesc'),
+          icon: '🌊',
+          createConfig: () => createWaterConfig('river', 8, 35),
         },
       ],
     },

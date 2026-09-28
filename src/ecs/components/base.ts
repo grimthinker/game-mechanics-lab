@@ -10,7 +10,8 @@ export type EntityArchetype =
   | 'obstacle'
   | 'bodyPart'
   | 'terrain'
-  | 'environment';
+  | 'environment'
+  | 'water';
 
 export const enum CollisionCategory {
   NONE = 0,

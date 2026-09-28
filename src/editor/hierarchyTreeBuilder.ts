@@ -15,7 +15,8 @@ export type HierarchyNodeType =
   | 'obstacle'
   | 'zone'
   | 'marker'
-  | 'environment';
+  | 'environment'
+  | 'water';
 
 export interface HierarchyTreeNode {
   id: string;
@@ -362,6 +363,7 @@ export function buildHierarchyTree(
     let icon = '❓';
     if (arch === 'obstacle') icon = '🧱';
     else if (arch === 'zone') icon = '🌀';
+    else if (arch === 'water') icon = '🌊';
     else if (arch === 'marker') icon = '📍';
     else if (arch === 'environment') icon = '🌤️';
 
@@ -403,7 +405,8 @@ export function buildHierarchyTree(
       arch === 'obstacle' ||
       arch === 'marker' ||
       arch === 'environment' ||
-      arch === 'terrain'
+      arch === 'terrain' ||
+      arch === 'water'
     ) {
       topLevelIds.add(id);
     } else if (arch === 'zone') {
@@ -417,6 +420,7 @@ export function buildHierarchyTree(
   const obstacleNodes: HierarchyTreeNode[] = [];
   const itemNodes: HierarchyTreeNode[] = [];
   const zoneNodes: HierarchyTreeNode[] = [];
+  const waterNodes: HierarchyTreeNode[] = [];
   const envNodes: HierarchyTreeNode[] = [];
   const markerNodes: HierarchyTreeNode[] = [];
 
@@ -436,6 +440,9 @@ export function buildHierarchyTree(
     } else if (arch === 'zone') {
       const res = buildStandardNode(id);
       if (res?.node) zoneNodes.push(res.node);
+    } else if (arch === 'water') {
+      const res = buildStandardNode(id);
+      if (res?.node) waterNodes.push(res.node);
     } else if (arch === 'environment' || arch === 'terrain') {
       const res = buildStandardNode(id);
       if (res?.node) envNodes.push(res.node);
@@ -489,6 +496,7 @@ export function buildHierarchyTree(
   addGroup('group_items', t('selectionDrawer.items'), '📦', itemNodes);
   addGroup('group_obstacles', t('selectionDrawer.obstacles'), '🧱', obstacleNodes);
   addGroup('group_zones', t('selectionDrawer.zones'), '🌀', zoneNodes);
+  addGroup('group_water', t('palette.categoryWater'), '🌊', waterNodes);
   addGroup('group_environment', t('inspector.environment'), '🌤️', envNodes);
   addGroup('group_markers', t('selectionDrawer.markers'), '📍', markerNodes);
 

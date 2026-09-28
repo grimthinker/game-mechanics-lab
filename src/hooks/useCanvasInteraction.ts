@@ -76,7 +76,13 @@ export const useCanvasInteraction = ({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       if (onClosePieMenu) onClosePieMenu();
-      appRef.current?.zoomAt(e.clientX, e.clientY, e.deltaY);
+      const app = appRef.current;
+      if (!app) return;
+      if (e.altKey) {
+        app.camera.adjustHeight(e.deltaY);
+      } else {
+        app.camera.zoomAt(e.clientX, e.clientY, e.deltaY, app.canvas);
+      }
     };
 
     container.addEventListener('wheel', onWheel, { passive: false });

@@ -18,3 +18,4 @@ export * from './InteractionSlotsInspector';
 export * from './EquipmentInspector';
 export * from './InventoryInspector';
 export * from './EnvironmentInspector';
+export * from './WaterInspector';

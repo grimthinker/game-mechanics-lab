@@ -13,10 +13,12 @@ export * from './components/rendering';
 export * from './components/terrain';
 export * from './components/fetch';
 export * from './components/environment';
+export * from './components/water';
 
 import { FetchStickComponent } from './components/fetch';
 import { TerrainComponent } from './components/terrain';
 import { EnvironmentComponent } from './components/environment';
+import { WaterComponent, WaterConfig } from './components/water';
 import {
   TagComponent,
   RenderableComponent,
@@ -139,6 +141,7 @@ export interface EntityComponents {
   thrownObject?: ThrownObjectComponent;
   fetchStick?: FetchStickComponent;
   environment?: EnvironmentComponent;
+  water?: WaterComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -187,6 +190,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'thrownObject',
   'fetchStick',
   'environment',
+  'water',
 ] as const;
 
 export interface EntityConfig {
@@ -227,4 +231,5 @@ export interface EntityConfig {
   thrownObject?: ThrownObjectComponent;
   fetchStick?: FetchStickComponent;
   environment?: EnvironmentComponent;
+  water?: WaterConfig;
 }

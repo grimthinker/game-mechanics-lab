@@ -8,6 +8,7 @@ import { AISystem } from '../ecs/systems/AISystem';
 import { InteractionSystem } from '../ecs/systems/InteractionSystem';
 import { ThrowingSystem } from '../ecs/systems/ThrowingSystem';
 import { FetchGameplaySystem } from '../ecs/systems/FetchGameplaySystem';
+import { WaterSystem } from '../ecs/systems/WaterSystem';
 import { AreaEffectorSystem } from '../ecs/systems/AreaEffectorSystem';
 import { AnatomySystem } from '../ecs/systems/AnatomySystem';
 import { AnimationSyncSystem } from '../ecs/systems/AnimationSyncSystem';
@@ -44,6 +45,7 @@ export class GameSimulation {
   public interactionSystem: InteractionSystem;
   public throwingSystem: ThrowingSystem;
   public fetchGameplaySystem: FetchGameplaySystem;
+  public waterSystem: WaterSystem;
   public areaEffectorSystem: AreaEffectorSystem;
   public animationSyncSystem: AnimationSyncSystem;
   public modifierSystem: ModifierSystem;
@@ -70,6 +72,7 @@ export class GameSimulation {
     this.interactionSystem = new InteractionSystem();
     this.throwingSystem = new ThrowingSystem();
     this.fetchGameplaySystem = new FetchGameplaySystem();
+    this.waterSystem = new WaterSystem();
     this.areaEffectorSystem = new AreaEffectorSystem();
     this.animationSyncSystem = new AnimationSyncSystem();
     this.modifierSystem = new ModifierSystem();
@@ -122,6 +125,7 @@ export class GameSimulation {
     this.syncDynamicBodiesToTransforms();
     this.attachmentSystem.update(this.world, this.physics);
     this.areaEffectorSystem.update(dt, this.world, this.physics);
+    this.waterSystem.update(dt, this.world, this.physics);
     this.damageSystem.update(dt, this.world);
     this.animationSyncSystem.update(dt, this.world);
   }

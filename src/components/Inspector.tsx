@@ -25,6 +25,7 @@ import {
   EquipmentInspector,
   InventoryInspector,
   EnvironmentInspector,
+  WaterInspector,
 } from './inspector/index';
 import { getAnatomyParts } from '../ecs/utils/hierarchy';
 import { EDITOR_CONFIG } from '../config/editorConfig';
@@ -137,6 +138,7 @@ export const Inspector: React.FC<InspectorProps> = ({
     equip: false,
     inventory: false,
     environment: true,
+    water: true,
   });
 
   const toggleSection = (key: string) => {
@@ -314,6 +316,9 @@ export const Inspector: React.FC<InspectorProps> = ({
               t('inspector.environment'),
               <EnvironmentInspector {...commonProps} />
             )}
+
+          {world.getComponent(targetId, 'water') &&
+            renderSection('water', t('inspector.water'), <WaterInspector {...commonProps} />)}
 
           {renderSection('meta', t('inspector.meta'), <MetaInspector {...commonProps} />)}
 
