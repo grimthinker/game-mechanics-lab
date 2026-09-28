@@ -1,3 +1,5 @@
+export const FOLIAGE_ZONES_COUNT = 5;
+
 export interface TerrainComponent {
   /** Физический размер террейна в метрах по оси X */
   width: number;
@@ -14,16 +16,26 @@ export interface TerrainComponent {
    * Размер splatResolution * splatResolution * 4 байт
    */
   splatData: Uint8Array;
+  /**
+   * Карта плотности зон растительности (Foliage Density Map).
+   * Каналы: 0 - Трава, 1 - Пшеница, 2 - Камыш, 3 - Сухая трава, 4 - Цветы.
+   * Размер: splatResolution * splatResolution * 5 байт
+   */
+  foliageData: Uint8Array;
   /** Масштаб тайлинга детальных текстур */
   textureTiling: number;
   /** Счетчик версий высот для независимого отслеживания изменений системами */
   geometryVersion?: number;
   /** Счетчик версий текстурной маски (Splatmap) для независимого отслеживания изменений системами */
   splatVersion?: number;
+  /** Счетчик версий карты плотности растительности */
+  foliageVersion?: number;
   /** Флаг необходимости перестроения вертексов Three.js геометрии */
   isGeometryDirty?: boolean;
   /** Флаг необходимости обновления текстуры Splatmap */
   isSplatDirty?: boolean;
+  /** Флаг необходимости пересчета инстансов растительности */
+  isFoliageDirty?: boolean;
   /** Флаг необходимости пересчета физического коллайдера Rapier3D */
   isPhysicsDirty?: boolean;
 }

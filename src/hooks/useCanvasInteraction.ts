@@ -59,6 +59,7 @@ export const useCanvasInteraction = ({
     entityId: string;
     beforeHeights: Float32Array;
     beforeSplat: Uint8Array;
+    beforeFoliage: Uint8Array;
     isDragging: boolean;
     flattenTarget?: number;
   } | null>(null);
@@ -128,7 +129,7 @@ export const useCanvasInteraction = ({
 
     // Действия на ЛКМ
     if (e.button === 0) {
-      if (app.gizmo.isDragging()) return; // Если уже тянем манипулятор, игнорируем клик для сцены
+      if (app.gizmo.isDragging()) return;
 
       const point = app.getCanvasPoint(e.clientX, e.clientY);
 
@@ -142,6 +143,7 @@ export const useCanvasInteraction = ({
             entityId: tId,
             beforeHeights: new Float32Array(tComp.terrain.heights),
             beforeSplat: new Uint8Array(tComp.terrain.splatData),
+            beforeFoliage: new Uint8Array(tComp.terrain.foliageData),
             isDragging: true,
           };
           terrainEditStateRef.current.flattenTarget = TerrainBrushController.applyBrush(
@@ -152,8 +154,9 @@ export const useCanvasInteraction = ({
             dt
           );
         }
-        return; // Блокируем выделение объектов под кистью
+        return;
       }
+
       // В режиме игры: подбор предмета через Ctrl+ЛКМ
       if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
         let targetEntityId = app.selection.pickNearestEntity(
@@ -163,7 +166,6 @@ export const useCanvasInteraction = ({
           e.clientY
         );
         if (targetEntityId) {
-          // Если кликнули по части тела, находим родительскую сборку предмета на полу
           if (!app.world.getComponent(targetEntityId, 'item')) {
             const assemblyRoots = app.world.getEntitiesWith('assemblyRoot', 'tag');
             const parentItem = assemblyRoots.find(
@@ -211,7 +213,7 @@ export const useCanvasInteraction = ({
         const comp = app.world.getEntity(entityId);
         if (comp?.item && !comp.ownership && mode === GameMode.EDITOR) {
           dragCandidateRef.current = { id: entityId, startX: e.clientX, startY: e.clientY };
-          return; // Откладываем выделение до отпускания или сдвига мыши
+          return;
         }
 
         const isBodyPart =
@@ -222,7 +224,6 @@ export const useCanvasInteraction = ({
             const rootTag = app.world.getComponent(rootId, 'tag');
             if (rootTag?.archetype === 'creature') {
               const creatureName = app.world.getComponent(rootId, 'meta')?.name || 'Существо';
-              const partName = comp?.meta?.name || 'Часть тела';
 
               if (e.shiftKey && app.selection.selectedEntityIds.has(rootId)) {
                 app.selection.deselectEntity(rootId);
@@ -276,7 +277,6 @@ export const useCanvasInteraction = ({
     app.setMouseScreenPos(e.clientX, e.clientY);
     const point = app.getCanvasPoint(e.clientX, e.clientY);
 
-    // Дросселируем обновление стейта React (HUD-координаты), чтобы не ререндерить всё дерево компонентов на каждый пиксель
     const now = performance.now();
     if (now - lastCursorUpdateRef.current > 60) {
       lastCursorUpdateRef.current = now;
@@ -297,7 +297,7 @@ export const useCanvasInteraction = ({
           point.x,
           point.z,
           app.terrainBrush,
-          1 / 60, // Фиксированный шаг dt для равномерного распределения силы кисти
+          1 / 60,
           terrainEditStateRef.current.flattenTarget
         );
       }
@@ -389,11 +389,19 @@ export const useCanvasInteraction = ({
       const terrains = app.world.getEntitiesWith('terrain');
       if (terrains.length > 0) {
         const [tId, tComp] = terrains[0];
-        // Сигнализируем Rapier3D, что пора пересчитать коллайдер
-        tComp.terrain.isPhysicsDirty = true;
+        const isHeightTool =
+          app.terrainBrush.tool === 'raise' ||
+          app.terrainBrush.tool === 'lower' ||
+          app.terrainBrush.tool === 'flatten' ||
+          app.terrainBrush.tool === 'smooth';
+
+        if (isHeightTool) {
+          tComp.terrain.isPhysicsDirty = true;
+        }
 
         const afterHeights = new Float32Array(tComp.terrain.heights);
         const afterSplat = new Uint8Array(tComp.terrain.splatData);
+        const afterFoliage = new Uint8Array(tComp.terrain.foliageData);
 
         const cmd = new TerrainModifyCommand(
           'Редактирование ландшафта',
@@ -402,7 +410,9 @@ export const useCanvasInteraction = ({
           terrainEditStateRef.current.beforeHeights,
           afterHeights,
           terrainEditStateRef.current.beforeSplat,
-          afterSplat
+          afterSplat,
+          terrainEditStateRef.current.beforeFoliage,
+          afterFoliage
         );
         app.commandHistory.push(cmd);
       }
@@ -447,7 +457,6 @@ export const useCanvasInteraction = ({
       // Автоматическая компенсация уклона поверхности (Slope Clearance)
       if (physHit) {
         const ny = Math.max(0.15, physHit.normal.y);
-        // Тангенс угла наклона поверхности: отношение горизонтального смещения к вертикальному
         const slopeFactor = Math.sqrt(Math.max(0, 1 - ny * ny)) / ny;
 
         if (placementMode.kind === 'entity') {
@@ -455,14 +464,11 @@ export const useCanvasInteraction = ({
             !!placementMode.config.item || placementMode.config.tag?.archetype === 'item';
           const r = placementMode.config.physics?.radius ?? 0.3;
           if (isItem) {
-            // Поднимаем предмет так, чтобы он не проваливался краями на склоне
             spawnPos.y += r + r * slopeFactor + 0.05;
           } else {
-            // Для препятствий (ящики, стены) компенсируем ширину основания
             spawnPos.y += r * slopeFactor * 0.5 + 0.02;
           }
         } else if (placementMode.kind === 'modular') {
-          // Для существа с радиусом коллизии 0.4м поднимаем капсулу выше самой высокой точки склона под ней
           const r = 0.4;
           spawnPos.y += r * slopeFactor + 0.08;
         }

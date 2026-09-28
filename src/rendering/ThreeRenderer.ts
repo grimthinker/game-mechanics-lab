@@ -53,7 +53,7 @@ export class ThreeRenderer implements IRenderer {
       #ifdef FOG_EXP2
         float fogDist = max(0.0, vFogDepth - ${TERRAIN_CONFIG.skirt.fogStartDistance.toFixed(1)});
         float ramp = 1.0 - exp(-fogDist * 0.006);
-        float maxCap = clamp(fogDensity * 320.0, 0.15, ${TERRAIN_CONFIG.skirt.maxFogCap.toFixed(2)});
+        float maxCap = clamp(fogDensity * 120.0, 0.08, 0.65);
         float fogFactor = ramp * maxCap;
       #else
         float fogDist = max(0.0, vFogDepth - fogNear);
@@ -63,10 +63,10 @@ export class ThreeRenderer implements IRenderer {
     #endif
     `;
 
-    // Создаем WebGL рендерер с включенными мягкими тенями
+    // Создаем WebGL рендерер с включенными тенями
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.canvas = this.renderer.domElement;
     this.canvas.style.display = 'block';
@@ -97,10 +97,6 @@ export class ThreeRenderer implements IRenderer {
 
     // Менеджер окружения (скайбокс, солнце, луна, звезды, тени и туман)
     this.environmentManager = new EnvironmentManager(this.scene);
-
-    // 3D-оси координат (Красная: X, Зеленая: Y (Вверх), Синяя: Z)
-    const axes = new THREE.AxesHelper(3);
-    this.scene.add(axes);
 
     // Манипулятор TransformControls
     this.transformControl = new TransformControls(this.camera, this.renderer.domElement);
@@ -350,9 +346,15 @@ export class ThreeRenderer implements IRenderer {
       const r = context.editorData.terrainBrush.radius;
       this.brushCursor.scale.set(r, r, r);
 
-      (this.brushCursor.material as THREE.MeshBasicMaterial).color.setHex(
-        context.editorData.terrainBrush.tool === 'paint' ? 0x3498db : 0xf39c12
-      );
+      const bTool = context.editorData.terrainBrush.tool;
+      let brushColorHex = 0xf39c12; // Скульпт высоты (оранжевый)
+      if (bTool === 'paint')
+        brushColorHex = 0x3498db; // Текстура грунта (синий)
+      else if (bTool === 'foliage')
+        brushColorHex = 0x2ecc71; // Посадка травы (зеленый)
+      else if (bTool === 'clear_foliage') brushColorHex = 0xe74c3c; // Очистка травы (красный)
+
+      (this.brushCursor.material as THREE.MeshBasicMaterial).color.setHex(brushColorHex);
     } else {
       this.brushCursor.visible = false;
     }
@@ -367,7 +369,7 @@ export class ThreeRenderer implements IRenderer {
             dayDuration: 600,
             azimuth: 0,
             axialTilt: 0.41,
-            fogDensity: 0.2,
+            fogDensity: 0.0012,
           };
 
     this.environmentManager.update(
@@ -473,8 +475,16 @@ export class ThreeRenderer implements IRenderer {
       const tag = world.getComponent(id, 'tag');
       const archetype = tag?.archetype ?? entity.meta?.entityType;
 
-      // Имена для предметов показываются через тултип, маркеры и части тела скрыты в общем оверлее
-      if (archetype === 'item' || archetype === 'marker' || archetype === 'bodyPart') continue;
+      // Имена для предметов, террейна, окружения, маркеров и частей тела скрыты в общем оверлее
+      if (
+        archetype === 'item' ||
+        archetype === 'marker' ||
+        archetype === 'bodyPart' ||
+        archetype === 'terrain' ||
+        archetype === 'environment'
+      ) {
+        continue;
+      }
 
       const health = world.getComponent(id, 'health');
       if (health && !health.isAlive) continue;

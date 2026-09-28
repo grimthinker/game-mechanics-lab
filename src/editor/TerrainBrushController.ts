@@ -14,6 +14,59 @@ export class TerrainBrushController {
     const radius = state.radius;
     const strength = state.strength;
 
+    // --- РЕЖИМ: ПОСАДКА И ОЧИСТКА ЗОН РАСТИТЕЛЬНОСТИ (FOLIAGE DENSITY MAP) ---
+    if (state.tool === 'foliage' || state.tool === 'clear_foliage') {
+      const splatRes = terrainComp.splatResolution || 512;
+      const splatCellSizeX = width / (splatRes - 1);
+      const splatCellSizeZ = depth / (splatRes - 1);
+      const gridX = Math.round((worldX + width / 2) / splatCellSizeX);
+      const gridZ = Math.round((worldZ + depth / 2) / splatCellSizeZ);
+      const cellRadius = Math.ceil(Math.max(radius / splatCellSizeX, radius / splatCellSizeZ));
+
+      const foliageData = terrainComp.foliageData;
+      let modified = false;
+      const targetChannel = state.foliageZone;
+      const isClear = state.tool === 'clear_foliage';
+
+      for (let z = gridZ - cellRadius; z <= gridZ + cellRadius; z++) {
+        for (let x = gridX - cellRadius; x <= gridX + cellRadius; x++) {
+          if (x < 0 || x >= splatRes || z < 0 || z >= splatRes) continue;
+
+          const wX = x * splatCellSizeX - width / 2;
+          const wZ = z * splatCellSizeZ - depth / 2;
+          const dist = Math.hypot(wX - worldX, wZ - worldZ);
+
+          if (dist <= radius) {
+            const t = 1 - dist / radius;
+            const smoothFalloff = t * t * (3 - 2 * t);
+            const delta = strength * smoothFalloff * dt * 255;
+            const idx = (z * splatRes + x) * 5 + targetChannel;
+            const oldVal = foliageData[idx];
+
+            if (isClear) {
+              const newVal = Math.max(0, oldVal - delta);
+              if (newVal !== oldVal) {
+                foliageData[idx] = Math.round(newVal);
+                modified = true;
+              }
+            } else {
+              const newVal = Math.min(255, oldVal + delta);
+              if (newVal !== oldVal) {
+                foliageData[idx] = Math.round(newVal);
+                modified = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (modified) {
+        terrainComp.isFoliageDirty = true;
+        terrainComp.foliageVersion = (terrainComp.foliageVersion ?? 0) + 1;
+      }
+      return undefined;
+    }
+
     // --- РЕЖИМ 1: ПОКРАСКА ТЕКСТУРНОЙ МАСКИ ВЫСОКОЙ ПЛОТНОСТИ (512x512) ---
     if (state.tool === 'paint') {
       const splatRes = terrainComp.splatResolution || 512;

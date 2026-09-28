@@ -25,6 +25,7 @@ export class EditorInteractionManager {
     active: false,
     tool: 'raise',
     texture: 0,
+    foliageZone: 0,
     radius: 3.0,
     strength: 2.0,
   };

@@ -200,6 +200,50 @@ export function createDefaultTerrainConfig(
     }
   }
 
+  // 3. Инициализация карты плотности зон растительности (5 каналов)
+  const foliageData = new Uint8Array(totalSplatTexels * 5);
+  for (let z = 0; z < splatResolution; z++) {
+    for (let x = 0; x < splatResolution; x++) {
+      const idx = z * splatResolution + x;
+      const fIdx = idx * 5;
+      const sIdx = idx * 4;
+
+      const wx = (x / (splatResolution - 1)) * width - halfW;
+      const wz = (z / (splatResolution - 1)) * depth - halfD;
+
+      const grassSplat = splatData[sIdx + 0];
+      const sandSplat = splatData[sIdx + 3];
+
+      // Канал 0: Обычная трава (где растет трава, кроме дорог)
+      foliageData[fIdx + 0] = grassSplat > 90 ? Math.round(grassSplat * 0.95) : 0;
+
+      // Канал 1: Пшеница (поле к востоку от дома: x: 8..20, z: -18..-4)
+      const isWheatField = wx >= 8 && wx <= 20 && wz >= -18 && wz <= -4;
+      if (isWheatField) {
+        foliageData[fIdx + 1] = 230;
+        foliageData[fIdx + 0] = 0; // вытесняет сорняки
+      }
+
+      // Канал 2: Камыш (вдоль низины главного тракта)
+      const dRoadMain = distanceToPolyline(wx, wz, ROAD_MAIN_PATH);
+      if (dRoadMain >= 2.6 && dRoadMain <= 4.2) {
+        foliageData[fIdx + 2] = Math.round(smoothStep(4.2, 3.2, dRoadMain) * 210);
+      }
+
+      // Канал 3: Сухая трава (на песчаных дюнах и полянах)
+      if (sandSplat > 60) {
+        foliageData[fIdx + 3] = Math.round((sandSplat / 255) * 180);
+      }
+
+      // Канал 4: Цветы (полянки перед домом и на восточной поляне)
+      const distYardFlowers = Math.hypot(wx - 2.5, wz - 4.5);
+      const distEastMeadow = Math.hypot(wx - 24, wz - 12);
+      if (distYardFlowers < 6.0 || distEastMeadow < 8.0) {
+        foliageData[fIdx + 4] = 200;
+      }
+    }
+  }
+
   const terrainComp: TerrainComponent = {
     width,
     depth,
@@ -207,11 +251,14 @@ export function createDefaultTerrainConfig(
     splatResolution,
     heights,
     splatData,
+    foliageData,
     textureTiling: 24,
     geometryVersion: 1,
     splatVersion: 1,
+    foliageVersion: 1,
     isGeometryDirty: true,
     isSplatDirty: true,
+    isFoliageDirty: true,
     isPhysicsDirty: true,
   };
 
@@ -246,6 +293,11 @@ export function createFlatTerrainConfig(
     splatData[i * 4 + 3] = 0;
   }
 
+  const foliageData = new Uint8Array(totalSplatTexels * 5);
+  for (let i = 0; i < totalSplatTexels; i++) {
+    foliageData[i * 5 + 0] = 210; // Зеленая трава по умолчанию
+  }
+
   return {
     tag: { archetype: 'terrain' },
     meta: { name: 'Плоский ландшафт', entityType: 'terrain' },
@@ -256,11 +308,14 @@ export function createFlatTerrainConfig(
       splatResolution,
       heights,
       splatData,
+      foliageData,
       textureTiling: 24 * (Math.max(width, depth) / 100),
       geometryVersion: 1,
       splatVersion: 1,
+      foliageVersion: 1,
       isGeometryDirty: true,
       isSplatDirty: true,
+      isFoliageDirty: true,
       isPhysicsDirty: true,
     },
     renderable: {

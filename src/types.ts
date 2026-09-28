@@ -39,13 +39,17 @@ export type GizmoTool = 'select' | 'translate' | 'rotate';
 export type PlacementMode =
   { kind: 'entity'; config: EntityConfig } | { kind: 'modular'; options: ModularPlacementOptions };
 
-export type TerrainToolType = 'raise' | 'lower' | 'flatten' | 'smooth' | 'paint';
+export type TerrainToolType =
+  'raise' | 'lower' | 'flatten' | 'smooth' | 'paint' | 'foliage' | 'clear_foliage';
+
 export type TerrainTextureChannel = 0 | 1 | 2 | 3; // R: Grass, G: Rock, B: Dirt, A: Sand
+export type FoliageZoneChannel = 0 | 1 | 2 | 3 | 4; // 0: Grass, 1: Wheat, 2: Reeds, 3: Dry Grass, 4: Flowers
 
 export interface TerrainBrushState {
   active: boolean;
   tool: TerrainToolType;
   texture: TerrainTextureChannel;
+  foliageZone: FoliageZoneChannel;
   radius: number;
   strength: number;
 }

@@ -12,6 +12,14 @@ import { Radians } from '../utils';
 import { evaluateStat } from './stats/StatEvaluator';
 import { fastClone } from './utils/clone';
 
+import {
+  packBitsCompress,
+  packBitsDecompress,
+  uint8ArrayToBase64,
+  base64ToUint8Array,
+} from './utils/terrainCompression';
+import { TerrainComponent } from './components/terrain';
+
 export interface SerializedTerrainData {
   width?: number;
   depth?: number;
@@ -19,8 +27,12 @@ export interface SerializedTerrainData {
   resolution: number;
   splatResolution: number;
   textureTiling: number;
-  heights: number[];
-  splatData: number[];
+  heights?: number[];
+  splatData?: number[];
+  foliageData?: number[];
+  heightsRleBase64?: string;
+  splatRleBase64?: string;
+  foliageRleBase64?: string;
   heightsBase64?: string;
   splatBase64?: string;
 }
@@ -60,15 +72,25 @@ export class WorldSerializer {
         const componentValue = comp[key];
         if (componentValue !== undefined) {
           if (key === 'terrain') {
-            const t = componentValue as import('./components/terrain').TerrainComponent;
+            const t = componentValue as TerrainComponent;
+            const heightsBytes = new Uint8Array(
+              t.heights.buffer,
+              t.heights.byteOffset,
+              t.heights.byteLength
+            );
+            const heightsRle = packBitsCompress(heightsBytes);
+            const splatRle = packBitsCompress(t.splatData);
+            const foliageRle = packBitsCompress(t.foliageData);
+
             data.components[key] = {
               width: t.width,
               depth: t.depth,
               resolution: t.resolution,
               splatResolution: t.splatResolution || 512,
               textureTiling: t.textureTiling,
-              heights: Array.from(t.heights),
-              splatData: Array.from(t.splatData),
+              heightsRleBase64: uint8ArrayToBase64(heightsRle),
+              splatRleBase64: uint8ArrayToBase64(splatRle),
+              foliageRleBase64: uint8ArrayToBase64(foliageRle),
             };
           } else {
             (data.components as Record<string, unknown>)[key] = fastClone(componentValue);
@@ -192,52 +214,77 @@ export class WorldSerializer {
       for (const key of SERIALIZABLE_COMPONENT_KEYS) {
         if (comps[key] !== undefined) {
           if (key === 'terrain') {
-            const rawT = comps[key];
+            const rawT = comps[key] as SerializedTerrainData;
             const res = rawT.resolution || 128;
             const splatRes = rawT.splatResolution || 512;
             let heights: Float32Array;
             let splatData: Uint8Array;
+            let foliageData: Uint8Array;
 
-            if (rawT.heights && Array.isArray(rawT.heights)) {
-              heights = new Float32Array(rawT.heights);
+            // 1. Десериализация высот
+            if (rawT.heightsRleBase64) {
+              const comp = base64ToUint8Array(rawT.heightsRleBase64);
+              const decomp = packBitsDecompress(comp, res * res * 4);
+              heights = new Float32Array(
+                decomp.buffer.slice(decomp.byteOffset, decomp.byteOffset + res * res * 4)
+              );
             } else if (rawT.heightsBase64) {
-              const bin = atob(rawT.heightsBase64);
-              const bytes = new Uint8Array(bin.length);
-              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-              heights = new Float32Array(bytes.buffer);
+              const bytes = base64ToUint8Array(rawT.heightsBase64);
+              heights = new Float32Array(
+                bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + res * res * 4)
+              );
+            } else if (rawT.heights && Array.isArray(rawT.heights)) {
+              heights = new Float32Array(rawT.heights);
             } else {
               heights = new Float32Array(res * res);
             }
 
-            if (rawT.splatData && Array.isArray(rawT.splatData)) {
-              splatData = new Uint8Array(rawT.splatData);
+            // 2. Десериализация Splatmap
+            if (rawT.splatRleBase64) {
+              const comp = base64ToUint8Array(rawT.splatRleBase64);
+              splatData = packBitsDecompress(comp, splatRes * splatRes * 4);
             } else if (rawT.splatBase64) {
-              const bin = atob(rawT.splatBase64);
-              splatData = new Uint8Array(bin.length);
-              for (let i = 0; i < bin.length; i++) splatData[i] = bin.charCodeAt(i);
+              splatData = base64ToUint8Array(rawT.splatBase64);
+            } else if (rawT.splatData && Array.isArray(rawT.splatData)) {
+              splatData = new Uint8Array(rawT.splatData);
             } else {
               splatData = new Uint8Array(splatRes * splatRes * 4);
             }
 
-            // Проверка и авто-исправление размеров массивов при повреждениях
+            // 3. Десериализация Foliage Density Map
+            if (rawT.foliageRleBase64) {
+              const comp = base64ToUint8Array(rawT.foliageRleBase64);
+              foliageData = packBitsDecompress(comp, splatRes * splatRes * 5);
+            } else if (rawT.foliageData && Array.isArray(rawT.foliageData)) {
+              foliageData = new Uint8Array(rawT.foliageData);
+            } else {
+              foliageData = new Uint8Array(splatRes * splatRes * 5);
+              for (let i = 0; i < splatRes * splatRes; i++) {
+                foliageData[i * 5] = splatData[i * 4];
+              }
+            }
+
+            // Валидация размеров
             if (heights.length !== res * res) {
-              console.warn(
-                `[WorldSerializer] Исправление размера карты высот с ${heights.length} на ${res * res}`
-              );
-              const newHeights = new Float32Array(res * res);
-              newHeights.set(heights.subarray(0, Math.min(heights.length, res * res)));
-              heights = newHeights;
+              const fixed = new Float32Array(res * res);
+              fixed.set(heights.subarray(0, Math.min(heights.length, res * res)));
+              heights = fixed;
             }
 
             if (splatData.length !== splatRes * splatRes * 4) {
-              const newSplat = new Uint8Array(splatRes * splatRes * 4);
-              newSplat.set(
-                splatData.subarray(0, Math.min(splatData.length, splatRes * splatRes * 4))
-              );
-              splatData = newSplat;
+              const fixed = new Uint8Array(splatRes * splatRes * 4);
+              fixed.set(splatData.subarray(0, Math.min(splatData.length, splatRes * splatRes * 4)));
+              splatData = fixed;
             }
 
-            // Защита от NaN, которые могли вызвать панику в Rapier3D (unreachable)
+            if (foliageData.length !== splatRes * splatRes * 5) {
+              const fixed = new Uint8Array(splatRes * splatRes * 5);
+              fixed.set(
+                foliageData.subarray(0, Math.min(foliageData.length, splatRes * splatRes * 5))
+              );
+              foliageData = fixed;
+            }
+
             for (let i = 0; i < heights.length; i++) {
               if (Number.isNaN(heights[i]) || !Number.isFinite(heights[i])) {
                 heights[i] = 0;
@@ -251,11 +298,14 @@ export class WorldSerializer {
               splatResolution: splatRes,
               heights,
               splatData,
+              foliageData,
               textureTiling: rawT.textureTiling || 24,
               geometryVersion: 1,
               splatVersion: 1,
+              foliageVersion: 1,
               isGeometryDirty: true,
               isSplatDirty: true,
+              isFoliageDirty: true,
               isPhysicsDirty: true,
             });
           } else {

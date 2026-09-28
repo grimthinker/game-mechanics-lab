@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GRASS_CONFIG } from '../../config/grassConfig';
 
 export interface GrassMaterialUniforms {
   uTime: { value: number };
@@ -34,7 +35,8 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
     shader.uniforms.uWindSpeed = { value: 1.8 };
     shader.uniforms.uWindStrength = { value: 0.14 };
     shader.uniforms.uTrampleMap = { value: defaultTrampleTexture };
-    shader.uniforms.uTerrainSize = { value: new THREE.Vector2(100.0, 100.0) };
+    shader.uniforms.uTrampleCenter = { value: new THREE.Vector2(0, 0) };
+    shader.uniforms.uTrampleSize = { value: GRASS_CONFIG.trample.mapSize };
     shader.uniforms.uCameraPos = { value: new THREE.Vector3(0, 0, 0) };
     shader.uniforms.uFadeStart = { value: 35.0 };
     shader.uniforms.uFadeEnd = { value: 45.0 };
@@ -46,7 +48,8 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
       uniform float uWindSpeed;
       uniform float uWindStrength;
       uniform sampler2D uTrampleMap;
-      uniform vec2 uTerrainSize;
+      uniform vec2 uTrampleCenter;
+      uniform float uTrampleSize;
       uniform vec3 uCameraPos;
       uniform float uFadeStart;
       uniform float uFadeEnd;
@@ -71,9 +74,11 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
       // uv.y строго 0.0 у корня и 1.0 на кончике (корень всегда неподвижен)
       float hFactor = uv.y;
 
-      // 1. Считывание примятости и направления из Trample Texture
-      vec2 trampleUv = (instanceRoot.xz + uTerrainSize * 0.5) / uTerrainSize;
-      vec4 trampleSample = texture2D(uTrampleMap, trampleUv);
+      // 1. Считывание примятости и направления из следящей Trample Texture
+      vec2 trampleUv = (instanceRoot.xz - uTrampleCenter) / uTrampleSize + 0.5;
+      vec4 trampleSample = (trampleUv.x >= 0.0 && trampleUv.x <= 1.0 && trampleUv.y >= 0.0 && trampleUv.y <= 1.0)
+        ? texture2D(uTrampleMap, trampleUv)
+        : vec4(0.0, 0.5, 0.5, 1.0);
 
       float maxTrampleFactor = trampleSample.r;
       vec2 decodedDir = trampleSample.gb * 2.0 - 1.0;

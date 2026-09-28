@@ -3,10 +3,13 @@ import { GameApp } from '../../GameApp';
 import { TerrainToolType, TerrainTextureChannel } from '../../types';
 import { t } from '../../locales';
 
+import { FoliageZoneChannel } from '../../types';
+
 export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
   const [active, setActive] = useState(false);
   const [tool, setTool] = useState<TerrainToolType>('raise');
   const [texture, setTexture] = useState<TerrainTextureChannel>(0);
+  const [foliageZone, setFoliageZone] = useState<FoliageZoneChannel>(0);
   const [radius, setRadius] = useState(() => {
     const saved = localStorage.getItem('terrain_brush_radius');
     return saved !== null ? Number(saved) : 3.0;
@@ -28,14 +31,14 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
   useEffect(() => {
     if (!app) return;
 
-    app.terrainBrush = { active, tool, texture, radius, strength };
+    app.terrainBrush = { active, tool, texture, foliageZone, radius, strength };
 
     // Если активирован режим кисти — сбрасываем выделение объектов, чтобы клик рисовал, а не выделял
     if (active) {
       app.selection.clear();
       app.gizmo.cancelDrag();
     }
-  }, [app, active, tool, texture, radius, strength]);
+  }, [app, active, tool, texture, foliageZone, radius, strength]);
 
   // Выключение режима при закрытии вкладки или размонтировании
   useEffect(() => {
@@ -50,6 +53,8 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     { id: 'flatten', icon: '📏', label: t('terrain.tool_flatten') },
     { id: 'smooth', icon: '🌊', label: t('terrain.tool_smooth') },
     { id: 'paint', icon: '🎨', label: t('terrain.tool_paint') },
+    { id: 'foliage', icon: '🌱', label: 'Посадка трав' },
+    { id: 'clear_foliage', icon: '🧹', label: 'Очистка трав' },
   ];
 
   const textures: { id: TerrainTextureChannel; color: string; label: string }[] = [
@@ -57,6 +62,14 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     { id: 1, color: '#95a5a6', label: t('terrain.tex_rock') },
     { id: 2, color: '#8d6e63', label: t('terrain.tex_dirt') },
     { id: 3, color: '#f4a460', label: t('terrain.tex_sand') },
+  ];
+
+  const foliageZones: { id: FoliageZoneChannel; icon: string; label: string; color: string }[] = [
+    { id: 0, icon: '🌿', label: 'Трава', color: '#2ecc71' },
+    { id: 1, icon: '🌾', label: 'Пшеница', color: '#f1c40f' },
+    { id: 2, icon: '🎋', label: 'Камыш', color: '#795548' },
+    { id: 3, icon: '🍂', label: 'Сухая трава', color: '#d4ac0d' },
+    { id: 4, icon: '🌸', label: 'Цветы', color: '#e74c3c' },
   ];
 
   return (
@@ -140,7 +153,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
         </div>
       </div>
 
-      {/* Выбор текстуры (только если выбран инструмент "Покраска") */}
+      {/* Выбор текстуры грунта */}
       {tool === 'paint' && (
         <div style={{ opacity: active ? 1 : 0.5, pointerEvents: active ? 'auto' : 'none' }}>
           <div
@@ -181,6 +194,47 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
                   }}
                 />
                 <span>{tex.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Выбор зоны растительности (Посадка / Очистка) */}
+      {(tool === 'foliage' || tool === 'clear_foliage') && (
+        <div style={{ opacity: active ? 1 : 0.5, pointerEvents: active ? 'auto' : 'none' }}>
+          <div
+            style={{
+              fontSize: '11px',
+              color: '#bdc3c7',
+              marginBottom: '8px',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+            }}
+          >
+            Зоны растительности (Foliage Map):
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+            {foliageZones.map((fz) => (
+              <button
+                key={fz.id}
+                onClick={() => setFoliageZone(fz.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px',
+                  backgroundColor: foliageZone === fz.id ? '#252525' : '#1a1a1a',
+                  color: '#fff',
+                  border: foliageZone === fz.id ? `2px solid ${fz.color}` : '1px solid #333',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: foliageZone === fz.id ? 'bold' : 'normal',
+                }}
+              >
+                <span style={{ fontSize: '15px' }}>{fz.icon}</span>
+                <span>{fz.label}</span>
               </button>
             ))}
           </div>

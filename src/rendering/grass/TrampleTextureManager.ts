@@ -12,6 +12,11 @@ export interface TrampleStamp {
 
 export class TrampleTextureManager {
   public readonly resolution: number;
+  public readonly mapSize: number;
+  public center = new THREE.Vector2(0, 0);
+  private lastCenter = new THREE.Vector2(0, 0);
+  private isFirstFrame: boolean = true;
+
   private readTarget: THREE.WebGLRenderTarget;
   private writeTarget: THREE.WebGLRenderTarget;
   private simScene: THREE.Scene;
@@ -29,8 +34,12 @@ export class TrampleTextureManager {
   /** Приоритет вектора движения над боковым расталкиванием */
   public motionBias: number = GRASS_CONFIG.trample.motionBias;
 
-  constructor(resolution: number = 256) {
+  constructor(
+    resolution: number = GRASS_CONFIG.trample.resolution,
+    mapSize: number = GRASS_CONFIG.trample.mapSize
+  ) {
     this.resolution = resolution;
+    this.mapSize = mapSize;
 
     const options: THREE.RenderTargetOptions = {
       minFilter: THREE.LinearFilter,
@@ -55,6 +64,7 @@ export class TrampleTextureManager {
     this.simMaterial = new THREE.ShaderMaterial({
       uniforms: {
         tPrev: { value: null },
+        uOffset: { value: new THREE.Vector2(0, 0) },
         uDeltaTime: { value: 0.016 },
         uRecoverySpeed: { value: this.recoverySpeed },
         uBendSpeed: { value: this.bendSpeed },
@@ -72,6 +82,7 @@ export class TrampleTextureManager {
       `,
       fragmentShader: `
         uniform sampler2D tPrev;
+        uniform vec2 uOffset;
         uniform float uDeltaTime;
         uniform float uRecoverySpeed;
         uniform float uBendSpeed;
@@ -83,7 +94,12 @@ export class TrampleTextureManager {
         varying vec2 vUv;
 
         void main() {
-          vec4 prev = texture2D(tPrev, vUv);
+          // Смещение текстуры истории при движении камеры
+          vec2 prevUv = vUv + uOffset;
+          vec4 prev = (prevUv.x >= 0.0 && prevUv.x <= 1.0 && prevUv.y >= 0.0 && prevUv.y <= 1.0)
+            ? texture2D(tPrev, prevUv)
+            : vec4(0.0, 0.5, 0.5, 1.0);
+
           float prevTrample = prev.r;
           vec2 prevDir = prev.gb * 2.0 - 1.0;
           float prevDirLen = length(prevDir);
@@ -193,9 +209,26 @@ export class TrampleTextureManager {
     renderer: THREE.WebGLRenderer,
     dt: number,
     stamps: TrampleStamp[],
-    terrainWidth: number,
-    terrainDepth: number
+    camX: number,
+    camZ: number
   ): void {
+    // Привязываем центр окна к дискретной сетке текселей для предотвращения размытия при скроллинге
+    const texelSize = this.mapSize / this.resolution;
+    const snappedX = Math.floor(camX / texelSize) * texelSize;
+    const snappedZ = Math.floor(camZ / texelSize) * texelSize;
+
+    if (this.isFirstFrame) {
+      this.lastCenter.set(snappedX, snappedZ);
+      this.isFirstFrame = false;
+    }
+
+    const offsetX = (snappedX - this.lastCenter.x) / this.mapSize;
+    const offsetZ = (snappedZ - this.lastCenter.y) / this.mapSize;
+    this.simMaterial.uniforms.uOffset.value.set(offsetX, offsetZ);
+
+    this.center.set(snappedX, snappedZ);
+    this.lastCenter.set(snappedX, snappedZ);
+
     this.simMaterial.uniforms.uDeltaTime.value = dt;
     this.simMaterial.uniforms.uRecoverySpeed.value = this.recoverySpeed;
     this.simMaterial.uniforms.uBendSpeed.value = this.bendSpeed;
@@ -203,19 +236,22 @@ export class TrampleTextureManager {
     this.simMaterial.uniforms.tPrev.value = this.readTarget.texture;
 
     const count = Math.min(32, stamps.length);
-    const halfW = terrainWidth * 0.5;
-    const halfD = terrainDepth * 0.5;
 
     for (let i = 0; i < 32; i++) {
       if (i < count) {
         const s = stamps[i];
-        const uvX = (s.x + halfW) / terrainWidth;
-        const uvY = (s.z + halfD) / terrainDepth;
-        // Упрощенно берем средний радиус по большей стороне
-        const maxDim = Math.max(terrainWidth, terrainDepth);
-        const uvRadius = s.radius / maxDim;
-        this.stampsUniform[i].set(uvX, uvY, uvRadius, s.strength);
-        this.dirsUniform[i].set(s.dirX, s.dirZ);
+        // Перевод позиции штампа в UV координаты локального окна 96x96 м
+        const uvX = (s.x - snappedX) / this.mapSize + 0.5;
+        const uvY = (s.z - snappedZ) / this.mapSize + 0.5;
+        const uvRadius = s.radius / this.mapSize;
+
+        if (uvX >= -0.2 && uvX <= 1.2 && uvY >= -0.2 && uvY <= 1.2) {
+          this.stampsUniform[i].set(uvX, uvY, uvRadius, s.strength);
+          this.dirsUniform[i].set(s.dirX, s.dirZ);
+        } else {
+          this.stampsUniform[i].set(0, 0, 0, 0);
+          this.dirsUniform[i].set(0, 0);
+        }
       } else {
         this.stampsUniform[i].set(0, 0, 0, 0);
         this.dirsUniform[i].set(0, 0);

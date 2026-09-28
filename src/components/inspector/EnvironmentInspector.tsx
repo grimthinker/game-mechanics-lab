@@ -25,7 +25,7 @@ export const EnvironmentInspector: React.FC<EnvironmentInspectorProps> = ({
   const [dayDuration, setDayDuration] = useState(env ? env.dayDuration : 600);
   const [azimuthDeg, setAzimuthDeg] = useState(env ? Math.round(rad2Deg(env.azimuth)) : 0);
   const [tiltDeg, setTiltDeg] = useState(env ? Math.round(rad2Deg(env.axialTilt)) : 23);
-  const [fogDensity, setFogDensity] = useState(env ? env.fogDensity : 0.007);
+  const [fogDensity, setFogDensity] = useState(env ? env.fogDensity : 0.0012);
 
   useEffect(() => {
     const comp = world.getComponent(targetId, 'environment');
@@ -213,9 +213,9 @@ export const EnvironmentInspector: React.FC<EnvironmentInspectorProps> = ({
         <input
           disabled={isReadOnly}
           type="range"
-          min="0.001"
-          max="0.03"
-          step="0.001"
+          min="0.0005"
+          max="0.0050"
+          step="0.0001"
           value={fogDensity}
           onChange={(e) =>
             handleUpdate({ fogDensity: parseFloat(e.target.value) }, t('history.environmentChange'))
