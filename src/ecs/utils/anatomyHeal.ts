@@ -1,6 +1,6 @@
 import { World } from '../World';
 import { EntityId, ConsciousnessState } from '../types';
-import { getAnatomyParts } from './hierarchy';
+import { getAnatomyParts, invalidateAnatomyCache } from './hierarchy';
 import { findActiveBrain } from './anatomy';
 import { evaluateConsciousness } from './anatomyStatus';
 
@@ -75,4 +75,6 @@ export function applyAnatomyHeal(
       if (b) b.isActive = true;
     }
   }
+
+  invalidateAnatomyCache(targetId);
 }

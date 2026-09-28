@@ -11,8 +11,8 @@ import {
   InteractionSlot,
 } from '../types';
 import { traverseAnatomyGraph, findActiveBrain } from './anatomy';
-
 import { getPartStatus, PartStatus } from './anatomyStatus';
+import { EventBus } from '../../core/EventBus';
 
 export interface AggregatedSlot {
   partId: EntityId;
@@ -22,25 +22,64 @@ export interface AggregatedSlot {
   isBroken: boolean;
 }
 
+interface AnatomyCacheEntry {
+  parts?: EntityId[];
+  slots?: AggregatedSlot[];
+}
+
+const anatomyCache = new Map<string, AnatomyCacheEntry>();
+
+export function invalidateAnatomyCache(targetId?: string): void {
+  if (targetId) {
+    anatomyCache.delete(targetId);
+  } else {
+    anatomyCache.clear();
+  }
+}
+
+// Автоматический сброс кэша при обновлении инвентаря или сущностей мира
+EventBus.on('inventory:updated', () => invalidateAnatomyCache());
+EventBus.on('world:updated', () => invalidateAnatomyCache());
+
 /**
  * Возвращает все части тела, привязанные к абстрактному корню существа (или саму часть, если это предмет)
  */
 export function getAnatomyParts(world: World, rootEntityId: EntityId): EntityId[] {
+  const cached = anatomyCache.get(rootEntityId);
+  if (cached?.parts) {
+    return cached.parts;
+  }
+
+  let parts: EntityId[];
   if (world.getComponent(rootEntityId, 'socketDef')) {
-    return traverseAnatomyGraph(world, rootEntityId).sort();
-  }
-  const assembly = world.getComponent(rootEntityId, 'assemblyRoot');
-  if (assembly) {
-    return traverseAnatomyGraph(world, assembly.rootPartId).sort();
-  }
-  const brains = world.getEntitiesWith('bodyBrain');
-  for (const [partId, { bodyBrain }] of brains) {
-    if (bodyBrain.rootEntityId === rootEntityId) {
-      return traverseAnatomyGraph(world, partId).sort();
+    parts = traverseAnatomyGraph(world, rootEntityId).sort();
+  } else {
+    const assembly = world.getComponent(rootEntityId, 'assemblyRoot');
+    if (assembly) {
+      parts = traverseAnatomyGraph(world, assembly.rootPartId).sort();
+    } else {
+      const brains = world.getEntitiesWith('bodyBrain');
+      let foundParts: EntityId[] | null = null;
+      for (const [partId, { bodyBrain }] of brains) {
+        if (bodyBrain.rootEntityId === rootEntityId) {
+          foundParts = traverseAnatomyGraph(world, partId).sort();
+          break;
+        }
+      }
+      parts = foundParts ?? [rootEntityId];
     }
   }
-  return [rootEntityId];
+
+  const entry = anatomyCache.get(rootEntityId);
+  if (entry) {
+    entry.parts = parts;
+  } else {
+    anatomyCache.set(rootEntityId, { parts });
+  }
+
+  return parts;
 }
+
 /**
  * Собирает слоты взаимодействия (руки) со всех частей тела в единый плоский массив
  */
@@ -48,6 +87,11 @@ export function getAggregatedInteractionSlots(
   world: World,
   rootEntityId: EntityId
 ): AggregatedSlot[] {
+  const cached = anatomyCache.get(rootEntityId);
+  if (cached?.slots) {
+    return cached.slots;
+  }
+
   const parts = getAnatomyParts(world, rootEntityId);
   const result: AggregatedSlot[] = [];
   let globalIdx = 0;
@@ -68,6 +112,14 @@ export function getAggregatedInteractionSlots(
       });
     }
   }
+
+  const entry = anatomyCache.get(rootEntityId);
+  if (entry) {
+    entry.slots = result;
+  } else {
+    anatomyCache.set(rootEntityId, { parts, slots: result });
+  }
+
   return result;
 }
 

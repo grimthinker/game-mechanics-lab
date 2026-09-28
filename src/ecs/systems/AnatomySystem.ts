@@ -19,6 +19,7 @@ import { evaluateConsciousness, getLocomotionState, getSensoryStats } from '../u
 import { ConsciousnessState } from '../types';
 import { CREATURE_RIG_PROFILES } from '../../rendering/rigProfiles';
 import { BodyStructureType } from '../templates';
+import { invalidateAnatomyCache } from '../utils/hierarchy';
 
 export class AnatomySystem {
   public update(_dt: number, world: World, physics: PhysicsSystem): void {
@@ -190,6 +191,15 @@ export class AnatomySystem {
           partName,
         });
       }
+    }
+
+    const hasTopologyChanges =
+      existingCreatureRoots.length !== claimedCreatureRootIds.size ||
+      viablePlans.some((p) => p.isNewRoot) ||
+      itemPlans.length > 0;
+
+    if (hasTopologyChanges) {
+      invalidateAnatomyCache();
     }
 
     for (const [rootId] of existingCreatureRoots) {

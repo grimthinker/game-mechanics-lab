@@ -1,7 +1,7 @@
 import { World } from '../World';
 import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { EntityId, CollisionCategory, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
-import { getAnatomyParts, getRootOwner } from './hierarchy';
+import { getAnatomyParts, getRootOwner, invalidateAnatomyCache } from './hierarchy';
 import { findActiveBrain } from './anatomy';
 import { getPartArmor, getConnectionArmor, selectDamageTarget } from './combat';
 import { DeathService } from '../services/DeathService';
@@ -63,6 +63,7 @@ export function destroyPartRecursive(world: World, physics: PhysicsSystem, partI
 
   // 2. Удаляем саму сущность части тела
   world.removeEntity(partId);
+  invalidateAnatomyCache();
 }
 
 export function applyDamageToPart(
@@ -94,6 +95,8 @@ export function applyDamageToPart(
     fp.current = nextFp;
     fp.isFunctional = fp.current >= 0;
   }
+
+  invalidateAnatomyCache();
 
   // При полном разрушении руки (ФП <= -max) сбрасываем удерживаемый предмет и прерываем атаку
   if (fp.current <= -fp.max.current) {
@@ -198,6 +201,7 @@ export function applyDamageToConnection(
     // Разрыв соединения: удаляем линк из обеих частей
     delete world.getComponent(partA, 'socketLink')?.links[socketIdA];
     delete world.getComponent(partB, 'socketLink')?.links[socketIdB];
+    invalidateAnatomyCache();
 
     if (overflow > 0) {
       // Перелив на одну из двух соединенных частей пропорционально их размеру

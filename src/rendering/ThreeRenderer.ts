@@ -17,6 +17,17 @@ import { IModelPreview } from './IModelPreview';
 import { ThreeModelPreview } from './ThreeModelPreview';
 import { TERRAIN_CONFIG } from '../config/terrainConfig';
 
+const DASH_THROW_TRAJECTORY = [5, 5];
+const DASH_EMPTY: number[] = [];
+
+const DEFAULT_ENV_FALLBACK = {
+  timeOfDay: 12.0,
+  dayDuration: 600,
+  azimuth: 0,
+  axialTilt: 0.41,
+  fogDensity: 0.0012,
+};
+
 export class ThreeRenderer implements IRenderer {
   private container: HTMLDivElement;
   private canvas: HTMLCanvasElement;
@@ -35,6 +46,7 @@ export class ThreeRenderer implements IRenderer {
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private intersectionPoint = new THREE.Vector3();
   private mouseNDC = new THREE.Vector2();
+  private _pickableObjects: THREE.Object3D[] = [];
 
   // --- Временные векторы для оптимизации (Scratch vectors) ---
   private _tempV1 = new THREE.Vector3();
@@ -199,7 +211,7 @@ export class ThreeRenderer implements IRenderer {
     this.raycaster.setFromCamera(this.mouseNDC, this.camera);
 
     // Исключаем купол неба, террейн, траву, сетку и служебные объекты ДО вызова трассировки на CPU
-    const pickableObjects: THREE.Object3D[] = [];
+    this._pickableObjects.length = 0;
     for (let i = 0; i < this.scene.children.length; i++) {
       const child = this.scene.children[i];
       if (
@@ -215,17 +227,22 @@ export class ThreeRenderer implements IRenderer {
       ) {
         continue;
       }
-      // Если это группа террейна с дочерним тяжелым мешем или юбкой
-      if (
-        child.children &&
-        child.children.some((c) => c.userData.isTerrainMesh || c.userData.isTerrainSkirt)
-      ) {
-        continue;
+      // Если это группа террейна с дочерним тяжелым мешем или юбкой (проверка без замыканий)
+      if (child.children && child.children.length > 0) {
+        let isTerrainGroup = false;
+        for (let j = 0; j < child.children.length; j++) {
+          const cData = child.children[j].userData;
+          if (cData.isTerrainMesh || cData.isTerrainSkirt) {
+            isTerrainGroup = true;
+            break;
+          }
+        }
+        if (isTerrainGroup) continue;
       }
-      pickableObjects.push(child);
+      this._pickableObjects.push(child);
     }
 
-    const intersects = this.raycaster.intersectObjects(pickableObjects, true);
+    const intersects = this.raycaster.intersectObjects(this._pickableObjects, true);
 
     for (const hit of intersects) {
       if (hit.object.userData.isSelectionOutline || hit.object.userData.isTerrainSkirt) {
@@ -307,9 +324,13 @@ export class ThreeRenderer implements IRenderer {
       context.editorData.gizmoTool &&
       context.editorData.gizmoTool !== 'select'
     ) {
-      const mesh = this.scene.children.find(
-        (c) => c.userData.entityId === context.editorData.selectedId
-      );
+      let mesh: THREE.Object3D | undefined;
+      for (let i = 0; i < this.scene.children.length; i++) {
+        if (this.scene.children[i].userData.entityId === context.editorData.selectedId) {
+          mesh = this.scene.children[i];
+          break;
+        }
+      }
       const isOwned = !!context.world.getComponent(context.editorData.selectedId, 'ownership');
 
       if (mesh && !isOwned) {
@@ -361,16 +382,7 @@ export class ThreeRenderer implements IRenderer {
 
     // Синхронизация небесного купола, положения светил, теней и тумана
     const envEntities = context.world.getEntitiesWith('environment');
-    const env =
-      envEntities.length > 0
-        ? envEntities[0][1].environment
-        : {
-            timeOfDay: 12.0,
-            dayDuration: 600,
-            azimuth: 0,
-            axialTilt: 0.41,
-            fogDensity: 0.0012,
-          };
+    const env = envEntities.length > 0 ? envEntities[0][1].environment : DEFAULT_ENV_FALLBACK;
 
     this.environmentManager.update(
       this.scene,
@@ -430,7 +442,7 @@ export class ThreeRenderer implements IRenderer {
         currY,
         currZ,
         'rgba(231, 76, 60, 0.8)',
-        [5, 5],
+        DASH_THROW_TRAJECTORY,
         2
       );
 
@@ -441,7 +453,7 @@ export class ThreeRenderer implements IRenderer {
       if (currY < 0) break; // Упрощенное пересечение с нулевым полом
     }
 
-    this.drawProjectedCircle(prevX, prevY, prevZ, 0.4, '#e74c3c', [], 'Прицел', 0, 16);
+    this.drawProjectedCircle(prevX, prevY, prevZ, 0.4, '#e74c3c', DASH_EMPTY, 'Прицел', 0, 16);
   }
 
   private renderScreenMarqueeBox(box: { start: Point; current: Point }): void {
@@ -947,7 +959,7 @@ export class ThreeRenderer implements IRenderer {
 
     this.uiCtx.strokeStyle = borderColor;
     this.uiCtx.lineWidth = 1;
-    this.uiCtx.setLineDash([]);
+    this.uiCtx.setLineDash(DASH_EMPTY);
     this.uiCtx.strokeRect(boxX, boxY, boxW, boxH);
 
     this.uiCtx.fillStyle = textColor;
