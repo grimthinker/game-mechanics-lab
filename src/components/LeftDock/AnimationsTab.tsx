@@ -204,7 +204,8 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, select
             const isPlaying = activeAnim === animName;
 
             let badgeColor = '#555';
-            if (animName.startsWith('attack')) badgeColor = '#e74c3c';
+            if (animName.startsWith('swim')) badgeColor = '#00bcd4';
+            else if (animName.startsWith('attack')) badgeColor = '#e74c3c';
             else if (animName.startsWith('pickup')) badgeColor = '#27ae60';
             else if (animName.startsWith('drop_item') || animName.startsWith('throw'))
               badgeColor = '#e67e22';

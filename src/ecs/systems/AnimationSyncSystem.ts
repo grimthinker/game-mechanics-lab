@@ -49,7 +49,9 @@ export class AnimationSyncSystem {
           ? 'crouch'
           : stance.includes('prone')
             ? 'prone'
-            : 'stand';
+            : stance.includes('swim')
+              ? 'swim'
+              : 'stand';
 
         const suffix =
           moveMode === 'sprinting'

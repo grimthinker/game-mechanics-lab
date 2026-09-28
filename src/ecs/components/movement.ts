@@ -11,7 +11,8 @@ export type TransitionCreatureStance =
   | 'stand_to_prone'
   | 'prone_to_stand';
 
-export type CreatureStance = BaseCreatureStance | TransitionCreatureStance | 'airborne' | 'sliding';
+export type CreatureStance =
+  BaseCreatureStance | TransitionCreatureStance | 'airborne' | 'sliding' | 'swim';
 
 export interface StanceTransitionComponent {
   fromStance: BaseCreatureStance;

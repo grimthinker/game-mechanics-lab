@@ -278,7 +278,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
         .build(name, durationIdle);
     };
 
-    // 1. Циклы локомоции
+    // 1. Циклы локомоции на суше
     const joggingClip = createWalkCycleClip('stand_jog', 0.5, 0.7, 0.07, 0);
     const walkClip = createWalkCycleClip('stand_walk', 0.8, 0.4, 0.02, 0);
     const sprintClip = createWalkCycleClip('stand_sprint', 0.35, 1.1, 0.03, 0);
@@ -289,7 +289,183 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     const crouchJoggingClip = createWalkCycleClip('crouch_jog', 0.5, 0.7, 0.02, 0.45);
     const crouchSprintingClip = createWalkCycleClip('crouch_sprint', 0.35, 1.0, 0.03, 0.65);
 
-    // 2. Подбор предметов (Левая рука + автозеркалирование на правую)
+    // ==========================================
+    // 2. АНИМАЦИИ ПЛАВАНИЯ (SWIMMING)
+    // ==========================================
+
+    // 2.1. Удержание на воде на месте (Treading water)
+    const swimIdleDuration = 2.0;
+    const swimIdleFrames = fps * swimIdleDuration;
+    const siTimes: number[] = [];
+    const siTorsoP: number[] = [];
+    const siTorsoQ: number[] = [];
+    const siHeadQ: number[] = [];
+    const siLArmQ: number[] = [];
+    const siRArmQ: number[] = [];
+    const siLLegP: number[] = [];
+    const siRLegP: number[] = [];
+    const siLLegQ: number[] = [];
+    const siRLegQ: number[] = [];
+
+    for (let i = 0; i <= swimIdleFrames; i++) {
+      const time = (i / swimIdleFrames) * swimIdleDuration;
+      siTimes.push(time);
+      const cycle = (i / swimIdleFrames) * Math.PI * 2;
+      const bob = Math.sin(cycle) * 0.035;
+
+      // Полувертикальный наклон корпуса в воде (~25 градусов)
+      siTorsoP.push(0, 0.75 + bob, 0.1);
+      siTorsoQ.push(...getQuat(0.45, 0, Math.sin(cycle) * 0.04));
+      siHeadQ.push(...getQuat(-0.45, 0, 0));
+
+      // Загребающие движения руками у груди (Sculling)
+      const armWave = Math.sin(cycle * 2) * 0.15;
+      siLArmQ.push(...getQuat(-0.6 + armWave, 0.35, -0.35));
+      siRArmQ.push(...getQuat(-0.6 + armWave, -0.35, 0.35));
+
+      // Ножницеобразные толчки ногами (Eggbeater / Scissor kick)
+      const legKick = Math.sin(cycle * 2) * 0.3;
+      siLLegP.push(0.15, 0.45, 0);
+      siRLegP.push(-0.15, 0.45, 0);
+      siLLegQ.push(...getQuat(0.45 + legKick, 0, 0.1));
+      siRLegQ.push(...getQuat(0.45 - legKick, 0, -0.1));
+    }
+
+    const swimIdleClip = new AnimationTrackBuilder()
+      .addPosTrack('Torso', siTimes, siTorsoP)
+      .addQuatTrack('Torso', siTimes, siTorsoQ)
+      .addQuatTrack('HeadPivot', siTimes, siHeadQ)
+      .addQuatTrack('LeftArmPivot', siTimes, siLArmQ)
+      .addQuatTrack('RightArmPivot', siTimes, siRArmQ)
+      .addPosTrack('LeftLegPivot', siTimes, siLLegP)
+      .addPosTrack('RightLegPivot', siTimes, siRLegP)
+      .addQuatTrack('LeftLegPivot', siTimes, siLLegQ)
+      .addQuatTrack('RightLegPivot', siTimes, siRLegQ)
+      .build('swim_idle', swimIdleDuration);
+
+    // 2.2. Медленное плавание брассом (Breaststroke)
+    const swimWalkDuration = 1.3;
+    const swimWalkFrames = fps * swimWalkDuration;
+    const swTimes: number[] = [];
+    const swTorsoP: number[] = [];
+    const swTorsoQ: number[] = [];
+    const swHeadQ: number[] = [];
+    const swLArmQ: number[] = [];
+    const swRArmQ: number[] = [];
+    const swLLegP: number[] = [];
+    const swRLegP: number[] = [];
+    const swLLegQ: number[] = [];
+    const swRLegQ: number[] = [];
+
+    for (let i = 0; i <= swimWalkFrames; i++) {
+      const time = (i / swimWalkFrames) * swimWalkDuration;
+      swTimes.push(time);
+      const cycle = (i / swimWalkFrames) * Math.PI * 2;
+
+      // Горизонтальное положение тела в скольжении брассом (~65 градусов наклона)
+      const surge = Math.sin(cycle) * 0.04;
+      swTorsoP.push(0, 0.58 + surge, 0.2);
+      swTorsoQ.push(...getQuat(1.15, 0, 0));
+      swHeadQ.push(...getQuat(-0.9, 0, 0));
+
+      // Гребок брассом: вытягивание вперед -> широкий развод в стороны -> подтягивание к груди
+      const armSweep = Math.sin(cycle);
+      const armPitch = -1.5 + Math.cos(cycle) * 0.7;
+      swLArmQ.push(...getQuat(armPitch, 0.2 + armSweep * 0.35, -0.3));
+      swRArmQ.push(...getQuat(armPitch, -0.2 - armSweep * 0.35, 0.3));
+
+      // Толчок ногами «лягушкой»
+      const legKick = Math.max(0, Math.sin(cycle));
+      swLLegP.push(0.15, 0.48, 0);
+      swRLegP.push(-0.15, 0.48, 0);
+      swLLegQ.push(...getQuat(1.2 - legKick * 0.7, 0, 0.15 + legKick * 0.25));
+      swRLegQ.push(...getQuat(1.2 - legKick * 0.7, 0, -0.15 - legKick * 0.25));
+    }
+
+    const swimWalkClip = new AnimationTrackBuilder()
+      .addPosTrack('Torso', swTimes, swTorsoP)
+      .addQuatTrack('Torso', swTimes, swTorsoQ)
+      .addQuatTrack('HeadPivot', swTimes, swHeadQ)
+      .addQuatTrack('LeftArmPivot', swTimes, swLArmQ)
+      .addQuatTrack('RightArmPivot', swTimes, swRArmQ)
+      .addPosTrack('LeftLegPivot', swTimes, swLLegP)
+      .addPosTrack('RightLegPivot', swTimes, swRLegP)
+      .addQuatTrack('LeftLegPivot', swTimes, swLLegQ)
+      .addQuatTrack('RightLegPivot', swTimes, swRLegQ)
+      .build('swim_walk', swimWalkDuration);
+
+    // 2.3. Кролевое плавание (Стандартный кроль и Силовой спринт)
+    const createFreestyleClip = (
+      name: string,
+      duration: number,
+      rollAmount: number,
+      kickAmp: number
+    ) => {
+      const frames = Math.max(2, Math.round(fps * duration));
+      const times: number[] = [];
+      const torsoP: number[] = [];
+      const torsoQ: number[] = [];
+      const headQ: number[] = [];
+      const lArmQ: number[] = [];
+      const rArmQ: number[] = [];
+      const lLegP: number[] = [];
+      const rLegP: number[] = [];
+      const lLegQ: number[] = [];
+      const rLegQ: number[] = [];
+
+      for (let i = 0; i <= frames; i++) {
+        const progress = i / frames;
+        const time = progress * duration;
+        times.push(time);
+        const cycle = progress * Math.PI * 2;
+
+        // Почти полностью горизонтальное положение тела (~80 градусов)
+        const roll = Math.sin(cycle) * rollAmount;
+        torsoP.push(0, 0.62, 0.25);
+        torsoQ.push(...getQuat(1.4, 0, roll));
+        torsoQ.push(...getQuat(1.4, 0, roll));
+        headQ.push(...getQuat(-1.2, -roll * 0.5, 0));
+
+        // Попеременный круговой пронос рук над водой и гребок под водой
+        const phaseL = cycle;
+        const phaseR = cycle + Math.PI;
+
+        const armPitchL = -1.2 + Math.cos(phaseL) * 1.1;
+        const armYawL = 0.15 + Math.sin(phaseL) * 0.25;
+        const armRollL = -0.15 + Math.sin(phaseL) * 0.45;
+
+        const armPitchR = -1.2 + Math.cos(phaseR) * 1.1;
+        const armYawR = -0.15 - Math.sin(phaseR) * 0.25;
+        const armRollR = 0.15 - Math.sin(phaseR) * 0.45;
+
+        lArmQ.push(...getQuat(armPitchL, armYawL, armRollL));
+        rArmQ.push(...getQuat(armPitchR, armYawR, armRollR));
+
+        // Шестиударный кролевый мах ногами
+        const legFlutter = Math.sin(cycle * 6) * kickAmp;
+        lLegP.push(0.15, 0.52, 0);
+        rLegP.push(-0.15, 0.52, 0);
+        lLegQ.push(...getQuat(1.4 + legFlutter, 0, 0.08));
+        rLegQ.push(...getQuat(1.4 - legFlutter, 0, -0.08));
+      }
+
+      return new AnimationTrackBuilder()
+        .addPosTrack('Torso', times, torsoP)
+        .addQuatTrack('Torso', times, torsoQ)
+        .addQuatTrack('HeadPivot', times, headQ)
+        .addQuatTrack('LeftArmPivot', times, lArmQ)
+        .addQuatTrack('RightArmPivot', times, rArmQ)
+        .addPosTrack('LeftLegPivot', times, lLegP)
+        .addPosTrack('RightLegPivot', times, rLegP)
+        .addQuatTrack('LeftLegPivot', times, lLegQ)
+        .addQuatTrack('RightLegPivot', times, rLegQ)
+        .build(name, duration);
+    };
+
+    const swimJogClip = createFreestyleClip('swim_jog', 0.9, 0.2, 0.22);
+    const swimSprintClip = createFreestyleClip('swim_sprint', 0.6, 0.28, 0.32);
+
+    // 3. Подбор предметов (Левая рука + автозеркалирование на правую)
     const pickupTimes = [0.0, 0.16, 0.32, 0.44, 0.58, 0.75];
     const pickupTiltDeep = 0.7;
     const pickupTiltPre = 0.35;
@@ -358,7 +534,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
 
     const pickupRightClip = AnimationTrackBuilder.mirrorClip(pickupLeftClip, 'pickup_right_hand');
 
-    // 3. Сброс предметов под ноги (Левая рука + автозеркалирование)
+    // 4. Сброс предметов под ноги (Левая рука + автозеркалирование)
     const dropItemTimes = [0.0, 0.1, 0.2, 0.32, 0.45];
     const dropItemTinyHop = 0.025;
     const dropItemTorsoP = [
@@ -452,7 +628,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       'drop_item_right_hand'
     );
 
-    // 4. Бросок предметов (Левая рука + автозеркалирование)
+    // 5. Бросок предметов (Левая рука + автозеркалирование)
     const throwItemTimes = [0.0, 0.14, 0.26, 0.38, 0.55];
     const throwItemTorsoP = [0, 1.1, 0, 0, 1.09, -0.02, 0, 1.13, 0.03, 0, 1.11, 0.01, 0, 1.1, 0];
 
@@ -505,7 +681,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       'throw_item_right_hand'
     );
 
-    // 5. Атака оружием (Левая рука + автозеркалирование)
+    // 6. Атака оружием (Левая рука + автозеркалирование)
     const attackTimes = [0.0, 0.08, 0.18, 0.28, 0.4];
     const attackLeftClip = new AnimationTrackBuilder()
       .addPosTrack(
@@ -549,7 +725,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
 
     const attackRightClip = AnimationTrackBuilder.mirrorClip(attackLeftClip, 'attack_right_hand');
 
-    // 6. Хранение и извлечение из инвентаря
+    // 7. Хранение и извлечение из инвентаря
     const storeTimes = [0.0, 0.15, 0.32, 0.45, 0.58, 0.75];
     const storeClip = new AnimationTrackBuilder()
       .addPosTrack(
@@ -640,7 +816,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       .addQuatTrack('RightLegPivot', [0.0, 0.85], [...idQ, ...idQ])
       .build('retrieve_inv', 0.85);
 
-    // 7. Надевание и снятие экипировки
+    // 8. Надевание и снятие экипировки
     const putOnTimes = [0.0, 0.25, 0.5, 0.75, 1.05];
     const putOnClip = new AnimationTrackBuilder()
       .addPosTrack(
@@ -723,7 +899,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       .addQuatTrack('RightLegPivot', [0.0, 1.05], [...idQ, ...idQ])
       .build('take_off', 1.05);
 
-    // 8. Переходы стоек
+    // 9. Переходы стоек
     const createStanceTransitionClip = (name: string, fromCrouch: boolean) => {
       const duration = 0.15;
       const times = [0.0, duration];
@@ -1005,7 +1181,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       ])
       .build('prone_to_crouch', 1.15);
 
-    // 9. Падение, смерть и ползание
+    // 10. Падение, смерть и ползание
     const fallTimes = [0.0, 0.18, 0.4, 0.65, 0.9];
     const fallBackClip = new AnimationTrackBuilder()
       .addPosTrack(
@@ -1099,7 +1275,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       )
       .build('dead', 1.0);
 
-    // 10. Ползание по-пластунски (Prone crawl)
+    // 11. Ползание по-пластунски (Prone crawl)
     const durationCrawl = 1.2;
     const crawlFrames = fps * durationCrawl;
     const crawlTimes: number[] = [];
@@ -1154,7 +1330,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       .addQuatTrack('RightLegPivot', crawlTimes, crawlLegQ)
       .build('prone_crawl', durationCrawl);
 
-    // 11. Лежа (Prone idle)
+    // 12. Лежа (Prone idle)
     const durationProne = 2.0;
     const proneFrames = fps * durationProne;
     const proneTimes: number[] = [];
@@ -1198,7 +1374,7 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
       .addQuatTrack('RightLegPivot', proneTimes, proneLegQAll)
       .build('prone_idle', durationProne);
 
-    // 12. Прыжок и свободный полет в воздухе (Airborne)
+    // 13. Прыжок и свободный полет в воздухе (Airborne)
     const durationAirborne = 1.0;
     const airborneFrames = fps * durationAirborne;
     const airborneTimes: number[] = [];
@@ -1266,6 +1442,13 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     map.set('prone_to_stand', proneToStandClip);
     map.set('crouch_to_prone', crouchToProneClip);
     map.set('prone_to_crouch', proneToCrouchClip);
+
+    // Анимации плавания
+    map.set('swim_idle', swimIdleClip);
+    map.set('swim_walk', swimWalkClip);
+    map.set('swim_jog', swimJogClip);
+    map.set('swim_sprint', swimSprintClip);
+
     map.set('attack', attackLeftClip);
     map.set('attack_left_hand', attackLeftClip);
     map.set('attack_right_hand', attackRightClip);

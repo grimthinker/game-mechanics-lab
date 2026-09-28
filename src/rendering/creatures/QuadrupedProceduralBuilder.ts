@@ -185,6 +185,7 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
     const legTrackTimes = [0.0, duration];
     const legTrackQ = [...idQ, ...idQ];
 
+    // 1. Покой стоя (Stand Idle)
     const dogIdleClip = new AnimationTrackBuilder()
       .addPosTrack('Torso', times, torsoP)
       .addQuatTrack('Torso', times, torsoQ)
@@ -209,7 +210,9 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       bounceAmount: number,
       torsoXRot = 0,
       headPosY = 0.18,
-      headPosZ = 0.3
+      headPosZ = 0.3,
+      torsoBaseY = 0.48,
+      legBaseY = 0.4
     ) => {
       const cycleFrames = Math.max(2, Math.round(fps * cycleDuration));
       const cycleTimes: number[] = [];
@@ -234,17 +237,17 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
         const swing = Math.sin(cycle) * swingAmount;
         const bounce = bounceAmount > 0 ? Math.pow(Math.sin(cycle), 2) * bounceAmount : 0;
 
-        cTorsoP.push(0, 0.48 + bounce, 0);
+        cTorsoP.push(0, torsoBaseY + bounce, 0);
         cTorsoQ.push(...getQuat(torsoXRot, 0, 0));
         cHeadP.push(0, headPosY, headPosZ);
         cHeadQ.push(...getQuat(-torsoXRot, 0, 0));
 
         cTailQ.push(...getQuat(-0.75 + bounce * 1.5, Math.sin(cycle) * 0.18, 0));
 
-        cFllP.push(0.16, 0.4 + bounce, 0.22);
-        cFrlP.push(-0.16, 0.4 + bounce, 0.22);
-        cBllP.push(0.16, 0.4 + bounce, -0.22);
-        cBrlP.push(-0.16, 0.4 + bounce, -0.22);
+        cFllP.push(0.16, legBaseY + bounce, 0.22);
+        cFrlP.push(-0.16, legBaseY + bounce, 0.22);
+        cBllP.push(0.16, legBaseY + bounce, -0.22);
+        cBrlP.push(-0.16, legBaseY + bounce, -0.22);
 
         cPair1Q.push(...getQuat(swing, 0, 0));
         cPair2Q.push(...getQuat(-swing, 0, 0));
@@ -267,11 +270,485 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
         .build(name, cycleDuration);
     };
 
+    // 2. Локомоция стоя
     const dogJoggingClip = createDogWalkCycleClip('stand_jog', 0.5, 0.7, 0.07, 0, 0.18, 0.3);
     const dogWalkClip = createDogWalkCycleClip('stand_walk', 0.8, 0.4, 0.03, 0, 0.18, 0.3);
     const dogSprintClip = createDogWalkCycleClip('stand_sprint', 0.35, 1.1, 0.03, 0, 0.11, 0.34);
 
-    // Атака пастью
+    // 3. Локомоция в приседе / подкрадывание (Crouch - Stalking)
+    const dogCrouchIdle = new AnimationTrackBuilder()
+      .addPosTrack('Torso', [0.0, 2.0], [0, 0.32, 0, 0, 0.32, 0])
+      .addQuatTrack('Torso', [0.0, 2.0], [...getQuat(0.12, 0, 0), ...getQuat(0.12, 0, 0)])
+      .addPosTrack('HeadPivot', [0.0, 2.0], [0, 0.1, 0.34, 0, 0.1, 0.34])
+      .addQuatTrack('HeadPivot', [0.0, 2.0], [...getQuat(-0.1, 0, 0), ...getQuat(-0.1, 0, 0)])
+      .addQuatTrack('TailPivot', [0.0, 2.0], [...getQuat(-0.4, 0, 0), ...getQuat(-0.4, 0, 0)])
+      .addPosTrack('FrontLeftLegPivot', [0.0, 2.0], [0.16, 0.26, 0.22, 0.16, 0.26, 0.22])
+      .addQuatTrack('FrontLeftLegPivot', [0.0, 2.0], [...idQ, ...idQ])
+      .addPosTrack('FrontRightLegPivot', [0.0, 2.0], [-0.16, 0.26, 0.22, -0.16, 0.26, 0.22])
+      .addQuatTrack('FrontRightLegPivot', [0.0, 2.0], [...idQ, ...idQ])
+      .addPosTrack('BackLeftLegPivot', [0.0, 2.0], [0.16, 0.26, -0.22, 0.16, 0.26, -0.22])
+      .addQuatTrack('BackLeftLegPivot', [0.0, 2.0], [...idQ, ...idQ])
+      .addPosTrack('BackRightLegPivot', [0.0, 2.0], [-0.16, 0.26, -0.22, -0.16, 0.26, -0.22])
+      .addQuatTrack('BackRightLegPivot', [0.0, 2.0], [...idQ, ...idQ])
+      .build('crouch_idle', 2.0);
+
+    const dogCrouchWalk = createDogWalkCycleClip(
+      'crouch_walk',
+      0.8,
+      0.35,
+      0.015,
+      0.12,
+      0.1,
+      0.34,
+      0.32,
+      0.26
+    );
+    const dogCrouchJog = createDogWalkCycleClip(
+      'crouch_jog',
+      0.5,
+      0.6,
+      0.02,
+      0.12,
+      0.1,
+      0.34,
+      0.32,
+      0.26
+    );
+    const dogCrouchSprint = createDogWalkCycleClip(
+      'crouch_sprint',
+      0.35,
+      0.9,
+      0.025,
+      0.15,
+      0.08,
+      0.35,
+      0.32,
+      0.26
+    );
+
+    // 4. Покой лежа (Prone Idle / Отдых)
+    const proneDuration = 2.0;
+    const proneFrames = fps * proneDuration;
+    const pTimes: number[] = [];
+    const pTorsoP: number[] = [];
+    const pTorsoQ: number[] = [];
+    const pHeadQ: number[] = [];
+    const pTailQ: number[] = [];
+
+    for (let i = 0; i <= proneFrames; i++) {
+      const t = (i / proneFrames) * proneDuration;
+      pTimes.push(t);
+      const cycle = (i / proneFrames) * Math.PI * 2;
+      const breathe = Math.sin(cycle) * 0.006;
+
+      pTorsoP.push(0, 0.18 + breathe, 0);
+      pTorsoQ.push(...getQuat(0.25 + Math.sin(cycle) * 0.01, 0, 0));
+      pHeadQ.push(...getQuat(-0.25 + Math.sin(cycle) * 0.01, 0, 0));
+      pTailQ.push(...getQuat(-0.2, 0, 0));
+    }
+
+    const dogProneIdle = new AnimationTrackBuilder()
+      .addPosTrack('Torso', pTimes, pTorsoP)
+      .addQuatTrack('Torso', pTimes, pTorsoQ)
+      .addPosTrack('HeadPivot', [0.0, proneDuration], [0, 0.02, 0.38, 0, 0.02, 0.38])
+      .addQuatTrack('HeadPivot', pTimes, pHeadQ)
+      .addQuatTrack('TailPivot', pTimes, pTailQ)
+      .addPosTrack('FrontLeftLegPivot', [0.0, proneDuration], [0.16, 0.14, 0.24, 0.16, 0.14, 0.24])
+      .addQuatTrack(
+        'FrontLeftLegPivot',
+        [0.0, proneDuration],
+        [...getQuat(1.4, 0, 0), ...getQuat(1.4, 0, 0)]
+      )
+      .addPosTrack(
+        'FrontRightLegPivot',
+        [0.0, proneDuration],
+        [-0.16, 0.14, 0.24, -0.16, 0.14, 0.24]
+      )
+      .addQuatTrack(
+        'FrontRightLegPivot',
+        [0.0, proneDuration],
+        [...getQuat(1.4, 0, 0), ...getQuat(1.4, 0, 0)]
+      )
+      .addPosTrack('BackLeftLegPivot', [0.0, proneDuration], [0.16, 0.14, -0.2, 0.16, 0.14, -0.2])
+      .addQuatTrack(
+        'BackLeftLegPivot',
+        [0.0, proneDuration],
+        [...getQuat(-1.4, 0, 0), ...getQuat(-1.4, 0, 0)]
+      )
+      .addPosTrack(
+        'BackRightLegPivot',
+        [0.0, proneDuration],
+        [-0.16, 0.14, -0.2, -0.16, 0.14, -0.2]
+      )
+      .addQuatTrack(
+        'BackRightLegPivot',
+        [0.0, proneDuration],
+        [...getQuat(-1.4, 0, 0), ...getQuat(-1.4, 0, 0)]
+      )
+      .build('prone_idle', proneDuration);
+
+    // 5. Ползание по-пластунски (Prone Crawl)
+    const crawlDuration = 1.0;
+    const crawlFrames = fps * crawlDuration;
+    const crTimes: number[] = [];
+    const crTorsoP: number[] = [];
+    const crTorsoQ: number[] = [];
+    const crHeadQ: number[] = [];
+    const crTailQ: number[] = [];
+    const crFllP: number[] = [];
+    const crFrlP: number[] = [];
+    const crBllP: number[] = [];
+    const crBrlP: number[] = [];
+    const crFllQ: number[] = [];
+    const crFrlQ: number[] = [];
+
+    for (let i = 0; i <= crawlFrames; i++) {
+      const t = (i / crawlFrames) * crawlDuration;
+      crTimes.push(t);
+      const cycle = (i / crawlFrames) * Math.PI * 2;
+      const roll = Math.sin(cycle) * 0.05;
+
+      crTorsoP.push(0, 0.2 + Math.abs(Math.sin(cycle)) * 0.015, 0);
+      crTorsoQ.push(...getQuat(0.2, 0, roll));
+      crHeadQ.push(...getQuat(-0.2, -roll * 0.5, 0));
+      crTailQ.push(...getQuat(-0.3, Math.sin(cycle) * 0.15, 0));
+
+      const reach = Math.sin(cycle) * 0.08;
+      crFllP.push(0.16, 0.15, 0.24 + reach);
+      crFrlP.push(-0.16, 0.15, 0.24 - reach);
+      crBllP.push(0.16, 0.15, -0.2 - reach);
+      crBrlP.push(-0.16, 0.15, -0.2 + reach);
+
+      crFllQ.push(...getQuat(1.3 + reach * 1.5, 0, 0));
+      crFrlQ.push(...getQuat(1.3 - reach * 1.5, 0, 0));
+    }
+
+    const dogProneCrawl = new AnimationTrackBuilder()
+      .addPosTrack('Torso', crTimes, crTorsoP)
+      .addQuatTrack('Torso', crTimes, crTorsoQ)
+      .addPosTrack('HeadPivot', [0.0, crawlDuration], [0, 0.02, 0.38, 0, 0.02, 0.38])
+      .addQuatTrack('HeadPivot', crTimes, crHeadQ)
+      .addQuatTrack('TailPivot', crTimes, crTailQ)
+      .addPosTrack('FrontLeftLegPivot', crTimes, crFllP)
+      .addQuatTrack('FrontLeftLegPivot', crTimes, crFllQ)
+      .addPosTrack('FrontRightLegPivot', crTimes, crFrlP)
+      .addQuatTrack('FrontRightLegPivot', crTimes, crFrlQ)
+      .addPosTrack('BackLeftLegPivot', crTimes, crBllP)
+      .addQuatTrack(
+        'BackLeftLegPivot',
+        [0.0, crawlDuration],
+        [...getQuat(-1.4, 0, 0), ...getQuat(-1.4, 0, 0)]
+      )
+      .addPosTrack('BackRightLegPivot', crTimes, crBrlP)
+      .addQuatTrack(
+        'BackRightLegPivot',
+        [0.0, crawlDuration],
+        [...getQuat(-1.4, 0, 0), ...getQuat(-1.4, 0, 0)]
+      )
+      .build('prone_crawl', crawlDuration);
+
+    // 6. Переходы: Стоя -> Лежа и Лежа -> Стоя
+    const transTimes = [0.0, 0.35, 0.7];
+    const dogStandToProne = new AnimationTrackBuilder()
+      .addPosTrack('Torso', transTimes, [0, 0.48, 0, 0, 0.32, 0, 0, 0.18, 0])
+      .addQuatTrack('Torso', transTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(0.12, 0, 0),
+        ...getQuat(0.25, 0, 0),
+      ])
+      .addPosTrack('HeadPivot', transTimes, [0, 0.18, 0.3, 0, 0.1, 0.34, 0, 0.02, 0.38])
+      .addQuatTrack('HeadPivot', transTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(-0.1, 0, 0),
+        ...getQuat(-0.25, 0, 0),
+      ])
+      .addPosTrack(
+        'FrontLeftLegPivot',
+        transTimes,
+        [0.16, 0.4, 0.22, 0.16, 0.26, 0.22, 0.16, 0.14, 0.24]
+      )
+      .addQuatTrack('FrontLeftLegPivot', transTimes, [
+        ...idQ,
+        ...getQuat(0.6, 0, 0),
+        ...getQuat(1.4, 0, 0),
+      ])
+      .addPosTrack(
+        'FrontRightLegPivot',
+        transTimes,
+        [-0.16, 0.4, 0.22, -0.16, 0.26, 0.22, -0.16, 0.14, 0.24]
+      )
+      .addQuatTrack('FrontRightLegPivot', transTimes, [
+        ...idQ,
+        ...getQuat(0.6, 0, 0),
+        ...getQuat(1.4, 0, 0),
+      ])
+      .addPosTrack(
+        'BackLeftLegPivot',
+        transTimes,
+        [0.16, 0.4, -0.22, 0.16, 0.26, -0.22, 0.16, 0.14, -0.2]
+      )
+      .addQuatTrack('BackLeftLegPivot', transTimes, [
+        ...idQ,
+        ...getQuat(-0.6, 0, 0),
+        ...getQuat(-1.4, 0, 0),
+      ])
+      .addPosTrack(
+        'BackRightLegPivot',
+        transTimes,
+        [-0.16, 0.4, -0.22, -0.16, 0.26, -0.22, -0.16, 0.14, -0.2]
+      )
+      .addQuatTrack('BackRightLegPivot', transTimes, [
+        ...idQ,
+        ...getQuat(-0.6, 0, 0),
+        ...getQuat(-1.4, 0, 0),
+      ])
+      .build('stand_to_prone', 0.7);
+
+    const dogProneToStand = new AnimationTrackBuilder()
+      .addPosTrack('Torso', transTimes, [0, 0.18, 0, 0, 0.32, 0, 0, 0.48, 0])
+      .addQuatTrack('Torso', transTimes, [
+        ...getQuat(0.25, 0, 0),
+        ...getQuat(0.12, 0, 0),
+        ...getQuat(0, 0, 0),
+      ])
+      .addPosTrack('HeadPivot', transTimes, [0, 0.02, 0.38, 0, 0.1, 0.34, 0, 0.18, 0.3])
+      .addQuatTrack('HeadPivot', transTimes, [
+        ...getQuat(-0.25, 0, 0),
+        ...getQuat(-0.1, 0, 0),
+        ...getQuat(0, 0, 0),
+      ])
+      .addPosTrack(
+        'FrontLeftLegPivot',
+        transTimes,
+        [0.16, 0.14, 0.24, 0.16, 0.26, 0.22, 0.16, 0.4, 0.22]
+      )
+      .addQuatTrack('FrontLeftLegPivot', transTimes, [
+        ...getQuat(1.4, 0, 0),
+        ...getQuat(0.6, 0, 0),
+        ...idQ,
+      ])
+      .addPosTrack(
+        'FrontRightLegPivot',
+        transTimes,
+        [-0.16, 0.14, 0.24, -0.16, 0.26, 0.22, -0.16, 0.4, 0.22]
+      )
+      .addQuatTrack('FrontRightLegPivot', transTimes, [
+        ...getQuat(1.4, 0, 0),
+        ...getQuat(0.6, 0, 0),
+        ...idQ,
+      ])
+      .addPosTrack(
+        'BackLeftLegPivot',
+        transTimes,
+        [0.16, 0.14, -0.2, 0.16, 0.26, -0.22, 0.16, 0.4, -0.22]
+      )
+      .addQuatTrack('BackLeftLegPivot', transTimes, [
+        ...getQuat(-1.4, 0, 0),
+        ...getQuat(-0.6, 0, 0),
+        ...idQ,
+      ])
+      .addPosTrack(
+        'BackRightLegPivot',
+        transTimes,
+        [-0.16, 0.14, -0.2, -0.16, 0.26, -0.22, -0.16, 0.4, -0.22]
+      )
+      .addQuatTrack('BackRightLegPivot', transTimes, [
+        ...getQuat(-1.4, 0, 0),
+        ...getQuat(-0.6, 0, 0),
+        ...idQ,
+      ])
+      .build('prone_to_stand', 0.7);
+
+    // ==========================================
+    // 7. АНИМАЦИИ ПЛАВАНИЯ СОБАКИ (SWIMMING)
+    // ==========================================
+
+    // 7.1. Удержание на воде на месте (Dog Treading water)
+    const swimDogIdleDuration = 1.6;
+    const swimDogIdleFrames = fps * swimDogIdleDuration;
+    const sdiTimes: number[] = [];
+    const sdiTorsoP: number[] = [];
+    const sdiTorsoQ: number[] = [];
+    const sdiHeadQ: number[] = [];
+    const sdiTailQ: number[] = [];
+    const sdiFllP: number[] = [];
+    const sdiFrlP: number[] = [];
+    const sdiBllP: number[] = [];
+    const sdiBrlP: number[] = [];
+    const sdiFllQ: number[] = [];
+    const sdiFrlQ: number[] = [];
+
+    for (let i = 0; i <= swimDogIdleFrames; i++) {
+      const t = (i / swimDogIdleFrames) * swimDogIdleDuration;
+      sdiTimes.push(t);
+      const cycle = (i / swimDogIdleFrames) * Math.PI * 2;
+      const bob = Math.sin(cycle) * 0.025;
+
+      // Грудная клетка приподнята над водой (наклон корпуса назад/вверх ~32 градуса)
+      sdiTorsoP.push(0, 0.38 + bob, 0);
+      sdiTorsoQ.push(...getQuat(-0.55, 0, 0));
+
+      // Голова высоко задрана над водой
+      sdiHeadQ.push(...getQuat(-0.5, 0, 0));
+      sdiTailQ.push(...getQuat(-0.9 + Math.sin(cycle) * 0.1, 0, 0));
+
+      // Ленивые вертикальные гребки лапами под себя
+      const paddleL = Math.sin(cycle);
+      const paddleR = -paddleL;
+
+      sdiFllP.push(0.16, 0.32 + paddleL * 0.03, 0.22);
+      sdiFrlP.push(-0.16, 0.32 + paddleR * 0.03, 0.22);
+      sdiBllP.push(0.16, 0.28, -0.22);
+      sdiBrlP.push(-0.16, 0.28, -0.22);
+
+      sdiFllQ.push(...getQuat(0.4 + paddleL * 0.3, 0, 0));
+      sdiFrlQ.push(...getQuat(0.4 + paddleR * 0.3, 0, 0));
+    }
+
+    const dogSwimIdle = new AnimationTrackBuilder()
+      .addPosTrack('Torso', sdiTimes, sdiTorsoP)
+      .addQuatTrack('Torso', sdiTimes, sdiTorsoQ)
+      .addPosTrack('HeadPivot', [0.0, swimDogIdleDuration], [0, 0.24, 0.32, 0, 0.24, 0.32])
+      .addQuatTrack('HeadPivot', sdiTimes, sdiHeadQ)
+      .addQuatTrack('TailPivot', sdiTimes, sdiTailQ)
+      .addPosTrack('FrontLeftLegPivot', sdiTimes, sdiFllP)
+      .addQuatTrack('FrontLeftLegPivot', sdiTimes, sdiFllQ)
+      .addPosTrack('FrontRightLegPivot', sdiTimes, sdiFrlP)
+      .addQuatTrack('FrontRightLegPivot', sdiTimes, sdiFrlQ)
+      .addPosTrack('BackLeftLegPivot', sdiTimes, sdiBllP)
+      .addQuatTrack(
+        'BackLeftLegPivot',
+        [0.0, swimDogIdleDuration],
+        [...getQuat(-0.5, 0, 0), ...getQuat(-0.5, 0, 0)]
+      )
+      .addPosTrack('BackRightLegPivot', sdiTimes, sdiBrlP)
+      .addQuatTrack(
+        'BackRightLegPivot',
+        [0.0, swimDogIdleDuration],
+        [...getQuat(-0.5, 0, 0), ...getQuat(-0.5, 0, 0)]
+      )
+      .build('swim_idle', swimDogIdleDuration);
+
+    // 7.2. Параметрический собачий стиль (Dog Paddle: walk / jog / sprint)
+    const createDogPaddleClip = (
+      name: string,
+      cycleDuration: number,
+      torsoPitch: number,
+      bounceAmp: number,
+      paddleAmp: number
+    ) => {
+      const cycleFrames = Math.max(2, Math.round(fps * cycleDuration));
+      const times: number[] = [];
+      const torsoP: number[] = [];
+      const torsoQ: number[] = [];
+      const headP: number[] = [];
+      const headQ: number[] = [];
+      const tailQ: number[] = [];
+      const fllP: number[] = [];
+      const frlP: number[] = [];
+      const bllP: number[] = [];
+      const brlP: number[] = [];
+      const fllQ: number[] = [];
+      const frlQ: number[] = [];
+      const bllQ: number[] = [];
+      const brlQ: number[] = [];
+
+      for (let i = 0; i <= cycleFrames; i++) {
+        const progress = i / cycleFrames;
+        const time = progress * cycleDuration;
+        times.push(time);
+        const cycle = progress * Math.PI * 2;
+        const bounce = Math.sin(cycle) * bounceAmp;
+
+        torsoP.push(0, 0.34 + bounce, 0);
+        torsoQ.push(...getQuat(torsoPitch, 0, Math.sin(cycle) * 0.05));
+
+        headP.push(0, 0.2, 0.35);
+        headQ.push(...getQuat(-0.35, 0, 0));
+        tailQ.push(...getQuat(-0.4, Math.sin(cycle * 2) * 0.25, 0));
+
+        // Гребки передними лапами по круговой траектории под грудь
+        const strokeL = Math.sin(cycle);
+        const strokeR = Math.sin(cycle + Math.PI);
+        const depthL = Math.cos(cycle);
+        const depthR = Math.cos(cycle + Math.PI);
+
+        fllP.push(0.16, 0.3 - depthL * 0.04, 0.22);
+        frlP.push(-0.16, 0.3 - depthR * 0.04, 0.22);
+
+        fllQ.push(...getQuat(-0.1 + strokeL * paddleAmp, 0, 0));
+        frlQ.push(...getQuat(-0.1 + strokeR * paddleAmp, 0, 0));
+
+        // Толчки задними лапами
+        const kickL = Math.sin(cycle + Math.PI * 0.5);
+        const kickR = Math.sin(cycle - Math.PI * 0.5);
+
+        bllP.push(0.16, 0.28, -0.22);
+        brlP.push(-0.16, 0.28, -0.22);
+
+        bllQ.push(...getQuat(-0.3 + kickL * (paddleAmp * 0.7), 0, 0));
+        brlQ.push(...getQuat(-0.3 + kickR * (paddleAmp * 0.7), 0, 0));
+      }
+
+      return new AnimationTrackBuilder()
+        .addPosTrack('Torso', times, torsoP)
+        .addQuatTrack('Torso', times, torsoQ)
+        .addPosTrack('HeadPivot', times, headP)
+        .addQuatTrack('HeadPivot', times, headQ)
+        .addQuatTrack('TailPivot', times, tailQ)
+        .addPosTrack('FrontLeftLegPivot', times, fllP)
+        .addQuatTrack('FrontLeftLegPivot', times, fllQ)
+        .addPosTrack('FrontRightLegPivot', times, frlP)
+        .addQuatTrack('FrontRightLegPivot', times, frlQ)
+        .addPosTrack('BackLeftLegPivot', times, bllP)
+        .addQuatTrack('BackLeftLegPivot', times, bllQ)
+        .addPosTrack('BackRightLegPivot', times, brlP)
+        .addQuatTrack('BackRightLegPivot', times, brlQ)
+        .build(name, cycleDuration);
+    };
+
+    const dogSwimWalk = createDogPaddleClip('swim_walk', 0.9, -0.32, 0.015, 0.45);
+    const dogSwimJog = createDogPaddleClip('swim_jog', 0.65, -0.22, 0.025, 0.7);
+    const dogSwimSprint = createDogPaddleClip('swim_sprint', 0.4, -0.12, 0.035, 1.0);
+
+    // 8. Бросок пасти / Встряхивание для броска (Head-flick toss)
+    const dogThrowTimes = [0.0, 0.12, 0.24, 0.45];
+    const dogThrowClip = new AnimationTrackBuilder()
+      .addPosTrack('Torso', dogThrowTimes, [0, 0.48, 0, 0, 0.44, -0.02, 0, 0.52, 0.04, 0, 0.48, 0])
+      .addQuatTrack('Torso', dogThrowTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(0.06, 0, 0),
+        ...getQuat(-0.1, 0, 0),
+        ...getQuat(0, 0, 0),
+      ])
+      .addPosTrack(
+        'HeadPivot',
+        dogThrowTimes,
+        [0, 0.18, 0.3, 0, 0.12, 0.34, 0, 0.24, 0.28, 0, 0.18, 0.3]
+      )
+      .addQuatTrack('HeadPivot', dogThrowTimes, [
+        ...getQuat(0, 0, 0),
+        ...getQuat(0.3, 0, 0), // Наклон вниз для замаха
+        ...getQuat(-0.95, 0, 0), // Резкий мощный подброс головы вверх
+        ...getQuat(0, 0, 0), // Возврат
+      ])
+      .addQuatTrack('TailPivot', dogThrowTimes, [
+        ...getQuat(-0.7, 0, 0),
+        ...getQuat(-0.4, 0.15, 0),
+        ...getQuat(-0.8, -0.15, 0),
+        ...getQuat(-0.7, 0, 0),
+      ])
+      .addPosTrack('FrontLeftLegPivot', [0.0, 0.45], [0.16, 0.4, 0.22, 0.16, 0.4, 0.22])
+      .addQuatTrack('FrontLeftLegPivot', [0.0, 0.45], [...idQ, ...idQ])
+      .addPosTrack('FrontRightLegPivot', [0.0, 0.45], [-0.16, 0.4, 0.22, -0.16, 0.4, 0.22])
+      .addQuatTrack('FrontRightLegPivot', [0.0, 0.45], [...idQ, ...idQ])
+      .addPosTrack('BackLeftLegPivot', [0.0, 0.45], [0.16, 0.4, -0.22, 0.16, 0.4, -0.22])
+      .addQuatTrack('BackLeftLegPivot', [0.0, 0.45], [...idQ, ...idQ])
+      .addPosTrack('BackRightLegPivot', [0.0, 0.45], [-0.16, 0.4, -0.22, -0.16, 0.4, -0.22])
+      .addQuatTrack('BackRightLegPivot', [0.0, 0.45], [...idQ, ...idQ])
+      .build('throw_item_jaws', 0.45);
+
+    // 9. Атака пастью
     const attackTimes = [0.0, 0.1, 0.22, 0.35];
     const attackClip = new AnimationTrackBuilder()
       .addPosTrack('Torso', attackTimes, [0, 0.48, 0, 0, 0.46, -0.04, 0, 0.52, 0.08, 0, 0.48, 0])
@@ -282,14 +759,14 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       )
       .build('attack', 0.35);
 
-    // Смерть собаки
+    // 10. Смерть собаки
     const deadTimes = [0.0, 0.3, 0.6];
     const deadClip = new AnimationTrackBuilder()
       .addPosTrack('Torso', deadTimes, [0, 0.48, 0, 0, 0.3, 0, 0, 0.15, 0])
       .addQuatTrack('Torso', deadTimes, [0, 0, 0, 1, 0, 0, -0.5, 0.86, 0, 0, -0.707, 0.707])
       .build('dead', 0.6);
 
-    // Подбор мяча/палки пастью
+    // 11. Подбор мяча/палки пастью
     const pickupTimes = [0.0, 0.18, 0.35, 0.48, 0.65];
     const dogPickupClip = new AnimationTrackBuilder()
       .addPosTrack(
@@ -379,7 +856,7 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       ])
       .build('pickup_jaws', 0.65);
 
-    // Сброс мяча/палки пастью
+    // 12. Сброс мяча/палки пастью
     const dropTimes = [0.0, 0.12, 0.24, 0.38];
     const dogDropClip = new AnimationTrackBuilder()
       .addPosTrack('Torso', dropTimes, [0, 0.48, 0, 0, 0.46, 0.02, 0, 0.44, 0.03, 0, 0.48, 0])
@@ -416,7 +893,7 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       .addQuatTrack('BackRightLegPivot', [0.0, 0.38], [...idQ, ...idQ])
       .build('drop_item_jaws', 0.38);
 
-    // Прыжок и свободный полет собаки (Airborne)
+    // 13. Прыжок и свободный полет собаки (Airborne)
     const durationDogAirborne = 0.8;
     const dogAirFrames = fps * durationDogAirborne;
     const dogAirTimes: number[] = [];
@@ -433,8 +910,8 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
     const dogAirBrlQ: number[] = [];
 
     for (let i = 0; i <= dogAirFrames; i++) {
-      const time = (i / dogAirFrames) * durationDogAirborne;
-      dogAirTimes.push(time);
+      const t = (i / dogAirFrames) * durationDogAirborne;
+      dogAirTimes.push(t);
       const cycle = (i / dogAirFrames) * Math.PI * 2;
       const floatY = Math.sin(cycle) * 0.01;
 
@@ -475,11 +952,29 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
     map.set('stand_walk', dogWalkClip);
     map.set('stand_jog', dogJoggingClip);
     map.set('stand_sprint', dogSprintClip);
+    map.set('crouch_idle', dogCrouchIdle);
+    map.set('crouch_walk', dogCrouchWalk);
+    map.set('crouch_jog', dogCrouchJog);
+    map.set('crouch_sprint', dogCrouchSprint);
+    map.set('prone_idle', dogProneIdle);
+    map.set('prone_crawl', dogProneCrawl);
+    map.set('stand_to_prone', dogStandToProne);
+    map.set('prone_to_stand', dogProneToStand);
+
+    // Анимации плавания собаки
+    map.set('swim_idle', dogSwimIdle);
+    map.set('swim_walk', dogSwimWalk);
+    map.set('swim_jog', dogSwimJog);
+    map.set('swim_sprint', dogSwimSprint);
+
     map.set('attack', attackClip);
     map.set('pickup', dogPickupClip);
     map.set('pickup_jaws', dogPickupClip);
     map.set('drop_item', dogDropClip);
     map.set('drop_item_jaws', dogDropClip);
+    map.set('throw', dogThrowClip);
+    map.set('throw_item', dogThrowClip);
+    map.set('throw_item_jaws', dogThrowClip);
     map.set('dead', deadClip);
     map.set('airborne', dogAirborneClip);
 
