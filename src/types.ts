@@ -54,4 +54,5 @@ export interface TerrainBrushState {
   foliageZone: FoliageZoneChannel;
   radius: number;
   strength: number;
+  hillSize: number;
 }

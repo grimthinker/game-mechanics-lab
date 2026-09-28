@@ -365,6 +365,14 @@ export const App: React.FC = () => {
       return;
     }
 
+    // Мгновенно наводим камеру на игрока при входе в режим игры
+    const tr = app.world.getComponent(playerId, 'transform');
+    if (tr) {
+      app.camera.targetX = tr.x;
+      app.camera.targetY = tr.y + 0.8;
+      app.camera.targetZ = tr.z;
+    }
+
     if (app.gameMode === GameMode.EDITOR) {
       app.editorSnapshot = app.serializeWorld();
     }

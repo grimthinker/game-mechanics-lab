@@ -2,6 +2,20 @@ import { TerrainComponent } from '../ecs/components/terrain';
 import { TerrainBrushState } from '../types';
 import { TERRAIN_CONFIG } from '../config/terrainConfig';
 
+function fastHash(x: number, z: number, seed: number): number {
+  let kx = (Math.floor(x) + 1000000) >>> 0;
+  let kz = (Math.floor(z) + 1000000) >>> 0;
+  let ks = (Math.floor(seed) + 1000000) >>> 0;
+
+  let h = (ks + kx) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = (h + kz) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+
+  return h / 4294967296.0;
+}
+
 export class TerrainBrushController {
   public static applyBrush(
     terrainComp: TerrainComponent,
@@ -215,14 +229,78 @@ export class TerrainBrushController {
             heights[idx] += (avg - heights[idx]) * Math.min(1, amount * 2);
             modified = true;
           } else if (state.tool === 'hills') {
-            const freq = TERRAIN_CONFIG.hills.frequency;
-            const n1 = Math.sin(wX * freq + 1.2) * Math.cos(wZ * freq + 2.3);
-            const n2 = Math.sin(wX * freq * 2.2 - 0.7) * Math.sin(wZ * freq * 2.0 + 1.1) * 0.5;
-            const n3 = Math.cos(wX * freq * 4.1 + 3.1) * Math.cos(wZ * freq * 3.7 - 1.9) * 0.25;
-            const ridge = 1.0 - Math.abs(Math.sin(wX * freq * 1.3 + wZ * freq * 1.1));
-            const ridgeH = ridge * ridge * 0.6;
-            const hillFactor = n1 + n2 + n3 + ridgeH - 0.2;
+            const hillSize = state.hillSize ?? TERRAIN_CONFIG.hills.defaultSize;
+            const S = Math.max(4.0, hillSize);
 
+            // 1. Основной слой: органические купола (сопки/холмы) с хаотичными центрами и размерами
+            const cx = Math.floor(wX / S);
+            const cz = Math.floor(wZ / S);
+
+            let majorHills = 0;
+            for (let di = -1; di <= 1; di++) {
+              for (let dj = -1; dj <= 1; dj++) {
+                const cellX = cx + di;
+                const cellZ = cz + dj;
+
+                const h1 = fastHash(cellX, cellZ, 11);
+                const h2 = fastHash(cellX, cellZ, 23);
+                const h3 = fastHash(cellX, cellZ, 37);
+                const h4 = fastHash(cellX, cellZ, 51);
+
+                // Случайный центр вершины холма внутри ячейки
+                const peakX = (cellX + 0.15 + h1 * 0.7) * S;
+                const peakZ = (cellZ + 0.15 + h2 * 0.7) * S;
+
+                // Индивидуальные радиус и высота
+                const peakRadius = S * (0.65 + h3 * 0.7);
+                const peakHeight = 0.6 + h4 * 0.8;
+
+                // Асимметрия формы (эллиптичность) исключает строгую круглость и полосы
+                const rotAngle = h1 * Math.PI;
+                const cosA = Math.cos(rotAngle);
+                const sinA = Math.sin(rotAngle);
+                const dx = wX - peakX;
+                const dz = wZ - peakZ;
+                const rotX = dx * cosA - dz * sinA;
+                const rotZ = (dx * sinA + dz * cosA) * (0.8 + h2 * 0.4);
+                const dist = Math.hypot(rotX, rotZ);
+
+                if (dist < peakRadius) {
+                  const t = 1.0 - dist / peakRadius;
+                  const profile = t * t * (3.0 - 2.0 * t); // Smoothstep-колокол
+                  majorHills += profile * peakHeight;
+                }
+              }
+            }
+
+            // 2. Вторичный слой: мелкие естественные бугорки и складки рельефа (масштаб 0.45 от базового)
+            const S2 = S * 0.45;
+            const cx2 = Math.floor(wX / S2);
+            const cz2 = Math.floor(wZ / S2);
+
+            let minorHills = 0;
+            for (let di = -1; di <= 1; di++) {
+              for (let dj = -1; dj <= 1; dj++) {
+                const cellX = cx2 + di;
+                const cellZ = cz2 + dj;
+                const h1 = fastHash(cellX, cellZ, 71);
+                const h2 = fastHash(cellX, cellZ, 83);
+                const h3 = fastHash(cellX, cellZ, 97);
+
+                const peakX = (cellX + 0.2 + h1 * 0.6) * S2;
+                const peakZ = (cellZ + 0.2 + h2 * 0.6) * S2;
+                const peakRadius = S2 * (0.6 + h3 * 0.6);
+
+                const dist = Math.hypot(wX - peakX, wZ - peakZ);
+                if (dist < peakRadius) {
+                  const t = 1.0 - dist / peakRadius;
+                  minorHills += t * t * (3.0 - 2.0 * t) * 0.35;
+                }
+              }
+            }
+
+            // Смещение -0.45 обеспечивает гармоничный баланс между холмами и ложбинами
+            const hillFactor = majorHills + minorHills - 0.45;
             heights[idx] += hillFactor * amount;
             modified = true;
           }

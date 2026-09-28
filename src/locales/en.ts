@@ -142,6 +142,7 @@ export const en = {
     tex_sand: 'Sand',
     radius: 'Brush Radius:',
     strength: 'Strength:',
+    hillSize: 'Hill Size:',
   },
   palette: {
     subtitle: 'Select a preset and click on the map to place:',

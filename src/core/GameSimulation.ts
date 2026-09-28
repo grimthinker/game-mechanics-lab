@@ -99,6 +99,20 @@ export class GameSimulation {
       this.updatePlayerAim(worldPoint);
     }
 
+    // Плавная привязка камеры к игроку в режиме игры
+    if (this.app.gameMode === GameMode.GAME) {
+      const playerId = this.getPlayerEntityId();
+      if (playerId) {
+        const tr = this.world.getComponent(playerId, 'transform');
+        if (tr) {
+          const lerpFactor = Math.min(1.0, 15.0 * dt);
+          this.app.camera.targetX += (tr.x - this.app.camera.targetX) * lerpFactor;
+          this.app.camera.targetY += (tr.y + 0.8 - this.app.camera.targetY) * lerpFactor;
+          this.app.camera.targetZ += (tr.z - this.app.camera.targetZ) * lerpFactor;
+        }
+      }
+    }
+
     this.environmentSystem.update(dt, this.world);
     this.anatomySystem.update(dt, this.world, this.physics);
     this.modifierSystem.update(dt, this.world);

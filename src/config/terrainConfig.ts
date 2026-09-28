@@ -8,7 +8,9 @@ export const TERRAIN_CONFIG = {
   splatBlurFactor: 1.1,
   /** Параметры генератора холмистой поверхности */
   hills: {
-    frequency: 0.45,
+    defaultSize: 18.0,
+    minSize: 6.0,
+    maxSize: 60.0,
   },
   /** Параметры процедурной юбки горизонта (Terrain Skirt) */
   skirt: {

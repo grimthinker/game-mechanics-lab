@@ -28,6 +28,7 @@ export class EditorInteractionManager {
     foliageZone: 0,
     radius: 3.0,
     strength: 2.0,
+    hillSize: 18.0,
   };
 
   private baseStateForCommit: SerializedEntityData[] = [];

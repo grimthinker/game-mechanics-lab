@@ -33,10 +33,18 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     const saved = localStorage.getItem('terrain_brush_strength');
     return saved !== null ? Number(saved) : 2.0;
   });
+  const [hillSize, setHillSize] = useState(() => {
+    const saved = localStorage.getItem('terrain_brush_hill_size');
+    return saved !== null ? Number(saved) : 18.0;
+  });
 
   useEffect(() => {
     localStorage.setItem('terrain_brush_tool', tool);
   }, [tool]);
+
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_hill_size', hillSize.toString());
+  }, [hillSize]);
 
   useEffect(() => {
     localStorage.setItem('terrain_brush_radius', radius.toString());
@@ -50,7 +58,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
   useEffect(() => {
     if (!app) return;
 
-    app.terrainBrush = { active, tool, texture, foliageZone, radius, strength };
+    app.terrainBrush = { active, tool, texture, foliageZone, radius, strength, hillSize };
 
     // Если активирован режим кисти — сбрасываем выделение объектов, чтобы клик рисовал, а не выделял
     if (active) {
@@ -255,7 +263,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
         </div>
       )}
 
-      {/* Ползунки Радиуса и Интенсивности */}
+      {/* Ползунки Радиуса, Интенсивности и Размера холмов */}
       <div
         style={{
           display: 'flex',
@@ -263,6 +271,68 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
           gap: '14px',
         }}
       >
+        {/* Дополнительный ползунок размера холма: выводится ТОЛЬКО для инструмента Холмы */}
+        {tool === 'hills' && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '12px',
+              color: '#bdc3c7',
+              backgroundColor: '#1b1b1b',
+              padding: '8px 10px',
+              borderRadius: '5px',
+              border: '1px solid #333',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#e67e22', fontWeight: 'bold' }}>{t('terrain.hillSize')}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="number"
+                  min="6.0"
+                  max="60.0"
+                  step="1.0"
+                  value={Number(hillSize.toFixed(1))}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setHillSize(isNaN(val) ? 6.0 : val);
+                  }}
+                  onBlur={() => setHillSize((prev) => Math.max(6.0, Math.min(60.0, prev)))}
+                  style={{
+                    width: '56px',
+                    backgroundColor: '#111',
+                    border: '1px solid #444',
+                    borderRadius: '3px',
+                    color: '#e67e22',
+                    fontWeight: 'bold',
+                    fontSize: '11px',
+                    padding: '2px 4px',
+                    textAlign: 'right',
+                  }}
+                />
+                <span style={{ color: '#e67e22', fontWeight: 'bold' }}>м</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="6.0"
+              max="60.0"
+              step="1.0"
+              value={Math.max(6.0, Math.min(60.0, hillSize))}
+              onChange={(e) => setHillSize(Number(e.target.value))}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                accentColor: '#e67e22',
+                cursor: 'pointer',
+                margin: 0,
+              }}
+            />
+          </div>
+        )}
+
         <div
           style={{
             display: 'flex',
