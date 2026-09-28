@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { GlobalInput } from '../input/GlobalInput';
 import { GameMode } from '../config/gameConfig';
+import { EventBus } from '../core/EventBus';
 
 interface UseKeyboardControlsProps {
   isModalOpen: boolean;
@@ -70,9 +71,7 @@ export const useKeyboardControls = ({
         return;
       }
       if (e.key === 'Escape') {
-        if ((window as any).appRef && (window as any).appRef.throwTargeting) {
-          (window as any).appRef.throwTargeting = null;
-        }
+        EventBus.emit('input:cancelTargeting');
       }
       if (isModalOpen || isEditModalOpen || isTextInputTarget(e.target)) return;
       const key = getKeyName(e);

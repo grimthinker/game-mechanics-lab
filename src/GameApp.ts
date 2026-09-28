@@ -184,6 +184,12 @@ export class GameApp {
         this.captureBaseState();
       }
     });
+
+    EventBus.on('input:cancelTargeting', () => {
+      if (this.throwTargeting) {
+        this.throwTargeting = null;
+      }
+    });
   }
 
   private handleResize = () => this.resizeCanvas();

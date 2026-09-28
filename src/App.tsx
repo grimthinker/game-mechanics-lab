@@ -2,37 +2,35 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameApp } from './GameApp';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import { useKeyboardControls } from './hooks/useKeyboardControls';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { useWorldIO } from './hooks/useWorldIO';
 import { EntityConfig } from './ecs/types';
 import { BTNodeDTO } from './ai/core';
 import { LeftDock, DockTab } from './components/LeftDock/LeftDock';
 import { PieMenu } from './components/PieMenu/PieMenu';
 import { PieMenuState } from './components/PieMenu/types';
-import { createRectanglePoints, deg2Rad } from './utils';
+import { usePieMenuTree } from './components/PieMenu/usePieMenuTree';
+import { PlacementOverlays } from './components/canvas/PlacementOverlays';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { HotkeysModal } from './components/HotkeysModal';
 import { CreatureWizardModal, NewWorldModal } from './components/modals';
 import { GameHUD } from './components/GameHUD';
-import { BodyStructureType, CREATURE_BLUEPRINTS } from './ecs/templates';
-import { ModularPlacementOptions, Vec3 } from './types';
+import { BodyStructureType } from './ecs/templates';
+import { ModularPlacementOptions } from './types';
 import { CanvasHUD } from './components/CanvasHUD';
 import { useDragDrop } from './dnd/DragDropContext';
 import { DragGhostOverlay } from './dnd/DragGhostOverlay';
 import { MultiSelectionDrawer } from './components/MultiSelectionDrawer';
-import { PlacementMode, BlackboardPickingState } from './types';
+import { PlacementMode, BlackboardPickingState, GizmoTool } from './types';
 import { GameMode } from './config/gameConfig';
-import { GizmoTool } from './types';
-import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { GlobalInput } from './input/GlobalInput';
-import './editor.css';
-import { createZoneConfig } from './ecs/archetypes';
 import { saveWorldToStorage, loadWorldFromStorage } from './storage/autoSave';
-import { EDITOR_CONFIG } from './config/editorConfig';
 import { t } from './locales';
 import { EventBus } from './core/EventBus';
 import { initRapier } from './physics/rapierLoader';
 import { TreeBBSchema } from './ai/schema';
-import { spawnFetchGroup } from './ecs/prefabs/fetchGroupPrefab';
+import './editor.css';
 
 export const App: React.FC = () => {
   const appRef = useRef<GameApp | null>(null);
@@ -55,7 +53,7 @@ export const App: React.FC = () => {
   }));
 
   const [isWasmReady, setIsWasmReady] = useState<boolean>(false);
-  const [isEngineReady, setIsEngineReady] = useState<boolean>(false);
+  const [, setIsEngineReady] = useState<boolean>(false);
   const [gizmoTool, setGizmoTool] = useState<GizmoTool>('translate');
   const [leftDockTab, setLeftDockTab] = useState<DockTab>('hierarchy');
   const [pieMenuState, setPieMenuState] = useState<PieMenuState | null>(null);
@@ -197,33 +195,6 @@ export const App: React.FC = () => {
     saveWorldToStorage(app, app.editorSnapshot);
   }, [closePieMenu, updateStats]);
 
-  const createEmptyWorld = useCallback(
-    (width: number, length: number) => {
-      closePieMenu();
-      const app = appRef.current;
-      if (!app) return;
-
-      app.editorSnapshot = null;
-      app.initEmptyWorld(width, length);
-      saveWorldToStorage(app);
-      syncPlayerControls();
-      updateStats();
-    },
-    [closePieMenu, syncPlayerControls, updateStats]
-  );
-
-  const loadDemoWorld = useCallback(() => {
-    closePieMenu();
-    const app = appRef.current;
-    if (!app) return;
-
-    app.editorSnapshot = null;
-    app.initDefaultWorld();
-    saveWorldToStorage(app);
-    syncPlayerControls();
-    updateStats();
-  }, [closePieMenu, syncPlayerControls, updateStats]);
-
   // 1. Асинхронная инициализация WASM модуля Rapier3D
   useEffect(() => {
     let isCancelled = false;
@@ -250,7 +221,6 @@ export const App: React.FC = () => {
     setApp(app);
 
     app.emitState(); // Форсируем первичную синхронизацию в React
-
     app.start();
 
     // Восстановление мира из автосохранения либо создание дефолтного мира
@@ -269,11 +239,15 @@ export const App: React.FC = () => {
     app.updateBTData(true);
     setIsEngineReady(true);
 
-    // Доступ к движку из консоли браузера для отладки
-    (window as any).appRef = app;
+    // Доступ к движку из консоли браузера только в режиме разработки (DEV)
+    if (import.meta.env.DEV) {
+      (window as any).appRef = app;
+    }
 
     return () => {
-      delete (window as any).appRef;
+      if (import.meta.env.DEV) {
+        delete (window as any).appRef;
+      }
       setApp(null);
       app.destroy();
       appRef.current = null;
@@ -281,39 +255,12 @@ export const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWasmReady, setApp]);
 
-  // Автосохранение при закрытии/скрытии вкладки браузера
-  useEffect(() => {
-    const handleSave = () => {
-      if (appRef.current) {
-        saveWorldToStorage(appRef.current, appRef.current.editorSnapshot);
-      }
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        handleSave();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleSave);
-    window.addEventListener('pagehide', handleSave);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleSave);
-      window.removeEventListener('pagehide', handleSave);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
   const togglePause = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
-
     if (app.gameMode === GameMode.EDITOR || app.gameMode === GameMode.GAME) {
       return;
     }
-
     app.isPaused = !app.isPaused;
   }, []);
 
@@ -438,6 +385,11 @@ export const App: React.FC = () => {
     }
   }, []);
 
+  const handleInspectBT = useCallback((id: string) => {
+    appRef.current?.selection.selectEntity(id, true);
+    setLeftDockTab('bt');
+  }, []);
+
   const handleCancelGizmo = useCallback(() => {
     const app = appRef.current;
     if (app && app.gizmo.isDragging()) {
@@ -478,6 +430,26 @@ export const App: React.FC = () => {
     }
     return false;
   }, [bbPicking]);
+
+  // Вынесенные файловые операции и автосохранение
+  const { saveWorldFile, loadWorldFile, createEmptyWorld, loadDemoWorld } = useWorldIO({
+    appRef,
+    closePieMenu,
+    syncPlayerControls,
+    updateStats,
+  });
+
+  // Вынесенное дерево радиального меню (Pie Menu)
+  const pieMenuItems = usePieMenuTree({
+    app: appRef.current,
+    pieMenuState,
+    onClose: closePieMenu,
+    onFocusEntity: handleFocusEntity,
+    onInspectBT: handleInspectBT,
+    onDeleteSelected: handleDeleteEntity,
+    syncPlayerControls,
+    updateStats,
+  });
 
   useGlobalShortcuts({
     mode: engineState.mode,
@@ -542,38 +514,8 @@ export const App: React.FC = () => {
           worldFileInputRef={worldFileInputRef}
           onNewWorld={() => setIsNewWorldModalOpen(true)}
           onDemoWorld={loadDemoWorld}
-          onSaveWorld={() => {
-            const app = appRef.current;
-            if (!app) return;
-            const data = app.serializeWorld();
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `world_${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-          }}
-          onLoadWorldFile={(file) => {
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-              try {
-                const data = JSON.parse(evt.target?.result as string);
-                const app = appRef.current;
-                if (app) {
-                  app.editorSnapshot = null;
-                  app.deserializeWorld(data);
-                  app.commandHistory.clear();
-                  saveWorldToStorage(app);
-                  syncPlayerControls();
-                  updateStats();
-                }
-              } catch {
-                alert(t('app.jsonReadError'));
-              }
-            };
-            reader.readAsText(file);
-          }}
+          onSaveWorld={saveWorldFile}
+          onLoadWorldFile={loadWorldFile}
           isPaused={engineState.isPaused}
           togglePause={togglePause}
           globalTimeScale={engineState.timeScale}
@@ -602,7 +544,7 @@ export const App: React.FC = () => {
 
       {/* Основная рабочая область (Flex-контейнер) */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-        {/* Левый док (Иерархия, Палитра, BT) */}
+        {/* Левый док (Иерархия, Палитра, BT, Анимации, Террейн) */}
         {engineState.mode !== GameMode.GAME && (
           <LeftDock
             app={appRef.current}
@@ -699,75 +641,13 @@ export const App: React.FC = () => {
             />
           )}
 
-          {/* Плашка режима размещения */}
-          {placementMode && (
-            <div
-              onMouseDown={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
-              onMouseUp={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              onContextMenu={(e) => e.stopPropagation()}
-              style={{
-                position: 'absolute',
-                top: 20,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: 'rgba(41, 128, 185, 0.9)',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                display: 'flex',
-                gap: '15px',
-                alignItems: 'center',
-                zIndex: 50,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              }}
-            >
-              <span>{t('app.placementPrompt')}</span>
-              <button
-                className="btn btn-sm"
-                style={{ backgroundColor: '#c0392b' }}
-                onClick={() => setPlacementMode(null)}
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          )}
-
-          {/* Плашка режима выбора сущности для Blackboard */}
-          {bbPicking && (
-            <div
-              onMouseDown={(e) => e.stopPropagation()}
-              onMouseMove={(e) => e.stopPropagation()}
-              onMouseUp={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              onContextMenu={(e) => e.stopPropagation()}
-              style={{
-                position: 'absolute',
-                top: 20,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: 'rgba(142, 68, 173, 0.95)',
-                padding: '10px 20px',
-                borderRadius: '8px',
-                display: 'flex',
-                gap: '15px',
-                alignItems: 'center',
-                zIndex: 50,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                color: '#fff',
-                fontSize: '12px',
-              }}
-            >
-              <span>🎯 {t('dock.blackboardPickingPrompt', { key: bbPicking.key })}</span>
-              <button
-                className="btn btn-sm"
-                style={{ backgroundColor: '#c0392b', color: '#fff' }}
-                onClick={() => setBbPicking(null)}
-              >
-                {t('common.cancel')}
-              </button>
-            </div>
-          )}
+          {/* Плашки режимов размещения и пикера Blackboard */}
+          <PlacementOverlays
+            placementMode={placementMode}
+            bbPicking={bbPicking}
+            onCancelPlacement={() => setPlacementMode(null)}
+            onCancelBBPicking={() => setBbPicking(null)}
+          />
 
           {/* Радиальное контекстное меню (Pie Menu) */}
           {pieMenuState && engineState.mode === GameMode.EDITOR && (
@@ -780,658 +660,7 @@ export const App: React.FC = () => {
                   : t('app.pieQuickSpawn')
               }
               onClose={closePieMenu}
-              items={
-                pieMenuState.targetEntityId
-                  ? [
-                      {
-                        id: 'clone',
-                        label:
-                          pieMenuState.targetEntityIds.length > 1
-                            ? t('pieMenu.cloneCount', {
-                                count: pieMenuState.targetEntityIds.length,
-                              })
-                            : t('pieMenu.clone'),
-                        icon: '📑',
-                        color: '#27ae60',
-                        onSelect: () => {
-                          const app = appRef.current;
-                          if (!app) return;
-                          const idsToClone =
-                            pieMenuState.targetEntityIds.length > 0
-                              ? pieMenuState.targetEntityIds
-                              : [pieMenuState.targetEntityId!];
-                          app.duplicateEntities(idsToClone, EDITOR_CONFIG.cloneOffset);
-                          syncPlayerControls();
-                          updateStats();
-                        },
-                      },
-                      {
-                        id: 'focus',
-                        label: t('pieMenu.focus'),
-                        icon: '🎯',
-                        color: '#3498db',
-                        onSelect: () => {
-                          if (pieMenuState.targetEntityId) {
-                            handleFocusEntity(pieMenuState.targetEntityId);
-                          }
-                        },
-                      },
-                      {
-                        id: 'inspect_bt',
-                        label: t('pieMenu.inspectBt'),
-                        icon: '🧠',
-                        color: '#9b59b6',
-                        onSelect: () => {
-                          if (pieMenuState.targetEntityId) {
-                            appRef.current?.selection.selectEntity(
-                              pieMenuState.targetEntityId,
-                              true
-                            );
-                            setLeftDockTab('bt');
-                          }
-                        },
-                      },
-                      {
-                        id: 'delete',
-                        label:
-                          pieMenuState.targetEntityIds.length > 1
-                            ? t('pieMenu.deleteCount', {
-                                count: pieMenuState.targetEntityIds.length,
-                              })
-                            : t('pieMenu.delete'),
-                        icon: '🗑️',
-                        danger: true,
-                        onSelect: () => {
-                          handleDeleteEntity();
-                        },
-                      },
-                    ]
-                  : [
-                      {
-                        id: 'category_creatures',
-                        label: t('pieMenu.creatures'),
-                        icon: '👤',
-                        color: '#2980b9',
-                        children: [
-                          {
-                            id: 'spawn_player',
-                            label: t('pieMenu.player'),
-                            icon: '🎮',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnPlayer'), () => {
-                                const spawnPos: Vec3 = {
-                                  x: pieMenuState.worldPos.x,
-                                  y: pieMenuState.worldPos.y + 0.15,
-                                  z: pieMenuState.worldPos.z,
-                                };
-                                const id = app.entityFactory.spawnModularHumanoid(
-                                  app.world,
-                                  app.physics,
-                                  app.aiSystem,
-                                  spawnPos,
-                                  'PlayerTree',
-                                  t('palette.player')
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_attacker',
-                            label: t('pieMenu.attacker'),
-                            icon: '⚔️',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnAttacker'), () => {
-                                const spawnPos: Vec3 = {
-                                  x: pieMenuState.worldPos.x,
-                                  y: pieMenuState.worldPos.y + 0.15,
-                                  z: pieMenuState.worldPos.z,
-                                };
-                                const id = app.entityFactory.spawnModularHumanoid(
-                                  app.world,
-                                  app.physics,
-                                  app.aiSystem,
-                                  spawnPos,
-                                  'AttackerTree',
-                                  t('palette.attacker')
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_quadruped',
-                            label: t('palette.quadrupedBot'),
-                            icon: '🐕',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnModular'), () => {
-                                const spawnPos: Vec3 = {
-                                  x: pieMenuState.worldPos.x,
-                                  y: pieMenuState.worldPos.y + 0.15,
-                                  z: pieMenuState.worldPos.z,
-                                };
-                                const id = app.entityFactory.spawnModularCreature(
-                                  app.world,
-                                  app.physics,
-                                  app.aiSystem,
-                                  spawnPos,
-                                  CREATURE_BLUEPRINTS.quadruped,
-                                  'AttackerTree',
-                                  t('palette.quadrupedBot')
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_arachnid',
-                            label: t('palette.arachnidBot'),
-                            icon: '🕷️',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnModular'), () => {
-                                const spawnPos: Vec3 = {
-                                  x: pieMenuState.worldPos.x,
-                                  y: pieMenuState.worldPos.y + 0.15,
-                                  z: pieMenuState.worldPos.z,
-                                };
-                                const id = app.entityFactory.spawnModularCreature(
-                                  app.world,
-                                  app.physics,
-                                  app.aiSystem,
-                                  spawnPos,
-                                  CREATURE_BLUEPRINTS.arachnid,
-                                  'AttackerTree',
-                                  t('palette.arachnidBot')
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_idle',
-                            label: t('palette.idleBot'),
-                            icon: '👤',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnModular'), () => {
-                                const spawnPos: Vec3 = {
-                                  x: pieMenuState.worldPos.x,
-                                  y: pieMenuState.worldPos.y + 0.15,
-                                  z: pieMenuState.worldPos.z,
-                                };
-                                const id = app.entityFactory.spawnModularHumanoid(
-                                  app.world,
-                                  app.physics,
-                                  app.aiSystem,
-                                  spawnPos,
-                                  'IdleTree',
-                                  t('palette.idleBot')
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_master_single',
-                            label: t('pieMenu.master'),
-                            icon: '🚶',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnModular'), () => {
-                                const spawnPos: Vec3 = {
-                                  x: pieMenuState.worldPos.x,
-                                  y: pieMenuState.worldPos.y + 0.15,
-                                  z: pieMenuState.worldPos.z,
-                                };
-                                const id = app.entityFactory.spawnModularHumanoid(
-                                  app.world,
-                                  app.physics,
-                                  app.aiSystem,
-                                  spawnPos,
-                                  'MasterFetchTree',
-                                  t('palette.master')
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                        ],
-                      },
-                      {
-                        id: 'category_weapons',
-                        label: t('pieMenu.weapons'),
-                        icon: '⚔️',
-                        color: '#f39c12',
-                        children: [
-                          {
-                            id: 'spawn_spear',
-                            label: t('pieMenu.spear'),
-                            icon: '🗡️',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnSpear'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'weapon' },
-                                    item: {
-                                      name: t('palette.spear'),
-                                      type: 'weapon',
-                                      maxStack: 1,
-                                      size: 10,
-                                      equipTypes: [],
-                                      equippable: false,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: { radius: 0.4, weight: 1, isSolid: true },
-                                    weaponStats: {
-                                      baseDamage: 25,
-                                      prepTime: 0.2,
-                                      recoveryTime: 0.3,
-                                    },
-                                    weaponZone: { hitZoneType: 'forward_line', length: 4.5 },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_sword',
-                            label: 'Меч',
-                            icon: '🗡️',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnSpear'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'weapon' },
-                                    meta: { name: 'Меч', entityType: 'item' },
-                                    visualModel: { modelId: 'proc://prop/sword' },
-                                    item: {
-                                      name: 'Меч',
-                                      type: 'weapon',
-                                      maxStack: 1,
-                                      size: 10,
-                                      equipTypes: [],
-                                      equippable: false,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: {
-                                      radius: 0.4,
-                                      weight: 2,
-                                      isSolid: true,
-                                      halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
-                                      colliderOffset: { x: 0, y: 0.36, z: 0 },
-                                    },
-                                    weaponStats: {
-                                      baseDamage: 25,
-                                      prepTime: 0.2,
-                                      recoveryTime: 0.3,
-                                    },
-                                    weaponZone: {
-                                      hitZoneType: 'angle',
-                                      radius: 2.5,
-                                      angle: deg2Rad(90),
-                                    },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_shotgun',
-                            label: t('palette.shotgun'),
-                            icon: '💥',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnSpear'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'weapon' },
-                                    item: {
-                                      name: t('palette.shotgun'),
-                                      type: 'weapon',
-                                      maxStack: 1,
-                                      size: 10,
-                                      equipTypes: [],
-                                      equippable: false,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: { radius: 0.4, weight: 1, isSolid: true },
-                                    weaponStats: {
-                                      baseDamage: 15,
-                                      prepTime: 0.4,
-                                      recoveryTime: 0.5,
-                                    },
-                                    weaponZone: {
-                                      hitZoneType: 'shrapnel',
-                                      length: 4.0,
-                                      angle: deg2Rad(60),
-                                      rayCount: 5,
-                                    },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_aura',
-                            label: t('palette.auraWeapon'),
-                            icon: '✨',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnSpear'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'weapon' },
-                                    item: {
-                                      name: t('palette.auraWeapon'),
-                                      type: 'weapon',
-                                      maxStack: 1,
-                                      size: 10,
-                                      equipTypes: [],
-                                      equippable: false,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: { radius: 0.4, weight: 1, isSolid: true },
-                                    weaponStats: {
-                                      baseDamage: 30,
-                                      prepTime: 0.3,
-                                      recoveryTime: 0.4,
-                                    },
-                                    weaponZone: { hitZoneType: 'radius', radius: 2.0 },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_ball',
-                            label: 'Мячик',
-                            icon: '🎾',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnSpear'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'weapon' },
-                                    meta: { name: 'Мячик', entityType: 'item' },
-                                    visualModel: { modelId: 'proc://prop/ball' },
-                                    item: {
-                                      name: 'Мячик',
-                                      type: 'weapon',
-                                      maxStack: 1,
-                                      size: 4,
-                                      equipTypes: [],
-                                      equippable: false,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: {
-                                      radius: 0.15,
-                                      weight: 0.5,
-                                      isSolid: true,
-                                      shape: 'ball',
-                                      restitution: 0.88,
-                                      friction: 0.85,
-                                      linearDamping: 0.25,
-                                      angularDamping: 2.0,
-                                    },
-                                    weaponStats: {
-                                      baseDamage: 5,
-                                      prepTime: 0.2,
-                                      recoveryTime: 0.3,
-                                    },
-                                    weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                        ],
-                      },
-                      {
-                        id: 'category_items',
-                        label: t('pieMenu.items'),
-                        icon: '📦',
-                        color: '#27ae60',
-                        children: [
-                          {
-                            id: 'spawn_wall',
-                            label: t('pieMenu.wall'),
-                            icon: '🧱',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnWall'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'obstacle' },
-                                    meta: {
-                                      name: t('palette.wall'),
-                                      entityType: 'obstacle',
-                                      destructible: false,
-                                    },
-                                    physics: {
-                                      radius: 2.0,
-                                      weight: 1000,
-                                      isSolid: true,
-                                      points: createRectanglePoints(4.0, 1.0),
-                                    },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_crate',
-                            label: t('pieMenu.crate'),
-                            icon: '📦',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnCrate'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'obstacle' },
-                                    meta: {
-                                      name: t('palette.crate'),
-                                      entityType: 'obstacle',
-                                      destructible: true,
-                                    },
-                                    health: { hp: 100, maxHp: 100 },
-                                    physics: {
-                                      radius: 0.8,
-                                      weight: 50,
-                                      isSolid: true,
-                                      points: createRectanglePoints(1.5, 1.5),
-                                    },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_fire_zone',
-                            label: t('pieMenu.fireZone'),
-                            icon: '🔥',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnFireZone'), () => {
-                                const id = app.spawnEntity(
-                                  createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_heal_zone',
-                            label: t('palette.zoneHeal'),
-                            icon: '💚',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnFireZone'), () => {
-                                const id = app.spawnEntity(
-                                  createZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_backpack',
-                            label: t('palette.backpack'),
-                            icon: '🎒',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnObject'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'bag' },
-                                    item: {
-                                      name: t('palette.backpack'),
-                                      type: 'bag',
-                                      maxStack: 1,
-                                      size: 10,
-                                      equipTypes: ['torso', 'sling'],
-                                      equippable: true,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: { radius: 0.4, weight: 1, isSolid: true },
-                                    inventory: { size: { width: 6, height: 4 } },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                          {
-                            id: 'spawn_chestplate',
-                            label: t('palette.chestplate'),
-                            icon: '🛡️',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnObject'), () => {
-                                const id = app.spawnEntity(
-                                  {
-                                    tag: { archetype: 'item', subType: 'armor' },
-                                    item: {
-                                      name: t('palette.chestplate'),
-                                      type: 'armor',
-                                      maxStack: 1,
-                                      size: 20,
-                                      equipTypes: ['torso'],
-                                      equippable: true,
-                                      equipTimeMultiplier: 1.0,
-                                    },
-                                    physics: { radius: 0.4, weight: 20, isSolid: true },
-                                    armorStats: { defense: 25, flatReduction: 5 },
-                                  },
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntity(id, true);
-                                return id;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                        ],
-                      },
-                      {
-                        id: 'category_groups',
-                        label: t('pieMenu.groups'),
-                        icon: '👥',
-                        color: '#9b59b6',
-                        children: [
-                          {
-                            id: 'spawn_group_fetch',
-                            label: t('pieMenu.fetchGroup'),
-                            icon: '🐕',
-                            onSelect: () => {
-                              const app = appRef.current;
-                              if (!app) return;
-                              app.executeTransaction(t('history.spawnFetchGroup'), () => {
-                                const result = spawnFetchGroup(
-                                  app.simulation,
-                                  pieMenuState.worldPos
-                                );
-                                app.selection.selectEntities([result.masterId, ...result.dogIds]);
-                                return result.masterId;
-                              });
-                              syncPlayerControls();
-                            },
-                          },
-                        ],
-                      },
-                    ]
-              }
+              items={pieMenuItems}
             />
           )}
         </div>
@@ -1448,6 +677,7 @@ export const App: React.FC = () => {
           />
         )}
       </div>
+
       <HotkeysModal isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
       <CreatureWizardModal
         isOpen={isCreatureWizardOpen}

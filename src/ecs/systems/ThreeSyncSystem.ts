@@ -14,6 +14,7 @@ import {
   CreatureMeshAssembler,
   RigAnimatorState as AnimatorState,
 } from '../../rendering/creatures/CreatureMeshAssembler';
+import { RigSocketBinder } from '../../rendering/creatures/RigSocketBinder';
 import {
   disposeObject,
   attachOutlines,
@@ -52,6 +53,7 @@ export class ThreeSyncSystem {
   private attackVisualsManager: AttackVisualsManager;
   private terrainSync: TerrainSyncSystem;
   private creatureAssembler: CreatureMeshAssembler;
+  private socketBinder: RigSocketBinder = new RigSocketBinder();
   private grassSync: GrassSyncSystem;
   private toonManager = ToonMaterialManager.getInstance();
   private isCelShading: boolean = false;
@@ -393,54 +395,8 @@ export class ThreeSyncSystem {
               });
             }
 
-            // Прикрепление экипированного оружия/предметов в кости рук и своевременное освобождение сокетов
-            const aggSlots = getAggregatedInteractionSlots(world, id);
-            for (const info of aggSlots) {
-              if (!info.slot.rigSocketName) continue;
-              const socketBone =
-                animState.socketBones.get(info.slot.rigSocketName) ||
-                animState.rig.getObjectByName(info.slot.rigSocketName);
-
-              if (!socketBone) continue;
-
-              if (info.slot.itemId) {
-                const itemObj = this.meshes.get(info.slot.itemId);
-                for (let c = socketBone.children.length - 1; c >= 0; c--) {
-                  const child = socketBone.children[c];
-                  if (child !== itemObj) {
-                    socketBone.remove(child);
-                    const entId = child.userData.entityId;
-                    if (entId && world.hasEntity(entId)) {
-                      this.scene.add(child);
-                    } else {
-                      ThreeSyncSystem.disposeObject(child);
-                    }
-                  }
-                }
-                if (itemObj && itemObj.parent !== socketBone) {
-                  socketBone.add(itemObj);
-                  const grip = itemObj.userData.gripTransform as GripTransform | undefined;
-                  if (grip) {
-                    itemObj.position.copy(grip.position);
-                    itemObj.quaternion.copy(grip.quaternion);
-                  } else {
-                    itemObj.position.set(0, 0, 0);
-                    itemObj.rotation.set(0, 0, 0);
-                  }
-                }
-              } else {
-                while (socketBone.children.length > 0) {
-                  const child = socketBone.children[0];
-                  socketBone.remove(child);
-                  const entId = child.userData.entityId;
-                  if (entId && world.hasEntity(entId)) {
-                    this.scene.add(child);
-                  } else {
-                    ThreeSyncSystem.disposeObject(child);
-                  }
-                }
-              }
-            }
+            // Прикрепление экипированного оружия/предметов в кости рук через RigSocketBinder
+            this.socketBinder.syncCreatureSockets(id, animState, world, this.meshes, this.scene);
           }
         }
         // 4. Фоллбэк-визуализация примитивов

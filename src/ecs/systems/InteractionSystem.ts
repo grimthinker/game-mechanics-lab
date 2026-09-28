@@ -1,23 +1,20 @@
 import { World } from '../World';
 import { PhysicsSystem } from './PhysicsSystem';
-import { CollisionCategory, EntityId, COLLISION_MASK_ALL, COLLISION_MASK_NONE } from '../types';
+import { EntityId } from '../types';
 import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
-import { Radians, calculateThrowVelocity, angleDifference } from '../../utils';
+import { Radians, angleDifference } from '../../utils';
 import {
   calculateTotalEntityWeight,
   getAggregatedInteractionSlots,
   AggregatedSlot,
 } from '../utils/hierarchy';
-import { findActiveBrain } from '../utils/anatomy';
 import { getPartStatus, PartStatus } from '../utils/anatomyStatus';
 import {
   canItemBePickedUp,
   canItemBeEquippedToArea,
   canItemBeHeldInSlot,
 } from '../utils/itemValidation';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { EventBus } from '../../core/EventBus';
-import { LOGIC_CONFIG } from '../../ai/config';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 
 export class InteractionSystem {
@@ -42,7 +39,7 @@ export class InteractionSystem {
   public static requestEquip(
     world: World,
     entityId: EntityId,
-    slotIndex: number, // global slot index
+    slotIndex: number,
     areaId: string,
     containerId?: EntityId
   ): boolean {
@@ -81,7 +78,7 @@ export class InteractionSystem {
   public static requestUnequip(
     world: World,
     entityId: EntityId,
-    slotIndex: number, // global slot index
+    slotIndex: number,
     areaId: string,
     targetItemId: EntityId,
     containerId?: EntityId
@@ -123,114 +120,39 @@ export class InteractionSystem {
     return true;
   }
 
-  private processPickupIntents(world: World): void {
-    const intents = world.getEntitiesWith('pickupIntent', 'transform', 'health');
+  public dropItem(
+    world: World,
+    _physics: PhysicsSystem,
+    entityId: EntityId,
+    globalSlotIndex: number
+  ): void {
+    const aggSlots = getAggregatedInteractionSlots(world, entityId);
+    const slotInfo = aggSlots[globalSlotIndex];
+    if (!slotInfo || !slotInfo.slot.itemId) return;
 
-    for (const [id, { pickupIntent, transform, health }] of intents) {
-      world.removeComponent(id, 'pickupIntent');
+    if (world.getComponent(entityId, 'interactionAction')) return;
 
-      if (!health.isAlive) continue;
-      if (world.getComponent(id, 'interactionAction')) continue;
+    const movementStats = world.getComponent(entityId, 'movementStats');
+    const prepTime = movementStats?.dropPrepTime?.current ?? 0.1;
 
-      const targetItemId = pickupIntent.targetItemId;
-      const targetTransform = world.getComponent(targetItemId, 'transform');
-      const targetItem = world.getComponent(targetItemId, 'item');
-      const targetPhysStats = world.getComponent(targetItemId, 'physicsStats');
-      const targetOwnership = world.getComponent(targetItemId, 'ownership');
-
-      if (!targetTransform || !targetItem || !targetPhysStats || targetOwnership) {
-        continue;
-      }
-
-      // ... проверка на уже запущенные действия ...
-      let isTargetAlreadyTargeted = false;
-      const activeInteractions = world.getEntitiesWith('interactionAction');
-      for (const [, { interactionAction }] of activeInteractions) {
-        if (
-          interactionAction.type === 'pickup' &&
-          interactionAction.targetId === targetItemId &&
-          interactionAction.phase !== 'abort_reach' &&
-          interactionAction.phase !== 'abort_lift'
-        ) {
-          isTargetAlreadyTargeted = true;
-          break;
-        }
-      }
-      if (isTargetAlreadyTargeted) continue;
-
-      const dx = targetTransform.x - transform.x;
-      const dz = targetTransform.z - transform.z;
-      const distXZ = Math.hypot(dx, dz);
-
-      const myPhysStats = world.getComponent(id, 'physicsStats');
-      const myRadius = myPhysStats?.radius.current ?? 0.4;
-      const myBaseHeight = myPhysStats?.height.current ?? 1.8;
-
-      const targetRadius = targetPhysStats.radius.current ?? 0.15;
-      const distBetweenBorders = Math.max(0, distXZ - myRadius - targetRadius);
-
-      // --- ВЕРТИКАЛЬНАЯ ПРОВЕРКА ---
-      const meta = world.getComponent(id, 'meta');
-      const stance = meta?.stance ?? 'standing';
-      let stanceMult =
-        BALANCE_CONFIG.creature.stanceHeightMultipliers[
-          stance as keyof typeof BALANCE_CONFIG.creature.stanceHeightMultipliers
-        ] ?? 1.0;
-
-      if (stance.includes('stand_to_crouch') || stance.includes('crouch_to_stand'))
-        stanceMult = 0.82;
-      else if (stance.includes('stand_to_prone') || stance.includes('prone_to_stand'))
-        stanceMult = 0.62;
-      else if (stance.includes('crouch_to_prone') || stance.includes('prone_to_crouch'))
-        stanceMult = 0.45;
-
-      const currentHeight = myBaseHeight * stanceMult;
-
-      // Вертикальный цилиндр подбора: от уровня ниже стоп на 20% до 20% выше макушки
-      const yMin = transform.y - currentHeight * 0.2;
-      const yMax = transform.y + currentHeight * 1.2;
-      const isWithinVerticalReach = targetTransform.y >= yMin && targetTransform.y <= yMax;
-
-      const aggSlots = getAggregatedInteractionSlots(world, id);
-      let bestSlotInfo: AggregatedSlot | null = null;
-      let maxStrength = -Infinity;
-
-      for (const info of aggSlots) {
-        if (
-          !info.isBroken &&
-          info.slot.itemId === null &&
-          distBetweenBorders <= info.slot.interactDist &&
-          isWithinVerticalReach
-        ) {
-          if (info.slot.strength > maxStrength) {
-            maxStrength = info.slot.strength;
-            bestSlotInfo = info;
-          }
-        }
-      }
-
-      if (!bestSlotInfo) {
-        continue;
-      }
-
-      world.addComponent(id, 'interactionAction', {
-        type: 'pickup',
-        phase: 'reach',
-        targetId: targetItemId,
-        slotIndex: bestSlotInfo.localSlotIndex,
-        partId: bestSlotInfo.partId,
-        slotKind: bestSlotInfo.slot.slotKind ?? 'left_hand',
-        targetItemPos: { x: targetTransform.x, y: targetTransform.y, z: targetTransform.z },
-        timer: GAMEPLAY_CONFIG.pickupReachDuration,
-        totalDuration: GAMEPLAY_CONFIG.pickupReachDuration,
-        elapsedInReach: 0,
-      });
-    }
+    world.addComponent(entityId, 'interactionAction', {
+      type: 'drop',
+      phase: 'drop_prep',
+      slotIndex: slotInfo.localSlotIndex,
+      partId: slotInfo.partId,
+      slotKind: slotInfo.slot.slotKind ?? 'left_hand',
+      timer: prepTime,
+      totalDuration: prepTime,
+    });
   }
 
   public cancelInteraction(world: World, physics: PhysicsSystem, entityId: EntityId): boolean {
     const action = world.getComponent(entityId, 'interactionAction');
     if (!action) return false;
+
+    if (action.type === 'throw') {
+      return false; // Делегируется в ThrowingSystem
+    }
 
     if (action.type === 'pickup') {
       if (action.phase === 'reach') {
@@ -318,86 +240,21 @@ export class InteractionSystem {
       if (action.phase === 'abort_drop' || action.phase === 'drop_recovery') {
         return false;
       }
-    } else if (action.type === 'throw') {
-      // В первой фазе поворота откат анимации не нужен — мгновенно отдаем контроль
-      if (action.phase === 'throw_turn') {
-        world.removeComponent(entityId, 'interactionAction');
-        return true;
-      }
-      if (action.phase === 'throw_prep') {
-        const elapsed = Math.max(0.01, action.totalDuration - action.timer);
-        action.phase = 'abort_throw';
-        action.timer = elapsed;
-        action.totalDuration = elapsed;
-        action.wantsCancel = false;
-        return true;
-      }
-      if (action.phase === 'abort_throw' || action.phase === 'throw_recovery') {
-        return false;
-      }
     }
 
     world.removeComponent(entityId, 'interactionAction');
     return true;
   }
 
-  private processDropIntents(world: World, physics: PhysicsSystem): void {
-    const intents = world.getEntitiesWith('dropItemIntent', 'health');
-
-    for (const [id, { dropItemIntent, health }] of intents) {
-      world.removeComponent(id, 'dropItemIntent');
-
-      if (!health.isAlive) continue;
-      this.dropItem(world, physics, id, dropItemIntent.slotIndex);
-    }
-  }
-
-  private processThrowIntents(world: World): void {
-    const intents = world.getEntitiesWith('throwItemIntent', 'health', 'transform');
-
-    for (const [id, { throwItemIntent, health, transform }] of intents) {
-      world.removeComponent(id, 'throwItemIntent');
-
-      if (!health.isAlive) continue;
-      if (world.getComponent(id, 'interactionAction')) continue;
-
-      const aggSlots = getAggregatedInteractionSlots(world, id);
-      const slotInfo = aggSlots[throwItemIntent.slotIndex];
-      if (!slotInfo || !slotInfo.slot.itemId) continue;
-
-      const meta = world.getComponent(id, 'meta');
-      const input = world.getComponent(id, 'input');
-
-      // Бросок разрешен в стойках standing и crouching. Если лежит — переводим в присед
-      if (meta?.stance === 'prone' || meta?.stance?.includes('prone')) {
-        if (input) input.desiredStance = 'crouching';
-        continue;
-      }
-      if (meta?.stance === 'airborne' || meta?.stance === 'sliding') {
-        continue;
-      }
-
-      world.addComponent(id, 'interactionAction', {
-        type: 'throw',
-        phase: 'throw_turn',
-        slotIndex: slotInfo.localSlotIndex,
-        partId: slotInfo.partId,
-        slotKind: slotInfo.slot.slotKind ?? 'left_hand',
-        targetItemPos: throwItemIntent.targetPos,
-        timer: 0,
-        totalDuration: 0,
-      });
-    }
-  }
-
   public update(dt: number, world: World, physics: PhysicsSystem): void {
     this.processPickupIntents(world);
     this.processDropIntents(world, physics);
-    this.processThrowIntents(world);
 
     const entities = world.getEntitiesWith('interactionAction', 'transform', 'health');
 
     for (const [id, { interactionAction, transform, health }] of entities) {
+      if (interactionAction.type === 'throw') continue; // Обрабатывается в ThrowingSystem
+
       const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
       const localDt = dt * ts;
 
@@ -440,56 +297,6 @@ export class InteractionSystem {
         continue;
       }
 
-      if (interactionAction.type === 'throw') {
-        if (interactionAction.phase === 'throw_turn') {
-          // Проверяем достижение требуемого угла поворота (до 15 градусов)
-          if (interactionAction.targetItemPos) {
-            const dx = interactionAction.targetItemPos.x - transform.x;
-            const dz = interactionAction.targetItemPos.z - transform.z;
-            const targetAngle = Math.atan2(dz, dx);
-            const diff = Math.abs(angleDifference(targetAngle, transform.angle));
-
-            const tolerance = LOGIC_CONFIG.throwTurnTolerance ?? Math.PI / 12;
-
-            if (diff <= tolerance) {
-              const movementStats = world.getComponent(id, 'movementStats');
-              const prepTime = movementStats?.throwPrepTime?.current ?? 0.25;
-
-              interactionAction.phase = 'throw_prep';
-              interactionAction.timer = prepTime;
-              interactionAction.totalDuration = prepTime;
-            }
-          }
-        } else if (interactionAction.phase === 'throw_prep') {
-          interactionAction.timer -= localDt;
-          if (interactionAction.timer <= 0) {
-            if (interactionAction.partId && interactionAction.targetItemPos) {
-              this.executePhysicalThrow(
-                world,
-                physics,
-                id,
-                interactionAction.partId,
-                interactionAction.targetItemPos
-              );
-            }
-            const movementStats = world.getComponent(id, 'movementStats');
-            const recTime = movementStats?.throwRecoveryTime?.current ?? 0.2;
-
-            interactionAction.phase = 'throw_recovery';
-            interactionAction.timer = recTime;
-            interactionAction.totalDuration = recTime;
-          }
-        } else if (
-          interactionAction.phase === 'throw_recovery' ||
-          interactionAction.phase === 'abort_throw'
-        ) {
-          interactionAction.timer -= localDt;
-          if (interactionAction.timer <= 0) {
-            world.removeComponent(id, 'interactionAction');
-          }
-        }
-        continue;
-      }
       if (interactionAction.type === 'pickup') {
         if (interactionAction.phase === 'reach') {
           interactionAction.elapsedInReach = (interactionAction.elapsedInReach ?? 0) + localDt;
@@ -594,16 +401,6 @@ export class InteractionSystem {
             const ownerPartId = interactionAction.partId || id;
             world.addComponent(targetId, 'ownership', { ownerId: ownerPartId, status: 'equipped' });
             world.removeComponent(targetId, 'thrownObject');
-
-            const fetchStick = world.getComponent(targetId, 'fetchStick');
-            if (fetchStick) {
-              if (id === fetchStick.ownerMasterId) {
-                fetchStick.state = 'held_by_master';
-              } else {
-                fetchStick.state = 'held_by_dog';
-                fetchStick.lastCarrierDogId = id;
-              }
-            }
 
             EventBus.emit('inventory:updated');
 
@@ -726,30 +523,117 @@ export class InteractionSystem {
     }
   }
 
-  public dropItem(
-    world: World,
-    physics: PhysicsSystem,
-    entityId: EntityId,
-    globalSlotIndex: number
-  ): void {
-    const aggSlots = getAggregatedInteractionSlots(world, entityId);
-    const slotInfo = aggSlots[globalSlotIndex];
-    if (!slotInfo || !slotInfo.slot.itemId) return;
+  private processPickupIntents(world: World): void {
+    const intents = world.getEntitiesWith('pickupIntent', 'transform', 'health');
 
-    if (world.getComponent(entityId, 'interactionAction')) return;
+    for (const [id, { pickupIntent, transform, health }] of intents) {
+      world.removeComponent(id, 'pickupIntent');
 
-    const movementStats = world.getComponent(entityId, 'movementStats');
-    const prepTime = movementStats?.dropPrepTime?.current ?? 0.1;
+      if (!health.isAlive) continue;
+      if (world.getComponent(id, 'interactionAction')) continue;
 
-    world.addComponent(entityId, 'interactionAction', {
-      type: 'drop',
-      phase: 'drop_prep',
-      slotIndex: slotInfo.localSlotIndex,
-      partId: slotInfo.partId,
-      slotKind: slotInfo.slot.slotKind ?? 'left_hand',
-      timer: prepTime,
-      totalDuration: prepTime,
-    });
+      const targetItemId = pickupIntent.targetItemId;
+      const targetTransform = world.getComponent(targetItemId, 'transform');
+      const targetItem = world.getComponent(targetItemId, 'item');
+      const targetPhysStats = world.getComponent(targetItemId, 'physicsStats');
+      const targetOwnership = world.getComponent(targetItemId, 'ownership');
+
+      if (!targetTransform || !targetItem || !targetPhysStats || targetOwnership) {
+        continue;
+      }
+
+      let isTargetAlreadyTargeted = false;
+      const activeInteractions = world.getEntitiesWith('interactionAction');
+      for (const [, { interactionAction }] of activeInteractions) {
+        if (
+          interactionAction.type === 'pickup' &&
+          interactionAction.targetId === targetItemId &&
+          interactionAction.phase !== 'abort_reach' &&
+          interactionAction.phase !== 'abort_lift'
+        ) {
+          isTargetAlreadyTargeted = true;
+          break;
+        }
+      }
+      if (isTargetAlreadyTargeted) continue;
+
+      const dx = targetTransform.x - transform.x;
+      const dz = targetTransform.z - transform.z;
+      const distXZ = Math.hypot(dx, dz);
+
+      const myPhysStats = world.getComponent(id, 'physicsStats');
+      const myRadius = myPhysStats?.radius.current ?? 0.4;
+      const myBaseHeight = myPhysStats?.height.current ?? 1.8;
+
+      const targetRadius = targetPhysStats.radius.current ?? 0.15;
+      const distBetweenBorders = Math.max(0, distXZ - myRadius - targetRadius);
+
+      const meta = world.getComponent(id, 'meta');
+      const stance = meta?.stance ?? 'standing';
+      let stanceMult =
+        BALANCE_CONFIG.creature.stanceHeightMultipliers[
+          stance as keyof typeof BALANCE_CONFIG.creature.stanceHeightMultipliers
+        ] ?? 1.0;
+
+      if (stance.includes('stand_to_crouch') || stance.includes('crouch_to_stand'))
+        stanceMult = 0.82;
+      else if (stance.includes('stand_to_prone') || stance.includes('prone_to_stand'))
+        stanceMult = 0.62;
+      else if (stance.includes('crouch_to_prone') || stance.includes('prone_to_crouch'))
+        stanceMult = 0.45;
+
+      const currentHeight = myBaseHeight * stanceMult;
+
+      const yMin = transform.y - currentHeight * 0.2;
+      const yMax = transform.y + currentHeight * 1.2;
+      const isWithinVerticalReach = targetTransform.y >= yMin && targetTransform.y <= yMax;
+
+      const aggSlots = getAggregatedInteractionSlots(world, id);
+      let bestSlotInfo: AggregatedSlot | null = null;
+      let maxStrength = -Infinity;
+
+      for (const info of aggSlots) {
+        if (
+          !info.isBroken &&
+          info.slot.itemId === null &&
+          distBetweenBorders <= info.slot.interactDist &&
+          isWithinVerticalReach
+        ) {
+          if (info.slot.strength > maxStrength) {
+            maxStrength = info.slot.strength;
+            bestSlotInfo = info;
+          }
+        }
+      }
+
+      if (!bestSlotInfo) {
+        continue;
+      }
+
+      world.addComponent(id, 'interactionAction', {
+        type: 'pickup',
+        phase: 'reach',
+        targetId: targetItemId,
+        slotIndex: bestSlotInfo.localSlotIndex,
+        partId: bestSlotInfo.partId,
+        slotKind: bestSlotInfo.slot.slotKind ?? 'left_hand',
+        targetItemPos: { x: targetTransform.x, y: targetTransform.y, z: targetTransform.z },
+        timer: GAMEPLAY_CONFIG.pickupReachDuration,
+        totalDuration: GAMEPLAY_CONFIG.pickupReachDuration,
+        elapsedInReach: 0,
+      });
+    }
+  }
+
+  private processDropIntents(world: World, physics: PhysicsSystem): void {
+    const intents = world.getEntitiesWith('dropItemIntent', 'health');
+
+    for (const [id, { dropItemIntent, health }] of intents) {
+      world.removeComponent(id, 'dropItemIntent');
+
+      if (!health.isAlive) continue;
+      this.dropItem(world, physics, id, dropItemIntent.slotIndex);
+    }
   }
 
   private executePhysicalDrop(
@@ -766,14 +650,6 @@ export class InteractionSystem {
     slot.itemId = null;
 
     world.removeComponent(itemId, 'ownership');
-
-    const fetchStick = world.getComponent(itemId, 'fetchStick');
-    if (fetchStick) {
-      if (fetchStick.state === 'held_by_dog') {
-        fetchStick.state = 'delivered';
-      }
-    }
-
     EventBus.emit('inventory:updated');
 
     const renderable = world.getComponent(itemId, 'renderable');
@@ -787,7 +663,6 @@ export class InteractionSystem {
     if (itemTransform && physStats) {
       const itemRadius = physStats.radius.current ?? 0.3;
       const creatureRadius = world.getComponent(entityId, 'physicsStats')?.radius.current ?? 0.4;
-
       const defaultDropOffset = creatureRadius + itemRadius + 0.05;
 
       const currentStance = world.getComponent(entityId, 'meta')?.stance || 'standing';
@@ -803,7 +678,6 @@ export class InteractionSystem {
       let dropOffset = defaultDropOffset;
       let isConstrainedByObstacle = false;
 
-      // Трассировка луча: проверка наличия препятствий на пути броска
       if (physics.driver && physics.driver.isReady) {
         const rayStart = { x: transform.x, y: dropY, z: transform.z };
         const hits = physics.driver.castRayMultiple(
@@ -821,7 +695,6 @@ export class InteractionSystem {
           const hitPhysStats = world.getComponent(hit.entityId, 'physicsStats');
 
           if (hitArch === 'obstacle' && hitPhysStats?.isSolid !== false) {
-            // Препятствие обнаружено ближе стандартной дистанции выноса
             const L = hit.toi;
             dropOffset = L - (itemRadius + 0.05);
             isConstrainedByObstacle = true;
@@ -846,116 +719,6 @@ export class InteractionSystem {
         const impulseMag = weight * targetVelocity;
         rawBody.applyImpulse({ x: dir.x * impulseMag, y: 0, z: dir.z * impulseMag }, true);
       }
-    }
-  }
-
-  private executePhysicalThrow(
-    world: World,
-    physics: PhysicsSystem,
-    entityId: EntityId,
-    partId: EntityId,
-    targetPos: import('../../types').Vec3
-  ): void {
-    const slot = world.getComponent(partId, 'interactionSlots');
-    const transform = world.getComponent(entityId, 'transform');
-    if (!slot || !slot.itemId || !transform) return;
-
-    const itemId = slot.itemId;
-    slot.itemId = null;
-
-    world.removeComponent(itemId, 'ownership');
-
-    const fetchStick = world.getComponent(itemId, 'fetchStick');
-    if (fetchStick) {
-      fetchStick.state = 'thrown';
-    }
-
-    EventBus.emit('inventory:updated');
-
-    const renderable = world.getComponent(itemId, 'renderable');
-    if (renderable) {
-      renderable.isVisible = true;
-    }
-
-    const itemTransform = world.getComponent(itemId, 'transform');
-    const physStats = world.getComponent(itemId, 'physicsStats');
-
-    if (itemTransform && physStats) {
-      const itemRadius = physStats.radius.current ?? 0.3;
-      const creatureRadius = world.getComponent(entityId, 'physicsStats')?.radius.current ?? 0.4;
-      const defaultDropOffset = creatureRadius + itemRadius + 0.05;
-
-      const currentStance = world.getComponent(entityId, 'meta')?.stance || 'standing';
-      let creatureHeight = 1.8;
-      if (currentStance.includes('crouch')) creatureHeight = 1.2;
-      else if (currentStance.includes('prone')) creatureHeight = 0.4;
-
-      const comY = transform.y + creatureHeight * 0.65;
-      const spawnY = Math.max(transform.y + itemRadius, comY);
-
-      const dir = { x: Math.cos(transform.angle), y: 0, z: Math.sin(transform.angle) };
-
-      let spawnOffset = defaultDropOffset;
-      let isConstrainedByObstacle = false;
-
-      // Проверка препятствия непосредственно перед носом персонажа
-      if (physics.driver && physics.driver.isReady) {
-        const rayStart = { x: transform.x, y: spawnY, z: transform.z };
-        const hits = physics.driver.castRayMultiple(
-          rayStart,
-          dir,
-          defaultDropOffset,
-          true,
-          entityId
-        );
-
-        for (const hit of hits) {
-          const hitTag = world.getComponent(hit.entityId, 'tag');
-          const hitMeta = world.getComponent(hit.entityId, 'meta');
-          const hitArch = hitTag?.archetype ?? hitMeta?.entityType;
-          const hitPhysStats = world.getComponent(hit.entityId, 'physicsStats');
-
-          if (hitArch === 'obstacle' && hitPhysStats?.isSolid !== false) {
-            const L = hit.toi;
-            spawnOffset = L - (itemRadius + 0.05);
-            isConstrainedByObstacle = true;
-            break;
-          }
-        }
-      }
-
-      const endX = transform.x + dir.x * spawnOffset;
-      const endZ = transform.z + dir.z * spawnOffset;
-
-      itemTransform.x = endX;
-      itemTransform.y = spawnY;
-      itemTransform.z = endZ;
-      // ВАЖНО: не выставляем isDirty = true, иначе syncDirtyTransforms обнулит скорость броска в setLinvel(0,0,0)
-      itemTransform.isDirty = false;
-
-      const rawBody = physics.createDynamicItemBody(world, itemId, { x: endX, y: spawnY, z: endZ });
-
-      if (rawBody && !isConstrainedByObstacle) {
-        const startPos = { x: endX, y: spawnY, z: endZ };
-        const strength = slot.strength ?? 15;
-        const weight = physStats.weight.current ?? 1;
-        const vel = calculateThrowVelocity(startPos, targetPos, strength, weight);
-
-        rawBody.applyImpulse({ x: vel.x * weight, y: vel.y * weight, z: vel.z * weight }, true);
-        rawBody.setLinvel({ x: vel.x, y: vel.y, z: vel.z }, true);
-        rawBody.wakeUp();
-
-        rawBody.setAngvel(
-          { x: (Math.random() - 0.5) * 4, y: 2.0, z: (Math.random() - 0.5) * 4 },
-          true
-        );
-      }
-
-      world.addComponent(itemId, 'thrownObject', {
-        throwerId: entityId,
-        timestamp: Date.now(),
-        isAirborne: true,
-      });
     }
   }
 }

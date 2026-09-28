@@ -18,6 +18,7 @@ import { getRootOwner } from '../ecs/utils/hierarchy';
 import { EventBus } from '../core/EventBus';
 import { TerrainBrushController } from '../editor/TerrainBrushController';
 import { TerrainModifyCommand } from '../history/commands/TerrainModifyCommand';
+import { spawnFetchGroup } from '../ecs/prefabs/fetchGroupPrefab';
 import { t } from '../locales';
 
 interface UseCanvasInteractionProps {
@@ -500,7 +501,6 @@ export const useCanvasInteraction = ({
       } else if (placementMode.kind === 'prefab') {
         if (placementMode.prefabId === 'fetch_group') {
           app.executeTransaction(t('history.spawnFetchGroup'), () => {
-            const { spawnFetchGroup } = require('../ecs/prefabs/fetchGroupPrefab');
             const result = spawnFetchGroup(app.simulation, spawnPos);
             app.selection.selectEntities([result.masterId, ...result.dogIds]);
             return result.masterId;
