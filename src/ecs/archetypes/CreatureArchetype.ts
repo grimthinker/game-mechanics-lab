@@ -62,6 +62,10 @@ export function assembleCreature(
     backwardTurnMultiplier: config.movement?.backwardTurnMultiplier ?? 0.6,
     pickupSpeedMultiplier: config.movement?.pickupSpeedMultiplier ?? 0.5,
     pickupTurnMultiplier: config.movement?.pickupTurnMultiplier ?? 1.1,
+    swimSpeedMultiplier:
+      config.movement?.swimSpeedMultiplier ?? BALANCE_CONFIG.creature.swimSpeedMultiplier,
+    wadingSpeedMultiplier:
+      config.movement?.wadingSpeedMultiplier ?? BALANCE_CONFIG.creature.wadingSpeedMultiplier,
     standToCrouchTime: createStat(
       config.movement?.standToCrouchTime ?? BALANCE_CONFIG.creature.transitions.standToCrouch
     ),

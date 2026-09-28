@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EnvironmentComponent } from '../../ecs/components/environment';
 import { SkyDome, SkyColors } from './SkyDome';
+import { GRAPHICS_CONFIG } from '../../config/graphicsConfig';
 
 export class EnvironmentManager {
   private skyDome: SkyDome;
@@ -36,20 +37,22 @@ export class EnvironmentManager {
   }
 
   private setupShadowCamera(light: THREE.DirectionalLight): void {
+    const cfg = GRAPHICS_CONFIG.shadows;
     light.castShadow = false;
-    light.shadow.mapSize.width = 4096;
-    light.shadow.mapSize.height = 4096;
-    light.shadow.bias = -0.00003;
-    light.shadow.normalBias = 0.025;
+    light.shadow.mapSize.width = cfg.mapSize;
+    light.shadow.mapSize.height = cfg.mapSize;
+    light.shadow.bias = cfg.bias;
+    light.shadow.normalBias = cfg.normalBias;
+    light.shadow.radius = cfg.radius;
 
     const cam = light.shadow.camera;
-    const bounds = 36;
+    const bounds = cfg.bounds;
     cam.left = -bounds;
     cam.right = bounds;
     cam.top = bounds;
     cam.bottom = -bounds;
-    cam.near = 1.0;
-    cam.far = 160.0;
+    cam.near = cfg.near;
+    cam.far = cfg.far;
   }
 
   public update(
@@ -115,7 +118,7 @@ export class EnvironmentManager {
     dir: THREE.Vector3,
     target: { x: number; y: number; z: number }
   ): void {
-    const dist = 60.0;
+    const dist = GRAPHICS_CONFIG.shadows.distance;
     light.position.set(
       target.x + dir.x * dist,
       target.y + Math.max(10, dir.y * dist),

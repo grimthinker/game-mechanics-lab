@@ -417,16 +417,24 @@ export class ThreeSyncSystem {
                 u.uSunColor.value.copy(sunColor);
                 u.uAmbientColor.value.copy(ambientColor);
 
-                // Реактивные параметры из Инспектора
-                if (waterComp.color) {
+                // Реактивные параметры из Инспектора с защитой от отсутствующих юниформов
+                if (waterComp.color && u.uColor) {
                   u.uColor.value.set(waterComp.color);
-                  u.uDeepColor.value.set(waterComp.color).multiplyScalar(0.65);
                 }
-                u.uOpacity.value = waterComp.opacity ?? 0.8;
-                u.uWaveSpeed.value = waterComp.waveSpeed ?? 1.2;
-                u.uWaveHeight.value = waterComp.waveHeight ?? 0.12;
-                u.uFlowSpeed.value = waterComp.flowSpeed ?? 0.0;
-                if (waterComp.flowDirection) {
+                if (u.uDeepColor) {
+                  if (waterComp.deepColor) {
+                    u.uDeepColor.value.set(waterComp.deepColor);
+                  } else if (waterComp.color) {
+                    u.uDeepColor.value.set(waterComp.color).multiplyScalar(0.55);
+                  }
+                }
+                if (u.uOpacity) u.uOpacity.value = waterComp.opacity ?? 0.88;
+                if (u.uShallowOpacity) u.uShallowOpacity.value = waterComp.shallowOpacity ?? 0.25;
+                if (u.uClarity) u.uClarity.value = waterComp.clarity ?? 2.5;
+                if (u.uWaveSpeed) u.uWaveSpeed.value = waterComp.waveSpeed ?? 1.2;
+                if (u.uWaveHeight) u.uWaveHeight.value = waterComp.waveHeight ?? 0.12;
+                if (u.uFlowSpeed) u.uFlowSpeed.value = waterComp.flowSpeed ?? 0.0;
+                if (waterComp.flowDirection && u.uFlowDirection) {
                   u.uFlowDirection.value.set(waterComp.flowDirection.x, waterComp.flowDirection.z);
                   if (u.uFlowDirection.value.lengthSq() > 0.001) {
                     u.uFlowDirection.value.normalize();

@@ -251,6 +251,29 @@ export const Inspector: React.FC<InspectorProps> = ({
   const inv = world.getComponent(targetId, 'inventory');
   const isBagEmpty = !inv || inv.slots.every((r) => r.every((c) => !c.itemId));
 
+  // Проверка применимости разделов к архетипу сущности
+  const canHavePhysicalStats =
+    currentArchetype === 'creature' ||
+    currentArchetype === 'bodyPart' ||
+    currentArchetype === 'item' ||
+    currentArchetype === 'obstacle';
+
+  const canHaveEquip =
+    currentArchetype === 'creature' ||
+    currentArchetype === 'bodyPart' ||
+    currentArchetype === 'item';
+
+  const canHaveInventory =
+    (currentArchetype === 'item' ||
+      currentArchetype === 'creature' ||
+      currentArchetype === 'bodyPart' ||
+      world.getComponent(targetId, 'inventory') !== undefined) &&
+    currentArchetype !== 'water' &&
+    currentArchetype !== 'environment' &&
+    currentArchetype !== 'terrain' &&
+    currentArchetype !== 'zone' &&
+    currentArchetype !== 'marker';
+
   const commonProps = {
     targetId,
     world,
@@ -323,6 +346,7 @@ export const Inspector: React.FC<InspectorProps> = ({
           {renderSection('meta', t('inspector.meta'), <MetaInspector {...commonProps} />)}
 
           {world.getComponent(targetId, 'physicsStats') &&
+            canHavePhysicalStats &&
             renderSection('physics', t('inspector.physics'), <PhysicsInspector {...commonProps} />)}
 
           {world.getComponent(targetId, 'health') &&
@@ -445,88 +469,90 @@ export const Inspector: React.FC<InspectorProps> = ({
               <InteractionSlotsInspector {...commonProps} onNavigate={pushPath} />
             )}
 
-          {renderSection(
-            'equip',
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>{t('inspector.equip')}</span>
-              {!isReadOnly && currentArchetype !== 'creature' && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{
-                    backgroundColor: '#27ae60',
-                    color: '#fff',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                    marginLeft: '8px',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (app) {
-                      app.mutations.addEquipmentArea(targetId);
-                      requestCommit(t('history.equipAdd'));
-                    }
-                  }}
-                >
-                  {t('inspector.addArea')}
-                </button>
-              )}
-            </div>,
-            <EquipmentInspector {...commonProps} onNavigate={pushPath} />
-          )}
+          {canHaveEquip &&
+            renderSection(
+              'equip',
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span>{t('inspector.equip')}</span>
+                {!isReadOnly && currentArchetype !== 'creature' && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{
+                      backgroundColor: '#27ae60',
+                      color: '#fff',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      marginLeft: '8px',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (app) {
+                        app.mutations.addEquipmentArea(targetId);
+                        requestCommit(t('history.equipAdd'));
+                      }
+                    }}
+                  >
+                    {t('inspector.addArea')}
+                  </button>
+                )}
+              </div>,
+              <EquipmentInspector {...commonProps} onNavigate={pushPath} />
+            )}
 
-          {renderSection(
-            'inventory',
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                width: '100%',
-              }}
-            >
-              <span>{t('inspector.inventory')}</span>
-              {currentArchetype === 'item' && !isReadOnly && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  style={{
-                    backgroundColor: inv ? '#c0392b' : '#27ae60',
-                    color: '#fff',
-                    padding: '2px 6px',
-                    fontSize: '10px',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (inv) {
-                      if (isBagEmpty) {
-                        if (app) {
-                          app.mutations.setEntityInventoryGrid(targetId, false);
-                          requestCommit(t('history.gridRemove'));
+          {canHaveInventory &&
+            renderSection(
+              'inventory',
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  width: '100%',
+                }}
+              >
+                <span>{t('inspector.inventory')}</span>
+                {currentArchetype === 'item' && !isReadOnly && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{
+                      backgroundColor: inv ? '#c0392b' : '#27ae60',
+                      color: '#fff',
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (inv) {
+                        if (isBagEmpty) {
+                          if (app) {
+                            app.mutations.setEntityInventoryGrid(targetId, false);
+                            requestCommit(t('history.gridRemove'));
+                          }
+                        } else {
+                          alert(t('inspector.invRemoveWarn'));
                         }
                       } else {
-                        alert(t('inspector.invRemoveWarn'));
+                        if (app) {
+                          app.mutations.setEntityInventoryGrid(targetId, true);
+                          requestCommit(t('history.gridAdd'));
+                        }
                       }
-                    } else {
-                      if (app) {
-                        app.mutations.setEntityInventoryGrid(targetId, true);
-                        requestCommit(t('history.gridAdd'));
-                      }
-                    }
-                  }}
-                >
-                  {inv ? t('inspector.removeGrid') : t('inspector.addGrid')}
-                </button>
-              )}
-            </div>,
-            <InventoryInspector targetId={targetId} world={world} onNavigate={pushPath} />
-          )}
+                    }}
+                  >
+                    {inv ? t('inspector.removeGrid') : t('inspector.addGrid')}
+                  </button>
+                )}
+              </div>,
+              <InventoryInspector targetId={targetId} world={world} onNavigate={pushPath} />
+            )}
         </form>
 
         {path.length === 1 && !isReadOnly && (

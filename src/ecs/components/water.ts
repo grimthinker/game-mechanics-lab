@@ -5,12 +5,20 @@ export interface WaterComponent {
   width: number;
   /** Длина водной глади по оси Z (в метрах) */
   depth: number;
+  /** Вертикальная глубина водоема вниз от поверхности (в метрах) */
+  maxDepth: number;
   /** Тип водоема: стоячее озеро или река с течением */
   waterType: WaterBodyType;
-  /** Цвет воды (Hex / CSS) */
+  /** Цвет воды у берега / на мелководье (Hex / CSS) */
   color: string;
-  /** Прозрачность (от 0.0 до 1.0) */
+  /** Цвет воды на глубине / в омуте (Hex / CSS) */
+  deepColor: string;
+  /** Непрозрачность воды на глубине (от 0.0 до 1.0) */
   opacity: number;
+  /** Прозрачность воды у самой кромки берега (от 0.0 до 1.0) */
+  shallowOpacity: number;
+  /** Дистанция прозрачности в метрах (на какой глубине вода становится полностью темной) */
+  clarity: number;
   /** Скорость анимации волн */
   waveSpeed: number;
   /** Высота (амплитуда) волн в метрах */
@@ -28,9 +36,13 @@ export interface WaterComponent {
 export interface WaterConfig {
   width?: number;
   depth?: number;
+  maxDepth?: number;
   waterType?: WaterBodyType;
   color?: string;
+  deepColor?: string;
   opacity?: number;
+  shallowOpacity?: number;
+  clarity?: number;
   waveSpeed?: number;
   waveHeight?: number;
   flowDirection?: { x: number; z: number };

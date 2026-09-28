@@ -43,6 +43,7 @@ export class TerrainChunk {
     // Сдвигаем меш в правильное мировое положение (центр чанка)
     this.mesh.position.set(posX, 0, posZ);
 
+    this.mesh.castShadow = true;
     this.mesh.receiveShadow = true;
     this.mesh.userData.isTerrainMesh = true;
     this.mesh.userData.chunkId = id;

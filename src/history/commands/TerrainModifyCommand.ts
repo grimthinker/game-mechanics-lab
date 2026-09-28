@@ -33,6 +33,10 @@ export class TerrainModifyCommand implements ICommand {
         comp.foliageVersion = (comp.foliageVersion ?? 0) + 1;
       }
 
+      if (comp.dirtyChunks) {
+        comp.dirtyChunks.clear();
+      }
+
       comp.isGeometryDirty = true;
       comp.isSplatDirty = true;
       comp.isPhysicsDirty = true;

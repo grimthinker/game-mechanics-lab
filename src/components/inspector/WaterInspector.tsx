@@ -54,76 +54,256 @@ export const WaterInspector: React.FC<WaterInspectorProps> = ({
         </select>
       </label>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
-          Ширина X (м):
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.width}
-            min={1}
-            max={500}
-            step={1}
-            onChange={(e) => handleChange({ width: Math.max(1, Number(e.target.value)) })}
-          />
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
-          Длина Z (м):
-          <input
-            disabled={isReadOnly}
-            type="number"
-            value={values.depth}
-            min={1}
-            max={500}
-            step={1}
-            onChange={(e) => handleChange({ depth: Math.max(1, Number(e.target.value)) })}
-          />
-        </label>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '11px' }}>Цвет воды:</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <input
-            disabled={isReadOnly}
-            type="color"
-            value={values.color}
-            onChange={(e) => handleChange({ color: e.target.value })}
+      {/* Размеры водоема */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          padding: '8px',
+          backgroundColor: '#1b1b1b',
+          borderRadius: '4px',
+          border: '1px solid #333',
+        }}
+      >
+        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
+          Габариты водоема (метры)
+        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <label
             style={{
-              width: '32px',
-              height: '24px',
-              cursor: 'pointer',
-              border: 'none',
-              background: 'none',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#ecf0f1',
             }}
-          />
-          <input
-            disabled={isReadOnly}
-            type="text"
-            value={values.color}
-            onChange={(e) => handleChange({ color: e.target.value })}
-            style={{ width: '70px', padding: '2px 4px', fontSize: '11px' }}
-          />
+          >
+            <span>Ширина X:</span>
+            <input
+              disabled={isReadOnly}
+              type="number"
+              min={1}
+              max={500}
+              step={1}
+              value={values.width}
+              onChange={(e) => handleChange({ width: Math.max(1, Number(e.target.value)) })}
+              style={{
+                width: '110px',
+                padding: '2px 6px',
+                fontSize: '11px',
+                textAlign: 'right',
+                boxSizing: 'border-box',
+              }}
+            />
+          </label>
+          <label
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#ecf0f1',
+            }}
+          >
+            <span>Длина Z:</span>
+            <input
+              disabled={isReadOnly}
+              type="number"
+              min={1}
+              max={500}
+              step={1}
+              value={values.depth}
+              onChange={(e) => handleChange({ depth: Math.max(1, Number(e.target.value)) })}
+              style={{
+                width: '110px',
+                padding: '2px 6px',
+                fontSize: '11px',
+                textAlign: 'right',
+                boxSizing: 'border-box',
+              }}
+            />
+          </label>
+          <label
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '11px',
+              color: '#ecf0f1',
+            }}
+          >
+            <span>Глубина (maxDepth):</span>
+            <input
+              disabled={isReadOnly}
+              type="number"
+              min={0.2}
+              max={50}
+              step={0.5}
+              value={values.maxDepth ?? (values.waterType === 'river' ? 2.5 : 4.0)}
+              onChange={(e) => handleChange({ maxDepth: Math.max(0.2, Number(e.target.value)) })}
+              style={{
+                width: '110px',
+                padding: '2px 6px',
+                fontSize: '11px',
+                textAlign: 'right',
+                boxSizing: 'border-box',
+              }}
+            />
+          </label>
         </div>
       </div>
 
-      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Прозрачность:</span>
-          <span style={{ color: '#3498db' }}>{Math.round(values.opacity * 100)}%</span>
-        </div>
-        <input
-          disabled={isReadOnly}
-          type="range"
-          min="0.1"
-          max="1.0"
-          step="0.05"
-          value={values.opacity}
-          onChange={(e) => handleChange({ opacity: parseFloat(e.target.value) })}
-          style={{ accentColor: '#3498db', cursor: 'pointer' }}
-        />
-      </label>
+      {/* Настройка цветов градиента глубины */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          padding: '8px',
+          backgroundColor: '#1b1b1b',
+          borderRadius: '4px',
+          border: '1px solid #333',
+        }}
+      >
+        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#3498db' }}>
+          Цветовой градиент глубины
+        </span>
 
+        {/* Цвет у берега (мелководье) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px' }}>У берега (мелководье):</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              disabled={isReadOnly}
+              type="color"
+              value={values.color}
+              onChange={(e) => handleChange({ color: e.target.value })}
+              style={{
+                width: '30px',
+                height: '22px',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'none',
+              }}
+            />
+            <input
+              disabled={isReadOnly}
+              type="text"
+              value={values.color}
+              onChange={(e) => handleChange({ color: e.target.value })}
+              style={{ width: '68px', padding: '2px 4px', fontSize: '11px' }}
+            />
+          </div>
+        </div>
+
+        {/* Цвет на глубине (омут) */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px' }}>На глубине (омут):</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              disabled={isReadOnly}
+              type="color"
+              value={values.deepColor || '#0b3954'}
+              onChange={(e) => handleChange({ deepColor: e.target.value })}
+              style={{
+                width: '30px',
+                height: '22px',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'none',
+              }}
+            />
+            <input
+              disabled={isReadOnly}
+              type="text"
+              value={values.deepColor || '#0b3954'}
+              onChange={(e) => handleChange({ deepColor: e.target.value })}
+              style={{ width: '68px', padding: '2px 4px', fontSize: '11px' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Настройка прозрачности у берега и на глубине */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          padding: '8px',
+          backgroundColor: '#1b1b1b',
+          borderRadius: '4px',
+          border: '1px solid #333',
+        }}
+      >
+        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#2ecc71' }}>
+          Прозрачность и толща воды
+        </span>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Непрозрачность у берега:</span>
+            <span style={{ color: '#2ecc71' }}>
+              {Math.round((values.shallowOpacity ?? 0.25) * 100)}%
+            </span>
+          </div>
+          <input
+            disabled={isReadOnly}
+            type="range"
+            min="0.0"
+            max="1.0"
+            step="0.05"
+            value={values.shallowOpacity ?? 0.25}
+            onChange={(e) => handleChange({ shallowOpacity: parseFloat(e.target.value) })}
+            style={{ accentColor: '#2ecc71', cursor: 'pointer' }}
+          />
+        </label>
+
+        <label style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Непрозрачность на глубине:</span>
+            <span style={{ color: '#3498db' }}>{Math.round(values.opacity * 100)}%</span>
+          </div>
+          <input
+            disabled={isReadOnly}
+            type="range"
+            min="0.1"
+            max="1.0"
+            step="0.05"
+            value={values.opacity}
+            onChange={(e) => handleChange({ opacity: parseFloat(e.target.value) })}
+            style={{ accentColor: '#3498db', cursor: 'pointer' }}
+          />
+        </label>
+
+        <label
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '11px',
+            marginTop: '2px',
+          }}
+        >
+          <span>Дистанция затемнения (м):</span>
+          <input
+            disabled={isReadOnly}
+            type="number"
+            min="0.2"
+            max="20.0"
+            step="0.2"
+            value={values.clarity ?? 2.5}
+            onChange={(e) =>
+              handleChange({ clarity: Math.max(0.2, parseFloat(e.target.value) || 2.5) })
+            }
+            style={{ width: '60px', padding: '2px', textAlign: 'right' }}
+            title="Глубина в метрах, на которой вода полностью темнеет и становится глубокой"
+          />
+        </label>
+      </div>
+
+      {/* Параметры волн */}
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span>Высота волн:</span>
@@ -158,6 +338,7 @@ export const WaterInspector: React.FC<WaterInspectorProps> = ({
         />
       </label>
 
+      {/* Параметры реки */}
       {values.waterType === 'river' && (
         <div
           style={{
@@ -236,6 +417,7 @@ export const WaterInspector: React.FC<WaterInspectorProps> = ({
         </div>
       )}
 
+      {/* Плотность и вязкость */}
       <div
         style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}
       >

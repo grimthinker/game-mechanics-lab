@@ -16,6 +16,7 @@ import { LOGIC_CONFIG } from '../ai/config';
 import { IModelPreview } from './IModelPreview';
 import { ThreeModelPreview } from './ThreeModelPreview';
 import { TERRAIN_CONFIG } from '../config/terrainConfig';
+import { GRAPHICS_CONFIG } from '../config/graphicsConfig';
 
 const DASH_THROW_TRAJECTORY = [5, 5];
 const DASH_EMPTY: number[] = [];
@@ -47,6 +48,7 @@ export class ThreeRenderer implements IRenderer {
   private intersectionPoint = new THREE.Vector3();
   private mouseNDC = new THREE.Vector2();
   private _pickableObjects: THREE.Object3D[] = [];
+  private depthRenderTarget: THREE.WebGLRenderTarget | null = null;
 
   // --- Временные векторы для оптимизации (Scratch vectors) ---
   private _tempV1 = new THREE.Vector3();
@@ -75,10 +77,10 @@ export class ThreeRenderer implements IRenderer {
     #endif
     `;
 
-    // Создаем WebGL рендерер с включенными тенями
+    // Создаем WebGL рендерер с включенными мягкими тенями (PCFSoftShadowMap)
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.canvas = this.renderer.domElement;
     this.canvas.style.display = 'block';
@@ -87,6 +89,17 @@ export class ThreeRenderer implements IRenderer {
     this.canvas.style.position = 'absolute';
     this.canvas.style.top = '0';
     this.canvas.style.left = '0';
+
+    // Применение выбранного метода фильтрации при масштабировании (Render Scale)
+    const filterMode = GRAPHICS_CONFIG.resolution.upscaleFilter;
+    if (filterMode === 'pixelated') {
+      this.canvas.style.imageRendering = 'pixelated';
+    } else if (filterMode === 'crisp') {
+      this.canvas.style.imageRendering = 'crisp-edges';
+    } else {
+      this.canvas.style.imageRendering = 'auto';
+    }
+
     this.container.appendChild(this.canvas);
 
     // Создаем неинтерактивный 2D-холст для UI (имена, healthbar'ы) поверх WebGL
@@ -104,8 +117,9 @@ export class ThreeRenderer implements IRenderer {
     // Инициализируем сцену
     this.scene = new THREE.Scene();
 
-    // Настраиваем камеру
-    this.camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
+    // Настраиваем камеру из конфигурационного файла
+    const camCfg = GRAPHICS_CONFIG.camera;
+    this.camera = new THREE.PerspectiveCamera(camCfg.fov, 1, camCfg.near, camCfg.far);
 
     // Менеджер окружения (скайбокс, солнце, луна, звезды, тени и туман)
     this.environmentManager = new EnvironmentManager(this.scene);
@@ -260,15 +274,31 @@ export class ThreeRenderer implements IRenderer {
   }
 
   public resize(width: number, height: number): void {
+    // Расчет эффективного разрешения рендера (Render Scale & HiDPI)
+    const resCfg = GRAPHICS_CONFIG.resolution;
+    const baseRatio = resCfg.useDevicePixelRatio
+      ? Math.min(window.devicePixelRatio || 1.0, resCfg.maxPixelRatio)
+      : 1.0;
+    const effectivePixelRatio = baseRatio * resCfg.scale;
+
+    this.renderer.setPixelRatio(effectivePixelRatio);
     this.renderer.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
+    // 2D UI холст строго равен размерам контейнера в CSS-пикселях (1:1 с мышью и текстом)
     this.uiCanvas.width = width;
     this.uiCanvas.height = height;
   }
 
   public destroy(): void {
+    if (this.depthRenderTarget) {
+      this.depthRenderTarget.dispose();
+      if (this.depthRenderTarget.depthTexture) {
+        this.depthRenderTarget.depthTexture.dispose();
+      }
+      this.depthRenderTarget = null;
+    }
     if (this.environmentManager) {
       this.environmentManager.destroy();
     }
@@ -297,8 +327,8 @@ export class ThreeRenderer implements IRenderer {
   }
 
   public render(context: RenderContext): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const internalW = this.canvas.width;
+    const internalH = this.canvas.height;
     const scale = context.camera.scale;
 
     // Точка фокуса берется напрямую из 3D-камеры в мировых координатах
@@ -391,10 +421,72 @@ export class ThreeRenderer implements IRenderer {
       env
     );
 
+    // --- 1. ПРЕДВАРИТЕЛЬНЫЙ ПРОХОД ГЛУБИНЫ ДЛЯ ВОДЫ (SHORELINE FOAM & DEPTH EXTINCTION) ---
+    if (!this.depthRenderTarget) {
+      this.depthRenderTarget = new THREE.WebGLRenderTarget(internalW, internalH, {
+        depthTexture: new THREE.DepthTexture(internalW, internalH),
+        depthBuffer: true,
+        format: THREE.RGBAFormat,
+      });
+    } else if (
+      this.depthRenderTarget.width !== internalW ||
+      this.depthRenderTarget.height !== internalH
+    ) {
+      this.depthRenderTarget.setSize(internalW, internalH);
+    }
+
+    // Скрываем меши воды, манипулятор и служебные маркеры перед непрозрачным проходом
+    const waterMeshes: THREE.Object3D[] = [];
+    this.scene.traverse((child) => {
+      if (child.userData.isWater || child.userData.isWaterMesh) {
+        if (child.visible) {
+          waterMeshes.push(child);
+          child.visible = false;
+        }
+      }
+    });
+
+    const prevGizmoVis = this.transformControl.getHelper().visible;
+    const prevBrushVis = this.brushCursor.visible;
+    this.transformControl.getHelper().visible = false;
+    this.brushCursor.visible = false;
+
+    // Рендерим непрозрачную сцену (дно, камни, деревья, персонажи) в буфер глубины
+    this.renderer.setRenderTarget(this.depthRenderTarget);
+    this.renderer.clear();
+    this.renderer.render(this.scene, this.camera);
+    this.renderer.setRenderTarget(null);
+
+    // Восстанавливаем видимость объектов
+    this.transformControl.getHelper().visible = prevGizmoVis;
+    this.brushCursor.visible = prevBrushVis;
+    for (let i = 0; i < waterMeshes.length; i++) {
+      waterMeshes[i].visible = true;
+    }
+
+    // Передаем текстуру глубины сцены в материалы воды с ее реальным физическим разрешением
+    const depthTex = this.depthRenderTarget.depthTexture;
+    for (let i = 0; i < waterMeshes.length; i++) {
+      waterMeshes[i].traverse((child) => {
+        if (
+          child instanceof THREE.Mesh &&
+          child.material &&
+          (child.material as any).uniforms?.tDepth
+        ) {
+          const u = (child.material as any).uniforms;
+          u.tDepth.value = depthTex;
+          u.uCameraNear.value = this.camera.near;
+          u.uCameraFar.value = this.camera.far;
+          u.uResolution.value.set(internalW, internalH);
+        }
+      });
+    }
+
+    // --- 2. ФИНАЛЬНЫЙ РЕНДЕР СЦЕНЫ С ВОДОЙ И ТЕНЯМИ НА ЭКРАН ---
     this.renderer.render(this.scene, this.camera);
 
-    // --- Отрисовка 2D UI поверх 3D сцены ---
-    this.uiCtx.clearRect(0, 0, w, h);
+    // --- Отрисовка 2D UI поверх 3D сцены (полная гарантированная очистка всего холста) ---
+    this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
 
     if (context.showUIOverlays) {
       this.renderUIOverlays(context.world, context.gameMode);

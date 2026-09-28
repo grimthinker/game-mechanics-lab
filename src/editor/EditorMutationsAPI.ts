@@ -709,6 +709,15 @@ export class EditorMutationsAPI {
     defaultName: string = 'Новая область',
     space?: number
   ): string {
+    const tag = this.world.getComponent(containerId, 'tag');
+    const meta = this.world.getComponent(containerId, 'meta');
+    const arch = tag?.archetype ?? meta?.entityType;
+
+    // Области экипировки логически разрешены ТОЛЬКО предметам и частям тел
+    if (arch !== 'item' && arch !== 'bodyPart') {
+      return '';
+    }
+
     let targetEquip = this.world.getComponent(containerId, 'equip');
     if (!targetEquip) {
       targetEquip = { equipmentAreas: [] };
@@ -737,7 +746,16 @@ export class EditorMutationsAPI {
   }
 
   public setEntityInventoryGrid(id: string, enable: boolean): boolean {
+    const tag = this.world.getComponent(id, 'tag');
+    const meta = this.world.getComponent(id, 'meta');
+    const arch = tag?.archetype ?? meta?.entityType;
+
     if (enable) {
+      // Сетка инвентаря разрешена ТОЛЬКО предметам (сумкам) и препятствиям (ящикам/сундукам)
+      if (arch !== 'item' && arch !== 'obstacle') {
+        return false;
+      }
+
       if (this.world.getComponent(id, 'inventory')) return false;
       this.world.addComponent(id, 'inventory', {
         size: { width: 4, height: 2 },
@@ -811,6 +829,11 @@ export class EditorMutationsAPI {
         }
       }
     }
+
+    if (patch.maxDepth !== undefined && physStats) {
+      setBaseStat(physStats.height, patch.maxDepth);
+    }
+
     return true;
   }
 }

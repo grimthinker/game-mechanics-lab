@@ -76,8 +76,11 @@ export class TerrainSyncSystem {
     if (terrainComp.isGeometryDirty) {
       if (!terrainComp.dirtyChunks) terrainComp.dirtyChunks = new Set<string>();
 
-      // Инкрементальное обновление только измененных чанков
-      for (const chunkId of terrainComp.dirtyChunks) {
+      // Если список затронутых чанков пуст (Undo/Redo или загрузка мира) — обновляем все чанки
+      const chunksToUpdate =
+        terrainComp.dirtyChunks.size > 0 ? terrainComp.dirtyChunks : this.chunks.keys();
+
+      for (const chunkId of chunksToUpdate) {
         const chunk = this.chunks.get(chunkId);
         if (chunk) {
           chunk.syncGeometry(terrainComp.heights, terrainComp.resolution, terrainComp.width);

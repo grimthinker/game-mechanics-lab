@@ -22,13 +22,18 @@ export function createWaterConfig(
 ): EntityConfig {
   const isRiver = waterType === 'river';
   const defaultName = name || (isRiver ? 'Река' : 'Озеро');
+  const maxDepth = options?.maxDepth ?? (isRiver ? 2.5 : 4.0);
 
   const waterComp: WaterComponent = {
     width,
     depth,
+    maxDepth,
     waterType,
-    color: options?.color ?? (isRiver ? '#1abc9c' : '#2980b9'),
-    opacity: options?.opacity ?? 0.8,
+    color: options?.color ?? (isRiver ? '#1abc9c' : '#3498db'),
+    deepColor: options?.deepColor ?? (isRiver ? '#0e6251' : '#0b3954'),
+    opacity: options?.opacity ?? 0.88,
+    shallowOpacity: options?.shallowOpacity ?? 0.25,
+    clarity: options?.clarity ?? (isRiver ? 2.0 : 3.0),
     waveSpeed: options?.waveSpeed ?? (isRiver ? 2.5 : 1.2),
     waveHeight: options?.waveHeight ?? (isRiver ? 0.08 : 0.12),
     flowDirection: options?.flowDirection ?? (isRiver ? { x: 0, z: 1 } : { x: 0, z: 0 }),
@@ -47,7 +52,7 @@ export function createWaterConfig(
     water: waterComp,
     physics: {
       radius: Math.max(width, depth) / 2,
-      height: 2.0,
+      height: maxDepth,
       weight: 100000,
       isSolid: false,
       points: createRectanglePoints(width, depth),
@@ -68,14 +73,27 @@ export function assembleWater(
   config: EntityConfig,
   position?: Vec3
 ): void {
+  const isRiver = config.water?.waterType === 'river';
+  const defaultMaxDepth = isRiver ? 2.5 : 4.0;
+
   const waterComp: WaterComponent = config.water
-    ? ({ ...config.water } as WaterComponent)
+    ? ({
+        ...config.water,
+        maxDepth: config.water.maxDepth ?? defaultMaxDepth,
+        deepColor: config.water.deepColor ?? (isRiver ? '#0e6251' : '#0b3954'),
+        shallowOpacity: config.water.shallowOpacity ?? 0.25,
+        clarity: config.water.clarity ?? (isRiver ? 2.0 : 3.0),
+      } as WaterComponent)
     : {
         width: 20,
         depth: 20,
+        maxDepth: 4.0,
         waterType: 'lake',
-        color: '#2980b9',
-        opacity: 0.8,
+        color: '#3498db',
+        deepColor: '#0b3954',
+        opacity: 0.88,
+        shallowOpacity: 0.25,
+        clarity: 3.0,
         waveSpeed: 1.2,
         waveHeight: 0.12,
         flowDirection: { x: 0, z: 0 },
@@ -86,6 +104,7 @@ export function assembleWater(
 
   const width = waterComp.width;
   const depth = waterComp.depth;
+  const maxDepth = waterComp.maxDepth;
   const radius = Math.max(width, depth) / 2;
 
   // 1. Тег архетипа
@@ -104,7 +123,7 @@ export function assembleWater(
   // 4. Физические характеристики сенсорного объема
   world.addComponent(id, 'physicsStats', {
     radius: createStat(radius),
-    height: createStat(2.0),
+    height: createStat(maxDepth),
     weight: createStat(100000),
     isSolid: false,
     points: createRectanglePoints(width, depth),
@@ -135,7 +154,7 @@ export function assembleWater(
     rawBody = physics.driver.createFixedBody(pos3D, id);
     const hx = width / 2;
     const hz = depth / 2;
-    const hy = 1.0; // Глубина сенсорной зоны под уровнем глади воды (2м общий охват)
+    const hy = maxDepth / 2;
     rawCollider = physics.driver.createCuboidCollider(hx, hy, hz, rawBody, 0, {
       x: 0,
       y: -hy,

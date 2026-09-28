@@ -259,6 +259,7 @@ export class VelocitySystem {
           (meta.stance === 'standing' ||
             meta.stance === 'crouching' ||
             meta.stance === 'airborne' ||
+            meta.stance === 'swim' ||
             meta.stance === 'stand_to_crouch' ||
             meta.stance === 'crouch_to_stand')
         ) {

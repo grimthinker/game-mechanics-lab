@@ -124,16 +124,24 @@ export class GrassSyncSystem {
         const chunkId = `${cx}_${cz}`;
         activeIds.add(chunkId);
 
+        const mustRebuild =
+          terrainComp.dirtyChunks.has(chunkId) ||
+          terrainComp.isFoliageDirty ||
+          terrainComp.isGeometryDirty;
+
         let chunk = this.chunks.get(chunkId);
         if (!chunk) {
           chunk = new GrassChunk(chunkId, cx, cz, this.scene, this.grassMaterial, this.geometries);
           chunk.build(terrainComp, world, physicsDriver ?? null, this.densityFactor);
           this.chunks.set(chunkId, chunk);
-        } else if (terrainComp.dirtyChunks.has(chunkId)) {
-          // Инкрементальное обновление только измененного кистью чанка
+        } else if (mustRebuild) {
           chunk.build(terrainComp, world, physicsDriver ?? null, this.densityFactor);
         }
       }
+    }
+
+    if (terrainComp.isFoliageDirty) {
+      terrainComp.isFoliageDirty = false;
     }
 
     // Удаление чанков, вышедших из зоны видимости (Distance Culling)

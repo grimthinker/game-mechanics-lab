@@ -38,6 +38,11 @@ export class MovementModifierSystem {
         input.isRunning = false;
       }
 
+      // В воде прыжки запрещены
+      if (meta.stance === 'swim') {
+        input.wantsJump = false;
+      }
+
       // Запрещаем спринт во время активных атак (устранение эксплойта)
       if (activeAttacks.attacks.length > 0) {
         input.isRunning = false;
@@ -62,6 +67,18 @@ export class MovementModifierSystem {
         });
       } else {
         removeModifier(movementStats.maxTurnSpeed, 'locomotion_turn');
+      }
+
+      // Модификатор скорости плавания в воде
+      if (meta.stance === 'swim') {
+        const swimMult = movementStats.swimSpeedMultiplier ?? 0.55;
+        addModifier(movementStats.maxSpeed, {
+          id: 'swim_speed',
+          type: ModifierType.PERCENT_MULT,
+          value: swimMult,
+        });
+      } else {
+        removeModifier(movementStats.maxSpeed, 'swim_speed');
       }
 
       const movementMode = meta.movementMode ?? 'immobile';

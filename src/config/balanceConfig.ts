@@ -19,6 +19,7 @@ export const BALANCE_CONFIG = {
       prone: 0.25,
       airborne: 1.0,
       sliding: 0.9,
+      swim: 0.65,
     } as Record<string, number>,
     /** Текущее здоровье существа при первичном спавне */
     hp: 100,
@@ -36,6 +37,10 @@ export const BALANCE_CONFIG = {
     crouchSpeedMultiplier: 0.45,
     /** Множитель скорости передвижения при замедленном шаге */
     walkSpeedMultiplier: 0.4,
+    /** Множитель скорости при плавании */
+    swimSpeedMultiplier: 0.55,
+    /** Множитель скорости при ходьбе вброд на мелководье */
+    wadingSpeedMultiplier: 0.75,
 
     /** Множитель скорости поворота корпуса при беге */
     runTurnMultiplier: 0.8,

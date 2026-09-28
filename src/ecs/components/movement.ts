@@ -94,6 +94,8 @@ export interface MovementConfig {
   backwardTurnMultiplier?: number;
   pickupSpeedMultiplier?: number;
   pickupTurnMultiplier?: number;
+  swimSpeedMultiplier?: number;
+  wadingSpeedMultiplier?: number;
   standToCrouchTime?: number;
   crouchToStandTime?: number;
   standToProneTime?: number;
@@ -129,6 +131,8 @@ export interface MovementStatsComponent {
   backwardTurnMultiplier: number;
   pickupSpeedMultiplier: number;
   pickupTurnMultiplier: number;
+  swimSpeedMultiplier: number;
+  wadingSpeedMultiplier: number;
   standToCrouchTime: StatValue<number>;
   crouchToStandTime: StatValue<number>;
   standToProneTime: StatValue<number>;

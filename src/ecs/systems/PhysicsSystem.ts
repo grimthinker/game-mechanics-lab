@@ -369,10 +369,14 @@ export class PhysicsSystem {
       const extVx = velocity.externalVx ?? 0;
       const extVy = velocity.externalVy ?? 0;
       const extVz = velocity.externalVz ?? 0;
+      const meta = world.getComponent(id, 'meta');
 
-      // Гравитация (-9.81 м/с²) и предел скорости свободного падения
-      velocity.vy = (velocity.vy ?? 0) - 9.81 * localDt;
-      velocity.vy = Math.max(-20.0, velocity.vy);
+      // Гравитация (-9.81 м/с²) и предел скорости свободного падения (для пловцов вертикаль управляется плавучестью)
+      const isSwimming = meta?.stance === 'swim';
+      if (!isSwimming) {
+        velocity.vy = (velocity.vy ?? 0) - 9.81 * localDt;
+        velocity.vy = Math.max(-20.0, velocity.vy);
+      }
 
       const desiredDx = selfDx + extVx * localDt;
       const desiredDy = (velocity.vy + extVy) * localDt;
@@ -382,7 +386,6 @@ export class PhysicsSystem {
         const physStats = world.getComponent(id, 'physicsStats');
         const characterMass = physStats?.totalWeight ?? physStats?.weight.current ?? 75;
 
-        const meta = world.getComponent(id, 'meta');
         const movementStats = world.getComponent(id, 'movementStats');
         const minSlideAngle =
           movementStats?.minSlopeSlideAngle ?? BALANCE_CONFIG.creature.minSlopeSlideAngle;
@@ -393,13 +396,13 @@ export class PhysicsSystem {
         const isAirborne =
           (meta?.stance === 'airborne' || velocity.isGrounded === false) && !wasSliding;
 
-        // Расчет перемещения через KCC контроллер
+        // Расчет перемещения через KCC контроллер (в воде отключаем snap-to-ground, чтобы пловца не тянуло ко дну)
         const { movement, isGrounded, groundNormal, slopeAngleDeg } =
           this.driver.computeCharacterMovement(
             phys.rawCollider,
             { x: desiredDx, y: desiredDy, z: desiredDz },
             characterMass,
-            isAirborne
+            isAirborne || isSwimming
           );
 
         transform.x += movement.x;
@@ -413,7 +416,10 @@ export class PhysicsSystem {
 
         // Определение контакта с землей: на крутом склоне считаем существо на земле, если оно упирается в склон
         let grounded = isGrounded;
-        if (isGrounded || (Math.abs(movement.y - desiredDy) > 0.0001 && desiredDy < 0)) {
+        if (
+          !isSwimming &&
+          (isGrounded || (Math.abs(movement.y - desiredDy) > 0.0001 && desiredDy < 0))
+        ) {
           grounded = true;
           // Обнуляем вертикальную скорость только на ровной поверхности, при скольжении сохраняем импульс вниз
           if (!isSlidingNow) {

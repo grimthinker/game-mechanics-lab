@@ -66,6 +66,19 @@ export class StanceSystem {
       const minSlideAngle = movementStats.minSlopeSlideAngle ?? 40;
       const isSliding = isGrounded && currentSlope > minSlideAngle;
 
+      // 0. Нахождение в воде (Плавание) — управляется WaterSystem
+      if (meta.stance === 'swim') {
+        world.removeComponent(id, 'stanceTransition');
+        removeModifier(movementStats.maxSpeed, 'stance_speed');
+        removeModifier(movementStats.maxTurnSpeed, 'stance_turn');
+        if (physics) {
+          const physStats = world.getComponent(id, 'physicsStats');
+          const radius = physStats?.radius.current ?? 0.4;
+          physics.updateCreatureColliderStance(world, id, 'swim', radius);
+        }
+        continue;
+      }
+
       // 1. Нахождение в воздухе (Airborne)
       if (!isGrounded && !isSliding) {
         if (meta.stance !== 'airborne') {
