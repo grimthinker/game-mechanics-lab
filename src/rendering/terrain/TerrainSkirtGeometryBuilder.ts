@@ -33,20 +33,23 @@ export class TerrainSkirtGeometryBuilder {
     const halfD = terrainComp.depth / 2;
     const skirtDist = cfg.distance;
     const distPower = cfg.distributionPower;
+    const underlap = 1.8; // Ширина подвернутого пояса под террейн (в метрах)
 
-    const totalVerts = (segments + 1) * (rings + 1);
+    // rings колец вовне + 1 подвернутое кольцо нахлеста внутри террейна
+    const totalRingRows = rings + 2;
+    const totalVerts = (segments + 1) * totalRingRows;
     const positions = new Float32Array(totalVerts * 3);
     const uvs = new Float32Array(totalVerts * 2);
 
-    const totalQuads = segments * rings;
+    const totalQuads = segments * (rings + 1);
     const indices = new Uint32Array(totalQuads * 6);
 
     let vPtr = 0;
     let uvPtr = 0;
 
-    for (let j = 0; j <= rings; j++) {
-      const u = j / rings;
-      const dist = skirtDist * Math.pow(u, distPower);
+    for (let j = 0; j < totalRingRows; j++) {
+      const isUnderlapRing = j === 0;
+      const isBorderRing = j === 1;
 
       for (let i = 0; i <= segments; i++) {
         const angle = (i / segments) * Math.PI * 2;
@@ -59,24 +62,47 @@ export class TerrainSkirtGeometryBuilder {
         const x0 = cosA * tBorder;
         const z0 = sinA * tBorder;
 
-        const x = x0 + cosA * dist;
-        const z = z0 + sinA * dist;
+        let x = x0;
+        let z = z0;
+        let y = 0;
+        let dist = 0;
 
-        const clampX = Math.max(-halfW + 0.01, Math.min(halfW - 0.01, x0));
-        const clampZ = Math.max(-halfD + 0.01, Math.min(halfD - 0.01, z0));
-        const edgeH = getTerrainHeightAt(terrainComp, clampX, clampZ) ?? 0;
+        const clampX0 = Math.max(-halfW + 0.01, Math.min(halfW - 0.01, x0));
+        const clampZ0 = Math.max(-halfD + 0.01, Math.min(halfD - 0.01, z0));
+        const edgeH = getTerrainHeightAt(terrainComp, clampX0, clampZ0) ?? 0;
 
-        const edgeBlend = Math.max(0.0, 1.0 - dist / cfg.edgeBlendDistance);
-        const smoothEdge = edgeBlend * edgeBlend * (3 - 2 * edgeBlend);
-        const hillY = calculateHillHeight(x, z, dist);
-        const y = edgeH * smoothEdge + hillY;
+        if (isUnderlapRing) {
+          // Кольцо 0: заходит на 1.8м под террейн и утапливается на 4 см ниже поверхности
+          x = x0 - cosA * underlap;
+          z = z0 - sinA * underlap;
+          const cx = Math.max(-halfW + 0.01, Math.min(halfW - 0.01, x));
+          const cz = Math.max(-halfD + 0.01, Math.min(halfD - 0.01, z));
+          y = (getTerrainHeightAt(terrainComp, cx, cz) ?? edgeH) - 0.04;
+          dist = -underlap;
+        } else if (isBorderRing) {
+          // Кольцо 1: лежит строго на внешней кромке террейна
+          x = x0;
+          z = z0;
+          y = edgeH;
+          dist = 0;
+        } else {
+          // Кольца 2..N: радиальное расширение в горизонт до 1500м
+          const u = (j - 1) / rings;
+          dist = skirtDist * Math.pow(u, distPower);
+          x = x0 + cosA * dist;
+          z = z0 + sinA * dist;
+
+          const edgeBlend = Math.max(0.0, 1.0 - dist / cfg.edgeBlendDistance);
+          const smoothEdge = edgeBlend * edgeBlend * (3 - 2 * edgeBlend);
+          const hillY = calculateHillHeight(x, z, dist);
+          y = edgeH * smoothEdge + hillY;
+        }
 
         positions[vPtr] = x;
         positions[vPtr + 1] = y;
         positions[vPtr + 2] = z;
 
         uvs[uvPtr] = i / segments;
-        // Записываем дистанцию в метрах от кромки активного мира
         uvs[uvPtr + 1] = dist;
 
         vPtr += 3;
@@ -86,20 +112,17 @@ export class TerrainSkirtGeometryBuilder {
 
     let iPtr = 0;
     const ringStride = segments + 1;
-    for (let j = 0; j < rings; j++) {
+    for (let j = 0; j < rings + 1; j++) {
       for (let i = 0; i < segments; i++) {
         const i0 = j * ringStride + i;
         const i1 = i0 + 1;
         const i2 = (j + 1) * ringStride + i;
         const i3 = i2 + 1;
 
-        // Корректный обход против часовой стрелки (CCW) при взгляде сверху:
-        // Треугольник 1: i0 -> i1 -> i2
         indices[iPtr++] = i0;
         indices[iPtr++] = i1;
         indices[iPtr++] = i2;
 
-        // Треугольник 2: i1 -> i3 -> i2
         indices[iPtr++] = i1;
         indices[iPtr++] = i3;
         indices[iPtr++] = i2;
@@ -127,6 +150,7 @@ export class TerrainSkirtGeometryBuilder {
     const halfD = terrainComp.depth / 2;
     const skirtDist = cfg.distance;
     const distPower = cfg.distributionPower;
+    const underlap = 1.8;
 
     for (let i = 0; i <= segments; i++) {
       const angle = (i / segments) * Math.PI * 2;
@@ -139,18 +163,32 @@ export class TerrainSkirtGeometryBuilder {
       const x0 = cosA * tBorder;
       const z0 = sinA * tBorder;
 
-      const clampX = Math.max(-halfW + 0.01, Math.min(halfW - 0.01, x0));
-      const clampZ = Math.max(-halfD + 0.01, Math.min(halfD - 0.01, z0));
-      const edgeH = getTerrainHeightAt(terrainComp, clampX, clampZ) ?? 0;
+      const clampX0 = Math.max(-halfW + 0.01, Math.min(halfW - 0.01, x0));
+      const clampZ0 = Math.max(-halfD + 0.01, Math.min(halfD - 0.01, z0));
+      const edgeH = getTerrainHeightAt(terrainComp, clampX0, clampZ0) ?? 0;
 
-      for (let j = 0; j <= rings; j++) {
-        const u = j / rings;
+      // 1. Обновление подвернутого внутреннего кольца (j = 0)
+      const vIdx0 = 0 * (segments + 1) + i;
+      const xIn = x0 - cosA * underlap;
+      const zIn = z0 - sinA * underlap;
+      const cx = Math.max(-halfW + 0.01, Math.min(halfW - 0.01, xIn));
+      const cz = Math.max(-halfD + 0.01, Math.min(halfD - 0.01, zIn));
+      const inH = (getTerrainHeightAt(terrainComp, cx, cz) ?? edgeH) - 0.04;
+      posAttr.setY(vIdx0, inH);
+
+      // 2. Обновление линии кромки террейна (j = 1)
+      const vIdx1 = 1 * (segments + 1) + i;
+      posAttr.setY(vIdx1, edgeH);
+
+      // 3. Обновление внешних колец перехода в холмы (j >= 2)
+      for (let j = 2; j <= rings + 1; j++) {
+        const u = (j - 1) / rings;
         const dist = skirtDist * Math.pow(u, distPower);
         if (dist > cfg.edgeBlendDistance) break;
 
         const vIdx = j * (segments + 1) + i;
-        const x = posAttr.getX(vIdx);
-        const z = posAttr.getZ(vIdx);
+        const x = x0 + cosA * dist;
+        const z = z0 + sinA * dist;
 
         const edgeBlend = Math.max(0.0, 1.0 - dist / cfg.edgeBlendDistance);
         const smoothEdge = edgeBlend * edgeBlend * (3 - 2 * edgeBlend);

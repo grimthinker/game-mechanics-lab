@@ -423,19 +423,37 @@ export class ThreeSyncSystem {
               );
             }
 
-            // 3. Получение параметров активного источника света сцены (солнце / луна)
-            const sunDir = new THREE.Vector3(0.5, 0.8, 0.3).normalize();
-            const sunColor = new THREE.Color(1.0, 0.95, 0.85);
+            // 3. Получение параметров освещения сцены с плавным взвешиванием при закате/восходе
+            const sunDir = new THREE.Vector3();
+            const sunColor = new THREE.Color(0, 0, 0);
             const ambientColor = new THREE.Color(0.25, 0.3, 0.4);
+            let totalDirectionalWeight = 0;
 
             for (let i = 0; i < this.scene.children.length; i++) {
               const child = this.scene.children[i];
-              if (child instanceof THREE.DirectionalLight && child.castShadow) {
-                sunColor.copy(child.color).multiplyScalar(child.intensity);
-                sunDir.copy(child.position).sub(child.target.position).normalize();
+              if (child instanceof THREE.DirectionalLight && child.intensity > 0) {
+                const lum =
+                  child.intensity *
+                  (child.color.r * 0.299 + child.color.g * 0.587 + child.color.b * 0.114);
+                if (lum > 0.0001) {
+                  const dir = new THREE.Vector3()
+                    .copy(child.position)
+                    .sub(child.target.position)
+                    .normalize();
+                  sunDir.addScaledVector(dir, lum);
+                  sunColor.add(new THREE.Color().copy(child.color).multiplyScalar(child.intensity));
+                  totalDirectionalWeight += lum;
+                }
               } else if (child instanceof THREE.AmbientLight) {
                 ambientColor.copy(child.color).multiplyScalar(child.intensity);
               }
+            }
+
+            if (totalDirectionalWeight > 0.0001) {
+              sunDir.normalize();
+            } else {
+              sunDir.set(0.5, 0.8, 0.3).normalize();
+              sunColor.setRGB(1.0, 0.95, 0.85);
             }
 
             // 4. Синхронизация юниформов шейдера

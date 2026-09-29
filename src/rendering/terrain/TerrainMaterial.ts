@@ -20,7 +20,7 @@ export function createTerrainMaterial(
   };
 
   material.userData.isSharedMaterial = true;
-  material.customProgramCacheKey = () => 'TerrainSplatMaterial_v8'; // Обновлен ключ кэша для рекомпиляции
+  material.customProgramCacheKey = () => 'TerrainSplatMaterial_v9'; // Обновлен ключ кэша для рекомпиляции
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.tSplat = { value: splatTexture };
@@ -66,13 +66,11 @@ export function createTerrainMaterial(
       `
       #include <color_fragment>
 
-      vec2 baseUv = vec2(vUv.x, 1.0 - vUv.y);
+      // 1. Координаты маски мазков кисти (Splatmap) строго недеформированы (1:1 к миру и кисти):
+      // Любые дороги, тропинки и мазки кисти идут точно по прямой без волнообразных искажений.
+      vec2 splatUv = vec2(vUv.x, 1.0 - vUv.y);
 
-      // Органический микро-шум для разбиения пиксельных ступеней растра
-      float jitter = (sin(vUv.x * 250.0) * cos(vUv.y * 250.0)) * 0.0025;
-      vec2 splatUv = baseUv + vec2(jitter, -jitter);
-
-      // 5-точечный мультисэмплинг с настраиваемым коэффициентом размытия границ
+      // Высококачественный 5-точечный мультисэмплинг для гладких границ мазков
       vec2 texel = vec2(1.0 / 512.0) * uSplatBlur;
       vec4 splat = texture2D(tSplat, splatUv) * 0.36;
       splat += texture2D(tSplat, splatUv + vec2(texel.x, 0.0)) * 0.16;
@@ -82,14 +80,15 @@ export function createTerrainMaterial(
 
       vec2 tiledUv = vUv * uTiling;
 
-      // 1. Искривление UV (Domain Warping): разрушает прямые ряды и диагонали сетки
-      vec2 uvWarp = vec2(
-        sin(vTriPos.z * 0.14 + vTriPos.x * 0.07),
-        cos(vTriPos.x * 0.14 - vTriPos.z * 0.07)
-      ) * 0.18;
-      vec2 warpedGrassUv = tiledUv + uvWarp;
+      // 2. Рандомизация травы происходит ИСКЛЮЧИТЕЛЬНО внутри текстуры травы (не затрагивая маску кисти):
+      // А) Микро-сдвиг UV травы для разрушения повторяемости травинок
+      vec2 grassMicroWarp = vec2(
+        sin(vTriPos.z * 0.45 + vTriPos.x * 0.25),
+        cos(vTriPos.x * 0.45 - vTriPos.z * 0.25)
+      ) * 0.08;
+      vec2 warpedGrassUv = tiledUv + grassMicroWarp;
 
-      // 2. Двухмасштабная выборка травы (поворот на ~45° и другой масштаб ~38%)
+      // Б) Двухмасштабная выборка травы (поворот на 45° и масштаб 0.38x) полностью устраняет сетку тайлинга
       vec2 macroGrassUv = vec2(
         warpedGrassUv.x * 0.38 - warpedGrassUv.y * 0.38,
         warpedGrassUv.x * 0.38 + warpedGrassUv.y * 0.38
@@ -99,7 +98,7 @@ export function createTerrainMaterial(
       vec4 colGrassMacro  = texture2D(tGrass, macroGrassUv);
       vec4 colGrass = mix(colGrassDetail, colGrassMacro, 0.42);
 
-      // 3. Макро-вариации оттенка и освещенности по мировым координатам (15-30 метров)
+      // В) Крупные разводы оттенка и влажности травы (15-30 метров)
       float macroShade = sin(vTriPos.x * 0.05) * cos(vTriPos.z * 0.05) * 0.5 + 0.5;
       float macroTint  = sin(vTriPos.x * 0.08 - vTriPos.z * 0.09) * 0.5 + 0.5;
       colGrass.rgb *= (0.86 + macroShade * 0.28);
@@ -107,17 +106,17 @@ export function createTerrainMaterial(
       vec3 lushGrassTint = vec3(0.94, 1.04, 0.96);
       colGrass.rgb *= mix(lushGrassTint, warmGrassTint, macroTint);
 
-      // Песок со сглаженным искривлением UV
-      vec4 colSand = texture2D(tSand, tiledUv + uvWarp * 0.5);
+      // Песок без деформации внешних границ
+      vec4 colSand = texture2D(tSand, tiledUv);
 
-      // === ТРИПЛАНАРНЫЙ МАППИНГ (Только Скала и Почва) ===
+      // === ТРИПЛАНАРНЫЙ МАППИНГ (Скала и Почва) ===
       
       // 1. Вычисляем веса смешивания осей на основе нормали
       vec3 blend = abs(vTriNormal);
-      blend = pow(blend, vec3(4.0)); // Увеличиваем резкость перехода между гранями
-      blend /= dot(blend, vec3(1.0)); // Нормализуем веса (сумма = 1.0)
+      blend = pow(blend, vec3(4.0));
+      blend /= dot(blend, vec3(1.0));
 
-      // 2. Координаты для боковых проекций (масшабируем с учетом общего Tiling)
+      // 2. Координаты для боковых проекций
       vec2 uvX = vTriPos.zy * (uTiling / 100.0);
       vec2 uvZ = vTriPos.xy * (uTiling / 100.0);
 

@@ -69,7 +69,8 @@ export class EnvironmentManager {
     const time = env.timeOfDay;
     const hourAngle = ((time - 6.0) / 24.0) * Math.PI * 2.0;
 
-    this.rotHour.makeRotationZ(-hourAngle);
+    // Вращение по часовому углу согласуется с направлением движения светил (rotHour * (1,0,0) = baseSun)
+    this.rotHour.makeRotationZ(hourAngle);
     this.rotTilt.makeRotationX(env.axialTilt);
     this.rotAzimuth.makeRotationY(env.azimuth);
 
@@ -83,6 +84,7 @@ export class EnvironmentManager {
     const colors = this.evaluateAtmosphereColors(sunElevation);
     const starFade = Math.max(0.0, Math.min(1.0, (-sunElevation - 0.05) / 0.25));
 
+    // Матрица перевода координат небесной сферы в мировое пространство с учетом наклона оси и времени
     const starMatrix = new THREE.Matrix4()
       .multiply(this.rotAzimuth)
       .multiply(this.rotTilt)
@@ -95,26 +97,38 @@ export class EnvironmentManager {
       scene.fog.density = env.fogDensity;
     }
 
-    const isSunDominant = sunElevation >= -0.05;
-
     this.sunLight.color.copy(colors.sunLight);
-    const sunIntensity = Math.max(0.0, Math.min(1.3, (sunElevation + 0.1) * 2.0));
+    const sunIntensity = Math.max(0.0, Math.min(1.3, (sunElevation + 0.08) * 2.2));
     this.sunLight.intensity = sunIntensity;
 
     this.moonLight.color.copy(colors.moonLight);
-    const moonIntensity = Math.max(0.0, Math.min(0.45, (-sunElevation + 0.1) * 0.9));
+    const moonIntensity = Math.max(0.0, Math.min(0.45, (-sunElevation + 0.04) * 0.9));
     this.moonLight.intensity = moonIntensity;
 
     this.ambientLight.color.copy(colors.ambient);
 
-    if (isSunDominant) {
+    // Плавный кросс-фейд теней в сумеречной зоне высоты солнца над горизонтом [-0.08, 0.04]
+    const twilightRange = 0.12;
+    const twilightT = Math.max(0.0, Math.min(1.0, (sunElevation - -0.08) / twilightRange));
+    const smoothSunShadow = twilightT * twilightT * (3.0 - 2.0 * twilightT);
+    const smoothMoonShadow = 1.0 - smoothSunShadow;
+
+    if (smoothSunShadow > 0.001) {
       this.sunLight.castShadow = true;
-      this.moonLight.castShadow = false;
+      this.sunLight.shadow.intensity = smoothSunShadow;
       this.alignLightWithTarget(this.sunLight, this.sunDir, focusTarget, visibleRadius);
     } else {
       this.sunLight.castShadow = false;
+      this.sunLight.shadow.intensity = 0.0;
+    }
+
+    if (smoothMoonShadow > 0.001) {
       this.moonLight.castShadow = true;
+      this.moonLight.shadow.intensity = smoothMoonShadow;
       this.alignLightWithTarget(this.moonLight, this.moonDir, focusTarget, visibleRadius);
+    } else {
+      this.moonLight.castShadow = false;
+      this.moonLight.shadow.intensity = 0.0;
     }
   }
 
@@ -244,7 +258,9 @@ export class EnvironmentManager {
       colors.horizon.lerpColors(cDuskHorizon, cSunsetHorizon, t);
       colors.haze.lerpColors(cDuskHaze, cSunsetHaze, t);
       colors.sunset.lerpColors(cDuskSunsetGlow, cSunsetGlow, t);
-      colors.sunLight.lerpColors(new THREE.Color(0.5, 0.18, 0.1), cSunsetLight, t);
+      // Плавное угасание цвета солнца к горизонту без резкого скачка в ноль
+      const duskSunColor = new THREE.Color(0.5, 0.18, 0.1).multiplyScalar(Math.min(1.0, t * 1.5));
+      colors.sunLight.lerpColors(duskSunColor, cSunsetLight, t);
       colors.ambient.lerpColors(cDuskAmbient, cSunsetAmbient, t);
     } else if (sunY >= -0.22) {
       // 4. Глубокие сумерки -> Наступление ночи
