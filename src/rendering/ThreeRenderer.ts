@@ -414,11 +414,14 @@ export class ThreeRenderer implements IRenderer {
     const envEntities = context.world.getEntitiesWith('environment');
     const env = envEntities.length > 0 ? envEntities[0][1].environment : DEFAULT_ENV_FALLBACK;
 
+    const visibleRadius = dist * GRAPHICS_CONFIG.shadows.frustumMargin;
+
     this.environmentManager.update(
       this.scene,
       this.camera,
       { x: centerX, y: centerY, z: centerZ },
-      env
+      env,
+      visibleRadius
     );
 
     // --- 1. ПРЕДВАРИТЕЛЬНЫЙ ПРОХОД ГЛУБИНЫ ДЛЯ ВОДЫ (SHORELINE FOAM & DEPTH EXTINCTION) ---

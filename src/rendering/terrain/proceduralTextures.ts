@@ -131,16 +131,16 @@ function generateGrassCanvas(size: number): HTMLCanvasElement {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
 
-      // Крупные пятна разной влажности травы + микродетали травинок
-      const baseFbm = seamlessFbm(x, y, size, 5, 4, 0.52, 10);
+      // Сбалансированный микрорельеф: мелкая фактура травинок с умеренным базовым шумом
+      const baseFbm = seamlessFbm(x, y, size, 4, 8, 0.45, 10);
       const fineNoise = seamlessNoise2D(x, y, size, 64, 55);
 
-      const factor = Math.max(0, Math.min(1, baseFbm * 0.8 + fineNoise * 0.2));
+      const factor = Math.max(0, Math.min(1, baseFbm * 0.35 + fineNoise * 0.65));
 
-      // [38, 88, 28] (густой темный) -> [78, 148, 48] (сочный) -> [115, 185, 62] (солнечный)
-      let r = 44 + factor * 66;
-      let g = 92 + factor * 86;
-      let b = 28 + factor * 30;
+      // Плотная и монотонная цветовая гамма без резких перепадов яркости внутри тайла
+      const r = 58 + factor * 28;
+      const g = 112 + factor * 36;
+      const b = 36 + factor * 18;
 
       data[idx] = Math.round(r);
       data[idx + 1] = Math.round(g);

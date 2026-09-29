@@ -16,6 +16,10 @@ export class EnvironmentManager {
   private rotAzimuth = new THREE.Matrix4();
   private rotHour = new THREE.Matrix4();
 
+  private _targetViewPos = new THREE.Vector3();
+  private _texelOffsetView = new THREE.Vector3();
+  private _texelOffsetWorld = new THREE.Vector3();
+
   constructor(scene: THREE.Scene) {
     this.skyDome = new SkyDome();
     scene.add(this.skyDome.mesh);
@@ -59,7 +63,8 @@ export class EnvironmentManager {
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     focusTarget: { x: number; y: number; z: number },
-    env: EnvironmentComponent
+    env: EnvironmentComponent,
+    visibleRadius: number = GRAPHICS_CONFIG.shadows.bounds
   ): void {
     const time = env.timeOfDay;
     const hourAngle = ((time - 6.0) / 24.0) * Math.PI * 2.0;
@@ -105,27 +110,61 @@ export class EnvironmentManager {
     if (isSunDominant) {
       this.sunLight.castShadow = true;
       this.moonLight.castShadow = false;
-      this.alignLightWithTarget(this.sunLight, this.sunDir, focusTarget);
+      this.alignLightWithTarget(this.sunLight, this.sunDir, focusTarget, visibleRadius);
     } else {
       this.sunLight.castShadow = false;
       this.moonLight.castShadow = true;
-      this.alignLightWithTarget(this.moonLight, this.moonDir, focusTarget);
+      this.alignLightWithTarget(this.moonLight, this.moonDir, focusTarget, visibleRadius);
     }
   }
 
   private alignLightWithTarget(
     light: THREE.DirectionalLight,
     dir: THREE.Vector3,
-    target: { x: number; y: number; z: number }
+    target: { x: number; y: number; z: number },
+    visibleRadius: number
   ): void {
-    const dist = GRAPHICS_CONFIG.shadows.distance;
-    light.position.set(
-      target.x + dir.x * dist,
-      target.y + Math.max(10, dir.y * dist),
-      target.z + dir.z * dist
-    );
+    const cfg = GRAPHICS_CONFIG.shadows;
+    const bounds = Math.max(cfg.minBounds, Math.min(cfg.maxBounds, visibleRadius));
+    const cam = light.shadow.camera;
+
+    if (Math.abs(cam.top - bounds) > 0.05) {
+      cam.left = -bounds;
+      cam.right = bounds;
+      cam.top = bounds;
+      cam.bottom = -bounds;
+      cam.updateProjectionMatrix();
+    }
+
+    const dist = cfg.distance;
+    const idealX = target.x + dir.x * dist;
+    const idealY = target.y + Math.max(10, dir.y * dist);
+    const idealZ = target.z + dir.z * dist;
+
+    light.position.set(idealX, idealY, idealZ);
     light.target.position.set(target.x, target.y, target.z);
     light.target.updateMatrixWorld();
+
+    cam.position.copy(light.position);
+    cam.lookAt(light.target.position);
+    cam.updateMatrixWorld();
+
+    this._targetViewPos.set(target.x, target.y, target.z).applyMatrix4(cam.matrixWorldInverse);
+
+    const texelSize = (bounds * 2.0) / cfg.mapSize;
+    const fracX = this._targetViewPos.x % texelSize;
+    const fracY = this._targetViewPos.y % texelSize;
+
+    this._texelOffsetView.set(fracX, fracY, 0);
+    this._texelOffsetWorld.copy(this._texelOffsetView).transformDirection(cam.matrixWorld);
+
+    light.position.add(this._texelOffsetWorld);
+    light.target.position.add(this._texelOffsetWorld);
+    light.target.updateMatrixWorld();
+
+    cam.position.copy(light.position);
+    cam.lookAt(light.target.position);
+    cam.updateMatrixWorld();
   }
 
   private evaluateAtmosphereColors(sunY: number): SkyColors {

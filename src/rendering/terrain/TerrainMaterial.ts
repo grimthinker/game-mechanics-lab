@@ -20,7 +20,7 @@ export function createTerrainMaterial(
   };
 
   material.userData.isSharedMaterial = true;
-  material.customProgramCacheKey = () => 'TerrainSplatMaterial_v7'; // Обновлен ключ кэша для рекомпиляции
+  material.customProgramCacheKey = () => 'TerrainSplatMaterial_v8'; // Обновлен ключ кэша для рекомпиляции
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms.tSplat = { value: splatTexture };
@@ -82,6 +82,34 @@ export function createTerrainMaterial(
 
       vec2 tiledUv = vUv * uTiling;
 
+      // 1. Искривление UV (Domain Warping): разрушает прямые ряды и диагонали сетки
+      vec2 uvWarp = vec2(
+        sin(vTriPos.z * 0.14 + vTriPos.x * 0.07),
+        cos(vTriPos.x * 0.14 - vTriPos.z * 0.07)
+      ) * 0.18;
+      vec2 warpedGrassUv = tiledUv + uvWarp;
+
+      // 2. Двухмасштабная выборка травы (поворот на ~45° и другой масштаб ~38%)
+      vec2 macroGrassUv = vec2(
+        warpedGrassUv.x * 0.38 - warpedGrassUv.y * 0.38,
+        warpedGrassUv.x * 0.38 + warpedGrassUv.y * 0.38
+      ) + vec2(17.3, 31.7);
+
+      vec4 colGrassDetail = texture2D(tGrass, warpedGrassUv);
+      vec4 colGrassMacro  = texture2D(tGrass, macroGrassUv);
+      vec4 colGrass = mix(colGrassDetail, colGrassMacro, 0.42);
+
+      // 3. Макро-вариации оттенка и освещенности по мировым координатам (15-30 метров)
+      float macroShade = sin(vTriPos.x * 0.05) * cos(vTriPos.z * 0.05) * 0.5 + 0.5;
+      float macroTint  = sin(vTriPos.x * 0.08 - vTriPos.z * 0.09) * 0.5 + 0.5;
+      colGrass.rgb *= (0.86 + macroShade * 0.28);
+      vec3 warmGrassTint = vec3(1.06, 1.02, 0.90);
+      vec3 lushGrassTint = vec3(0.94, 1.04, 0.96);
+      colGrass.rgb *= mix(lushGrassTint, warmGrassTint, macroTint);
+
+      // Песок со сглаженным искривлением UV
+      vec4 colSand = texture2D(tSand, tiledUv + uvWarp * 0.5);
+
       // === ТРИПЛАНАРНЫЙ МАППИНГ (Только Скала и Почва) ===
       
       // 1. Вычисляем веса смешивания осей на основе нормали
@@ -94,13 +122,9 @@ export function createTerrainMaterial(
       vec2 uvZ = vTriPos.xy * (uTiling / 100.0);
 
       // 3. Выборка текстур
-      // Трава и Песок (остаются планарными)
-      vec4 colGrass = texture2D(tGrass, tiledUv);
-      vec4 colSand  = texture2D(tSand, tiledUv);
-
       // Скала (Трипланар)
       vec4 cxRock = texture2D(tRock, uvX);
-      vec4 cyRock = texture2D(tRock, tiledUv); // Для крыши используем UV оригинала для идеального тайлинга
+      vec4 cyRock = texture2D(tRock, tiledUv);
       vec4 czRock = texture2D(tRock, uvZ);
       vec4 colRock = cxRock * blend.x + cyRock * blend.y + czRock * blend.z;
 
