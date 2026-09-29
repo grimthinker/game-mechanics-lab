@@ -12,6 +12,7 @@ import { Vec3 } from '../../types';
 import { WaterComponent, WaterConfig } from '../components/water';
 import { createStat } from '../stats/StatEvaluator';
 import { createRectanglePoints } from '../../utils';
+import { GRAPHICS_CONFIG } from '../../config/graphicsConfig';
 
 export function createWaterConfig(
   waterType: 'lake' | 'river' = 'lake',
@@ -35,6 +36,8 @@ export function createWaterConfig(
     shallowOpacity: options?.shallowOpacity ?? 0.25,
     clarity: options?.clarity ?? (isRiver ? 2.0 : 3.0),
     waveSpeed: options?.waveSpeed ?? (isRiver ? 2.5 : 1.2),
+    rippleSpeed: options?.rippleSpeed ?? 1.0,
+    rippleDamping: options?.rippleDamping ?? GRAPHICS_CONFIG.water.ripples.damping,
     waveHeight: options?.waveHeight ?? (isRiver ? 0.08 : 0.12),
     flowDirection: options?.flowDirection ?? (isRiver ? { x: 0, z: 1 } : { x: 0, z: 0 }),
     flowSpeed: options?.flowSpeed ?? (isRiver ? 2.0 : 0.0),
@@ -83,6 +86,8 @@ export function assembleWater(
         deepColor: config.water.deepColor ?? (isRiver ? '#0e6251' : '#0b3954'),
         shallowOpacity: config.water.shallowOpacity ?? 0.25,
         clarity: config.water.clarity ?? (isRiver ? 2.0 : 3.0),
+        rippleSpeed: config.water.rippleSpeed ?? 1.0,
+        rippleDamping: config.water.rippleDamping ?? GRAPHICS_CONFIG.water.ripples.damping,
       } as WaterComponent)
     : {
         width: 20,
@@ -95,6 +100,8 @@ export function assembleWater(
         shallowOpacity: 0.25,
         clarity: 3.0,
         waveSpeed: 1.2,
+        rippleSpeed: 1.0,
+        rippleDamping: GRAPHICS_CONFIG.water.ripples.damping,
         waveHeight: 0.12,
         flowDirection: { x: 0, z: 0 },
         flowSpeed: 0.0,

@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { WaterComponent } from '../../ecs/components/water';
 import { GRAPHICS_CONFIG } from '../../config/graphicsConfig';
 
-export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial {
+export function createWaterMaterial(
+  comp: WaterComponent,
+  rippleTexture?: THREE.Texture | null
+): THREE.ShaderMaterial {
   const baseColor = new THREE.Color(comp.color || '#3498db');
   const deepColor = new THREE.Color(comp.deepColor || '#0b3954');
 
@@ -11,38 +14,58 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
     flowDir.normalize();
   }
 
+  const defaultRippleTex = new THREE.DataTexture(
+    new Float32Array([0, 0, 0, 1]),
+    1,
+    1,
+    THREE.RGBAFormat,
+    THREE.FloatType
+  );
+  defaultRippleTex.needsUpdate = true;
+
+  const rippleRes = GRAPHICS_CONFIG.water.ripples.resolution;
+
+  const waterUniforms = THREE.UniformsUtils.merge([
+    THREE.UniformsLib['lights'],
+    THREE.UniformsLib['fog'],
+    {
+      receiveShadow: { value: true },
+      uTime: { value: 0 },
+      // Цвета мелководья и глубины
+      uColor: { value: baseColor },
+      uDeepColor: { value: deepColor },
+      // Прозрачность у берега и на глубине
+      uOpacity: { value: comp.opacity ?? 0.88 },
+      uShallowOpacity: { value: comp.shallowOpacity ?? 0.25 },
+      uClarity: { value: comp.clarity ?? 2.5 },
+      // Параметры волн и течения
+      uWaveSpeed: { value: comp.waveSpeed ?? 1.2 },
+      uWaveHeight: { value: comp.waveHeight ?? 0.12 },
+      uFlowDirection: { value: flowDir },
+      uFlowSpeed: { value: comp.flowSpeed ?? 0.0 },
+      // Интерактивная рябь: инициализируем null для предотвращения попытки клонирования RenderTarget текстуры
+      tRipple: { value: null },
+      uRippleTexel: { value: new THREE.Vector2(1.0 / rippleRes, 1.0 / rippleRes) },
+      uRippleDisplacement: { value: GRAPHICS_CONFIG.water.ripples.displacementScale },
+      // Освещение
+      uSunDirection: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
+      uSunColor: { value: new THREE.Color(1.0, 0.95, 0.85) },
+      uAmbientColor: { value: new THREE.Color(0.25, 0.3, 0.4) },
+      // Глубина сцены
+      tDepth: { value: null },
+      uCameraNear: { value: 0.1 },
+      uCameraFar: { value: 1000.0 },
+      uResolution: { value: new THREE.Vector2(1, 1) },
+    },
+  ]);
+
+  // Присваиваем текстуру напрямую по ссылке в обход cloneUniforms
+  waterUniforms.tRipple.value = rippleTexture || defaultRippleTex;
+
   const material = new THREE.ShaderMaterial({
     lights: true, // Включаем прием теней от источников света Three.js
     fog: true,
-    uniforms: THREE.UniformsUtils.merge([
-      THREE.UniformsLib['lights'],
-      THREE.UniformsLib['fog'],
-      {
-        receiveShadow: { value: true },
-        uTime: { value: 0 },
-        // Цвета мелководья и глубины
-        uColor: { value: baseColor },
-        uDeepColor: { value: deepColor },
-        // Прозрачность у берега и на глубине
-        uOpacity: { value: comp.opacity ?? 0.88 },
-        uShallowOpacity: { value: comp.shallowOpacity ?? 0.25 },
-        uClarity: { value: comp.clarity ?? 2.5 },
-        // Параметры волн и течения
-        uWaveSpeed: { value: comp.waveSpeed ?? 1.2 },
-        uWaveHeight: { value: comp.waveHeight ?? 0.12 },
-        uFlowDirection: { value: flowDir },
-        uFlowSpeed: { value: comp.flowSpeed ?? 0.0 },
-        // Освещение
-        uSunDirection: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
-        uSunColor: { value: new THREE.Color(1.0, 0.95, 0.85) },
-        uAmbientColor: { value: new THREE.Color(0.25, 0.3, 0.4) },
-        // Глубина сцены
-        tDepth: { value: null },
-        uCameraNear: { value: 0.1 },
-        uCameraFar: { value: 1000.0 },
-        uResolution: { value: new THREE.Vector2(1, 1) },
-      },
-    ]),
+    uniforms: waterUniforms,
     vertexShader: `
     #include <common>
     #include <fog_pars_vertex>
@@ -53,6 +76,8 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
     uniform float uWaveHeight;
     uniform vec2 uFlowDirection;
     uniform float uFlowSpeed;
+    uniform sampler2D tRipple;
+    uniform float uRippleDisplacement;
 
     varying vec2 vUv;
     varying vec3 vWorldPosition;
@@ -73,10 +98,14 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
       
       float totalWave = (w1 + w2 + w3) * uWaveHeight * 0.6;
 
-      vec3 transformed = position;
-      transformed.y += totalWave;
+      // Смещение вершин от интерактивных расходящихся волн
+      float rippleSample = texture2D(tRipple, uv).r;
+      float rippleHeight = rippleSample * uRippleDisplacement;
 
-      vWaveHeight = totalWave;
+      vec3 transformed = position;
+      transformed.y += totalWave + rippleHeight;
+
+      vWaveHeight = totalWave + rippleHeight;
       vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
 
       // Аналитическое вычисление нормалей волн для честного отражения света
@@ -133,6 +162,9 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
       uniform float uCameraFar;
       uniform vec2 uResolution;
 
+      uniform sampler2D tRipple;
+      uniform vec2 uRippleTexel;
+
       varying vec2 vUv;
       varying vec3 vWorldPosition;
       varying vec3 vNormal;
@@ -171,7 +203,7 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
         // Градиент прозрачности: у берега - uShallowOpacity, на глубине - uOpacity
         float dynamicOpacity = mix(uShallowOpacity, uOpacity, absorption);
 
-        // --- 2. ГЕНЕРАТОР КАУСТИКИ И БЕРЕГОВОЙ ПЕНЫ ---
+        // --- 2. ГЕНЕРАТОР КАУСТИКИ, БЕРЕГОВОЙ И КИЛЬВАТЕРНОЙ ПЕНЫ ---
         vec2 flowOffset = uFlowDirection * uFlowSpeed * uTime * 0.5;
         vec2 p = (vWorldPosition.xz + flowOffset) * 0.8; 
         float t = uTime * 0.6;
@@ -185,11 +217,28 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
         float waveFoam = highlights * smoothstep(-0.02, 0.05, vWaveHeight);
         float shoreFoam = smoothstep(${GRAPHICS_CONFIG.water.shoreFoamDistance.toFixed(2)}, 0.02, waterDepth);
 
-        float totalFoam = max(waveFoam, shoreFoam * 0.85);
-        waterBase += vec3(0.65, 0.85, 1.0) * totalFoam;
+        // Расчет нормалей и пены от интерактивной ряби
+        float rL = texture2D(tRipple, vUv - vec2(uRippleTexel.x, 0.0)).r;
+        float rR = texture2D(tRipple, vUv + vec2(uRippleTexel.x, 0.0)).r;
+        float rD = texture2D(tRipple, vUv - vec2(0.0, uRippleTexel.y)).r;
+        float rU = texture2D(tRipple, vUv + vec2(0.0, uRippleTexel.y)).r;
+        float rCenter = texture2D(tRipple, vUv).r;
+
+        vec3 rippleNormal = vec3(-(rR - rL) * 2.8, 0.0, (rU - rD) * 2.8);
+        
+        // Мягкая пена на гребне волны: объединяем высоту волны и наклон склона, устраняя провал/дырку в центре
+        float wavePeak = max(0.0, rCenter);
+        float waveSlope = length(vec2(rR - rL, rU - rD));
+        float waveEnergy = wavePeak * 0.65 + waveSlope * 0.35;
+        float wakeFoam = smoothstep(${GRAPHICS_CONFIG.water.ripples.foamThreshold.toFixed(2)}, 0.16, waveEnergy) * 0.35;
+
+        float totalFoam = clamp(max(waveFoam, shoreFoam * 0.85) + wakeFoam * 0.5, 0.0, 0.85);
+        // Мягкое смешивание цвета пены без аддитивного пересвета
+        waterBase = mix(waterBase, vec3(0.85, 0.95, 1.0), totalFoam);
 
         // --- 3. ДИНАМИЧЕСКИЙ РАСЧЕТ ОСВЕЩЕНИЯ И ТЕНЕЙ (SHADOW MAP) ---
-        vec3 N = normalize(vNormal);
+        vec3 perturbedN = normalize(vNormal + rippleNormal);
+        vec3 N = normalize(perturbedN);
         if (!gl_FrontFacing) N = -N;
 
         float shadow = 1.0;
@@ -220,6 +269,6 @@ export function createWaterMaterial(comp: WaterComponent): THREE.ShaderMaterial 
   });
 
   material.userData.isSharedMaterial = true;
-  material.customProgramCacheKey = () => 'WaterShaderMaterial_v6';
+  material.customProgramCacheKey = () => 'WaterShaderMaterial_v9';
   return material;
 }

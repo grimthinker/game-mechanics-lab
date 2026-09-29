@@ -77,10 +77,10 @@ export class ThreeRenderer implements IRenderer {
     #endif
     `;
 
-    // Создаем WebGL рендерер с включенными мягкими тенями (PCFSoftShadowMap)
+    // Создаем WebGL рендерер с включенными тенями PCFShadowMap
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     this.canvas = this.renderer.domElement;
     this.canvas.style.display = 'block';
@@ -425,64 +425,83 @@ export class ThreeRenderer implements IRenderer {
     );
 
     // --- 1. ПРЕДВАРИТЕЛЬНЫЙ ПРОХОД ГЛУБИНЫ ДЛЯ ВОДЫ (SHORELINE FOAM & DEPTH EXTINCTION) ---
-    if (!this.depthRenderTarget) {
-      this.depthRenderTarget = new THREE.WebGLRenderTarget(internalW, internalH, {
-        depthTexture: new THREE.DepthTexture(internalW, internalH),
-        depthBuffer: true,
-        format: THREE.RGBAFormat,
-      });
-    } else if (
-      this.depthRenderTarget.width !== internalW ||
-      this.depthRenderTarget.height !== internalH
-    ) {
-      this.depthRenderTarget.setSize(internalW, internalH);
-    }
-
-    // Скрываем меши воды, манипулятор и служебные маркеры перед непрозрачным проходом
     const waterMeshes: THREE.Object3D[] = [];
-    this.scene.traverse((child) => {
+    for (let i = 0; i < this.scene.children.length; i++) {
+      const child = this.scene.children[i];
       if (child.userData.isWater || child.userData.isWaterMesh) {
         if (child.visible) {
           waterMeshes.push(child);
-          child.visible = false;
         }
       }
-    });
-
-    const prevGizmoVis = this.transformControl.getHelper().visible;
-    const prevBrushVis = this.brushCursor.visible;
-    this.transformControl.getHelper().visible = false;
-    this.brushCursor.visible = false;
-
-    // Рендерим непрозрачную сцену (дно, камни, деревья, персонажи) в буфер глубины
-    this.renderer.setRenderTarget(this.depthRenderTarget);
-    this.renderer.clear();
-    this.renderer.render(this.scene, this.camera);
-    this.renderer.setRenderTarget(null);
-
-    // Восстанавливаем видимость объектов
-    this.transformControl.getHelper().visible = prevGizmoVis;
-    this.brushCursor.visible = prevBrushVis;
-    for (let i = 0; i < waterMeshes.length; i++) {
-      waterMeshes[i].visible = true;
     }
 
-    // Передаем текстуру глубины сцены в материалы воды с ее реальным физическим разрешением
-    const depthTex = this.depthRenderTarget.depthTexture;
-    for (let i = 0; i < waterMeshes.length; i++) {
-      waterMeshes[i].traverse((child) => {
-        if (
-          child instanceof THREE.Mesh &&
-          child.material &&
-          (child.material as any).uniforms?.tDepth
-        ) {
-          const u = (child.material as any).uniforms;
-          u.tDepth.value = depthTex;
-          u.uCameraNear.value = this.camera.near;
-          u.uCameraFar.value = this.camera.far;
-          u.uResolution.value.set(internalW, internalH);
+    // Оптимизация: проход глубины запускается ТОЛЬКО если на сцене физически присутствует вода
+    if (waterMeshes.length > 0) {
+      if (!this.depthRenderTarget) {
+        this.depthRenderTarget = new THREE.WebGLRenderTarget(internalW, internalH, {
+          depthTexture: new THREE.DepthTexture(internalW, internalH),
+          depthBuffer: true,
+          format: THREE.RGBAFormat,
+        });
+      } else if (
+        this.depthRenderTarget.width !== internalW ||
+        this.depthRenderTarget.height !== internalH
+      ) {
+        this.depthRenderTarget.setSize(internalW, internalH);
+      }
+
+      // Скрываем воду перед проходом глубины
+      for (let i = 0; i < waterMeshes.length; i++) {
+        waterMeshes[i].visible = false;
+      }
+
+      // Исключаем инстанс-траву (isGrassMesh), манипулятор и курсор: они не нужны для глубины дна
+      const hiddenMeshes: THREE.Object3D[] = [];
+      this.scene.traverse((child) => {
+        if (child.userData.isGrassMesh && child.visible) {
+          hiddenMeshes.push(child);
+          child.visible = false;
         }
       });
+
+      const prevGizmoVis = this.transformControl.getHelper().visible;
+      const prevBrushVis = this.brushCursor.visible;
+      this.transformControl.getHelper().visible = false;
+      this.brushCursor.visible = false;
+
+      // Рендерим только рельеф, камни и персонажей в буфер глубины
+      this.renderer.setRenderTarget(this.depthRenderTarget);
+      this.renderer.clear();
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(null);
+
+      // Восстанавливаем видимость объектов
+      this.transformControl.getHelper().visible = prevGizmoVis;
+      this.brushCursor.visible = prevBrushVis;
+      for (let i = 0; i < hiddenMeshes.length; i++) {
+        hiddenMeshes[i].visible = true;
+      }
+      for (let i = 0; i < waterMeshes.length; i++) {
+        waterMeshes[i].visible = true;
+      }
+
+      // Передаем текстуру глубины сцены в материалы воды
+      const depthTex = this.depthRenderTarget.depthTexture;
+      for (let i = 0; i < waterMeshes.length; i++) {
+        waterMeshes[i].traverse((child) => {
+          if (
+            child instanceof THREE.Mesh &&
+            child.material &&
+            (child.material as any).uniforms?.tDepth
+          ) {
+            const u = (child.material as any).uniforms;
+            u.tDepth.value = depthTex;
+            u.uCameraNear.value = this.camera.near;
+            u.uCameraFar.value = this.camera.far;
+            u.uResolution.value.set(internalW, internalH);
+          }
+        });
+      }
     }
 
     // --- 2. ФИНАЛЬНЫЙ РЕНДЕР СЦЕНЫ С ВОДОЙ И ТЕНЯМИ НА ЭКРАН ---

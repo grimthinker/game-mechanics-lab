@@ -25,6 +25,11 @@ import { GrassSyncSystem } from '../../rendering/grass/GrassSyncSystem';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 import { ToonMaterialManager } from '../../rendering/materials/ToonMaterialManager';
 import { createWaterMaterial } from '../../rendering/materials/WaterMaterial';
+import { WaterRippleManager, WaterDisturbance } from '../../rendering/water/WaterRippleManager';
+import { GRAPHICS_CONFIG } from '../../config/graphicsConfig';
+import { WaterComponent } from '../components/water';
+import { TransformComponent } from '../components/physics';
+import { getTerrainHeightAt } from '../components/terrain';
 
 const PROCEDURAL_PROP_SCALES: Record<string, { baseRadius: number; baseHeight: number }> = {
   'proc://prop/tree': { baseRadius: 0.6, baseHeight: 4.0 },
@@ -42,6 +47,7 @@ export class ThreeSyncSystem {
   public static attachOutlines = attachOutlines;
 
   private scene: THREE.Scene;
+  private renderer?: THREE.WebGLRenderer;
   private meshes: Map<EntityId, THREE.Object3D> = new Map();
   private loadingMeshes: Set<EntityId> = new Set();
   private loadingGenerations: Map<EntityId, number> = new Map();
@@ -110,6 +116,7 @@ export class ThreeSyncSystem {
 
   constructor(scene: THREE.Scene, renderer?: THREE.WebGLRenderer) {
     this.scene = scene;
+    this.renderer = renderer;
     this.attackVisualsManager = new AttackVisualsManager(scene);
     this.terrainSync = new TerrainSyncSystem();
     this.creatureAssembler = new CreatureMeshAssembler(
@@ -360,6 +367,8 @@ export class ThreeSyncSystem {
         if (archetype === 'water') {
           const waterComp = world.getComponent(id, 'water');
           if (waterComp) {
+            const rippleManager = obj.userData.rippleManager as WaterRippleManager | undefined;
+
             // 1. Динамическая перестройка сетки геометрии при изменении размеров X/Z в инспекторе
             if (
               obj.userData.currentWidth !== waterComp.width ||
@@ -368,8 +377,12 @@ export class ThreeSyncSystem {
               obj.userData.currentWidth = waterComp.width;
               obj.userData.currentDepth = waterComp.depth;
 
-              const segsX = Math.max(4, Math.ceil(waterComp.width * 1.5));
-              const segsZ = Math.max(4, Math.ceil(waterComp.depth * 1.5));
+              if (rippleManager) {
+                rippleManager.setSize(waterComp.width, waterComp.depth);
+              }
+
+              const segsX = Math.max(16, Math.ceil(waterComp.width * 2.5));
+              const segsZ = Math.max(16, Math.ceil(waterComp.depth * 2.5));
               const newGeo = new THREE.PlaneGeometry(
                 waterComp.width,
                 waterComp.depth,
@@ -386,7 +399,21 @@ export class ThreeSyncSystem {
               });
             }
 
-            // 2. Получение параметров активного источника света сцены (солнце / луна)
+            // 2. Симуляция расходящейся интерактивной ряби
+            if (rippleManager && this.renderer) {
+              const disturbances = this.collectWaterDisturbances(world, waterComp, transform);
+              rippleManager.update(
+                this.renderer,
+                dt,
+                disturbances,
+                transform.x,
+                transform.z,
+                waterComp.rippleSpeed ?? 1.0,
+                waterComp.rippleDamping ?? GRAPHICS_CONFIG.water.ripples.damping
+              );
+            }
+
+            // 3. Получение параметров активного источника света сцены (солнце / луна)
             const sunDir = new THREE.Vector3(0.5, 0.8, 0.3).normalize();
             const sunColor = new THREE.Color(1.0, 0.95, 0.85);
             const ambientColor = new THREE.Color(0.25, 0.3, 0.4);
@@ -401,7 +428,9 @@ export class ThreeSyncSystem {
               }
             }
 
-            // 3. Синхронизация юниформов шейдера
+            // 4. Синхронизация юниформов шейдера
+            const rippleTex = rippleManager ? rippleManager.getTexture() : null;
+
             obj.traverse((child) => {
               if (
                 child instanceof THREE.Mesh &&
@@ -411,6 +440,11 @@ export class ThreeSyncSystem {
                 const u = (child.material as any).uniforms;
 
                 u.uTime.value += dt;
+
+                // Передача текстуры интерактивных волн
+                if (rippleTex && u.tRipple) {
+                  u.tRipple.value = rippleTex;
+                }
 
                 // Передача параметров света
                 u.uSunDirection.value.copy(sunDir);
@@ -552,6 +586,10 @@ export class ThreeSyncSystem {
     for (const [id, mesh] of this.meshes.entries()) {
       if (!activeIds.has(id)) {
         this.loadingGenerations.set(id, (this.loadingGenerations.get(id) ?? 0) + 1);
+        if (mesh.userData.rippleManager) {
+          mesh.userData.rippleManager.destroy();
+          delete mesh.userData.rippleManager;
+        }
         ThreeSyncSystem.disposeObject(mesh);
         if (mesh.parent) {
           mesh.parent.remove(mesh);
@@ -788,12 +826,18 @@ export class ThreeSyncSystem {
     } else if (archetype === 'water') {
       const waterComp = world.getComponent(id, 'water');
       if (waterComp) {
-        const segsX = Math.max(4, Math.ceil(waterComp.width * 1.5));
-        const segsZ = Math.max(4, Math.ceil(waterComp.depth * 1.5));
+        const segsX = Math.max(16, Math.ceil(waterComp.width * 2.5));
+        const segsZ = Math.max(16, Math.ceil(waterComp.depth * 2.5));
         const geo = new THREE.PlaneGeometry(waterComp.width, waterComp.depth, segsX, segsZ);
         geo.rotateX(-Math.PI / 2);
 
-        const mat = createWaterMaterial(waterComp);
+        const rippleManager = new WaterRippleManager(
+          GRAPHICS_CONFIG.water.ripples.resolution,
+          waterComp.width,
+          waterComp.depth
+        );
+
+        const mat = createWaterMaterial(waterComp, rippleManager.getTexture());
         const waterMesh = new THREE.Mesh(geo, mat);
         waterMesh.receiveShadow = true;
         waterMesh.userData.isWaterMesh = true;
@@ -804,6 +848,7 @@ export class ThreeSyncSystem {
         group.userData.entityId = id;
         group.userData.currentWidth = waterComp.width;
         group.userData.currentDepth = waterComp.depth;
+        group.userData.rippleManager = rippleManager;
         return group;
       }
     }
@@ -825,5 +870,153 @@ export class ThreeSyncSystem {
     }
 
     return undefined;
+  }
+
+  private collectWaterDisturbances(
+    world: World,
+    waterComp: WaterComponent,
+    waterTransform: TransformComponent
+  ): WaterDisturbance[] {
+    const disturbances: WaterDisturbance[] = [];
+    const halfW = waterComp.width / 2;
+    const halfD = waterComp.depth / 2;
+    const waterSurfaceY = waterTransform.y;
+    const maxDepth = waterComp.maxDepth ?? 4.0;
+
+    const terrainEntities = world.getEntitiesWith('terrain');
+    const terrainComp = terrainEntities.length > 0 ? terrainEntities[0][1].terrain : undefined;
+
+    // 1. Существа (игрок, собаки)
+    const creatures = world.getEntitiesWith('transform', 'meta', 'health');
+    for (const [cId, { transform, meta, health }] of creatures) {
+      if (!health.isAlive) continue;
+
+      const dx = transform.x - waterTransform.x;
+      const dz = transform.z - waterTransform.z;
+
+      // Существо должно быть строго в границах водоема по горизонтали
+      if (Math.abs(dx) <= halfW && Math.abs(dz) <= halfD) {
+        // Проверяем высоту рельефа под ногами: если грунт выше водной глади — существо на сухом берегу
+        let terrainY: number | null = null;
+        if (terrainComp) {
+          terrainY = getTerrainHeightAt(terrainComp, transform.x, transform.z);
+          if (terrainY !== null && terrainY >= waterSurfaceY - 0.02) {
+            continue; // Сухой берег
+          }
+        }
+
+        // Глубина погружения подошв/тела в воду (в метрах)
+        const immersion = waterSurfaceY - transform.y;
+        // Если ноги выше воды или погружены менее чем на 4 см — вода не реагирует
+        if (immersion < 0.04 || transform.y < waterSurfaceY - maxDepth - 0.5) {
+          continue;
+        }
+
+        // Локальная глубина водоема в данной точке берега
+        const localWaterDepth =
+          terrainY !== null ? Math.max(0, waterSurfaceY - terrainY) : immersion;
+        if (localWaterDepth < 0.04) {
+          continue;
+        }
+
+        const vel = world.getComponent(cId, 'velocity');
+        const speed = Math.hypot(vel?.vx ?? 0, vel?.vz ?? 0);
+        const physStats = world.getComponent(cId, 'physicsStats');
+        const radius = physStats?.radius.current ?? 0.4;
+        const creatureHeight = physStats?.height.current ?? 1.8;
+
+        const isSwimming = meta.stance === 'swim';
+        const isMoving = speed > 0.05;
+
+        // Если существо полностью стоит на месте и не плывет — оно не создает волн
+        if (!isMoving && !isSwimming) {
+          continue;
+        }
+
+        if (isMoving || isSwimming) {
+          // Плавная кривая отклика: от 0.04м до 50% роста существа
+          const targetImmersion = isSwimming ? creatureHeight * 0.45 : 0.5;
+          const immersionFactor = Math.min(
+            1.0,
+            Math.max(0.0, (immersion - 0.04) / Math.max(0.08, targetImmersion - 0.04))
+          );
+
+          // Затухание волн на ультра-мелководье у кромки берега (глубина до 25 см)
+          const shoreDepthFactor = Math.min(1.0, Math.max(0.0, (localWaterDepth - 0.04) / 0.25));
+          const effectiveImmersion = immersionFactor * shoreDepthFactor;
+
+          if (effectiveImmersion <= 0.02) {
+            continue;
+          }
+
+          const baseStrength = isSwimming
+            ? isMoving
+              ? Math.min(0.24, 0.05 + speed * 0.04)
+              : 0.015
+            : Math.min(0.18, speed * 0.035);
+
+          // Плавная пульсация во время нахождения в воде без движения (treading water / idle)
+          const timePulse =
+            !isMoving && isSwimming
+              ? Math.sin(
+                  performance.now() * 0.006 +
+                    cId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+                ) *
+                  0.5 +
+                0.5
+              : 1.0;
+
+          disturbances.push({
+            x: transform.x,
+            z: transform.z,
+            radius: (radius + (isMoving ? 0.25 : 0.12)) * Math.max(0.6, effectiveImmersion),
+            strength: baseStrength * effectiveImmersion * timePulse,
+          });
+        }
+      }
+    }
+
+    // 2. Динамические физические предметы (мячики, палки, ящики)
+    const items = world.getEntitiesWith('transform', 'physicsBody', 'physicsStats');
+    for (const [itId, { transform, physicsBody, physicsStats }] of items) {
+      if (world.getComponent(itId, 'ownership')) continue;
+      if (!physicsBody.rawBody || physicsBody.bodyType !== 'dynamic') continue;
+
+      const dx = transform.x - waterTransform.x;
+      const dz = transform.z - waterTransform.z;
+
+      if (Math.abs(dx) <= halfW && Math.abs(dz) <= halfD) {
+        if (terrainComp) {
+          const terrainY = getTerrainHeightAt(terrainComp, transform.x, transform.z);
+          if (terrainY !== null && terrainY >= waterSurfaceY - 0.02) {
+            continue;
+          }
+        }
+
+        const radius = physicsStats.radius.current ?? 0.2;
+        const itemBottomY = transform.y - radius;
+        const itemImmersion = waterSurfaceY - itemBottomY;
+
+        if (itemImmersion < 0.03 || transform.y < waterSurfaceY - maxDepth) {
+          continue;
+        }
+
+        const linvel = physicsBody.rawBody.linvel();
+        const speed = Math.hypot(linvel.x, linvel.y, linvel.z);
+
+        if (speed > 0.08) {
+          const immersionRatio = Math.min(1.0, Math.max(0.0, itemImmersion / (radius * 1.8)));
+
+          disturbances.push({
+            x: transform.x,
+            z: transform.z,
+            radius: (radius + 0.15) * Math.max(0.6, immersionRatio),
+            strength: Math.min(0.28, speed * 0.05) * immersionRatio,
+          });
+        }
+      }
+    }
+
+    return disturbances;
   }
 }

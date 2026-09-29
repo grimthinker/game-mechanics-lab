@@ -323,7 +323,7 @@ export const WaterInspector: React.FC<WaterInspectorProps> = ({
 
       <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Скорость волн:</span>
+          <span>Скорость фоновых волн:</span>
           <span style={{ color: '#f39c12' }}>{values.waveSpeed.toFixed(1)}x</span>
         </div>
         <input
@@ -335,6 +335,41 @@ export const WaterInspector: React.FC<WaterInspectorProps> = ({
           value={values.waveSpeed}
           onChange={(e) => handleChange({ waveSpeed: parseFloat(e.target.value) })}
           style={{ accentColor: '#f39c12', cursor: 'pointer' }}
+        />
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>Скорость ряби от объектов:</span>
+          <span style={{ color: '#3498db' }}>{(values.rippleSpeed ?? 1.0).toFixed(2)}x</span>
+        </div>
+        <input
+          disabled={isReadOnly}
+          type="range"
+          min="0.05"
+          max="3.0"
+          step="0.05"
+          value={values.rippleSpeed ?? 1.0}
+          onChange={(e) => handleChange({ rippleSpeed: parseFloat(e.target.value) })}
+          style={{ accentColor: '#3498db', cursor: 'pointer' }}
+        />
+      </label>
+
+      <label style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>Затухание ряби (Damping):</span>
+          <span style={{ color: '#2ecc71' }}>{(values.rippleDamping ?? 0.984).toFixed(3)}</span>
+        </div>
+        <input
+          disabled={isReadOnly}
+          type="range"
+          min="0.900"
+          max="0.995"
+          step="0.001"
+          value={values.rippleDamping ?? 0.984}
+          onChange={(e) => handleChange({ rippleDamping: parseFloat(e.target.value) })}
+          style={{ accentColor: '#2ecc71', cursor: 'pointer' }}
+          title="0.900 = быстро исчезает • 0.995 = долгоиграющие круги"
         />
       </label>
 

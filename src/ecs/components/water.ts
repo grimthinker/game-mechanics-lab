@@ -19,8 +19,12 @@ export interface WaterComponent {
   shallowOpacity: number;
   /** Дистанция прозрачности в метрах (на какой глубине вода становится полностью темной) */
   clarity: number;
-  /** Скорость анимации волн */
+  /** Скорость анимации фоновых волн */
   waveSpeed: number;
+  /** Скорость расхождения интерактивной ряби от объектов */
+  rippleSpeed: number;
+  /** Коэффициент затухания ряби (0.95 - быстрое затухание, 0.995 - долгоиграющие круги) */
+  rippleDamping: number;
   /** Высота (амплитуда) волн в метрах */
   waveHeight: number;
   /** Направление вектора течения в плоскости XZ */
@@ -44,6 +48,8 @@ export interface WaterConfig {
   shallowOpacity?: number;
   clarity?: number;
   waveSpeed?: number;
+  rippleSpeed?: number;
+  rippleDamping?: number;
   waveHeight?: number;
   flowDirection?: { x: number; z: number };
   flowSpeed?: number;
