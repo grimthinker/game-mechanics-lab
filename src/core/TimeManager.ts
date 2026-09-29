@@ -78,6 +78,9 @@ export class TimeManager {
     // Синхронизация ручных изменений трансформаций (из UI/Gizmo) с физическим движком (даже на паузе)
     this.app.simulation.physics.syncDirtyTransforms(this.app.world);
 
+    // Плавное подтягивание позиции, поворота, наклона и зума камеры на каждом кадре
+    this.app.camera.update(realDt, this.app.gameMode === GameMode.GAME);
+
     // Плавная синхронизация Three.js сцены и миксеров анимаций по честному времени кадра рендера
     const renderDt = this.isPaused ? realDt : realDt * this.globalTimeScale;
     this.app.simulation.threeSyncSystem.update(

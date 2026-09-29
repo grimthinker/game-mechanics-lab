@@ -140,6 +140,9 @@ export const App: React.FC = () => {
 
     const unsubPlayerDied = EventBus.on('game:playerDied', () => {
       if (appRef.current) {
+        if (appRef.current.gameMode === GameMode.GAME) {
+          appRef.current.camera.restoreState();
+        }
         appRef.current.gameMode = GameMode.SIMULATION;
         appRef.current.isPaused = true;
       }
@@ -263,6 +266,10 @@ export const App: React.FC = () => {
     if (!app) return;
     app.clearPlayerAim();
 
+    if (app.gameMode === GameMode.GAME) {
+      app.camera.restoreState();
+    }
+
     // Сохраняем прогресс перед полной выгрузкой мира
     if (app.gameMode === GameMode.EDITOR) {
       saveWorldToStorage(app);
@@ -281,6 +288,11 @@ export const App: React.FC = () => {
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
+
+    // Восстанавливаем позицию камеры редактора/симуляции, если выходим из игры
+    if (app.gameMode === GameMode.GAME) {
+      app.camera.restoreState();
+    }
 
     // Если мы переходим из МЕНЮ - значит память была пуста, нужно загрузить мир
     if (app.gameMode === GameMode.MENU) {
@@ -312,6 +324,11 @@ export const App: React.FC = () => {
     if (!app) return;
     app.clearPlayerAim();
 
+    // Восстанавливаем позицию камеры редактора/симуляции, если выходим из игры
+    if (app.gameMode === GameMode.GAME) {
+      app.camera.restoreState();
+    }
+
     if (app.gameMode === GameMode.EDITOR) {
       app.editorSnapshot = app.serializeWorld();
     }
@@ -339,13 +356,15 @@ export const App: React.FC = () => {
       return;
     }
 
-    // Мгновенно наводим камеру на игрока при входе в режим игры
-    const tr = app.world.getComponent(playerId, 'transform');
-    if (tr) {
-      app.camera.targetX = tr.x;
-      app.camera.targetY = tr.y + 0.8;
-      app.camera.targetZ = tr.z;
+    // Сохраняем положение камеры редактора/симуляции перед переходом в игру
+    app.camera.saveState();
+
+    // Мгновенно наводим камеру на голову игрока при входе в режим игры и применяем игровые лимиты
+    const headPos = app.simulation.getPlayerHeadPosition(playerId);
+    if (headPos) {
+      app.camera.snapToTarget(headPos.x, headPos.y, headPos.z);
     }
+    app.camera.clampToGameBounds();
 
     if (app.gameMode === GameMode.EDITOR) {
       app.editorSnapshot = app.serializeWorld();

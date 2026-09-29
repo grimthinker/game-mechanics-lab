@@ -81,7 +81,13 @@ export const useCanvasInteraction = ({
       if (e.altKey) {
         app.camera.adjustHeight(e.deltaY);
       } else {
-        app.camera.zoomAt(e.clientX, e.clientY, e.deltaY, app.canvas);
+        app.camera.zoomAt(
+          e.clientX,
+          e.clientY,
+          e.deltaY,
+          app.canvas,
+          app.gameMode === GameMode.GAME
+        );
       }
     };
 
@@ -270,7 +276,7 @@ export const useCanvasInteraction = ({
     if (!app) return;
 
     if (app.camera.isRotating) {
-      app.camera.rotate(e.clientX, e.clientY);
+      app.camera.rotate(e.clientX, e.clientY, app.gameMode === GameMode.GAME);
       e.currentTarget.style.cursor = 'move';
       return;
     }

@@ -30,6 +30,7 @@ import { getAnatomyParts, getAllContainedItems } from '../ecs/utils/hierarchy';
 import { Radians } from '../utils';
 import { EventBus } from './EventBus';
 import { initDefaultWorldPrefab } from '../ecs/prefabs/defaultWorldPrefab';
+import { BALANCE_CONFIG } from '../config/balanceConfig';
 
 export class GameSimulation {
   public world: World;
@@ -97,17 +98,11 @@ export class GameSimulation {
       this.updatePlayerAim(worldPoint);
     }
 
-    // Плавная привязка камеры к игроку в режиме игры
+    // Привязка фокуса камеры к голове игрока в режиме игры
     if (this.app.gameMode === GameMode.GAME) {
-      const playerId = this.getPlayerEntityId();
-      if (playerId) {
-        const tr = this.world.getComponent(playerId, 'transform');
-        if (tr) {
-          const lerpFactor = Math.min(1.0, 15.0 * dt);
-          this.app.camera.targetX += (tr.x - this.app.camera.targetX) * lerpFactor;
-          this.app.camera.targetY += (tr.y + 0.8 - this.app.camera.targetY) * lerpFactor;
-          this.app.camera.targetZ += (tr.z - this.app.camera.targetZ) * lerpFactor;
-        }
+      const headPos = this.getPlayerHeadPosition();
+      if (headPos) {
+        this.app.camera.setDesiredTarget(headPos.x, headPos.y, headPos.z);
       }
     }
 
@@ -145,6 +140,28 @@ export class GameSimulation {
     }
     this.playerEntityId = null;
     return null;
+  }
+
+  public getPlayerHeadPosition(playerId?: string | null): Vec3 | null {
+    const id = playerId ?? this.getPlayerEntityId();
+    if (!id) return null;
+    const tr = this.world.getComponent(id, 'transform');
+    if (!tr) return null;
+
+    const physStats = this.world.getComponent(id, 'physicsStats');
+    const baseHeight = physStats?.height?.current ?? 1.8;
+    const meta = this.world.getComponent(id, 'meta');
+    const stance = meta?.stance ?? 'standing';
+
+    const stanceMult = BALANCE_CONFIG.creature.stanceHeightMultipliers[stance] ?? 1.0;
+    const currentHeight = baseHeight * stanceMult;
+    const headRatio = BALANCE_CONFIG.camera.gameMode.headHeightRatio;
+
+    return {
+      x: tr.x,
+      y: tr.y + currentHeight * headRatio,
+      z: tr.z,
+    };
   }
 
   public updatePlayerAim(worldPoint: Vec3): void {
