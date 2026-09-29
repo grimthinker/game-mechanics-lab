@@ -132,11 +132,16 @@ export class ThreeSyncSystem {
 
   public clearMeshes(): void {
     for (const [, mesh] of this.meshes.entries()) {
+      if (mesh.userData.rippleManager) {
+        mesh.userData.rippleManager.destroy();
+        delete mesh.userData.rippleManager;
+      }
       ThreeSyncSystem.disposeObject(mesh);
       if (mesh.parent) {
         mesh.parent.remove(mesh);
       }
     }
+    this.terrainSync.clear();
     this.attackVisualsManager.clear();
     this.grassSync.clear();
     this.meshes.clear();

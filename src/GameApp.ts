@@ -69,7 +69,7 @@ export class GameApp {
     this.emitState();
   }
 
-  private _gameMode: GameMode = GameMode.EDITOR;
+  private _gameMode: GameMode = GameMode.MENU;
   public get gameMode() {
     return this._gameMode;
   }

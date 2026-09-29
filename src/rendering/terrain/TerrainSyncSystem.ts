@@ -72,6 +72,19 @@ export class TerrainSyncSystem {
     return this.rootGroup;
   }
 
+  public clear(): void {
+    for (const chunk of this.chunks.values()) {
+      chunk.dispose();
+    }
+    this.chunks.clear();
+
+    if (this.globalSplatTexture) {
+      this.globalSplatTexture.dispose();
+      this.globalSplatTexture = null;
+    }
+    this.rootGroup = null;
+  }
+
   public syncTerrain(obj: THREE.Object3D, terrainComp: TerrainComponent): void {
     if (terrainComp.isGeometryDirty) {
       if (!terrainComp.dirtyChunks) terrainComp.dirtyChunks = new Set<string>();

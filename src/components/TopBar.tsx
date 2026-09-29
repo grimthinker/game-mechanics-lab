@@ -7,6 +7,7 @@ export interface TopBarProps {
   goToEditor: () => void;
   goToSimulation: () => void;
   goToGame: () => void;
+  goToMenu: () => void;
   obstaclesEnabled: boolean;
   setObstaclesEnabled: (val: boolean) => void;
   worldFileInputRef: React.RefObject<HTMLInputElement | null>;
@@ -36,6 +37,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   goToEditor,
   goToSimulation,
   goToGame,
+  goToMenu,
   obstaclesEnabled,
   setObstaclesEnabled,
   worldFileInputRef,
@@ -280,6 +282,18 @@ export const TopBar: React.FC<TopBarProps> = ({
           onClick={goToGame}
         >
           {t('topbar.game')}
+        </button>
+        <button
+          className="btn btn-sm"
+          style={{
+            backgroundColor: mode === GameMode.MENU ? '#d35400' : 'transparent',
+            color: '#fff',
+            border: 'none',
+            padding: '4px 12px',
+          }}
+          onClick={goToMenu}
+        >
+          {t('topbar.menu')}
         </button>
 
         {mode !== GameMode.EDITOR && (

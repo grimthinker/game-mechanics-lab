@@ -93,7 +93,7 @@ export const useCanvasInteraction = ({
 
   const handleMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
     const app = appRef.current;
-    if (!app) return;
+    if (!app || mode === GameMode.MENU) return;
 
     if (onClosePieMenu) onClosePieMenu();
 

@@ -13,6 +13,7 @@ import { usePieMenuTree } from './components/PieMenu/usePieMenuTree';
 import { PlacementOverlays } from './components/canvas/PlacementOverlays';
 import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
+import { MainMenu } from './components/MainMenu';
 import { HotkeysModal } from './components/HotkeysModal';
 import { CreatureWizardModal, NewWorldModal } from './components/modals';
 import { GameHUD } from './components/GameHUD';
@@ -38,7 +39,7 @@ export const App: React.FC = () => {
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const [engineState, setEngineState] = useState(() => ({
-    mode: GameMode.EDITOR,
+    mode: GameMode.MENU,
     isPaused: true,
     timeScale: 1.0,
     showUIOverlays: true,
@@ -220,23 +221,14 @@ export const App: React.FC = () => {
     appRef.current = app;
     setApp(app);
 
+    app.gameMode = GameMode.MENU;
+    app.isPaused = true;
     app.emitState(); // Форсируем первичную синхронизацию в React
     app.start();
 
-    // Восстановление мира из автосохранения либо создание дефолтного мира
-    const autoSave = loadWorldFromStorage();
-    if (autoSave && autoSave.world) {
-      app.deserializeWorld(autoSave.world);
-      if (autoSave.camera) {
-        app.camera.deserialize(autoSave.camera);
-      }
-    } else {
-      app.initDefaultWorld();
-      saveWorldToStorage(app);
-    }
+    // В главном меню мы стартуем с пустой сцены для экономии памяти.
+    // Загрузка мира отложена до вызова goToEditor.
 
-    app.selection.emitSelectionChanged();
-    app.updateBTData(true);
     setIsEngineReady(true);
 
     // Доступ к движку из консоли браузера только в режиме разработки (DEV)
@@ -264,15 +256,49 @@ export const App: React.FC = () => {
     app.isPaused = !app.isPaused;
   }, []);
 
+  const goToMenu = useCallback(() => {
+    GlobalInput.keys.clear();
+    const app = appRef.current;
+    if (!app) return;
+    app.clearPlayerAim();
+
+    // Сохраняем прогресс перед полной выгрузкой мира
+    if (app.gameMode === GameMode.EDITOR) {
+      saveWorldToStorage(app);
+    } else if (app.gameMode === GameMode.SIMULATION || app.gameMode === GameMode.GAME) {
+      saveWorldToStorage(app, app.editorSnapshot);
+    }
+
+    app.gameMode = GameMode.MENU;
+    app.isPaused = true;
+    app.selection.clear();
+    app.clearWorld(); // Выгружаем мир из памяти
+  }, []);
+
   const goToEditor = useCallback(() => {
     GlobalInput.keys.clear();
     const app = appRef.current;
     if (!app) return;
     app.clearPlayerAim();
-    if (app.editorSnapshot) {
+
+    // Если мы переходим из МЕНЮ - значит память была пуста, нужно загрузить мир
+    if (app.gameMode === GameMode.MENU) {
+      const autoSave = loadWorldFromStorage();
+      if (autoSave && autoSave.world) {
+        app.deserializeWorld(autoSave.world);
+        if (autoSave.camera) {
+          app.camera.deserialize(autoSave.camera);
+        }
+      } else {
+        app.initDefaultWorld();
+      }
+      app.selection.emitSelectionChanged();
+      app.updateBTData(true);
+    } else if (app.editorSnapshot) {
       app.deserializeWorld(app.editorSnapshot);
       app.editorSnapshot = null;
     }
+
     app.gameMode = GameMode.EDITOR;
     app.isPaused = true;
     app.selection.clear();
@@ -499,13 +525,14 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Верхняя панель управления скрывается в режиме игры */}
-      {engineState.mode !== GameMode.GAME && (
+      {/* Верхняя панель управления скрывается в режиме игры и в главном меню */}
+      {engineState.mode !== GameMode.GAME && engineState.mode !== GameMode.MENU && (
         <TopBar
           mode={engineState.mode}
           goToEditor={goToEditor}
           goToSimulation={goToSimulation}
           goToGame={goToGame}
+          goToMenu={goToMenu}
           obstaclesEnabled={obstaclesEnabled}
           setObstaclesEnabled={(val) => {
             setObstaclesEnabled(val);
@@ -545,7 +572,7 @@ export const App: React.FC = () => {
       {/* Основная рабочая область (Flex-контейнер) */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
         {/* Левый док (Иерархия, Палитра, BT, Анимации, Террейн) */}
-        {engineState.mode !== GameMode.GAME && (
+        {engineState.mode !== GameMode.GAME && engineState.mode !== GameMode.MENU && (
           <LeftDock
             app={appRef.current}
             world={appRef.current?.world}
@@ -593,8 +620,13 @@ export const App: React.FC = () => {
           onMouseLeave={handleMouseLeave}
           onContextMenu={handleContextMenu}
         >
+          {/* Главное меню */}
+          {engineState.mode === GameMode.MENU && (
+            <MainMenu onOpenEditor={goToEditor} onDemoLevel={() => {}} onOpenSettings={() => {}} />
+          )}
+
           {/* Статус-бар холста (зум, координаты, сброс вида, выбор манипулятора) */}
-          {engineState.mode !== GameMode.GAME && (
+          {engineState.mode !== GameMode.GAME && engineState.mode !== GameMode.MENU && (
             <CanvasHUD
               camera={appRef.current?.camera}
               cursorWorldPos={cursorWorldPos}
@@ -616,7 +648,7 @@ export const App: React.FC = () => {
           )}
 
           {/* Нижняя панель группового выделения (Drawer) */}
-          {engineState.mode !== GameMode.GAME && (
+          {engineState.mode !== GameMode.GAME && engineState.mode !== GameMode.MENU && (
             <MultiSelectionDrawer
               selectedEntityIds={selectedEntityIds}
               selectedEntityId={selectedEntityId}
@@ -666,7 +698,7 @@ export const App: React.FC = () => {
         </div>
 
         {/* Правый док (Живой Инспектор) */}
-        {engineState.mode !== GameMode.GAME && (
+        {engineState.mode !== GameMode.GAME && engineState.mode !== GameMode.MENU && (
           <Inspector
             app={appRef.current}
             mode={engineState.mode}

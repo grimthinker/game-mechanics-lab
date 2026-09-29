@@ -362,6 +362,7 @@ export class GameSimulation {
     }
     this.aiSystem.clear();
     this.app.editor.selection.clear();
+    this.app.editor.commandHistory.clear();
     this.threeSyncSystem.clearMeshes();
     EventBus.emit('world:updated');
   }

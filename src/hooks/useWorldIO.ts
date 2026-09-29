@@ -83,7 +83,8 @@ export function useWorldIO({
   // Автосохранение при закрытии/скрытии вкладки браузера
   useEffect(() => {
     const handleSave = () => {
-      if (appRef.current) {
+      // Если мы в меню, мир выгружен, поэтому ничего не сохраняем, чтобы не затереть сейв пустотой
+      if (appRef.current && appRef.current.gameMode !== 'menu') {
         saveWorldToStorage(appRef.current, appRef.current.editorSnapshot);
       }
     };

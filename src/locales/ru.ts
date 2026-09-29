@@ -27,6 +27,7 @@ export const ru = {
     editor: 'Редактор',
     simulation: 'Симуляция',
     game: 'Играть',
+    menu: 'В меню',
     pause: 'ПАУЗА',
     running: '▶ ИДЕТ',
     speed: 'Скорость:',
@@ -35,6 +36,14 @@ export const ru = {
     aiDebug: 'AI Debug',
     celShading: 'Cel Shading',
     hotkeysTitle: 'Горячие клавиши',
+  },
+  mainMenu: {
+    title: '3D SIMULATOR',
+    subtitle: 'Главное меню',
+    demoLevel: 'ДЕМО УРОВЕНЬ',
+    editor: 'РЕДАКТОР',
+    settings: 'НАСТРОЙКИ',
+    soon: 'Раздел находится в разработке',
   },
   hud: {
     zoom: 'Зум:',

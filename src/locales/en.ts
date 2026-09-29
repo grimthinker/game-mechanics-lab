@@ -27,6 +27,7 @@ export const en = {
     editor: 'Editor',
     simulation: 'Simulation',
     game: 'Play',
+    menu: 'To Menu',
     pause: 'PAUSE',
     running: '▶ RUNNING',
     speed: 'Speed:',
@@ -35,6 +36,14 @@ export const en = {
     aiDebug: 'AI Debug',
     celShading: 'Cel Shading',
     hotkeysTitle: 'Hotkeys',
+  },
+  mainMenu: {
+    title: '3D SIMULATOR',
+    subtitle: 'Main Menu',
+    demoLevel: 'DEMO LEVEL',
+    editor: 'EDITOR',
+    settings: 'SETTINGS',
+    soon: 'Coming soon',
   },
   hud: {
     zoom: 'Zoom:',
