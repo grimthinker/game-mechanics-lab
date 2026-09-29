@@ -32,10 +32,16 @@ export const MainMenu: React.FC<MainMenuProps> = ({
     gap: '8px',
   };
 
-  const primaryButtonStyle: React.CSSProperties = {
-    ...buttonStyle,
-    backgroundColor: 'rgba(41, 128, 185, 0.85)',
-    border: '1px solid rgba(52, 152, 219, 0.6)',
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.backgroundColor = 'rgba(45, 45, 45, 0.95)';
+    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+    e.currentTarget.style.transform = 'translateY(-1px)';
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.backgroundColor = 'rgba(28, 28, 28, 0.85)';
+    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+    e.currentTarget.style.transform = 'translateY(0)';
   };
 
   return (
@@ -92,59 +98,37 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           </div>
         </div>
 
-        {/* Кнопка 1: ДЕМО УРОВЕНЬ (пока без действия) */}
+        {/* Кнопка 1: ДЕМО УРОВЕНЬ */}
         <button
           type="button"
           style={buttonStyle}
           onClick={onDemoLevel}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(45, 45, 45, 0.95)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(28, 28, 28, 0.85)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-          }}
-          title={t('mainMenu.soon')}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <span>🎯</span>
           <span>{t('mainMenu.demoLevel')}</span>
         </button>
 
-        {/* Кнопка 2: РЕДАКТОР (открывает редактор) */}
+        {/* Кнопка 2: РЕДАКТОР */}
         <button
           type="button"
-          style={primaryButtonStyle}
+          style={buttonStyle}
           onClick={onOpenEditor}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#2980b9';
-            e.currentTarget.style.borderColor = '#5dade2';
-            e.currentTarget.style.transform = 'translateY(-1px)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(41, 128, 185, 0.85)';
-            e.currentTarget.style.borderColor = 'rgba(52, 152, 219, 0.6)';
-            e.currentTarget.style.transform = 'translateY(0)';
-          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <span>🛠️</span>
           <span>{t('mainMenu.editor')}</span>
         </button>
 
-        {/* Кнопка 3: НАСТРОЙКИ (пока без действия) */}
+        {/* Кнопка 3: НАСТРОЙКИ */}
         <button
           type="button"
           style={buttonStyle}
           onClick={onOpenSettings}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(45, 45, 45, 0.95)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(28, 28, 28, 0.85)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
-          }}
-          title={t('mainMenu.soon')}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           <span>⚙️</span>
           <span>{t('mainMenu.settings')}</span>

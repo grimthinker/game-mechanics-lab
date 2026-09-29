@@ -167,6 +167,20 @@ export class EnvironmentManager {
     cam.updateMatrixWorld();
   }
 
+  public applySettings(): void {
+    const cfg = GRAPHICS_CONFIG.shadows;
+    [this.sunLight, this.moonLight].forEach((light) => {
+      if (light.shadow.mapSize.width !== cfg.mapSize) {
+        light.shadow.mapSize.width = cfg.mapSize;
+        light.shadow.mapSize.height = cfg.mapSize;
+        if (light.shadow.map) {
+          light.shadow.map.dispose();
+          light.shadow.map = null as any;
+        }
+      }
+    });
+  }
+
   private evaluateAtmosphereColors(sunY: number): SkyColors {
     const colors: SkyColors = {
       zenith: new THREE.Color(),

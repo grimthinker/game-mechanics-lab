@@ -348,14 +348,14 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
               <input
                 type="number"
                 min="0.2"
-                max="30.0"
+                max="60.0"
                 step="0.1"
                 value={Number(radius.toFixed(1))}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
                   setRadius(isNaN(val) ? 0.2 : val);
                 }}
-                onBlur={() => setRadius((prev) => Math.max(0.2, Math.min(30.0, prev)))}
+                onBlur={() => setRadius((prev) => Math.max(0.2, Math.min(60.0, prev)))}
                 style={{
                   width: '56px',
                   backgroundColor: '#111',
@@ -374,9 +374,9 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
           <input
             type="range"
             min="0.2"
-            max="30.0"
+            max="60.0"
             step="0.1"
-            value={Math.max(0.2, Math.min(30.0, radius))}
+            value={Math.max(0.2, Math.min(60.0, radius))}
             onChange={(e) => setRadius(Number(e.target.value))}
             style={{
               width: '100%',

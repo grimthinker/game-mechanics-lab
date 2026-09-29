@@ -15,7 +15,7 @@ import { Inspector } from './components/Inspector';
 import { TopBar } from './components/TopBar';
 import { MainMenu } from './components/MainMenu';
 import { HotkeysModal } from './components/HotkeysModal';
-import { CreatureWizardModal, NewWorldModal } from './components/modals';
+import { CreatureWizardModal, NewWorldModal, SettingsModal } from './components/modals';
 import { GameHUD } from './components/GameHUD';
 import { BodyStructureType } from './ecs/templates';
 import { ModularPlacementOptions } from './types';
@@ -87,6 +87,7 @@ export const App: React.FC = () => {
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   const [isCreatureWizardOpen, setIsCreatureWizardOpen] = useState(false);
   const [isNewWorldModalOpen, setIsNewWorldModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const { setApp } = useDragDrop();
 
@@ -622,7 +623,11 @@ export const App: React.FC = () => {
         >
           {/* Главное меню */}
           {engineState.mode === GameMode.MENU && (
-            <MainMenu onOpenEditor={goToEditor} onDemoLevel={() => {}} onOpenSettings={() => {}} />
+            <MainMenu
+              onOpenEditor={goToEditor}
+              onDemoLevel={() => {}}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+            />
           )}
 
           {/* Статус-бар холста (зум, координаты, сброс вида, выбор манипулятора) */}
@@ -726,6 +731,11 @@ export const App: React.FC = () => {
         isOpen={isNewWorldModalOpen}
         onClose={() => setIsNewWorldModalOpen(false)}
         onConfirm={createEmptyWorld}
+      />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onSave={() => appRef.current?.applyGlobalSettings()}
       />
       <DragGhostOverlay />
     </div>

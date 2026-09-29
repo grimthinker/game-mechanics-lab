@@ -208,6 +208,13 @@ export class GameApp {
     this.renderer.resize(w, h);
   }
 
+  public applyGlobalSettings(): void {
+    if (this.renderer instanceof ThreeRenderer) {
+      this.renderer.applySettings();
+    }
+    this.simulation.threeSyncSystem.applySettings();
+  }
+
   public emitState(): void {
     EventBus.emit('engine:state-changed', {
       mode: this._gameMode,

@@ -1,7 +1,9 @@
+import { fastClone } from '../ecs/utils/clone';
+
 /**
  * Конфигурация параметров процедурной травы и ее генерации
  */
-export const GRASS_CONFIG = {
+export const DEFAULT_GRASS_CONFIG = {
   /** Значение коэффициента плотности по умолчанию (от 0.0 до 1.0) */
   defaultDensityFactor: 0.8,
 
@@ -73,4 +75,7 @@ export const GRASS_CONFIG = {
     /** Порог смещения камеры для перезасева ячеек */
     camMoveThreshold: 5.0,
   },
-} as const;
+};
+
+// Актуальная рабочая копия конфигурации (изменяется в рантайме через SettingsManager)
+export const GRASS_CONFIG = fastClone(DEFAULT_GRASS_CONFIG);

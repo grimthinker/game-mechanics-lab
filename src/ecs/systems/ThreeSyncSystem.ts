@@ -30,6 +30,7 @@ import { GRAPHICS_CONFIG } from '../../config/graphicsConfig';
 import { WaterComponent } from '../components/water';
 import { TransformComponent } from '../components/physics';
 import { getTerrainHeightAt } from '../components/terrain';
+import { GRASS_CONFIG } from '../../config/grassConfig';
 
 const PROCEDURAL_PROP_SCALES: Record<string, { baseRadius: number; baseHeight: number }> = {
   'proc://prop/tree': { baseRadius: 0.6, baseHeight: 4.0 },
@@ -148,6 +149,10 @@ export class ThreeSyncSystem {
     this.animators.clear();
     this.loadingMeshes.clear();
     this.loadingGenerations.clear();
+  }
+
+  public applySettings(): void {
+    this.grassSync.densityFactor = GRASS_CONFIG.defaultDensityFactor;
   }
 
   public destroy(): void {

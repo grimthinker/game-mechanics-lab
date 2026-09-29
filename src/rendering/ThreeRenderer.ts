@@ -181,6 +181,27 @@ export class ThreeRenderer implements IRenderer {
     return { x: 0, y: 0, z: 0 };
   }
 
+  public applySettings(): void {
+    const camCfg = GRAPHICS_CONFIG.camera;
+    if (this.camera.fov !== camCfg.fov) {
+      this.camera.fov = camCfg.fov;
+      this.camera.updateProjectionMatrix();
+    }
+
+    const filterMode = GRAPHICS_CONFIG.resolution.upscaleFilter;
+    if (filterMode === 'pixelated') {
+      this.canvas.style.imageRendering = 'pixelated';
+    } else if (filterMode === 'crisp') {
+      this.canvas.style.imageRendering = 'crisp-edges';
+    } else {
+      this.canvas.style.imageRendering = 'auto';
+    }
+
+    // Принудительный ресайз для применения нового Render Scale
+    this.resize(this.container.clientWidth, this.container.clientHeight);
+    this.environmentManager.applySettings();
+  }
+
   public getScreenRay(clientX: number, clientY: number): { origin: Vec3; direction: Vec3 } {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseNDC.x = ((clientX - rect.left) / rect.width) * 2 - 1;
