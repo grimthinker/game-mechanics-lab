@@ -7,7 +7,7 @@ export class EnvironmentManager {
   private skyDome: SkyDome;
   public sunLight: THREE.DirectionalLight;
   public moonLight: THREE.DirectionalLight;
-  public ambientLight: THREE.AmbientLight;
+  public hemisphereLight: THREE.HemisphereLight;
 
   private sunDir = new THREE.Vector3();
   private moonDir = new THREE.Vector3();
@@ -34,8 +34,9 @@ export class EnvironmentManager {
     scene.add(this.moonLight);
     scene.add(this.moonLight.target);
 
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(this.ambientLight);
+    // Полусферический рассеянный свет: моделирует верхний свет неба и отражения от земли снизу
+    this.hemisphereLight = new THREE.HemisphereLight(0xc8dcff, 0x5c4a38, 0.65);
+    scene.add(this.hemisphereLight);
 
     scene.fog = new THREE.FogExp2(0xd6e5f5, 0.0012);
   }
@@ -97,15 +98,29 @@ export class EnvironmentManager {
       scene.fog.density = env.fogDensity;
     }
 
+    const sunMult = env.sunIntensityMultiplier ?? 1.0;
+    const ambientIntensity = env.ambientIntensity ?? 0.65;
+
     this.sunLight.color.copy(colors.sunLight);
-    const sunIntensity = Math.max(0.0, Math.min(1.3, (sunElevation + 0.08) * 2.2));
+    const sunIntensity = Math.max(0.0, Math.min(1.3, (sunElevation + 0.08) * 2.2)) * sunMult;
     this.sunLight.intensity = sunIntensity;
 
     this.moonLight.color.copy(colors.moonLight);
-    const moonIntensity = Math.max(0.0, Math.min(0.45, (-sunElevation + 0.04) * 0.9));
+    const moonIntensity = Math.max(0.0, Math.min(0.45, (-sunElevation + 0.04) * 0.9)) * sunMult;
     this.moonLight.intensity = moonIntensity;
 
-    this.ambientLight.color.copy(colors.ambient);
+    // Управление рассеянным светом полусферы (HemisphereLight) с учетом цветов из инспектора
+    const userSkyColor = new THREE.Color(env.hemiSkyColor ?? '#c8dcff');
+    const userGroundColor = new THREE.Color(env.hemiGroundColor ?? '#5c4a38');
+    const dayFactor = Math.max(0.0, Math.min(1.0, (sunElevation + 0.08) * 3.5));
+
+    this.hemisphereLight.color.lerpColors(colors.ambient, userSkyColor, dayFactor);
+    this.hemisphereLight.groundColor.lerpColors(
+      new THREE.Color(0.02, 0.03, 0.05),
+      userGroundColor,
+      dayFactor
+    );
+    this.hemisphereLight.intensity = ambientIntensity;
 
     // Плавный кросс-фейд теней в сумеречной зоне высоты солнца над горизонтом [-0.08, 0.04]
     const twilightRange = 0.12;
@@ -293,6 +308,6 @@ export class EnvironmentManager {
     if (this.sunLight.target.parent) this.sunLight.target.parent.remove(this.sunLight.target);
     if (this.moonLight.parent) this.moonLight.parent.remove(this.moonLight);
     if (this.moonLight.target.parent) this.moonLight.target.parent.remove(this.moonLight.target);
-    if (this.ambientLight.parent) this.ambientLight.parent.remove(this.ambientLight);
+    if (this.hemisphereLight.parent) this.hemisphereLight.parent.remove(this.hemisphereLight);
   }
 }

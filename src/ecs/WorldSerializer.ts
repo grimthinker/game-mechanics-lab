@@ -662,12 +662,24 @@ export class WorldSerializer {
     }
   }
 
-  public deserializeWorld(data: SerializedWorldData): void {
+  public deserializeWorld(data: SerializedWorldData | any): void {
     if (!data) return;
     this.app.clearWorld();
 
-    if (Array.isArray(data.entities)) {
-      this.deserializeEntities(data.entities);
+    // Поддержка как прямого формата { entities: [...] }, так и { world: { entities: [...] } }
+    const entities = Array.isArray(data.entities)
+      ? data.entities
+      : Array.isArray(data.world?.entities)
+        ? data.world.entities
+        : null;
+
+    if (entities) {
+      this.deserializeEntities(entities);
+    }
+
+    const cameraData = data.camera ?? data.world?.camera;
+    if (cameraData) {
+      this.app.camera.deserialize(cameraData);
     }
   }
 }

@@ -365,6 +365,11 @@ export const en = {
     noon: 'Noon',
     dusk: 'Dusk',
     midnight: 'Midnight',
+    globalLighting: 'Global Illumination (GI):',
+    ambientIntensity: 'Shadow Fill (Ambient):',
+    sunIntensity: 'Sun Intensity (Direct):',
+    skyLightColor: 'Sky Light Color:',
+    groundLightColor: 'Ground Reflection Color:',
   },
   metaInspector: {
     nameLabel: 'Name / Label:',

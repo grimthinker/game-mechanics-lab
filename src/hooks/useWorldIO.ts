@@ -19,7 +19,11 @@ export function useWorldIO({
   const saveWorldFile = useCallback(() => {
     const app = appRef.current;
     if (!app) return;
-    const data = app.serializeWorld();
+    const worldData = app.editorSnapshot ?? app.serializeWorld();
+    const data = {
+      ...worldData,
+      camera: app.camera.serialize(),
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -44,7 +48,8 @@ export function useWorldIO({
             syncPlayerControls();
             updateStats();
           }
-        } catch {
+        } catch (err) {
+          console.error('[loadWorldFile] Ошибка при чтении JSON файла мира:', err);
           alert(t('app.jsonReadError'));
         }
       };

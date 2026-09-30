@@ -10,8 +10,10 @@ export interface WaterDisturbance {
 
 export class WaterRippleManager {
   public readonly resolution: number;
-  private width: number;
-  private depth: number;
+  public readonly simSize: number;
+  public center = new THREE.Vector2(0, 0);
+  private lastCenter = new THREE.Vector2(0, 0);
+  private isFirstFrame: boolean = true;
 
   private readTarget: THREE.WebGLRenderTarget;
   private writeTarget: THREE.WebGLRenderTarget;
@@ -29,12 +31,10 @@ export class WaterRippleManager {
 
   constructor(
     resolution: number = GRAPHICS_CONFIG.water.ripples.resolution,
-    width: number = 20,
-    depth: number = 20
+    simSize: number = 48.0
   ) {
     this.resolution = resolution;
-    this.width = width;
-    this.depth = depth;
+    this.simSize = simSize;
 
     const options: THREE.RenderTargetOptions = {
       minFilter: THREE.LinearFilter,
@@ -55,15 +55,13 @@ export class WaterRippleManager {
     this.simScene = new THREE.Scene();
     this.simCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    const aspect = width / Math.max(0.1, depth);
-
     this.simMaterial = new THREE.ShaderMaterial({
       uniforms: {
         tPrev: { value: this.readTarget.texture },
         uTexelSize: { value: new THREE.Vector2(1.0 / resolution, 1.0 / resolution) },
         uDamping: { value: GRAPHICS_CONFIG.water.ripples.damping },
         uWaveSpeedSq: { value: 0.5 },
-        uAspect: { value: aspect },
+        uOffset: { value: new THREE.Vector2(0, 0) },
         uDisturbances: { value: this.disturbancesUniform },
         uDisturbanceCount: { value: 0 },
       },
@@ -75,25 +73,29 @@ export class WaterRippleManager {
         }
       `,
       fragmentShader: `
-        uniform sampler2D tPrev;
+    uniform sampler2D tPrev;
         uniform vec2 uTexelSize;
         uniform float uDamping;
         uniform float uWaveSpeedSq;
-        uniform float uAspect;
+        uniform vec2 uOffset;
         uniform vec4 uDisturbances[32];
         uniform int uDisturbanceCount;
 
         varying vec2 vUv;
 
         void main() {
-          vec4 prevSample = texture2D(tPrev, vUv);
+          vec2 prevUv = vUv + uOffset;
+          vec4 prevSample = (prevUv.x >= 0.0 && prevUv.x <= 1.0 && prevUv.y >= 0.0 && prevUv.y <= 1.0)
+            ? texture2D(tPrev, prevUv)
+            : vec4(0.0);
+
           float currentH = prevSample.r;
           float pastH = prevSample.g;
-
-          float nL = texture2D(tPrev, vUv - vec2(uTexelSize.x, 0.0)).r;
-          float nR = texture2D(tPrev, vUv + vec2(uTexelSize.x, 0.0)).r;
-          float nD = texture2D(tPrev, vUv - vec2(0.0, uTexelSize.y)).r;
-          float nU = texture2D(tPrev, vUv + vec2(0.0, uTexelSize.y)).r;
+          
+          float nL = (prevUv.x - uTexelSize.x >= 0.0) ? texture2D(tPrev, prevUv - vec2(uTexelSize.x, 0.0)).r : 0.0;
+          float nR = (prevUv.x + uTexelSize.x <= 1.0) ? texture2D(tPrev, prevUv + vec2(uTexelSize.x, 0.0)).r : 0.0;
+          float nD = (prevUv.y - uTexelSize.y >= 0.0) ? texture2D(tPrev, prevUv - vec2(0.0, uTexelSize.y)).r : 0.0;
+          float nU = (prevUv.y + uTexelSize.y <= 1.0) ? texture2D(tPrev, prevUv + vec2(0.0, uTexelSize.y)).r : 0.0;
 
           // Физическое 2D-волновое уравнение с параметрической скоростью распространения (S = uWaveSpeedSq):
           float neighborSum = nL + nR + nD + nU;
@@ -113,7 +115,6 @@ export class WaterRippleManager {
             if (radius <= 0.0001) continue;
 
             vec2 delta = vUv - dist.xy;
-            delta.x *= uAspect;
             float d = length(delta);
             if (d < radius) {
               float falloff = cos(d / radius * 1.5707963);
@@ -133,12 +134,8 @@ export class WaterRippleManager {
     this.simScene.add(this.quadMesh);
   }
 
-  public setSize(width: number, depth: number): void {
-    this.width = width;
-    this.depth = depth;
-    if (this.simMaterial.uniforms.uAspect) {
-      this.simMaterial.uniforms.uAspect.value = width / Math.max(0.1, depth);
-    }
+  public get isSleepingState(): boolean {
+    return this.isSleeping;
   }
 
   public getTexture(): THREE.Texture {
@@ -149,11 +146,27 @@ export class WaterRippleManager {
     renderer: THREE.WebGLRenderer,
     dt: number,
     disturbances: WaterDisturbance[],
-    waterCenterX: number,
-    waterCenterZ: number,
+    camX: number,
+    camZ: number,
     rippleSpeed: number = 1.0,
     rippleDamping: number = GRAPHICS_CONFIG.water.ripples.damping
   ): void {
+    const texelSize = this.simSize / this.resolution;
+    const snappedX = Math.floor(camX / texelSize) * texelSize;
+    const snappedZ = Math.floor(camZ / texelSize) * texelSize;
+
+    if (this.isFirstFrame) {
+      this.lastCenter.set(snappedX, snappedZ);
+      this.isFirstFrame = false;
+    }
+
+    const offsetX = (snappedX - this.lastCenter.x) / this.simSize;
+    const offsetZ = (snappedZ - this.lastCenter.y) / this.simSize;
+    this.simMaterial.uniforms.uOffset.value.set(offsetX, offsetZ);
+
+    this.center.set(snappedX, snappedZ);
+    this.lastCenter.set(snappedX, snappedZ);
+
     const count = Math.min(32, disturbances.length);
 
     // 1. Управление сном (Dormant Mode): если в воде никого нет и волны растворились — полностью выключаем расчет
@@ -183,14 +196,20 @@ export class WaterRippleManager {
       this.simAccumulator - targetSimInterval
     );
 
-    // 3. Расчет коэффициента скорости с ограничением подшагов до максимума 2
-    const clampedSpeed = Math.max(0.05, Math.min(3.0, rippleSpeed));
-    const subSteps = Math.min(2, Math.ceil(clampedSpeed * 0.7));
-    const subSpeed = clampedSpeed / subSteps;
+    // 3. Физически точный расчет коэффициента скорости на основе размера ячеек
+    const physicalDx = this.simSize / this.resolution;
+    const physicalSpeed = 2.5 * Math.max(0.1, rippleSpeed);
 
-    const waveSpeedSq = 0.5 * Math.min(1.0, subSpeed * subSpeed);
+    // Расчет подшагов для обеспечения стабильности 2D волнового уравнения (CFL условие)
+    const baseCfl = (physicalSpeed * targetSimInterval) / physicalDx;
+    const subSteps = Math.min(3, Math.ceil(baseCfl / 0.6));
+    const stepDt = targetSimInterval / subSteps;
+
+    const cfl = (physicalSpeed * stepDt) / physicalDx;
+    const waveSpeedSq = cfl * cfl;
+
     const decayRate = 1.0 - Math.max(0.85, Math.min(0.999, rippleDamping));
-    const stepDamping = Math.max(0.85, Math.min(0.9999, 1.0 - decayRate * subSpeed));
+    const stepDamping = Math.max(0.85, Math.min(0.9999, 1.0 - decayRate / subSteps));
 
     this.simMaterial.uniforms.uWaveSpeedSq.value = waveSpeedSq;
     this.simMaterial.uniforms.uDamping.value = stepDamping;
@@ -198,12 +217,9 @@ export class WaterRippleManager {
     for (let i = 0; i < 32; i++) {
       if (i < count) {
         const d = disturbances[i];
-        const rx = d.x - waterCenterX;
-        const rz = d.z - waterCenterZ;
-
-        const uvX = rx / this.width + 0.5;
-        const uvY = 0.5 - rz / this.depth;
-        const uvRadius = d.radius / this.depth;
+        const uvX = (d.x - snappedX) / this.simSize + 0.5;
+        const uvY = (d.z - snappedZ) / this.simSize + 0.5;
+        const uvRadius = d.radius / this.simSize;
 
         if (uvX >= -0.1 && uvX <= 1.1 && uvY >= -0.1 && uvY <= 1.1) {
           this.disturbancesUniform[i].set(uvX, uvY, uvRadius, d.strength);

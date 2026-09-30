@@ -27,6 +27,10 @@ const DEFAULT_ENV_FALLBACK = {
   azimuth: 0,
   axialTilt: 0.41,
   fogDensity: 0.0012,
+  ambientIntensity: 0.65,
+  sunIntensityMultiplier: 1.0,
+  hemiSkyColor: '#c8dcff',
+  hemiGroundColor: '#5c4a38',
 };
 
 export class ThreeRenderer implements IRenderer {
@@ -368,6 +372,9 @@ export class ThreeRenderer implements IRenderer {
     this.camera.position.set(camX, camY, camZ);
     this.camera.lookAt(centerX, centerY, centerZ);
 
+    // ВАЖНО: Принудительное обновление матриц камеры для корректной работы Frustum Culling
+    this.camera.updateMatrixWorld();
+
     // Синхронизация манипулятора
     if (
       context.gameMode === 'editor' &&
@@ -456,19 +463,41 @@ export class ThreeRenderer implements IRenderer {
       }
     }
 
-    // Оптимизация: проход глубины запускается ТОЛЬКО если на сцене физически присутствует вода
+    // Проверка видимости воды в пирамиде камеры (Frustum Culling)
+    let hasVisibleWater = false;
     if (waterMeshes.length > 0) {
+      const projScreenMatrix = new THREE.Matrix4().multiplyMatrices(
+        this.camera.projectionMatrix,
+        this.camera.matrixWorldInverse
+      );
+      const frustum = new THREE.Frustum().setFromProjectionMatrix(projScreenMatrix);
+
+      for (let i = 0; i < waterMeshes.length; i++) {
+        const box = new THREE.Box3().setFromObject(waterMeshes[i]);
+        if (frustum.intersectsBox(box)) {
+          hasVisibleWater = true;
+          break;
+        }
+      }
+    }
+
+    // Оптимизация: проход глубины запускается ТОЛЬКО если вода реально видна на экране
+    if (hasVisibleWater) {
+      // Половинное разрешение для прохода глубины (сокращает нагрузку на GPU на 75%)
+      const depthW = Math.max(1, Math.floor(internalW * 0.5));
+      const depthH = Math.max(1, Math.floor(internalH * 0.5));
+
       if (!this.depthRenderTarget) {
-        this.depthRenderTarget = new THREE.WebGLRenderTarget(internalW, internalH, {
-          depthTexture: new THREE.DepthTexture(internalW, internalH),
+        this.depthRenderTarget = new THREE.WebGLRenderTarget(depthW, depthH, {
+          depthTexture: new THREE.DepthTexture(depthW, depthH),
           depthBuffer: true,
           format: THREE.RGBAFormat,
         });
       } else if (
-        this.depthRenderTarget.width !== internalW ||
-        this.depthRenderTarget.height !== internalH
+        this.depthRenderTarget.width !== depthW ||
+        this.depthRenderTarget.height !== depthH
       ) {
-        this.depthRenderTarget.setSize(internalW, internalH);
+        this.depthRenderTarget.setSize(depthW, depthH);
       }
 
       // Скрываем воду перед проходом глубины
@@ -476,10 +505,10 @@ export class ThreeRenderer implements IRenderer {
         waterMeshes[i].visible = false;
       }
 
-      // Исключаем инстанс-траву (isGrassMesh), манипулятор и курсор: они не нужны для глубины дна
+      // Исключаем траву, юбку горизонта (горы вдали не могут быть под водой), манипулятор и курсор
       const hiddenMeshes: THREE.Object3D[] = [];
       this.scene.traverse((child) => {
-        if (child.userData.isGrassMesh && child.visible) {
+        if ((child.userData.isGrassMesh || child.userData.isTerrainSkirt) && child.visible) {
           hiddenMeshes.push(child);
           child.visible = false;
         }

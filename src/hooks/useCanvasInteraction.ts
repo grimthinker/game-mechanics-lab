@@ -79,7 +79,9 @@ export const useCanvasInteraction = ({
       const app = appRef.current;
       if (!app) return;
       if (e.altKey) {
-        app.camera.adjustHeight(e.deltaY);
+        if (app.gameMode !== GameMode.GAME) {
+          app.camera.adjustHeight(e.deltaY);
+        }
       } else {
         app.camera.zoomAt(
           e.clientX,
@@ -133,8 +135,8 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Панорамирование камеры на СКМ (колесико мыши)
-    if (e.button === 1) {
+    // Панорамирование камеры на СКМ (колесико мыши) — запрещено в режиме игры
+    if (e.button === 1 && app.gameMode !== GameMode.GAME) {
       e.preventDefault();
       app.startPan(e.clientX, e.clientY);
       e.currentTarget.style.cursor = 'grabbing';
@@ -281,7 +283,7 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    if ((e.buttons & 4) === 4) {
+    if ((e.buttons & 4) === 4 && app.gameMode !== GameMode.GAME) {
       app.pan(e.clientX, e.clientY);
       e.currentTarget.style.cursor = 'grabbing';
       return;

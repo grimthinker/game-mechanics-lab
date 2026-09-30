@@ -13,6 +13,10 @@ export function createDefaultEnvironmentConfig(): EntityConfig {
     azimuth: deg2Rad(45),
     axialTilt: deg2Rad(23.5),
     fogDensity: 0.0012,
+    ambientIntensity: 0.65,
+    sunIntensityMultiplier: 1.0,
+    hemiSkyColor: '#c8dcff',
+    hemiGroundColor: '#5c4a38',
   };
 
   return {

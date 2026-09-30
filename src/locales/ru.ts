@@ -366,6 +366,11 @@ export const ru = {
     noon: 'Полдень',
     dusk: 'Закат',
     midnight: 'Полночь',
+    globalLighting: 'Глобальное освещение (GI):',
+    ambientIntensity: 'Освещенность теней (Ambient):',
+    sunIntensity: 'Яркость солнца (Direct):',
+    skyLightColor: 'Свет неба (Sky Color):',
+    groundLightColor: 'Отражение земли (Ground):',
   },
   metaInspector: {
     nameLabel: 'Имя / Название:',

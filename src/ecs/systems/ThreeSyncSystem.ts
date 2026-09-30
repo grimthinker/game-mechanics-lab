@@ -387,12 +387,9 @@ export class ThreeSyncSystem {
               obj.userData.currentWidth = waterComp.width;
               obj.userData.currentDepth = waterComp.depth;
 
-              if (rippleManager) {
-                rippleManager.setSize(waterComp.width, waterComp.depth);
-              }
-
-              const segsX = Math.max(16, Math.ceil(waterComp.width * 2.5));
-              const segsZ = Math.max(16, Math.ceil(waterComp.depth * 2.5));
+              // Ограничиваем плотность сетки максимум 80 сегментами во избежание просадок FPS на больших водоемах
+              const segsX = Math.max(16, Math.min(80, Math.ceil(waterComp.width * 1.2)));
+              const segsZ = Math.max(16, Math.min(80, Math.ceil(waterComp.depth * 1.2)));
               const newGeo = new THREE.PlaneGeometry(
                 waterComp.width,
                 waterComp.depth,
@@ -416,8 +413,8 @@ export class ThreeSyncSystem {
                 this.renderer,
                 dt,
                 disturbances,
-                transform.x,
-                transform.z,
+                cameraTargetX,
+                cameraTargetZ,
                 waterComp.rippleSpeed ?? 1.0,
                 waterComp.rippleDamping ?? GRAPHICS_CONFIG.water.ripples.damping
               );
@@ -444,6 +441,8 @@ export class ThreeSyncSystem {
                   sunColor.add(new THREE.Color().copy(child.color).multiplyScalar(child.intensity));
                   totalDirectionalWeight += lum;
                 }
+              } else if (child instanceof THREE.HemisphereLight) {
+                ambientColor.copy(child.color).multiplyScalar(child.intensity);
               } else if (child instanceof THREE.AmbientLight) {
                 ambientColor.copy(child.color).multiplyScalar(child.intensity);
               }
@@ -469,9 +468,18 @@ export class ThreeSyncSystem {
 
                 u.uTime.value += dt;
 
-                // Передача текстуры интерактивных волн
+                // Передача текстуры интерактивных волн и флага активности симуляции
                 if (rippleTex && u.tRipple) {
                   u.tRipple.value = rippleTex;
+                }
+                if (u.uHasRipples) {
+                  u.uHasRipples.value = rippleManager && !rippleManager.isSleepingState ? 1.0 : 0.0;
+                }
+                if (u.uRippleCenter && rippleManager) {
+                  u.uRippleCenter.value.copy(rippleManager.center);
+                }
+                if (u.uRippleSize && rippleManager) {
+                  u.uRippleSize.value = rippleManager.simSize;
                 }
 
                 // Передача параметров света
@@ -854,15 +862,15 @@ export class ThreeSyncSystem {
     } else if (archetype === 'water') {
       const waterComp = world.getComponent(id, 'water');
       if (waterComp) {
-        const segsX = Math.max(16, Math.ceil(waterComp.width * 2.5));
-        const segsZ = Math.max(16, Math.ceil(waterComp.depth * 2.5));
+        // Ограничиваем плотность сетки максимум 80 сегментами во избежание просадок FPS на больших водоемах
+        const segsX = Math.max(16, Math.min(100, Math.ceil(waterComp.width * 1.2)));
+        const segsZ = Math.max(16, Math.min(100, Math.ceil(waterComp.depth * 1.2)));
         const geo = new THREE.PlaneGeometry(waterComp.width, waterComp.depth, segsX, segsZ);
         geo.rotateX(-Math.PI / 2);
 
         const rippleManager = new WaterRippleManager(
           GRAPHICS_CONFIG.water.ripples.resolution,
-          waterComp.width,
-          waterComp.depth
+          48.0
         );
 
         const mat = createWaterMaterial(waterComp, rippleManager.getTexture());

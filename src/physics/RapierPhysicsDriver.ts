@@ -30,9 +30,6 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     this.world.integrationParameters.dt = this.fixedTimestep;
     this.eventQueue = new RAPIER.EventQueue(true);
 
-    // Создаем базовый статический пол 100x100 метров на уровне Y = 0
-    this.createGround(100, 1.0, 0.0);
-
     // Инициализация KCC контроллера с автоподъемом на ступени и мягким скольжением
     const offset = 0.02; // отступ 2 см для исключения залипания
     this.characterController = this.world.createCharacterController(offset);

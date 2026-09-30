@@ -55,13 +55,13 @@ export const DEFAULT_GRASS_CONFIG = {
   },
   /** Базовая высота различных типов растительности в метрах */
   heights: {
-    blade3: 0.55,
-    blade4: 0.55,
-    blade5: 0.55,
-    wheat: 0.82,
-    reeds: 1.35,
-    dryGrass: 0.48,
-    flowers: 0.48,
+    blade3: 0.75,
+    blade4: 0.75,
+    blade5: 0.75,
+    wheat: 0.92,
+    reeds: 1.45,
+    dryGrass: 0.68,
+    flowers: 0.58,
   },
 
   /** Настройки зоны бесшовного плавного увядания/роста травы по расстоянию */

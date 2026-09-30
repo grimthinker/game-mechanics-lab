@@ -185,20 +185,22 @@ export const TopBar: React.FC<TopBarProps> = ({
                 >
                   {t('topbar.demoWorld')}
                 </button>
-                <input
-                  type="file"
-                  ref={worldFileInputRef}
-                  style={{ display: 'none' }}
-                  accept=".json"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) onLoadWorldFile(file);
-                    e.target.value = '';
-                  }}
-                />
               </div>
             </>
           )}
+
+          {/* Инпут вынесен за пределы условного блока, чтобы не размонтироваться при клике */}
+          <input
+            type="file"
+            ref={worldFileInputRef}
+            style={{ display: 'none' }}
+            accept=".json"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onLoadWorldFile(file);
+              e.target.value = '';
+            }}
+          />
         </div>
 
         <div

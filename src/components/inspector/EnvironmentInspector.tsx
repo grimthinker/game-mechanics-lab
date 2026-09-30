@@ -26,6 +26,12 @@ export const EnvironmentInspector: React.FC<EnvironmentInspectorProps> = ({
   const [azimuthDeg, setAzimuthDeg] = useState(env ? Math.round(rad2Deg(env.azimuth)) : 0);
   const [tiltDeg, setTiltDeg] = useState(env ? Math.round(rad2Deg(env.axialTilt)) : 23);
   const [fogDensity, setFogDensity] = useState(env ? env.fogDensity : 0.0012);
+  const [ambientIntensity, setAmbientIntensity] = useState(env?.ambientIntensity ?? 0.65);
+  const [sunIntensityMultiplier, setSunIntensityMultiplier] = useState(
+    env?.sunIntensityMultiplier ?? 1.0
+  );
+  const [hemiSkyColor, setHemiSkyColor] = useState(env?.hemiSkyColor ?? '#c8dcff');
+  const [hemiGroundColor, setHemiGroundColor] = useState(env?.hemiGroundColor ?? '#5c4a38');
 
   useEffect(() => {
     const comp = world.getComponent(targetId, 'environment');
@@ -35,6 +41,10 @@ export const EnvironmentInspector: React.FC<EnvironmentInspectorProps> = ({
       setAzimuthDeg(Math.round(rad2Deg(comp.azimuth)));
       setTiltDeg(Math.round(rad2Deg(comp.axialTilt)));
       setFogDensity(comp.fogDensity);
+      setAmbientIntensity(comp.ambientIntensity ?? 0.65);
+      setSunIntensityMultiplier(comp.sunIntensityMultiplier ?? 1.0);
+      setHemiSkyColor(comp.hemiSkyColor ?? '#c8dcff');
+      setHemiGroundColor(comp.hemiGroundColor ?? '#5c4a38');
     }
   }, [targetId, world]);
 
@@ -46,6 +56,11 @@ export const EnvironmentInspector: React.FC<EnvironmentInspectorProps> = ({
     if (patch.azimuth !== undefined) setAzimuthDeg(Math.round(rad2Deg(patch.azimuth)));
     if (patch.axialTilt !== undefined) setTiltDeg(Math.round(rad2Deg(patch.axialTilt)));
     if (patch.fogDensity !== undefined) setFogDensity(patch.fogDensity);
+    if (patch.ambientIntensity !== undefined) setAmbientIntensity(patch.ambientIntensity);
+    if (patch.sunIntensityMultiplier !== undefined)
+      setSunIntensityMultiplier(patch.sunIntensityMultiplier);
+    if (patch.hemiSkyColor !== undefined) setHemiSkyColor(patch.hemiSkyColor);
+    if (patch.hemiGroundColor !== undefined) setHemiGroundColor(patch.hemiGroundColor);
 
     if (app) {
       app.mutations.updateEntityEnvironment(targetId, patch);
@@ -222,6 +237,135 @@ export const EnvironmentInspector: React.FC<EnvironmentInspectorProps> = ({
           }
           style={{ accentColor: '#1abc9c', cursor: 'pointer' }}
         />
+      </div>
+
+      {/* Раздел глобальной освещенности (GI) и мягкости теней */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          padding: '8px',
+          backgroundColor: '#1b1b1b',
+          borderRadius: '4px',
+          border: '1px solid #333',
+        }}
+      >
+        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#f39c12' }}>
+          {t('environmentInspector.globalLighting')}
+        </span>
+
+        {/* Яркость теней / фонового света */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+            <span>{t('environmentInspector.ambientIntensity')}</span>
+            <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>
+              {Math.round(ambientIntensity * 100)}%
+            </span>
+          </div>
+          <input
+            disabled={isReadOnly}
+            type="range"
+            min="0.1"
+            max="1.5"
+            step="0.05"
+            value={ambientIntensity}
+            onChange={(e) =>
+              handleUpdate(
+                { ambientIntensity: parseFloat(e.target.value) },
+                t('history.environmentChange')
+              )
+            }
+            style={{ accentColor: '#2ecc71', cursor: 'pointer' }}
+          />
+        </div>
+
+        {/* Множитель яркости прямого солнечного света */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+            <span>{t('environmentInspector.sunIntensity')}</span>
+            <span style={{ color: '#e67e22', fontWeight: 'bold' }}>
+              {sunIntensityMultiplier.toFixed(2)}x
+            </span>
+          </div>
+          <input
+            disabled={isReadOnly}
+            type="range"
+            min="0.1"
+            max="2.0"
+            step="0.05"
+            value={sunIntensityMultiplier}
+            onChange={(e) =>
+              handleUpdate(
+                { sunIntensityMultiplier: parseFloat(e.target.value) },
+                t('history.environmentChange')
+              )
+            }
+            style={{ accentColor: '#e67e22', cursor: 'pointer' }}
+          />
+        </div>
+
+        {/* Цвет верхнего рассеянного света неба */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px' }}>{t('environmentInspector.skyLightColor')}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              disabled={isReadOnly}
+              type="color"
+              value={hemiSkyColor}
+              onChange={(e) =>
+                handleUpdate({ hemiSkyColor: e.target.value }, t('history.environmentChange'))
+              }
+              style={{
+                width: '28px',
+                height: '22px',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'none',
+              }}
+            />
+            <input
+              disabled={isReadOnly}
+              type="text"
+              value={hemiSkyColor}
+              onChange={(e) =>
+                handleUpdate({ hemiSkyColor: e.target.value }, t('history.environmentChange'))
+              }
+              style={{ width: '64px', padding: '2px 4px', fontSize: '11px' }}
+            />
+          </div>
+        </div>
+
+        {/* Цвет нижнего отраженного света земли */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px' }}>{t('environmentInspector.groundLightColor')}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <input
+              disabled={isReadOnly}
+              type="color"
+              value={hemiGroundColor}
+              onChange={(e) =>
+                handleUpdate({ hemiGroundColor: e.target.value }, t('history.environmentChange'))
+              }
+              style={{
+                width: '28px',
+                height: '22px',
+                cursor: 'pointer',
+                border: 'none',
+                background: 'none',
+              }}
+            />
+            <input
+              disabled={isReadOnly}
+              type="text"
+              value={hemiGroundColor}
+              onChange={(e) =>
+                handleUpdate({ hemiGroundColor: e.target.value }, t('history.environmentChange'))
+              }
+              style={{ width: '64px', padding: '2px 4px', fontSize: '11px' }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

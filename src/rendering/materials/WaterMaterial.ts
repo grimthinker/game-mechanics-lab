@@ -47,6 +47,9 @@ export function createWaterMaterial(
       tRipple: { value: null },
       uRippleTexel: { value: new THREE.Vector2(1.0 / rippleRes, 1.0 / rippleRes) },
       uRippleDisplacement: { value: GRAPHICS_CONFIG.water.ripples.displacementScale },
+      uHasRipples: { value: 0.0 },
+      uRippleCenter: { value: new THREE.Vector2(0, 0) },
+      uRippleSize: { value: 48.0 },
       // Освещение
       uSunDirection: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
       uSunColor: { value: new THREE.Color(1.0, 0.95, 0.85) },
@@ -74,10 +77,12 @@ export function createWaterMaterial(
     uniform float uTime;
     uniform float uWaveSpeed;
     uniform float uWaveHeight;
-    uniform vec2 uFlowDirection;
+  uniform vec2 uFlowDirection;
     uniform float uFlowSpeed;
     uniform sampler2D tRipple;
     uniform float uRippleDisplacement;
+    uniform vec2 uRippleCenter;
+    uniform float uRippleSize;
 
     varying vec2 vUv;
     varying vec3 vWorldPosition;
@@ -98,8 +103,12 @@ export function createWaterMaterial(
       
       float totalWave = (w1 + w2 + w3) * uWaveHeight * 0.6;
 
-      // Смещение вершин от интерактивных расходящихся волн
-      float rippleSample = texture2D(tRipple, uv).r;
+      // Смещение вершин от интерактивных расходящихся волн (в мировых координатах для независимости от размера меша)
+      vec2 rippleUv = (worldPos.xz - uRippleCenter) / uRippleSize + 0.5;
+      float rippleSample = 0.0;
+      if (rippleUv.x >= 0.0 && rippleUv.x <= 1.0 && rippleUv.y >= 0.0 && rippleUv.y <= 1.0) {
+        rippleSample = texture2D(tRipple, rippleUv).r;
+      }
       float rippleHeight = rippleSample * uRippleDisplacement;
 
       vec3 transformed = position;
@@ -108,23 +117,10 @@ export function createWaterMaterial(
       vWaveHeight = totalWave + rippleHeight;
       vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
 
-      // Аналитическое вычисление нормалей волн для честного отражения света
-      float dw1_dx = 1.2 * cos(p.x * 1.2 + uTime * uWaveSpeed) * cos(p.y * 1.1 + uTime * uWaveSpeed * 0.8);
-      float dw1_dz = -1.1 * sin(p.x * 1.2 + uTime * uWaveSpeed) * sin(p.y * 1.1 + uTime * uWaveSpeed * 0.8);
-
-      float dw2_dx = 0.8 * cos(p.x * 0.8 - p.y * 1.3 + uTime * uWaveSpeed * 1.1) * 0.6;
-      float dw2_dz = -1.3 * cos(p.x * 0.8 - p.y * 1.3 + uTime * uWaveSpeed * 1.1) * 0.6;
-
-      float dw3_dx = -1.5 * sin(p.x * 1.5 + p.y * 0.7 - uTime * uWaveSpeed * 0.9) * 0.4;
-      float dw3_dz = -0.7 * sin(p.x * 1.5 + p.y * 0.7 - uTime * uWaveSpeed * 0.9) * 0.4;
-
-      float dH_dx = (dw1_dx + dw2_dx + dw3_dx) * (uWaveHeight * 0.6 * 0.4);
-      float dH_dz = (dw1_dz + dw2_dz + dw3_dz) * (uWaveHeight * 0.6 * 0.4);
-
-      vec3 objectNormal = normalize(vec3(-dH_dx, 1.0, -dH_dz));
-      vNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);
+      // Базовая нормаль плоского меша (обычно (0,1,0))
+      vNormal = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+      vec3 transformedNormal = normalMatrix * normal;
       
-      vec3 transformedNormal = normalize(normalMatrix * objectNormal);
       vec4 worldPosition = vec4(vWorldPosition, 1.0);
       
       vec4 mvPosition = viewMatrix * worldPosition;
@@ -152,6 +148,7 @@ export function createWaterMaterial(
       uniform vec2 uFlowDirection;
       uniform float uFlowSpeed;
       uniform float uWaveHeight;
+      uniform float uWaveSpeed;
 
       uniform vec3 uSunDirection;
       uniform vec3 uSunColor;
@@ -164,6 +161,10 @@ export function createWaterMaterial(
 
       uniform sampler2D tRipple;
       uniform vec2 uRippleTexel;
+      uniform float uHasRipples;
+      uniform float uRippleDisplacement;
+      uniform vec2 uRippleCenter;
+      uniform float uRippleSize;
 
       varying vec2 vUv;
       varying vec3 vWorldPosition;
@@ -217,27 +218,55 @@ export function createWaterMaterial(
         float waveFoam = highlights * smoothstep(-0.02, 0.05, vWaveHeight);
         float shoreFoam = smoothstep(${GRAPHICS_CONFIG.water.shoreFoamDistance.toFixed(2)}, 0.02, waterDepth);
 
-        // Расчет нормалей и пены от интерактивной ряби
-        float rL = texture2D(tRipple, vUv - vec2(uRippleTexel.x, 0.0)).r;
-        float rR = texture2D(tRipple, vUv + vec2(uRippleTexel.x, 0.0)).r;
-        float rD = texture2D(tRipple, vUv - vec2(0.0, uRippleTexel.y)).r;
-        float rU = texture2D(tRipple, vUv + vec2(0.0, uRippleTexel.y)).r;
-        float rCenter = texture2D(tRipple, vUv).r;
+        // Расчет нормалей и пены от интерактивной ряби (только при активных волнах)
+        vec3 rippleNormal = vec3(0.0);
+        float wakeFoam = 0.0;
 
-        vec3 rippleNormal = vec3(-(rR - rL) * 2.8, 0.0, (rU - rD) * 2.8);
-        
-        // Мягкая пена на гребне волны: объединяем высоту волны и наклон склона, устраняя провал/дырку в центре
-        float wavePeak = max(0.0, rCenter);
-        float waveSlope = length(vec2(rR - rL, rU - rD));
-        float waveEnergy = wavePeak * 0.65 + waveSlope * 0.35;
-        float wakeFoam = smoothstep(${GRAPHICS_CONFIG.water.ripples.foamThreshold.toFixed(2)}, 0.16, waveEnergy) * 0.35;
+        vec2 rippleUv = (vWorldPosition.xz - uRippleCenter) / uRippleSize + 0.5;
+
+        if (uHasRipples > 0.5 && rippleUv.x >= 0.0 && rippleUv.x <= 1.0 && rippleUv.y >= 0.0 && rippleUv.y <= 1.0) {
+          float rL = texture2D(tRipple, rippleUv - vec2(uRippleTexel.x, 0.0)).r;
+          float rR = texture2D(tRipple, rippleUv + vec2(uRippleTexel.x, 0.0)).r;
+          float rD = texture2D(tRipple, rippleUv - vec2(0.0, uRippleTexel.y)).r;
+          float rU = texture2D(tRipple, rippleUv + vec2(0.0, uRippleTexel.y)).r;
+          float rCenter = texture2D(tRipple, rippleUv).r;
+
+          float physicalDistX = 2.0 * uRippleTexel.x * uRippleSize;
+          float physicalDistY = 2.0 * uRippleTexel.y * uRippleSize;
+          
+          float dy_dx = (rR - rL) * uRippleDisplacement / physicalDistX;
+          float dy_dz = (rU - rD) * uRippleDisplacement / physicalDistY;
+          
+          rippleNormal = vec3(-dy_dx, 0.0, -dy_dz);
+          
+          float wavePeak = max(0.0, rCenter);
+          float waveSlope = length(vec2(rR - rL, rU - rD));
+          float waveEnergy = wavePeak * 0.65 + waveSlope * 0.35;
+          wakeFoam = smoothstep(${GRAPHICS_CONFIG.water.ripples.foamThreshold.toFixed(2)}, 0.16, waveEnergy) * 0.35;
+        }
+
+        // Аналитические нормали для фоновых волн (расчет во фрагментном шейдере для детализации)
+        vec2 pWave = vWorldPosition.xz * 0.4 + flowOffset;
+        float dw1_dx = 1.2 * cos(pWave.x * 1.2 + uTime * uWaveSpeed) * cos(pWave.y * 1.1 + uTime * uWaveSpeed * 0.8);
+        float dw1_dz = -1.1 * sin(pWave.x * 1.2 + uTime * uWaveSpeed) * sin(pWave.y * 1.1 + uTime * uWaveSpeed * 0.8);
+
+        float dw2_dx = 0.8 * cos(pWave.x * 0.8 - pWave.y * 1.3 + uTime * uWaveSpeed * 1.1) * 0.6;
+        float dw2_dz = -1.3 * cos(pWave.x * 0.8 - pWave.y * 1.3 + uTime * uWaveSpeed * 1.1) * 0.6;
+
+        float dw3_dx = -1.5 * sin(pWave.x * 1.5 + pWave.y * 0.7 - uTime * uWaveSpeed * 0.9) * 0.4;
+        float dw3_dz = -0.7 * sin(pWave.x * 1.5 + pWave.y * 0.7 - uTime * uWaveSpeed * 0.9) * 0.4;
+
+        float dH_dx = (dw1_dx + dw2_dx + dw3_dx) * (uWaveHeight * 0.6 * 0.4);
+        float dH_dz = (dw1_dz + dw2_dz + dw3_dz) * (uWaveHeight * 0.6 * 0.4);
+
+        vec3 proceduralNormal = vec3(-dH_dx, 0.0, -dH_dz);
 
         float totalFoam = clamp(max(waveFoam, shoreFoam * 0.85) + wakeFoam * 0.5, 0.0, 0.85);
         // Мягкое смешивание цвета пены без аддитивного пересвета
         waterBase = mix(waterBase, vec3(0.85, 0.95, 1.0), totalFoam);
 
         // --- 3. ДИНАМИЧЕСКИЙ РАСЧЕТ ОСВЕЩЕНИЯ И ТЕНЕЙ (SHADOW MAP) ---
-        vec3 perturbedN = normalize(vNormal + rippleNormal);
+        vec3 perturbedN = normalize(vNormal + proceduralNormal + rippleNormal);
         vec3 N = normalize(perturbedN);
         if (!gl_FrontFacing) N = -N;
 
@@ -265,7 +294,7 @@ export function createWaterMaterial(
     `,
     transparent: true,
     depthWrite: false,
-    side: THREE.DoubleSide,
+    side: THREE.DoubleSide, // Возвращаем двусторонний рендер: предотвращает исчезновение воды при низких углах камеры
   });
 
   material.userData.isSharedMaterial = true;

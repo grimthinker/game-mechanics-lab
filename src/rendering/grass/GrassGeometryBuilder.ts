@@ -21,11 +21,11 @@ export class GrassGeometryBuilder {
   public static createClusterGeometry(options: GrassClusterOptions = {}): THREE.BufferGeometry {
     const bladeCount = Math.max(1, options.bladeCount ?? 4);
     const segments = Math.max(1, options.segments ?? 3);
-    const height = options.height ?? 0.55;
-    const baseWidth = options.baseWidth ?? 0.07;
+    const height = options.height ?? 0.72;
+    const baseWidth = options.baseWidth ?? 0.1;
     const tipWidth = options.tipWidth ?? 0.015;
-    const curveStrength = options.curveStrength ?? 0.12;
-    const rootRadius = options.rootRadius ?? 0.025;
+    const curveStrength = options.curveStrength ?? 0.17;
+    const rootRadius = options.rootRadius ?? 0.04;
 
     const rootColor = options.rootColor ?? new THREE.Color(0x3e732e);
     const tipColor = options.tipColor ?? new THREE.Color(0x7ec842);
@@ -182,9 +182,9 @@ export class GrassGeometryBuilder {
   /** Камыш / Рогоз: яркие сочные листья и бархатный каштановый початок */
   public static createReedsGeometry(): THREE.BufferGeometry {
     const height = GRASS_CONFIG.heights.reeds;
-    const headBaseY = height * 0.65;
-    const headHeight = 0.3;
-    const headRadius = 0.048;
+    const headBaseY = height * 0.75;
+    const headHeight = 0.32;
+    const headRadius = 0.05;
 
     const stalkColor = new THREE.Color(0x689f38); // свежий сочный зеленый
     const leafColor = new THREE.Color(0x7cb342);

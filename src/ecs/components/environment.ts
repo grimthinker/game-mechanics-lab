@@ -9,4 +9,12 @@ export interface EnvironmentComponent {
   axialTilt: number;
   /** Плотность экспоненциальной дымки у горизонта */
   fogDensity: number;
+  /** Интенсивность рассеянного фонового света (освещенность теней) */
+  ambientIntensity?: number;
+  /** Множитель яркости прямого солнечного и лунного света */
+  sunIntensityMultiplier?: number;
+  /** Цвет верхнего рассеянного света полусферы (небо) */
+  hemiSkyColor?: string;
+  /** Цвет нижнего рассеянного света полусферы (земля/отражение) */
+  hemiGroundColor?: string;
 }
