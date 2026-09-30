@@ -398,6 +398,12 @@ export class EditorMutationsAPI {
       if (physStats && physStats.radius.base !== patch.radius) {
         setBaseStat(physStats.radius, patch.radius);
       }
+      const shape = this.world.getComponent(id, 'zoneShape');
+      if (shape) {
+        shape.radius = patch.radius;
+        shape.width = patch.radius * 2;
+        shape.depth = patch.radius * 2;
+      }
     }
     return true;
   }
@@ -834,6 +840,49 @@ export class EditorMutationsAPI {
       setBaseStat(physStats.height, patch.maxDepth);
     }
 
+    return true;
+  }
+
+  public updateEntityZoneShape(
+    id: string,
+    patch: Partial<import('../ecs/components/zone').ZoneShapeComponent>
+  ): boolean {
+    let shape = this.world.getComponent(id, 'zoneShape');
+    if (!shape) {
+      const effector = this.world.getComponent(id, 'areaEffector');
+      const r = effector?.radius ?? 2.5;
+      shape = {
+        shapeType: 'cylinder',
+        radius: r,
+        height: 2.5,
+        width: r * 2,
+        depth: r * 2,
+      };
+      this.world.addComponent(id, 'zoneShape', shape);
+    }
+
+    Object.assign(shape, patch);
+
+    const effector = this.world.getComponent(id, 'areaEffector');
+    if (effector && patch.radius !== undefined) {
+      effector.radius = patch.radius;
+    }
+
+    const physStats = this.world.getComponent(id, 'physicsStats');
+    if (physStats && patch.radius !== undefined) {
+      setBaseStat(physStats.radius, patch.radius);
+    }
+
+    return true;
+  }
+
+  public updateEntityGameplayZone(
+    id: string,
+    patch: Partial<import('../ecs/components/zone').GameplayZoneComponent>
+  ): boolean {
+    const zone = this.world.getComponent(id, 'gameplayZone');
+    if (!zone) return false;
+    Object.assign(zone, patch);
     return true;
   }
 }

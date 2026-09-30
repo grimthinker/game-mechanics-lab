@@ -358,36 +358,52 @@ export class GrassGeometryBuilder {
     uvs.push(0.5, 1.0);
     colors.push(centerColor.r, centerColor.g, centerColor.b);
 
-    // 3. Яркие лепестки (обход строго CCW при взгляде сверху: нормали направлены к небу)
+    // 3. Объемные закругленные лепестки (состоят из 2 треугольников с расширением к центру)
     let pIdx = centerIdx + 1;
     for (let i = 0; i < petalCount; i++) {
-      const a1 = (i / petalCount) * Math.PI * 2;
-      const a2 = ((i + 0.65) / petalCount) * Math.PI * 2;
-      const aMid = (a1 + a2) * 0.5;
+      const angle = (i / petalCount) * Math.PI * 2;
+      const bIdx = centerIdx;
 
-      const p1Idx = pIdx++;
-      const p2Idx = pIdx++;
+      // Угловой полуразмах лепестка для создания округлой формы
+      const sideSpread = (0.48 / petalCount) * Math.PI * 2;
+      const midAngleL = angle - sideSpread;
+      const midAngleR = angle + sideSpread;
 
+      const midDist = flowerRadius * 0.62;
+      const lIdx = pIdx++;
+      const rIdx = pIdx++;
+      const tipIdx = pIdx++;
+
+      // Левая точка расширения лепестка
       positions.push(
-        Math.cos(aMid) * flowerRadius,
-        stemHeight + 0.012,
-        Math.sin(aMid) * flowerRadius
-      );
-      normals.push(Math.cos(aMid) * 0.2, 0.95, Math.sin(aMid) * 0.2);
-      uvs.push(1.0, 1.0);
-      colors.push(petalColor.r, petalColor.g, petalColor.b);
-
-      positions.push(
-        Math.cos(a2) * (flowerRadius * 0.55),
+        Math.cos(midAngleL) * midDist,
         stemHeight + 0.018,
-        Math.sin(a2) * (flowerRadius * 0.55)
+        Math.sin(midAngleL) * midDist
       );
-      normals.push(Math.cos(a2) * 0.2, 0.95, Math.sin(a2) * 0.2);
-      uvs.push(1.0, 1.0);
+      normals.push(0, 0.9, 0.4);
+      uvs.push(0.2, 0.4);
       colors.push(petalColor.r, petalColor.g, petalColor.b);
 
-      // CCW обход: Center -> P2 -> P1 смотрит строго ВВЕРХ в небо (+Y)
-      indices.push(centerIdx, p2Idx, p1Idx);
+      // Правая точка расширения лепестка
+      positions.push(
+        Math.cos(midAngleR) * midDist,
+        stemHeight + 0.018,
+        Math.sin(midAngleR) * midDist
+      );
+      normals.push(0, 0.9, 0.4);
+      uvs.push(0.8, 0.4);
+      colors.push(petalColor.r, petalColor.g, petalColor.b);
+
+      // Кончик лепестка (слегка приподнят для чашевидной формы)
+      const tipDist = flowerRadius * 1.15;
+      positions.push(Math.cos(angle) * tipDist, stemHeight + 0.035, Math.sin(angle) * tipDist);
+      normals.push(Math.cos(angle) * 0.3, 0.85, Math.sin(angle) * 0.3);
+      uvs.push(0.5, 1.0);
+      colors.push(petalColor.r, petalColor.g, petalColor.b);
+
+      // Два треугольника лепестка (CCW обход: Центр -> Лево -> Кончик, Центр -> Кончик -> Право)
+      indices.push(bIdx, lIdx, tipIdx);
+      indices.push(bIdx, tipIdx, rIdx);
     }
 
     const geo = new THREE.BufferGeometry();

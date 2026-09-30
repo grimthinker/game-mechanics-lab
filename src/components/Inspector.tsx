@@ -26,6 +26,8 @@ import {
   InventoryInspector,
   EnvironmentInspector,
   WaterInspector,
+  ZoneShapeInspector,
+  GameplayZoneInspector,
 } from './inspector/index';
 import { getAnatomyParts } from '../ecs/utils/hierarchy';
 import { EDITOR_CONFIG } from '../config/editorConfig';
@@ -139,6 +141,8 @@ export const Inspector: React.FC<InspectorProps> = ({
     inventory: false,
     environment: true,
     water: true,
+    zoneShape: true,
+    gameplayZone: true,
   });
 
   const toggleSection = (key: string) => {
@@ -382,6 +386,20 @@ export const Inspector: React.FC<InspectorProps> = ({
 
           {world.getComponent(targetId, 'aiStats') &&
             renderSection('ai', t('inspector.ai'), <AIInspector {...commonProps} />)}
+
+          {world.getComponent(targetId, 'zoneShape') &&
+            renderSection(
+              'zoneShape',
+              'Форма и размеры зоны',
+              <ZoneShapeInspector {...commonProps} />
+            )}
+
+          {world.getComponent(targetId, 'gameplayZone') &&
+            renderSection(
+              'gameplayZone',
+              'Параметры логической зоны',
+              <GameplayZoneInspector {...commonProps} />
+            )}
 
           {world.getComponent(targetId, 'areaEffector') &&
             renderSection(

@@ -35,6 +35,8 @@ export interface EventMap {
     quaternion: { x: number; y: number; z: number; w: number };
   };
   'input:cancelTargeting': void;
+  'zone:entered': { zoneId: string; entityId: string };
+  'zone:exited': { zoneId: string; entityId: string };
 }
 
 type EventCallback<T> = (data: T) => void;

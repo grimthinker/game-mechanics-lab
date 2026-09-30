@@ -131,6 +131,25 @@ export interface IPhysicsDriver {
   /** Запрашивает все сущности в радиусе (сферическое перекрытие в 3D) */
   queryEntitiesInSphere(center: Vec3, radius: number): string[];
 
+  /** Запрашивает все сущности внутри параллелепипеда (ориентированного бокса) */
+  queryEntitiesInBox(center: Vec3, halfExtents: Vec3, rotation?: import('../types').Quat): string[];
+
+  /** Запрашивает все сущности внутри вертикального цилиндра */
+  queryEntitiesInCylinder(
+    center: Vec3,
+    halfHeight: number,
+    radius: number,
+    rotation?: import('../types').Quat
+  ): string[];
+
+  /** Универсальный пространственный запрос сущностей в заданной форме зоны */
+  queryEntitiesInZoneShape(
+    shapeType: 'sphere' | 'cylinder' | 'box',
+    center: Vec3,
+    dimensions: { radius: number; height: number; width: number; depth: number },
+    rotation?: import('../types').Quat
+  ): string[];
+
   /** Принудительно будит спящие динамические тела в заданном радиусе (например, при взрыве или разрушении опоры) */
   wakeUpDynamicBodiesInRadius(center: Vec3, radius: number): void;
 

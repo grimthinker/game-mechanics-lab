@@ -19,3 +19,5 @@ export * from './EquipmentInspector';
 export * from './InventoryInspector';
 export * from './EnvironmentInspector';
 export * from './WaterInspector';
+export * from './ZoneShapeInspector';
+export * from './GameplayZoneInspector';

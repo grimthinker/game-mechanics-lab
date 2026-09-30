@@ -14,8 +14,10 @@ export * from './components/terrain';
 export * from './components/fetch';
 export * from './components/environment';
 export * from './components/water';
+export * from './components/zone';
 
 import { FetchStickComponent } from './components/fetch';
+import { ZoneShapeComponent, GameplayZoneComponent } from './components/zone';
 import { TerrainComponent } from './components/terrain';
 import { EnvironmentComponent } from './components/environment';
 import { WaterComponent, WaterConfig } from './components/water';
@@ -142,6 +144,8 @@ export interface EntityComponents {
   fetchStick?: FetchStickComponent;
   environment?: EnvironmentComponent;
   water?: WaterComponent;
+  zoneShape?: ZoneShapeComponent;
+  gameplayZone?: GameplayZoneComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -191,6 +195,8 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'fetchStick',
   'environment',
   'water',
+  'zoneShape',
+  'gameplayZone',
 ] as const;
 
 export interface EntityConfig {
@@ -232,4 +238,6 @@ export interface EntityConfig {
   fetchStick?: FetchStickComponent;
   environment?: EnvironmentComponent;
   water?: WaterConfig;
+  zoneShape?: ZoneShapeComponent;
+  gameplayZone?: GameplayZoneComponent;
 }

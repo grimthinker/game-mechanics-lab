@@ -64,6 +64,8 @@ export function getZoneVisuals(
   }
 }
 
+import { ZoneShapeComponent, GameplayZoneComponent, GameplayZoneRole } from '../components/zone';
+
 export function createZoneConfig(
   effect: ZoneEffectType,
   radius: number = 2.5,
@@ -82,6 +84,13 @@ export function createZoneConfig(
       name: name || getDefaultZoneName(effect, valuePerSec),
       entityType: 'zone',
     },
+    zoneShape: {
+      shapeType: 'cylinder',
+      radius,
+      height: 2.5,
+      width: radius * 2,
+      depth: radius * 2,
+    },
     areaEffector: {
       effect,
       radius,
@@ -92,6 +101,44 @@ export function createZoneConfig(
       distanceAttenuation,
       centerValue,
       boundaryValue,
+    },
+    physics: {
+      radius,
+      weight: 1,
+      isSolid: false,
+    },
+  };
+}
+
+export function createGameplayZoneConfig(
+  role: GameplayZoneRole,
+  name: string,
+  zoneTag?: string,
+  shapeType: 'sphere' | 'cylinder' | 'box' = 'cylinder',
+  dimensions: { radius?: number; height?: number; width?: number; depth?: number } = {}
+): EntityConfig {
+  const radius = dimensions.radius ?? 4.0;
+  const height = dimensions.height ?? 3.0;
+  const width = dimensions.width ?? 6.0;
+  const depth = dimensions.depth ?? 6.0;
+
+  return {
+    tag: { archetype: 'zone', subType: role },
+    meta: {
+      name,
+      entityType: 'zone',
+    },
+    zoneShape: {
+      shapeType,
+      radius,
+      height,
+      width,
+      depth,
+    },
+    gameplayZone: {
+      role,
+      zoneTag,
+      occupantIds: [],
     },
     physics: {
       radius,
@@ -131,7 +178,28 @@ export function assembleZone(
   });
 
   // 3. Компонент эффектора
-  world.addComponent(id, 'areaEffector', effector);
+  if (config.areaEffector) {
+    world.addComponent(id, 'areaEffector', effector);
+  }
+
+  // 3.1. Логическая зона
+  if (config.gameplayZone) {
+    world.addComponent(id, 'gameplayZone', {
+      role: config.gameplayZone.role ?? 'generic',
+      zoneTag: config.gameplayZone.zoneTag,
+      occupantIds: [],
+    });
+  }
+
+  // 3.2. Форма зоны
+  const shape: ZoneShapeComponent = config.zoneShape ?? {
+    shapeType: 'cylinder',
+    radius,
+    height: 2.5,
+    width: radius * 2,
+    depth: radius * 2,
+  };
+  world.addComponent(id, 'zoneShape', shape);
 
   // 4. Компонент привязки (если передан)
   if (config.attachment) {

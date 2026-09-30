@@ -78,38 +78,65 @@ export class ThreeSyncSystem {
   private matZoneDmg = new THREE.MeshBasicMaterial({
     color: 0xe74c3c,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.15,
     side: THREE.DoubleSide,
+    depthWrite: false,
   });
   private matZoneJoint = new THREE.MeshBasicMaterial({
     color: 0xe67e22,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.15,
     side: THREE.DoubleSide,
+    depthWrite: false,
   });
   private matZoneHeal = new THREE.MeshBasicMaterial({
     color: 0x2ecc71,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.15,
     side: THREE.DoubleSide,
+    depthWrite: false,
   });
   private matZoneNeutral = new THREE.MeshBasicMaterial({
     color: 0x9b59b6,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.15,
     side: THREE.DoubleSide,
+    depthWrite: false,
   });
   private matZoneSlow = new THREE.MeshBasicMaterial({
     color: 0x3498db,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.15,
     side: THREE.DoubleSide,
+    depthWrite: false,
   });
   private matZoneFast = new THREE.MeshBasicMaterial({
     color: 0x1abc9c,
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.15,
     side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  private matZoneQuest = new THREE.MeshBasicMaterial({
+    color: 0x00e5ff,
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  private matZoneAI = new THREE.MeshBasicMaterial({
+    color: 0xf1c40f,
+    transparent: true,
+    opacity: 0.12,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+  private matZoneThrowTarget = new THREE.MeshBasicMaterial({
+    color: 0xe67e22,
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.DoubleSide,
+    depthWrite: false,
   });
   private matSelection = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
   private matSilhouetteOutline = createOutlineShaderMaterial(0x2ecc71, 3.2);
@@ -315,10 +342,26 @@ export class ThreeSyncSystem {
             const limbScale = (limbRadius / 0.3) * 0.75;
             obj.scale.set(limbScale, limbScale, limbScale);
           } else if (archetype === 'zone') {
-            const effector = world.getComponent(id, 'areaEffector');
-            const physStats = world.getComponent(id, 'physicsStats');
-            const r = effector?.radius ?? physStats?.radius.current ?? 2.5;
-            obj.scale.set(r, 1, r);
+            const shape = world.getComponent(id, 'zoneShape');
+            if (shape) {
+              // Если форма зоны изменилась в инспекторе — динамически перестраиваем меш геометрии
+              if (obj.userData.currentShapeType !== shape.shapeType) {
+                this.rebuildZoneMeshGeometry(obj, shape, world, id);
+              }
+
+              if (shape.shapeType === 'sphere') {
+                obj.scale.set(shape.radius, shape.radius, shape.radius);
+              } else if (shape.shapeType === 'cylinder') {
+                obj.scale.set(shape.radius, shape.height / 2, shape.radius);
+              } else {
+                obj.scale.set(shape.width, shape.height, shape.depth);
+              }
+            } else {
+              const effector = world.getComponent(id, 'areaEffector');
+              const physStats = world.getComponent(id, 'physicsStats');
+              const r = effector?.radius ?? physStats?.radius.current ?? 2.5;
+              obj.scale.set(r, 1, r);
+            }
           } else if (archetype === 'obstacle') {
             const physStats = world.getComponent(id, 'physicsStats');
             const visual = world.getComponent(id, 'visualModel');
@@ -599,20 +642,11 @@ export class ThreeSyncSystem {
           }
 
           if (archetype === 'zone') {
-            const effector = world.getComponent(id, 'areaEffector');
-            if (effector) {
-              let mat = this.matZoneNeutral;
-              if (effector.effect === 'damage') mat = this.matZoneDmg;
-              else if (effector.effect === 'joint_damage') mat = this.matZoneJoint;
-              else if (effector.effect === 'heal') mat = this.matZoneHeal;
-              else if (effector.effect === 'time_dilation') {
-                mat = effector.valuePerSec > 1.0 ? this.matZoneFast : this.matZoneSlow;
-              }
-              const mainMesh = obj.children.find(
-                (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
-              ) as THREE.Mesh;
-              if (mainMesh && mainMesh.material !== mat) mainMesh.material = mat;
-            }
+            const mat = this.getZoneMaterial(world, id);
+            const mainMesh = obj.children.find(
+              (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
+            ) as THREE.Mesh;
+            if (mainMesh && mainMesh.material !== mat) mainMesh.material = mat;
           }
         }
       }
@@ -841,19 +875,36 @@ export class ThreeSyncSystem {
       mainMesh = new THREE.Mesh(geo, mat);
       mainMesh.position.y = 0;
     } else if (archetype === 'zone') {
-      const effector = world.getComponent(id, 'areaEffector');
-      let mat = this.matZoneNeutral;
-      if (effector?.effect === 'damage') mat = this.matZoneDmg;
-      else if (effector?.effect === 'joint_damage') mat = this.matZoneJoint;
-      else if (effector?.effect === 'heal') mat = this.matZoneHeal;
-      else if (effector?.effect === 'time_dilation') {
-        mat = (effector.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
+      const shape = world.getComponent(id, 'zoneShape');
+      const mat = this.getZoneMaterial(world, id);
+      const shapeType = shape?.shapeType ?? 'cylinder';
+
+      let geo: THREE.BufferGeometry;
+      let posY = 1;
+
+      if (shapeType === 'sphere') {
+        geo = new THREE.SphereGeometry(1, 24, 18);
+        posY = 1;
+        const r = shape?.radius ?? radius;
+        group.scale.set(r, r, r);
+      } else if (shapeType === 'box') {
+        geo = new THREE.BoxGeometry(1, 1, 1);
+        posY = 0.5;
+        const w = shape?.width ?? 4;
+        const h = shape?.height ?? 2.5;
+        const d = shape?.depth ?? 4;
+        group.scale.set(w, h, d);
+      } else {
+        geo = new THREE.CylinderGeometry(1, 1, 2, 32);
+        posY = 1;
+        const r = shape?.radius ?? radius;
+        const h = shape?.height ?? 2.5;
+        group.scale.set(r, h / 2, r);
       }
-      const geo = new THREE.CylinderGeometry(1, 1, 2, 32);
+
       mainMesh = new THREE.Mesh(geo, mat);
-      mainMesh.position.y = 1;
-      const r = effector?.radius ?? radius;
-      group.scale.set(r, 1, r);
+      mainMesh.position.y = posY;
+      group.userData.currentShapeType = shapeType;
     } else if (archetype === 'terrain') {
       const terrainComp = world.getComponent(id, 'terrain');
       if (terrainComp) {
@@ -1054,5 +1105,71 @@ export class ThreeSyncSystem {
     }
 
     return disturbances;
+  }
+
+  private getZoneMaterial(world: World, id: EntityId): THREE.Material {
+    const effector = world.getComponent(id, 'areaEffector');
+    const gameplayZone = world.getComponent(id, 'gameplayZone');
+    let mat = this.matZoneNeutral;
+
+    if (effector) {
+      if (effector.effect === 'damage') mat = this.matZoneDmg;
+      else if (effector.effect === 'joint_damage') mat = this.matZoneJoint;
+      else if (effector.effect === 'heal') mat = this.matZoneHeal;
+      else if (effector.effect === 'time_dilation') {
+        mat = (effector.valuePerSec ?? 1) > 1.0 ? this.matZoneFast : this.matZoneSlow;
+      }
+    } else if (gameplayZone) {
+      if (gameplayZone.role === 'quest') mat = this.matZoneQuest;
+      else if (gameplayZone.role === 'ai_area') mat = this.matZoneAI;
+      else if (gameplayZone.role === 'throw_target') mat = this.matZoneThrowTarget;
+    }
+
+    return mat;
+  }
+
+  private rebuildZoneMeshGeometry(
+    group: THREE.Object3D,
+    shape: import('../components/zone').ZoneShapeComponent,
+    world: World,
+    entityId: EntityId
+  ): void {
+    let oldMesh: THREE.Mesh | null = null;
+    for (let i = group.children.length - 1; i >= 0; i--) {
+      const child = group.children[i];
+      if (child instanceof THREE.Mesh && !child.userData.isSelectionOutline) {
+        oldMesh = child;
+        group.remove(child);
+        break;
+      }
+    }
+
+    if (oldMesh) {
+      ThreeSyncSystem.disposeObject(oldMesh);
+    }
+
+    let geo: THREE.BufferGeometry;
+    let posY = 1;
+
+    if (shape.shapeType === 'sphere') {
+      geo = new THREE.SphereGeometry(1, 24, 18);
+      posY = 1;
+    } else if (shape.shapeType === 'box') {
+      geo = new THREE.BoxGeometry(1, 1, 1);
+      posY = 0.5;
+    } else {
+      geo = new THREE.CylinderGeometry(1, 1, 2, 32);
+      posY = 1;
+    }
+
+    const mat = this.getZoneMaterial(world, entityId);
+    const newMesh = new THREE.Mesh(geo, mat);
+    newMesh.position.y = posY;
+    newMesh.userData.entityId = entityId;
+    newMesh.userData.isSharedMaterial = true;
+
+    group.add(newMesh);
+    ThreeSyncSystem.attachOutlines(group, this.matSilhouetteOutline);
+    group.userData.currentShapeType = shape.shapeType;
   }
 }

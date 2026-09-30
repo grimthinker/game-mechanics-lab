@@ -457,19 +457,123 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
 
   public queryEntitiesInSphere(center: Vec3, radius: number): string[] {
     if (!this.world) return [];
+    if (this.isBroadPhaseDirty) {
+      this.updateSceneQueries();
+    }
     const hitIds = new Set<string>();
     const shapePos = new RAPIER.Vector3(center.x, center.y, center.z);
     const shapeRot = { w: 1.0, x: 0.0, y: 0.0, z: 0.0 };
-    const shape = new RAPIER.Ball(radius);
+    const shape = new RAPIER.Ball(Math.max(0.01, radius));
 
-    this.world.intersectionsWithShape(shapePos, shapeRot, shape, (collider: RAPIER.Collider) => {
-      const parent = collider.parent();
-      if (parent) {
-        const entityId = this.getEntityIdByBody(parent);
-        if (entityId) hitIds.add(entityId);
-      }
-      return true;
-    });
+    this.world.intersectionsWithShape(
+      shapePos,
+      shapeRot,
+      shape,
+      (collider: RAPIER.Collider) => {
+        const parent = collider.parent();
+        if (parent) {
+          const entityId = this.getEntityIdByBody(parent);
+          if (entityId) hitIds.add(entityId);
+        }
+        return true;
+      },
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+    );
+    return Array.from(hitIds);
+  }
+
+  public queryEntitiesInZoneShape(
+    shapeType: 'sphere' | 'cylinder' | 'box',
+    center: Vec3,
+    dimensions: { radius: number; height: number; width: number; depth: number },
+    rotation?: import('../types').Quat
+  ): string[] {
+    if (shapeType === 'box') {
+      return this.queryEntitiesInBox(
+        center,
+        {
+          x: dimensions.width / 2,
+          y: dimensions.height / 2,
+          z: dimensions.depth / 2,
+        },
+        rotation
+      );
+    }
+    if (shapeType === 'cylinder') {
+      return this.queryEntitiesInCylinder(
+        center,
+        dimensions.height / 2,
+        dimensions.radius,
+        rotation
+      );
+    }
+    return this.queryEntitiesInSphere(center, dimensions.radius);
+  }
+
+  public queryEntitiesInBox(
+    center: Vec3,
+    halfExtents: Vec3,
+    rotation?: import('../types').Quat
+  ): string[] {
+    if (!this.world) return [];
+    if (this.isBroadPhaseDirty) {
+      this.updateSceneQueries();
+    }
+    const hitIds = new Set<string>();
+    const shapePos = new RAPIER.Vector3(center.x, center.y, center.z);
+    const shapeRot = rotation ?? { w: 1.0, x: 0.0, y: 0.0, z: 0.0 };
+    const shape = new RAPIER.Cuboid(
+      Math.max(0.01, halfExtents.x),
+      Math.max(0.01, halfExtents.y),
+      Math.max(0.01, halfExtents.z)
+    );
+
+    this.world.intersectionsWithShape(
+      shapePos,
+      shapeRot,
+      shape,
+      (collider: RAPIER.Collider) => {
+        const parent = collider.parent();
+        if (parent) {
+          const entityId = this.getEntityIdByBody(parent);
+          if (entityId) hitIds.add(entityId);
+        }
+        return true;
+      },
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+    );
+    return Array.from(hitIds);
+  }
+
+  public queryEntitiesInCylinder(
+    center: Vec3,
+    halfHeight: number,
+    radius: number,
+    rotation?: import('../types').Quat
+  ): string[] {
+    if (!this.world) return [];
+    if (this.isBroadPhaseDirty) {
+      this.updateSceneQueries();
+    }
+    const hitIds = new Set<string>();
+    const shapePos = new RAPIER.Vector3(center.x, center.y, center.z);
+    const shapeRot = rotation ?? { w: 1.0, x: 0.0, y: 0.0, z: 0.0 };
+    const shape = new RAPIER.Cylinder(Math.max(0.01, halfHeight), Math.max(0.01, radius));
+
+    this.world.intersectionsWithShape(
+      shapePos,
+      shapeRot,
+      shape,
+      (collider: RAPIER.Collider) => {
+        const parent = collider.parent();
+        if (parent) {
+          const entityId = this.getEntityIdByBody(parent);
+          if (entityId) hitIds.add(entityId);
+        }
+        return true;
+      },
+      RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+    );
     return Array.from(hitIds);
   }
 

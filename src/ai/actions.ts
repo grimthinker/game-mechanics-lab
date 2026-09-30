@@ -1156,6 +1156,8 @@ export class BTActionMasterLookAtDog extends BTSimpleAction {
   }
 }
 
+import { getRandomPointInZone, getZoneCenter } from '../ecs/components/zone';
+
 export class BTConditionDistance extends BTSimpleAction {
   public static readonly nodeName = 'Проверка дистанции до цели';
   public static readonly description = 'Проверяет, находится ли цель в пределах заданной дистанции';
@@ -1181,5 +1183,86 @@ export class BTConditionDistance extends BTSimpleAction {
     const dist = Math.hypot(targetPos.x - selfPos.x, targetPos.z - selfPos.z);
 
     return dist <= this.params.maxDistance ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+  }
+}
+
+export class BTConditionInsideZone extends BTSimpleAction {
+  public static readonly nodeName = 'Проверка нахождения в зоне';
+  public static readonly description = 'Проверяет, находится ли агент внутри указанной зоны';
+  public static readonly defaultParams = { zoneKey: 'targetZoneId' };
+
+  private params: typeof BTConditionInsideZone.defaultParams;
+
+  constructor(params?: Partial<typeof BTConditionInsideZone.defaultParams>) {
+    super();
+    this.params = { ...BTConditionInsideZone.defaultParams, ...params };
+  }
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const zoneId = bb.get<string>(this.params.zoneKey);
+    if (!zoneId) return NodeStatus.FAILURE;
+
+    const zoneComp = entity.world.getComponent(zoneId, 'gameplayZone');
+    if (zoneComp) {
+      return zoneComp.occupantIds.includes(entity.id) ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+    }
+
+    const shape = entity.world.getComponent(zoneId, 'zoneShape');
+    const transform = entity.world.getComponent(zoneId, 'transform');
+    if (!shape || !transform) return NodeStatus.FAILURE;
+
+    const selfPos = entity.getPos();
+    const center = getZoneCenter(transform, shape);
+    const dx = selfPos.x - center.x;
+    const dy = selfPos.y - center.y;
+    const dz = selfPos.z - center.z;
+
+    if (shape.shapeType === 'sphere') {
+      return Math.hypot(dx, dy, dz) <= shape.radius ? NodeStatus.SUCCESS : NodeStatus.FAILURE;
+    }
+    if (shape.shapeType === 'cylinder') {
+      return Math.hypot(dx, dz) <= shape.radius && Math.abs(dy) <= shape.height / 2
+        ? NodeStatus.SUCCESS
+        : NodeStatus.FAILURE;
+    }
+    return Math.abs(dx) <= shape.width / 2 &&
+      Math.abs(dz) <= shape.depth / 2 &&
+      Math.abs(dy) <= shape.height / 2
+      ? NodeStatus.SUCCESS
+      : NodeStatus.FAILURE;
+  }
+}
+
+export class BTActionGetRandomPointInZone extends BTSimpleAction {
+  public static readonly nodeName = 'Точка в зоне';
+  public static readonly description =
+    'Генерирует случайную точку внутри зоны и сохраняет в память';
+  public static readonly defaultParams = {
+    zoneKey: 'targetZoneId',
+    targetPosKey: 'targetPos',
+  };
+
+  private params: typeof BTActionGetRandomPointInZone.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionGetRandomPointInZone.defaultParams>) {
+    super();
+    this.params = { ...BTActionGetRandomPointInZone.defaultParams, ...params };
+  }
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const zoneId = bb.get<string>(this.params.zoneKey);
+    if (!zoneId) return NodeStatus.FAILURE;
+
+    const shape = entity.world.getComponent(zoneId, 'zoneShape');
+    const transform = entity.world.getComponent(zoneId, 'transform');
+    if (!shape || !transform) return NodeStatus.FAILURE;
+
+    const terrain = entity.world.getComponent('terrain', 'terrain');
+    const point = getRandomPointInZone(transform, shape, terrain);
+
+    bb.set(this.params.targetPosKey, point);
+    return NodeStatus.SUCCESS;
   }
 }

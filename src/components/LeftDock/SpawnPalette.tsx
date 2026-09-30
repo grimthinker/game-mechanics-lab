@@ -1,7 +1,7 @@
 import React from 'react';
 import { EntityConfig } from '../../ecs/types';
 import { BodyStructureType } from '../../ecs/templates';
-import { createZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
+import { createZoneConfig, createGameplayZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
 import {
   createHouseConfig,
   createFenceConfig,
@@ -460,6 +460,51 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
     {
       title: t('palette.categoryZones'),
       items: [
+        {
+          id: 'zone_quest_destination',
+          name: 'Зона квеста (Точка назначения)',
+          description: 'Триггер достижения цели квеста для игрока',
+          icon: '🏁',
+          createConfig: () =>
+            createGameplayZoneConfig('quest', 'Точка назначения', 'quest_target_1', 'cylinder', {
+              radius: 3.0,
+              height: 3.0,
+            }),
+        },
+        {
+          id: 'zone_ai_gathering',
+          name: 'Зона сбора (Лагерь)',
+          description: 'Область, где существа собираются в режиме ожидания',
+          icon: '🏕️',
+          createConfig: () =>
+            createGameplayZoneConfig('ai_area', 'Зона сбора', 'camp_gathering', 'cylinder', {
+              radius: 6.0,
+              height: 3.0,
+            }),
+        },
+        {
+          id: 'zone_throw_target',
+          name: 'Зона цели броска',
+          description: 'Прямоугольная область цели для бросков (футбол, мишень)',
+          icon: '🎯',
+          createConfig: () =>
+            createGameplayZoneConfig('throw_target', 'Створ цели броска', 'goal_area', 'box', {
+              width: 8.0,
+              depth: 4.0,
+              height: 3.0,
+            }),
+        },
+        {
+          id: 'zone_fetch_play',
+          name: 'Зона игры в апорт',
+          description: 'Область игры для хозяина и собак',
+          icon: '🎾',
+          createConfig: () =>
+            createGameplayZoneConfig('ai_area', 'Зона апорта', 'fetch_play_zone', 'cylinder', {
+              radius: 18.0,
+              height: 3.0,
+            }),
+        },
         {
           id: 'zone_damage',
           name: t('palette.zoneFire'),

@@ -6,58 +6,79 @@ import { addModifier, createStat } from '../stats/StatEvaluator';
 import { applyZoneDamageToCreature, applyZoneJointDamageToCreature } from '../utils/anatomyDamage';
 import { EFFECTOR_CONFIG } from '../../config/effectorConfig';
 
+import { getZoneCenter, ZoneShapeComponent } from '../components/zone';
+
 export class AreaEffectorSystem {
   private pulseTimer: number = 0;
   private readonly PULSE_INTERVAL: number = EFFECTOR_CONFIG.pulseInterval;
 
   public update(dt: number, world: World, physics: PhysicsSystem): void {
+    if (!physics.driver || !physics.driver.isReady) return;
+
     this.pulseTimer += dt;
     const isPulseTick = this.pulseTimer >= this.PULSE_INTERVAL;
     if (isPulseTick) {
       this.pulseTimer = 0;
     }
 
-    // Зоны могут не иметь physicsBody, если мы удалим их физику, опираемся только на Transform
     const effectors = world.getEntitiesWith('areaEffector', 'transform');
-    // Собираем всех потенциальных жертв заранее, чтобы избежать N*M запросов к ECS
-    const targets = world.getEntitiesWith('transform', 'health', 'physicsStats', 'physicsBody');
 
     for (const [zoneId, { areaEffector, transform: zoneTransform }] of effectors) {
       const attachment = world.getComponent(zoneId, 'attachment');
+      const shape: ZoneShapeComponent = world.getComponent(zoneId, 'zoneShape') ?? {
+        shapeType: 'cylinder',
+        radius: areaEffector.radius,
+        height: 2.5,
+        width: areaEffector.radius * 2,
+        depth: areaEffector.radius * 2,
+      };
 
-      for (const [
-        targetId,
-        { transform: targetTransform, health, physicsStats, physicsBody },
-      ] of targets) {
-        if (!health.isAlive) continue;
+      const center = getZoneCenter(zoneTransform, shape);
+      const hitEntityIds = physics.driver.queryEntitiesInZoneShape(
+        shape.shapeType,
+        center,
+        shape,
+        zoneTransform.rotation
+      );
 
-        if ((physicsBody.category & (CollisionCategory.CREATURE | CollisionCategory.ITEM)) === 0) {
-          continue;
-        }
-
-        // Иммунитет носителя ауры
+      for (const targetId of hitEntityIds) {
+        if (targetId === zoneId) continue;
         if (areaEffector.ignoreParent && attachment && attachment.parentId === targetId) {
           continue;
         }
 
-        const targetRadius = physicsStats.radius.current ?? 0.4;
+        const health = world.getComponent(targetId, 'health');
+        if (!health || !health.isAlive) continue;
 
-        // Цилиндрический расчет: горизонтальная дистанция в плоскости XZ + высота Y
-        const dx = targetTransform.x - zoneTransform.x;
-        const dy = Math.abs(targetTransform.y - zoneTransform.y);
-        const dz = targetTransform.z - zoneTransform.z;
-        const distXZ = Math.hypot(dx, dz);
+        const physicsBody = world.getComponent(targetId, 'physicsBody');
+        if (!physicsBody) continue;
+        if ((physicsBody.category & (CollisionCategory.CREATURE | CollisionCategory.ITEM)) === 0) {
+          continue;
+        }
 
-        // Высота цилиндра зоны 2 метра (от -0.2м до +2.2м с запасом)
-        if (dy > 2.5) continue;
+        const targetTransform = world.getComponent(targetId, 'transform');
+        if (!targetTransform) continue;
 
-        const effectiveRadius = areaEffector.radius + targetRadius;
-        if (distXZ > effectiveRadius) continue; // Объект вне зоны
-        const dist = distXZ;
-
+        const physicsStats = world.getComponent(targetId, 'physicsStats');
         const targetTs = world.getComponent(targetId, 'timeScale')?.multiplier.current ?? 1.0;
         const localDt = dt * targetTs;
         const deltaValue = areaEffector.valuePerSec * localDt;
+
+        const dx = targetTransform.x - center.x;
+        const dy = targetTransform.y - center.y;
+        const dz = targetTransform.z - center.z;
+
+        let normalizedDist = 0;
+        if (shape.shapeType === 'sphere') {
+          normalizedDist = Math.hypot(dx, dy, dz) / Math.max(0.01, shape.radius);
+        } else if (shape.shapeType === 'cylinder') {
+          normalizedDist = Math.hypot(dx, dz) / Math.max(0.01, shape.radius);
+        } else {
+          const hx = Math.max(0.01, shape.width / 2);
+          const hz = Math.max(0.01, shape.depth / 2);
+          normalizedDist = Math.max(Math.abs(dx) / hx, Math.abs(dz) / hz);
+        }
+        normalizedDist = Math.min(1.0, Math.max(0.0, normalizedDist));
 
         // Поле замедления/ускорения времени
         if (areaEffector.effect === 'time_dilation') {
@@ -69,23 +90,21 @@ export class AreaEffectorSystem {
           if (targetTimeScale) {
             let timeMultiplier = areaEffector.valuePerSec;
 
-            // Плавное радиальное изменение эффекта времени от центра к границе
             if (
               areaEffector.distanceAttenuation &&
               areaEffector.centerValue !== undefined &&
               areaEffector.boundaryValue !== undefined
             ) {
-              const t = Math.min(1, Math.max(0, dist / effectiveRadius));
               timeMultiplier =
                 areaEffector.centerValue +
-                (areaEffector.boundaryValue - areaEffector.centerValue) * t;
+                (areaEffector.boundaryValue - areaEffector.centerValue) * normalizedDist;
             }
 
             addModifier(targetTimeScale.multiplier, {
               id: `zone_td_${zoneId}`,
               type: ModifierType.PERCENT_MULT,
               value: Math.max(0, timeMultiplier),
-              duration: 0.15, // Быстро спадает при выходе из зоны
+              duration: 0.15,
             });
           }
           continue;
@@ -121,14 +140,14 @@ export class AreaEffectorSystem {
         else if (areaEffector.effect === 'heal') {
           applyHeal(world, targetId, deltaValue, isPulseTick);
         }
-        // 3. Отталкивание (Repel) и Притягивание (Attract) импульсом с учетом массы и 3D вектора
+        // 3. Отталкивание (Repel) и Притягивание (Attract)
         else if (areaEffector.effect === 'repel' || areaEffector.effect === 'attract') {
-          // Защита от деления на ноль и дерганья в самом центре воронки
-          if (areaEffector.effect === 'attract' && dist <= 0.2) continue;
+          const distXZ = Math.hypot(dx, dz);
+          if (areaEffector.effect === 'attract' && distXZ <= 0.2) continue;
 
-          const ux = dist > 0.001 ? dx / dist : Math.random() - 0.5;
-          const uy = dist > 0.001 ? dy / dist : Math.random() - 0.5;
-          const uz = dist > 0.001 ? dz / dist : Math.random() - 0.5;
+          const ux = distXZ > 0.001 ? dx / distXZ : Math.random() - 0.5;
+          const uy = dy !== 0 ? Math.sign(dy) * 0.2 : 0;
+          const uz = distXZ > 0.001 ? dz / distXZ : Math.random() - 0.5;
           const len = Math.hypot(ux, uy, uz) || 1;
 
           let forceMagnitude = areaEffector.valuePerSec;
@@ -137,16 +156,14 @@ export class AreaEffectorSystem {
             areaEffector.centerValue !== undefined &&
             areaEffector.boundaryValue !== undefined
           ) {
-            const t = Math.min(1, Math.max(0, dist / effectiveRadius));
             forceMagnitude =
               areaEffector.centerValue +
-              (areaEffector.boundaryValue - areaEffector.centerValue) * t;
+              (areaEffector.boundaryValue - areaEffector.centerValue) * normalizedDist;
           }
 
           const sign = areaEffector.effect === 'repel' ? 1 : -1;
-          const weight = physicsStats.totalWeight ?? physicsStats.weight.current ?? 1;
+          const weight = physicsStats?.totalWeight ?? physicsStats?.weight.current ?? 1;
 
-          // Для динамических тел Rapier (ящики, выброшенные предметы) прикладываем физический импульс и будим тело
           if (physicsBody.rawBody && physicsBody.bodyType === 'dynamic') {
             if (physicsBody.rawBody.isSleeping()) {
               physicsBody.rawBody.wakeUp();
@@ -163,7 +180,6 @@ export class AreaEffectorSystem {
             continue;
           }
 
-          // Для кинематических персонажей передаем импульс в скорость ECS
           const velocity = world.getComponent(targetId, 'velocity');
           if (!velocity) continue;
 
