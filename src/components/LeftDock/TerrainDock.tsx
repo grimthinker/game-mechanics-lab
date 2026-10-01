@@ -24,6 +24,15 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
       : 'raise';
   });
   const [texture, setTexture] = useState<TerrainTextureChannel>(0);
+  const [customTextureMix, setCustomTextureMix] = useState<[number, number, number, number]>(() => {
+    const saved = localStorage.getItem('terrain_brush_custom_mix');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {}
+    }
+    return [25, 25, 25, 25]; // Значения по умолчанию
+  });
   const [foliageZone, setFoliageZone] = useState<FoliageZoneChannel>(0);
   const [radius, setRadius] = useState(() => {
     const saved = localStorage.getItem('terrain_brush_radius');
@@ -54,18 +63,31 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     localStorage.setItem('terrain_brush_strength', strength.toString());
   }, [strength]);
 
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_custom_mix', JSON.stringify(customTextureMix));
+  }, [customTextureMix]);
+
   // Синхронизация локального состояния React со стейтом кисти движка
   useEffect(() => {
     if (!app) return;
 
-    app.terrainBrush = { active, tool, texture, foliageZone, radius, strength, hillSize };
+    app.terrainBrush = {
+      active,
+      tool,
+      texture,
+      customTextureMix,
+      foliageZone,
+      radius,
+      strength,
+      hillSize,
+    };
 
     // Если активирован режим кисти — сбрасываем выделение объектов, чтобы клик рисовал, а не выделял
     if (active) {
       app.selection.clear();
       app.gizmo.cancelDrag();
     }
-  }, [app, active, tool, texture, foliageZone, radius, strength]);
+  }, [app, active, tool, texture, customTextureMix, foliageZone, radius, strength, hillSize]);
 
   // Выключение режима при закрытии вкладки или размонтировании
   useEffect(() => {
@@ -90,6 +112,7 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     { id: 1, color: '#95a5a6', label: t('terrain.tex_rock') },
     { id: 2, color: '#8d6e63', label: t('terrain.tex_dirt') },
     { id: 3, color: '#f4a460', label: t('terrain.tex_sand') },
+    { id: 'custom', color: '#9b59b6', label: 'Смесь' },
   ];
 
   const foliageZones: { id: FoliageZoneChannel; icon: string; label: string; color: string }[] = [
@@ -177,48 +200,101 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
 
       {/* Выбор текстуры грунта */}
       {tool === 'paint' && (
-        <div>
-          <div
-            style={{
-              fontSize: '11px',
-              color: '#bdc3c7',
-              marginBottom: '8px',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-            }}
-          >
-            {t('terrain.textures')}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <div
+              style={{
+                fontSize: '11px',
+                color: '#bdc3c7',
+                marginBottom: '8px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+              }}
+            >
+              {t('terrain.textures')}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+              {textures.map((tex) => (
+                <button
+                  key={tex.id}
+                  onClick={() => setTexture(tex.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px',
+                    backgroundColor: texture === tex.id ? '#222' : '#1a1a1a',
+                    color: '#fff',
+                    border: texture === tex.id ? `2px solid ${tex.color}` : '1px solid #333',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '12px',
+                      height: '12px',
+                      backgroundColor: tex.color,
+                      borderRadius: '2px',
+                    }}
+                  />
+                  <span>{tex.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            {textures.map((tex) => (
-              <button
-                key={tex.id}
-                onClick={() => setTexture(tex.id)}
+
+          {/* Настройка пропорций кастомной смеси */}
+          {texture === 'custom' && (
+            <div
+              style={{
+                backgroundColor: '#1b1b1b',
+                padding: '10px',
+                borderRadius: '6px',
+                border: '1px solid #333',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px',
-                  backgroundColor: texture === tex.id ? '#222' : '#1a1a1a',
-                  color: '#fff',
-                  border: texture === tex.id ? `2px solid ${tex.color}` : '1px solid #333',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
+                  fontSize: '10px',
+                  color: '#9b59b6',
+                  fontWeight: 'bold',
+                  textTransform: 'uppercase',
+                  marginBottom: '4px',
                 }}
               >
-                <div
-                  style={{
-                    width: '12px',
-                    height: '12px',
-                    backgroundColor: tex.color,
-                    borderRadius: '2px',
-                  }}
-                />
-                <span>{tex.label}</span>
-              </button>
-            ))}
-          </div>
+                Пропорции смеси
+              </div>
+              {textures.slice(0, 4).map((tex, i) => (
+                <div key={tex.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', width: '50px', color: '#bdc3c7' }}>
+                    {tex.label}
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={customTextureMix[i]}
+                    onChange={(e) => {
+                      const newMix = [...customTextureMix] as [number, number, number, number];
+                      newMix[i] = Number(e.target.value);
+                      setCustomTextureMix(newMix);
+                    }}
+                    style={{ flex: 1, accentColor: tex.color, cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{ fontSize: '10px', color: '#888', width: '24px', textAlign: 'right' }}
+                  >
+                    {customTextureMix[i]}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -44,13 +44,14 @@ export type PlacementMode =
 export type TerrainToolType =
   'raise' | 'lower' | 'flatten' | 'smooth' | 'hills' | 'paint' | 'foliage' | 'clear_foliage';
 
-export type TerrainTextureChannel = 0 | 1 | 2 | 3; // R: Grass, G: Rock, B: Dirt, A: Sand
+export type TerrainTextureChannel = 0 | 1 | 2 | 3 | 'custom'; // R: Grass, G: Rock, B: Dirt, A: Sand
 export type FoliageZoneChannel = 0 | 1 | 2 | 3 | 4; // 0: Grass, 1: Wheat, 2: Reeds, 3: Dry Grass, 4: Flowers
 
 export interface TerrainBrushState {
   active: boolean;
   tool: TerrainToolType;
   texture: TerrainTextureChannel;
+  customTextureMix: [number, number, number, number];
   foliageZone: FoliageZoneChannel;
   radius: number;
   strength: number;

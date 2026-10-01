@@ -122,34 +122,38 @@ export class TerrainBrushController {
             const amount = strength * smoothFalloff * dt;
             const idx = z * splatRes + x;
             const sIdx = idx * 4;
-            const targetChannel = state.texture;
-            const paintAmount = amount * 180;
 
-            const oldVal = splatData[sIdx + targetChannel];
-            const newVal = Math.min(255, oldVal + paintAmount);
-            const added = newVal - oldVal;
+            // Расчет целевых пропорций для смешивания (в сумме 1.0)
+            let targetRatios = [0, 0, 0, 0];
+            if (state.texture === 'custom') {
+              const sum = state.customTextureMix.reduce((a, b) => a + b, 0) || 1;
+              targetRatios = state.customTextureMix.map((v) => v / sum);
+            } else {
+              targetRatios[state.texture as number] = 1.0;
+            }
 
-            if (added > 0) {
-              splatData[sIdx + targetChannel] = newVal;
+            // Чем больше amount, тем ближе цвет пикселя станет к targetRatios
+            const paintFactor = Math.min(1.0, amount * 2.0);
+            let localModified = false;
 
-              let otherSum = 0;
-              for (let c = 0; c < 4; c++) {
-                if (c !== targetChannel) otherSum += splatData[sIdx + c];
+            for (let c = 0; c < 4; c++) {
+              const current = splatData[sIdx + c];
+              const target = targetRatios[c] * 255.0;
+              const newVal = Math.round(current + (target - current) * paintFactor);
+
+              if (current !== newVal) {
+                splatData[sIdx + c] = newVal;
+                localModified = true;
               }
+            }
 
-              if (otherSum > 0) {
-                const subtractRatio = Math.max(0, otherSum - added) / otherSum;
-                for (let c = 0; c < 4; c++) {
-                  if (c !== targetChannel) {
-                    splatData[sIdx + c] = Math.round(splatData[sIdx + c] * subtractRatio);
-                  }
-                }
-              }
-
+            if (localModified) {
+              // Гарантируем, что сумма всегда равна ровно 255 (защита от погрешностей округления)
               let total =
                 splatData[sIdx] + splatData[sIdx + 1] + splatData[sIdx + 2] + splatData[sIdx + 3];
-              if (total === 0) splatData[sIdx] = 255;
-              else if (total !== 255) {
+              if (total === 0) {
+                splatData[sIdx] = 255;
+              } else if (total !== 255) {
                 const r = 255 / total;
                 splatData[sIdx] = Math.round(splatData[sIdx] * r);
                 splatData[sIdx + 1] = Math.round(splatData[sIdx + 1] * r);
