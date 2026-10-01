@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { GameApp } from '../../GameApp';
-import { TerrainToolType, TerrainTextureChannel } from '../../types';
+import { TerrainToolType, TerrainTextureChannel, BrushShape } from '../../types';
 import { t } from '../../locales';
 
 import { FoliageZoneChannel } from '../../types';
@@ -34,6 +34,14 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     return [25, 25, 25, 25]; // Значения по умолчанию
   });
   const [foliageZone, setFoliageZone] = useState<FoliageZoneChannel>(0);
+  const [shape, setShape] = useState<BrushShape>(() => {
+    const saved = localStorage.getItem('terrain_brush_shape');
+    return saved === 'square' ? 'square' : 'circle';
+  });
+  const [rotation, setRotation] = useState<number>(() => {
+    const saved = localStorage.getItem('terrain_brush_rotation');
+    return saved !== null ? Number(saved) : 0;
+  });
   const [radius, setRadius] = useState(() => {
     const saved = localStorage.getItem('terrain_brush_radius');
     return saved !== null ? Number(saved) : 3.0;
@@ -67,6 +75,14 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
     localStorage.setItem('terrain_brush_custom_mix', JSON.stringify(customTextureMix));
   }, [customTextureMix]);
 
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_shape', shape);
+  }, [shape]);
+
+  useEffect(() => {
+    localStorage.setItem('terrain_brush_rotation', rotation.toString());
+  }, [rotation]);
+
   // Синхронизация локального состояния React со стейтом кисти движка
   useEffect(() => {
     if (!app) return;
@@ -77,6 +93,8 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
       texture,
       customTextureMix,
       foliageZone,
+      shape,
+      rotation,
       radius,
       strength,
       hillSize,
@@ -87,7 +105,19 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
       app.selection.clear();
       app.gizmo.cancelDrag();
     }
-  }, [app, active, tool, texture, customTextureMix, foliageZone, radius, strength, hillSize]);
+  }, [
+    app,
+    active,
+    tool,
+    texture,
+    customTextureMix,
+    foliageZone,
+    shape,
+    rotation,
+    radius,
+    strength,
+    hillSize,
+  ]);
 
   // Выключение режима при закрытии вкладки или размонтировании
   useEffect(() => {
@@ -338,6 +368,114 @@ export const TerrainDock: React.FC<{ app?: GameApp | null }> = ({ app }) => {
           </div>
         </div>
       )}
+
+      {/* Форма кисти: Круг / Квадрат */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div
+          style={{
+            fontSize: '11px',
+            color: '#bdc3c7',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+          }}
+        >
+          Форма кисти
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button
+            type="button"
+            onClick={() => setShape('circle')}
+            style={{
+              flex: 1,
+              padding: '6px',
+              backgroundColor: shape === 'circle' ? '#2980b9' : '#222',
+              color: '#fff',
+              border: shape === 'circle' ? '1px solid #3498db' : '1px solid #444',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: shape === 'circle' ? 'bold' : 'normal',
+            }}
+          >
+            ⚪ Круг
+          </button>
+          <button
+            type="button"
+            onClick={() => setShape('square')}
+            style={{
+              flex: 1,
+              padding: '6px',
+              backgroundColor: shape === 'square' ? '#2980b9' : '#222',
+              color: '#fff',
+              border: shape === 'square' ? '1px solid #3498db' : '1px solid #444',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '11px',
+              fontWeight: shape === 'square' ? 'bold' : 'normal',
+            }}
+          >
+            ⬛ Квадрат
+          </button>
+        </div>
+
+        {/* Угол поворота квадрата */}
+        {shape === 'square' && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              fontSize: '12px',
+              color: '#bdc3c7',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Угол поворота:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <input
+                  type="number"
+                  min="0"
+                  max="90"
+                  step="1"
+                  value={Math.round(rotation)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    setRotation(isNaN(val) ? 0 : val);
+                  }}
+                  onBlur={() => setRotation((prev) => Math.max(0, Math.min(90, prev)))}
+                  style={{
+                    width: '56px',
+                    backgroundColor: '#111',
+                    border: '1px solid #444',
+                    borderRadius: '3px',
+                    color: '#9b59b6',
+                    fontWeight: 'bold',
+                    fontSize: '11px',
+                    padding: '2px 4px',
+                    textAlign: 'right',
+                  }}
+                />
+                <span style={{ color: '#9b59b6', fontWeight: 'bold' }}>°</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="90"
+              step="1"
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                accentColor: '#9b59b6',
+                cursor: 'pointer',
+                margin: 0,
+              }}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Ползунки Радиуса, Интенсивности и Размера холмов */}
       <div

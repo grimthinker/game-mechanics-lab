@@ -16,6 +16,43 @@ function fastHash(x: number, z: number, seed: number): number {
   return h / 4294967296.0;
 }
 
+function getBrushFalloff(
+  wX: number,
+  wZ: number,
+  centerX: number,
+  centerZ: number,
+  radius: number,
+  shape: 'circle' | 'square',
+  rotDeg: number
+): { inBrush: boolean; falloff: number } {
+  const dx = wX - centerX;
+  const dz = wZ - centerZ;
+
+  if (shape === 'square') {
+    const rad = (-rotDeg * Math.PI) / 180;
+    const cosA = Math.cos(rad);
+    const sinA = Math.sin(rad);
+
+    // Вращение точки в локальную систему координат квадрата
+    const rx = dx * cosA - dz * sinA;
+    const rz = dx * sinA + dz * cosA;
+
+    const maxCoord = Math.max(Math.abs(rx), Math.abs(rz));
+    if (maxCoord <= radius) {
+      const t = 1.0 - maxCoord / radius;
+      return { inBrush: true, falloff: t * t * (3.0 - 2.0 * t) };
+    }
+    return { inBrush: false, falloff: 0 };
+  } else {
+    const dist = Math.hypot(dx, dz);
+    if (dist <= radius) {
+      const t = 1.0 - dist / radius;
+      return { inBrush: true, falloff: t * t * (3.0 - 2.0 * t) };
+    }
+    return { inBrush: false, falloff: 0 };
+  }
+}
+
 export class TerrainBrushController {
   public static applyBrush(
     terrainComp: TerrainComponent,
@@ -28,14 +65,19 @@ export class TerrainBrushController {
     const { width, depth, resolution, heights, splatData } = terrainComp;
     const radius = state.radius;
     const strength = state.strength;
+    const shape = state.shape || 'circle';
+    const rotation = state.rotation || 0;
 
     if (!terrainComp.dirtyChunks) terrainComp.dirtyChunks = new Set<string>();
 
+    // Для квадрата диагональ равна radius * sqrt(2) ≈ radius * 1.42
+    const checkRadius = shape === 'square' ? radius * 1.42 : radius;
+
     // Добавление затронутых чанков в сет для инкрементального обновления
-    const minCX = Math.floor((worldX - radius + width / 2) / 32);
-    const maxCX = Math.floor((worldX + radius + width / 2) / 32);
-    const minCZ = Math.floor((worldZ - radius + depth / 2) / 32);
-    const maxCZ = Math.floor((worldZ + radius + depth / 2) / 32);
+    const minCX = Math.floor((worldX - checkRadius + width / 2) / 32);
+    const maxCX = Math.floor((worldX + checkRadius + width / 2) / 32);
+    const minCZ = Math.floor((worldZ - checkRadius + depth / 2) / 32);
+    const maxCZ = Math.floor((worldZ + checkRadius + depth / 2) / 32);
 
     for (let cz = minCZ; cz <= maxCZ; cz++) {
       for (let cx = minCX; cx <= maxCX; cx++) {
@@ -50,7 +92,9 @@ export class TerrainBrushController {
       const splatCellSizeZ = depth / (splatRes - 1);
       const gridX = Math.round((worldX + width / 2) / splatCellSizeX);
       const gridZ = Math.round((worldZ + depth / 2) / splatCellSizeZ);
-      const cellRadius = Math.ceil(Math.max(radius / splatCellSizeX, radius / splatCellSizeZ));
+      const cellRadius = Math.ceil(
+        Math.max(checkRadius / splatCellSizeX, checkRadius / splatCellSizeZ)
+      );
 
       const foliageData = terrainComp.foliageData;
       let modified = false;
@@ -63,11 +107,17 @@ export class TerrainBrushController {
 
           const wX = x * splatCellSizeX - width / 2;
           const wZ = z * splatCellSizeZ - depth / 2;
-          const dist = Math.hypot(wX - worldX, wZ - worldZ);
+          const { inBrush, falloff: smoothFalloff } = getBrushFalloff(
+            wX,
+            wZ,
+            worldX,
+            worldZ,
+            radius,
+            shape,
+            rotation
+          );
 
-          if (dist <= radius) {
-            const t = 1 - dist / radius;
-            const smoothFalloff = t * t * (3 - 2 * t);
+          if (inBrush) {
             const delta = strength * smoothFalloff * dt * 255;
             const idx = (z * splatRes + x) * 5 + targetChannel;
             const oldVal = foliageData[idx];
@@ -103,7 +153,9 @@ export class TerrainBrushController {
       const splatCellSizeZ = depth / (splatRes - 1);
       const gridX = Math.round((worldX + width / 2) / splatCellSizeX);
       const gridZ = Math.round((worldZ + depth / 2) / splatCellSizeZ);
-      const cellRadius = Math.ceil(Math.max(radius / splatCellSizeX, radius / splatCellSizeZ));
+      const cellRadius = Math.ceil(
+        Math.max(checkRadius / splatCellSizeX, checkRadius / splatCellSizeZ)
+      );
 
       let modified = false;
 
@@ -113,12 +165,17 @@ export class TerrainBrushController {
 
           const wX = x * splatCellSizeX - width / 2;
           const wZ = z * splatCellSizeZ - depth / 2;
-          const dist = Math.hypot(wX - worldX, wZ - worldZ);
+          const { inBrush, falloff: smoothFalloff } = getBrushFalloff(
+            wX,
+            wZ,
+            worldX,
+            worldZ,
+            radius,
+            shape,
+            rotation
+          );
 
-          if (dist <= radius) {
-            // Кубический спад Smoothstep (3t^2 - 2t^3) для идеально круглого и бесшовного пятна кисти
-            const t = 1 - dist / radius;
-            const smoothFalloff = t * t * (3 - 2 * t);
+          if (inBrush) {
             const amount = strength * smoothFalloff * dt;
             const idx = z * splatRes + x;
             const sIdx = idx * 4;
@@ -179,7 +236,7 @@ export class TerrainBrushController {
     const cellSizeZ = 1.0;
     const gridX = Math.round((worldX + width / 2) / cellSizeX);
     const gridZ = Math.round((worldZ + depth / 2) / cellSizeZ);
-    const cellRadius = Math.ceil(radius);
+    const cellRadius = Math.ceil(checkRadius);
 
     let modified = false;
 
@@ -198,12 +255,17 @@ export class TerrainBrushController {
 
         const wX = x * cellSizeX - width / 2;
         const wZ = z * cellSizeZ - depth / 2;
-        const dist = Math.hypot(wX - worldX, wZ - worldZ);
+        const { inBrush, falloff: smoothFalloff } = getBrushFalloff(
+          wX,
+          wZ,
+          worldX,
+          worldZ,
+          radius,
+          shape,
+          rotation
+        );
 
-        if (dist <= radius) {
-          // Кубический спад Smoothstep для мягких холмов и впадин без острых конусов
-          const t = 1 - dist / radius;
-          const smoothFalloff = t * t * (3 - 2 * t);
+        if (inBrush) {
           const amount = strength * smoothFalloff * dt;
           const idx = z * resolution + x;
 

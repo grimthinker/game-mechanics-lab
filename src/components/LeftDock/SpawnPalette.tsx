@@ -19,6 +19,7 @@ import {
   createCratePropConfig,
   createBridgeConfig,
   createLampPostConfig,
+  createWellConfig,
 } from '../../ecs/archetypes/ObstacleArchetype';
 import { createWaterConfig } from '../../ecs/archetypes/WaterArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
@@ -512,6 +513,13 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           id: 'buildings',
           title: t('palette.subgroupBuildings'),
           items: [
+            {
+              id: 'obstacle_well',
+              name: 'Колодец',
+              description: 'Каменный колодец с деревянным воротом и навесом',
+              icon: '🪣',
+              createConfig: () => createWellConfig(),
+            },
             {
               id: 'obstacle_house',
               name: t('palette.house'),

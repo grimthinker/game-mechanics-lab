@@ -41,6 +41,7 @@ const PROCEDURAL_PROP_SCALES: Record<
   'proc://prop/tree_3': { baseRadius: 0.8, baseHeight: 4.8, baseWidth: 1.6, baseDepth: 1.6 },
   'proc://prop/tree_spruce': { baseRadius: 1.85, baseHeight: 4.2, baseWidth: 3.7, baseDepth: 3.7 },
   'proc://prop/tree_pine': { baseRadius: 1.4, baseHeight: 5.2, baseWidth: 2.8, baseDepth: 2.8 },
+  'proc://prop/well': { baseRadius: 1.15, baseHeight: 2.6, baseWidth: 2.3, baseDepth: 2.3 },
   'proc://prop/signpost': { baseRadius: 0.4, baseHeight: 2.1, baseWidth: 0.8, baseDepth: 0.8 },
   'proc://prop/signpost_single': {
     baseRadius: 0.4,
@@ -388,11 +389,13 @@ export class ThreeSyncSystem {
             const physStats = world.getComponent(id, 'physicsStats');
             const visual = world.getComponent(id, 'visualModel');
             const propScale = visual?.modelId ? PROCEDURAL_PROP_SCALES[visual.modelId] : undefined;
+            const isTree = tag?.subType === 'tree' || visual?.modelId?.includes('tree');
 
             let curW = (physStats?.radius.current ?? 1.0) * 2;
             let curD = (physStats?.radius.current ?? 1.0) * 2;
 
-            if (physStats?.points && physStats.points.length > 0) {
+            // Для деревьев используем радиус кроны (radius), чтобы узкий ствол в points не сжимал крону
+            if (!isTree && physStats?.points && physStats.points.length > 0) {
               let minX = physStats.points[0].x,
                 maxX = physStats.points[0].x;
               let minY = physStats.points[0].y,

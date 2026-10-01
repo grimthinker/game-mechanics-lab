@@ -36,6 +36,8 @@ export class ProceduralPropManager {
       prop = this.buildSpruce();
     } else if (name === 'tree_pine') {
       prop = this.buildPine();
+    } else if (name === 'well') {
+      prop = this.buildWell();
     } else if (name === 'signpost') {
       prop = this.buildSignpost();
     } else if (name === 'signpost_single') {
@@ -267,22 +269,21 @@ export class ProceduralPropManager {
       flatShading: true,
     });
 
-    // 1. Двухцветный 8-гранный граненый ствол (светлый низ, темный верх под кроной)
-    const trunkLowerGeo = new THREE.CylinderGeometry(0.22, 0.26, 0.55, 8).toNonIndexed();
+    // 1. Двухцветный 8-гранный ствол
+    const trunkLowerGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.55, 8).toNonIndexed();
     trunkLowerGeo.computeVertexNormals();
     const trunkLower = new THREE.Mesh(trunkLowerGeo, barkMat);
     trunkLower.position.set(0, 0.275, 0);
     trunkLower.rotation.y = Math.PI / 8;
     group.add(trunkLower);
 
-    const trunkUpperGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.55, 8).toNonIndexed();
+    const trunkUpperGeo = new THREE.CylinderGeometry(0.2, 0.24, 0.55, 8).toNonIndexed();
     trunkUpperGeo.computeVertexNormals();
     const trunkUpper = new THREE.Mesh(trunkUpperGeo, barkShadowMat);
     trunkUpper.position.set(0, 0.75, 0);
     trunkUpper.rotation.y = Math.PI / 8;
     group.add(trunkUpper);
 
-    // Вспомогательная функция сборки 8-гранного многогранника хвои
     const createFacetedTier = (radius: number, height: number, bottomY: number) => {
       const geo = new THREE.ConeGeometry(radius, height, 8).toNonIndexed();
       geo.computeVertexNormals();
@@ -292,15 +293,212 @@ export class ProceduralPropManager {
       return mesh;
     };
 
-    // 2. 3 широких яруса хвои (нижний широкий, средний переходный, верхний остроконечный)
-    const tierBottom = createFacetedTier(1.85, 1.25, 0.75);
+    // 2. Расширенные объемные ярусы хвои
+    const tierBottom = createFacetedTier(2.1, 1.35, 0.75);
     group.add(tierBottom);
 
-    const tierMid = createFacetedTier(1.45, 1.35, 1.55);
+    const tierMid = createFacetedTier(1.65, 1.45, 1.55);
     group.add(tierMid);
 
-    const tierTop = createFacetedTier(0.95, 1.85, 2.35);
+    const tierTop = createFacetedTier(1.1, 1.95, 2.35);
     group.add(tierTop);
+
+    return group;
+  }
+
+  /** Колодец: низкополигональный средневековый каменный колодец с деревянным воротом и синей крышей */
+  private buildWell(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'WellRoot';
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0x7e858f,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const stoneDarkMat = new THREE.MeshStandardMaterial({
+      color: 0x5d636c,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x54331a,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const roofBlueMat = new THREE.MeshStandardMaterial({
+      color: 0x1d4ed8,
+      roughness: 0.55,
+      flatShading: true,
+    });
+    const ropeMat = new THREE.MeshStandardMaterial({
+      color: 0xd97706,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0xd1d5db,
+      metalness: 0.75,
+      roughness: 0.35,
+      flatShading: true,
+    });
+    const waterVoidMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      roughness: 0.2,
+      flatShading: true,
+    });
+
+    const segments = 8;
+
+    // 1. Нижнее расширенное каменное кольцо основания
+    const baseBottomGeo = new THREE.CylinderGeometry(1.0, 1.15, 0.22, segments).toNonIndexed();
+    baseBottomGeo.computeVertexNormals();
+    const baseBottom = new THREE.Mesh(baseBottomGeo, stoneDarkMat);
+    baseBottom.position.set(0, 0.11, 0);
+    group.add(baseBottom);
+
+    // 2. Основной каменный восьмигранный цилиндр сруба
+    const baseMidGeo = new THREE.CylinderGeometry(0.96, 1.0, 0.75, segments).toNonIndexed();
+    baseMidGeo.computeVertexNormals();
+    const baseMid = new THREE.Mesh(baseMidGeo, stoneMat);
+    baseMid.position.set(0, 0.55, 0);
+    group.add(baseMid);
+
+    // 3. Верхний выступающий бортик колодца
+    const baseTopGeo = new THREE.CylinderGeometry(1.08, 1.0, 0.2, segments).toNonIndexed();
+    baseTopGeo.computeVertexNormals();
+    const baseTop = new THREE.Mesh(baseTopGeo, stoneDarkMat);
+    baseTop.position.set(0, 0.95, 0);
+    group.add(baseTop);
+
+    // Внутренняя водная гладь/пустота колодца
+    const waterSurface = new THREE.Mesh(new THREE.CircleGeometry(0.85, segments), waterVoidMat);
+    waterSurface.rotation.x = -Math.PI / 2;
+    waterSurface.position.set(0, 0.88, 0);
+    group.add(waterSurface);
+
+    // Боковые деревянные накладные доски на каменном срубе с металлическим ромбом
+    [-1, 1].forEach((sign) => {
+      const plank = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.85, 0.06), woodMat);
+      plank.position.set(0, 0.55, sign * 1.02);
+      group.add(plank);
+
+      const diamond = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.08), metalMat);
+      diamond.rotation.z = Math.PI / 4;
+      diamond.position.set(0, 0.6, sign * 1.03);
+      group.add(diamond);
+    });
+
+    // Перекрывающие колодец доски
+    const plank1 = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.05, 0.26), woodMat);
+    plank1.position.set(0.1, 1.06, 0.05);
+    plank1.rotation.y = 0.25;
+    group.add(plank1);
+
+    const plank2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.05, 0.22), woodMat);
+    plank2.position.set(-0.15, 1.07, -0.2);
+    plank2.rotation.y = -0.3;
+    group.add(plank2);
+
+    // 4. Деревянные вертикальные стойки с Y-образными ветвями-распорками
+    [-0.9, 0.9].forEach((px) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.55, 0.18), woodMat);
+      post.position.set(px, 1.65, 0);
+      group.add(post);
+
+      // Y-образные распорки под крышей
+      const strutL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.12), woodMat);
+      strutL.position.set(px, 2.3, -0.16);
+      strutL.rotation.x = -0.65;
+      group.add(strutL);
+
+      const strutR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.45, 0.12), woodMat);
+      strutR.position.set(px, 2.3, 0.16);
+      strutR.rotation.x = 0.65;
+      group.add(strutR);
+    });
+
+    // 5. Поперечный ворот с барабаном и намотанной веревкой
+    const axle = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.08, 0.08), metalMat);
+    axle.position.set(0, 1.85, 0);
+    group.add(axle);
+
+    // Барабан с веревкой (золотисто-рыжий)
+    const drum = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.45, 8).toNonIndexed(),
+      ropeMat
+    );
+    drum.rotation.z = Math.PI / 2;
+    drum.position.set(0, 1.85, 0);
+    group.add(drum);
+
+    // Свисающий хвост веревки
+    const hangingRope = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.6, 4), ropeMat);
+    hangingRope.position.set(0.08, 1.5, 0.08);
+    group.add(hangingRope);
+
+    // Рукоять ворота (Stick / Crank)
+    const crankArm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.35, 0.05), metalMat);
+    crankArm.position.set(-1.03, 1.75, 0);
+    group.add(crankArm);
+
+    const crankHandle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.05), woodMat);
+    crankHandle.position.set(-1.12, 1.6, 0);
+    group.add(crankHandle);
+
+    // 6. Двускатная синяя крыша с деревянными фронтонами
+    const roofBeam = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.12, 0.12), woodMat);
+    roofBeam.position.set(0, 2.85, 0);
+    group.add(roofBeam);
+
+    // Деревянные торцевые карнизные треугольники фронтона
+    [-1.0, 1.0].forEach((px) => {
+      const gableR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 1.3), woodMat);
+      gableR.position.set(px, 2.45, 0.42);
+      gableR.rotation.x = 0.65;
+      group.add(gableR);
+
+      const gableL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 1.3), woodMat);
+      gableL.position.set(px, 2.45, -0.42);
+      gableL.rotation.x = -0.65;
+      group.add(gableL);
+    });
+
+    // Два ската синей крыши
+    const slopeFront = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.08, 1.15), roofBlueMat);
+    slopeFront.position.set(0, 2.5, 0.45);
+    slopeFront.rotation.x = 0.65;
+    group.add(slopeFront);
+
+    const slopeBack = new THREE.Mesh(new THREE.BoxGeometry(2.15, 0.08, 1.15), roofBlueMat);
+    slopeBack.position.set(0, 2.5, -0.45);
+    slopeBack.rotation.x = -0.65;
+    group.add(slopeBack);
+
+    // 7. Деревянное ведёрко, стоящее на краю колодца
+    const bucketGroup = new THREE.Group();
+    bucketGroup.position.set(0.65, 1.07, 0.35);
+
+    const bucketBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.11, 0.22, 6).toNonIndexed(),
+      woodMat
+    );
+    bucketBody.position.set(0, 0.11, 0);
+    bucketGroup.add(bucketBody);
+
+    const bucketRim = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.145, 0.03, 6), metalMat);
+    bucketRim.position.set(0, 0.2, 0);
+    bucketGroup.add(bucketRim);
+
+    const bucketHandle = new THREE.Mesh(
+      new THREE.TorusGeometry(0.12, 0.015, 4, 8, Math.PI),
+      metalMat
+    );
+    bucketHandle.rotation.z = Math.PI;
+    bucketHandle.position.set(0, 0.22, 0);
+    bucketGroup.add(bucketHandle);
+
+    group.add(bucketGroup);
 
     return group;
   }

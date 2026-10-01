@@ -8,12 +8,13 @@ import { SpawnPalette } from './SpawnPalette';
 import { BTGraph } from '../BTGraph';
 import { AnimationsTab } from './AnimationsTab';
 import { TerrainDock } from './TerrainDock';
+import { PropBrushDock } from './PropBrushDock';
 import { useResizable } from '../../hooks/useResizable';
 import { t } from '../../locales';
 import { BodyStructureType } from '../../ecs/templates';
 import { BBKeyType } from '../../ai/schema';
 
-export type DockTab = 'hierarchy' | 'palette' | 'bt' | 'animations' | 'terrain';
+export type DockTab = 'hierarchy' | 'palette' | 'bt' | 'animations' | 'terrain' | 'props';
 
 export interface LeftDockProps {
   app?: GameApp | null;
@@ -595,6 +596,22 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         >
           {t('dock.terrain')}
         </button>
+        <button
+          onClick={() => setActiveTab('props')}
+          style={{
+            flex: 1,
+            backgroundColor: activeTab === 'props' ? '#252525' : 'transparent',
+            color: activeTab === 'props' ? '#fff' : '#888',
+            border: activeTab === 'props' ? '1px solid #3a3a3a' : '1px solid transparent',
+            borderRadius: '4px',
+            padding: '6px 4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+          }}
+        >
+          {t('dock.props')}
+        </button>
       </div>
 
       {/* Тело вкладки */}
@@ -613,6 +630,8 @@ export const LeftDock: React.FC<LeftDockProps> = ({
         )}
 
         {activeTab === 'terrain' && <TerrainDock app={app} />}
+
+        {activeTab === 'props' && <PropBrushDock app={app} />}
 
         {activeTab === 'palette' && (
           <SpawnPalette

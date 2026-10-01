@@ -146,6 +146,18 @@ export class GameApp {
   public set terrainBrush(val) {
     this.editor.terrainBrush = val;
   }
+  public get propBrush() {
+    return this.editor.propBrush;
+  }
+  public set propBrush(val) {
+    this.editor.propBrush = val;
+  }
+  public get propBrushPresets() {
+    return this.editor.propBrushPresets;
+  }
+  public set propBrushPresets(val) {
+    this.editor.propBrushPresets = val;
+  }
   public get editorSnapshot() {
     return this.editor.editorSnapshot;
   }
@@ -441,6 +453,7 @@ export class GameApp {
         showAIDebug: this.showAIDebug,
         gizmoTool: this.gizmo.tool,
         terrainBrush: this.terrainBrush,
+        propBrush: this.propBrush,
         cursorWorldPos,
         throwTrajectory,
       },

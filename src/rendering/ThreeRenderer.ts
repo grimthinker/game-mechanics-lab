@@ -46,6 +46,8 @@ export class ThreeRenderer implements IRenderer {
   public environmentManager: EnvironmentManager;
   private isDraggingGizmo = false;
   private brushCursor: THREE.Mesh;
+  private circleCursorGeo: THREE.BufferGeometry;
+  private squareCursorGeo: THREE.BufferGeometry;
 
   private raycaster = new THREE.Raycaster();
   private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -151,15 +153,37 @@ export class ThreeRenderer implements IRenderer {
       }
     });
 
-    const brushGeo = new THREE.RingGeometry(0.9, 1.0, 32);
-    brushGeo.rotateX(-Math.PI / 2);
+    // 1. Геометрия круглого курсора (кольцо)
+    this.circleCursorGeo = new THREE.RingGeometry(0.92, 1.0, 48);
+    this.circleCursorGeo.rotateX(-Math.PI / 2);
+
+    // 2. Геометрия квадратного курсора (полая квадратная рамка на плоскости XZ)
+    const squareShape = new THREE.Shape();
+    squareShape.moveTo(-1, -1);
+    squareShape.lineTo(1, -1);
+    squareShape.lineTo(1, 1);
+    squareShape.lineTo(-1, 1);
+    squareShape.closePath();
+
+    const squareHole = new THREE.Path();
+    const inEdge = 0.92;
+    squareHole.moveTo(-inEdge, -inEdge);
+    squareHole.lineTo(inEdge, -inEdge);
+    squareHole.lineTo(inEdge, inEdge);
+    squareHole.lineTo(-inEdge, inEdge);
+    squareHole.closePath();
+    squareShape.holes.push(squareHole);
+
+    this.squareCursorGeo = new THREE.ShapeGeometry(squareShape);
+    this.squareCursorGeo.rotateX(-Math.PI / 2);
+
     this.brushCursor = new THREE.Mesh(
-      brushGeo,
+      this.circleCursorGeo,
       new THREE.MeshBasicMaterial({
         color: 0xf39c12,
         transparent: true,
-        opacity: 0.8,
-        depthTest: false, // Чтобы кольцо было видно сквозь неровности
+        opacity: 0.85,
+        depthTest: false,
         side: THREE.DoubleSide,
       })
     );
@@ -317,6 +341,9 @@ export class ThreeRenderer implements IRenderer {
   }
 
   public destroy(): void {
+    if (this.circleCursorGeo) this.circleCursorGeo.dispose();
+    if (this.squareCursorGeo) this.squareCursorGeo.dispose();
+
     if (this.depthRenderTarget) {
       this.depthRenderTarget.dispose();
       if (this.depthRenderTarget.depthTexture) {
@@ -414,24 +441,47 @@ export class ThreeRenderer implements IRenderer {
       this.transformControl.detach();
     }
 
-    // Отрисовка 3D-курсора кисти террейна
-    if (context.editorData.terrainBrush?.active && context.editorData.cursorWorldPos) {
+    // Отрисовка 3D-курсора кистей (Ландшафт и Флора)
+    const tBrush = context.editorData.terrainBrush;
+    const pBrush = context.editorData.propBrush;
+    const cursorWorldPos = context.editorData.cursorWorldPos;
+
+    if (cursorWorldPos && (tBrush?.active || pBrush?.active)) {
       this.brushCursor.visible = true;
-      this.brushCursor.position.set(
-        context.editorData.cursorWorldPos.x,
-        context.editorData.cursorWorldPos.y + 0.1,
-        context.editorData.cursorWorldPos.z
-      );
-      const r = context.editorData.terrainBrush.radius;
+      this.brushCursor.position.set(cursorWorldPos.x, cursorWorldPos.y + 0.1, cursorWorldPos.z);
+
+      const isProp = Boolean(pBrush?.active);
+      const activeBrush = isProp ? pBrush! : tBrush!;
+      const r = activeBrush.radius;
       this.brushCursor.scale.set(r, r, r);
 
-      const bTool = context.editorData.terrainBrush.tool;
-      let brushColorHex = 0xf39c12; // Скульпт высоты (оранжевый)
-      if (bTool === 'paint')
-        brushColorHex = 0x3498db; // Текстура грунта (синий)
-      else if (bTool === 'foliage')
-        brushColorHex = 0x2ecc71; // Посадка травы (зеленый)
-      else if (bTool === 'clear_foliage') brushColorHex = 0xe74c3c; // Очистка травы (красный)
+      // Переключение геометрии: Круг / Квадрат
+      const isSquare = activeBrush.shape === 'square';
+      const targetGeo = isSquare ? this.squareCursorGeo : this.circleCursorGeo;
+      if (this.brushCursor.geometry !== targetGeo) {
+        this.brushCursor.geometry = targetGeo;
+      }
+
+      // Поворот квадрата на заданный угол вокруг вертикальной оси Y
+      const rotAngleRad = isSquare ? (-(activeBrush.rotation || 0) * Math.PI) / 180 : 0;
+      this.brushCursor.rotation.set(0, rotAngleRad, 0);
+
+      // Определение цвета курсора
+      let brushColorHex = 0xf39c12;
+      if (isProp) {
+        if (pBrush!.mode === 'erase') {
+          brushColorHex = 0xe74c3c; // Красный (Ластик объектов)
+        } else {
+          brushColorHex = 0x9b59b6; // Фиолетовый (Посадка объектов)
+        }
+      } else {
+        const bTool = tBrush!.tool;
+        if (bTool === 'paint')
+          brushColorHex = 0x3498db; // Текстура грунта (синий)
+        else if (bTool === 'foliage')
+          brushColorHex = 0x2ecc71; // Посадка травы (зеленый)
+        else if (bTool === 'clear_foliage') brushColorHex = 0xe74c3c; // Очистка травы (красный)
+      }
 
       (this.brushCursor.material as THREE.MeshBasicMaterial).color.setHex(brushColorHex);
     } else {

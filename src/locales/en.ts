@@ -145,6 +145,7 @@ export const en = {
     bt: 'Behavior Tree',
     animations: 'Animations',
     terrain: 'Terrain',
+    props: 'Props',
     noAnimations: 'Selected entity has no rigged animations',
     selectCreaturePrompt: 'Select a creature on stage to view its animations',
     searchAnimationsPlaceholder: 'Search animations...',

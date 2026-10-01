@@ -8,7 +8,7 @@ import { CommandHistory } from '../history/CommandHistory';
 import { TransactionBuilder } from '../history/TransactionBuilder';
 import { EntitySnapshotCommand } from '../history/commands/EntitySnapshotCommand';
 import { SerializedWorldData, SerializedEntityData } from '../ecs/WorldSerializer';
-import { TerrainBrushState } from '../types';
+import { TerrainBrushState, PropBrushState, PropBrushPreset } from '../types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { GameMode } from '../config/gameConfig';
 
@@ -25,11 +25,26 @@ export class EditorInteractionManager {
     active: false,
     tool: 'raise',
     texture: 0,
+    customTextureMix: [25, 25, 25, 25],
     foliageZone: 0,
+    shape: 'circle',
+    rotation: 0,
     radius: 3.0,
     strength: 2.0,
     hillSize: 18.0,
   };
+
+  public propBrush: PropBrushState = {
+    active: false,
+    mode: 'paint',
+    shape: 'circle',
+    rotation: 0,
+    radius: 5.0,
+    density: 0.5,
+    minDistance: 2.0,
+    activePresetId: null,
+  };
+  public propBrushPresets: PropBrushPreset[] = []; // Заполняется из компонента UI
 
   private baseStateForCommit: SerializedEntityData[] = [];
   private baseSelectionForCommit = { id: null as string | null, ids: [] as string[] };

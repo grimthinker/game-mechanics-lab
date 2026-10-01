@@ -24,6 +24,44 @@ import { fastClone } from '../utils/clone';
 import { buildObstacleColliders } from '../utils/obstacleColliders';
 export { buildObstacleColliders };
 
+export function createWellConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const radius = 1.15;
+  const height = 2.6;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'building' },
+    meta: { name: 'Колодец', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/well' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius,
+      height,
+      weight: 2500,
+      isSolid: true,
+      points: createRectanglePoints(radius * 2, radius * 2),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: 0.5,
+          radius: 1.1,
+          offset: { x: 0, y: 0.5, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 800,
+      hp: 800,
+      destructible: true,
+    },
+  };
+}
+
 export function createHouseConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
   const width = 5.0;
   const depth = 5.4;

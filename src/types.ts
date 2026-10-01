@@ -47,13 +47,44 @@ export type TerrainToolType =
 export type TerrainTextureChannel = 0 | 1 | 2 | 3 | 'custom'; // R: Grass, G: Rock, B: Dirt, A: Sand
 export type FoliageZoneChannel = 0 | 1 | 2 | 3 | 4; // 0: Grass, 1: Wheat, 2: Reeds, 3: Dry Grass, 4: Flowers
 
+export type BrushShape = 'circle' | 'square';
+
 export interface TerrainBrushState {
   active: boolean;
   tool: TerrainToolType;
   texture: TerrainTextureChannel;
   customTextureMix: [number, number, number, number];
   foliageZone: FoliageZoneChannel;
+  shape: BrushShape;
+  rotation: number; // В градусах (0-90)
   radius: number;
   strength: number;
   hillSize: number;
+}
+
+export interface PropBrushItem {
+  propId: string;
+  weight: number;
+  scaleMin: Vec3;
+  scaleMax: Vec3;
+  rotMin: Vec3; // В градусах
+  rotMax: Vec3; // В градусах
+  offsetY?: number; // Смещение по высоте в метрах (заглубление в грунт)
+}
+
+export interface PropBrushPreset {
+  id: string;
+  name: string;
+  items: PropBrushItem[];
+}
+
+export interface PropBrushState {
+  active: boolean;
+  mode: 'paint' | 'erase';
+  shape: BrushShape;
+  rotation: number; // В градусах (0-90)
+  radius: number;
+  density: number; // Вероятность спавна за тик (0.1 - 1.0)
+  minDistance: number; // Минимальная дистанция между объектами
+  activePresetId: string | null;
 }

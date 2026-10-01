@@ -146,6 +146,7 @@ export const ru = {
     bt: 'Дерево (BT)',
     animations: 'Анимации',
     terrain: 'Террейн',
+    props: 'Пропсы',
     noAnimations: 'У выбранного объекта нет скелета с анимациями',
     selectCreaturePrompt: 'Выберите существо на сцене для просмотра списка анимаций',
     searchAnimationsPlaceholder: 'Поиск анимаций...',

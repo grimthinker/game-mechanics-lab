@@ -14,6 +14,10 @@ import { PieMenuState } from '../components/PieMenu/types';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { useDragDrop } from '../dnd/DragDropContext';
 import { CREATURE_BLUEPRINTS } from '../ecs/templates';
+import { getPropRegistry } from '../editor/PropRegistry';
+import { deg2Rad } from '../utils';
+import { SerializedEntityData } from '../ecs/WorldSerializer';
+import { EntitySnapshotCommand } from '../history/commands/EntitySnapshotCommand';
 import { getRootOwner } from '../ecs/utils/hierarchy';
 import { EventBus } from '../core/EventBus';
 import { TerrainBrushController } from '../editor/TerrainBrushController';
@@ -65,6 +69,19 @@ export const useCanvasInteraction = ({
     isDragging: boolean;
     flattenTarget?: number;
   } | null>(null);
+
+  // Реф для хранения транзакции кисти объектов (Prop Brush)
+  const propBrushStateRef = useRef<{
+    isDragging: boolean;
+    lastSpawnTime: number;
+    spawnedIds: Set<string>;
+    deletedEntitiesData: SerializedEntityData[];
+  }>({
+    isDragging: false,
+    lastSpawnTime: 0,
+    spawnedIds: new Set(),
+    deletedEntitiesData: [],
+  });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -149,7 +166,19 @@ export const useCanvasInteraction = ({
 
       const point = app.getCanvasPoint(e.clientX, e.clientY);
 
-      // В режиме кисти: начинаем мазок
+      // В режиме кисти объектов (Prop Brush): начало мазка
+      if (app.propBrush.active && mode === GameMode.EDITOR) {
+        propBrushStateRef.current = {
+          isDragging: true,
+          lastSpawnTime: performance.now(),
+          spawnedIds: new Set(),
+          deletedEntitiesData: [],
+        };
+        applyPropBrushAtPoint(point);
+        return;
+      }
+
+      // В режиме кисти террейна: начинаем мазок
       if (app.terrainBrush.active && mode === GameMode.EDITOR) {
         const terrains = app.world.getEntitiesWith('terrain');
         if (terrains.length > 0) {
@@ -306,7 +335,18 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Во время движения кистью наносим мазки
+    // Во время движения кистью пропов
+    if (propBrushStateRef.current.isDragging && app.propBrush.active) {
+      const now = performance.now();
+      // Ограничиваем частоту спавна при драге (каждые 80мс)
+      if (now - propBrushStateRef.current.lastSpawnTime > 80) {
+        applyPropBrushAtPoint(point);
+        propBrushStateRef.current.lastSpawnTime = now;
+      }
+      return;
+    }
+
+    // Во время движения кистью террейна наносим мазки
     if (terrainEditStateRef.current?.isDragging && app.terrainBrush.active) {
       const terrains = app.world.getEntitiesWith('terrain');
       if (terrains.length > 0) {
@@ -401,7 +441,34 @@ export const useCanvasInteraction = ({
 
     if (e.button !== 0) return;
 
-    // В момент завершения мазка — формируем команду и отправляем в историю (Undo/Redo)
+    // Завершение мазка кисти объектов (Prop Brush)
+    if (propBrushStateRef.current.isDragging) {
+      propBrushStateRef.current.isDragging = false;
+      const { spawnedIds, deletedEntitiesData } = propBrushStateRef.current;
+
+      if (spawnedIds.size > 0 || deletedEntitiesData.length > 0) {
+        const desc =
+          app.propBrush.mode === 'paint' ? 'Посадка объектов кистью' : 'Удаление объектов ластиком';
+
+        // Создаем After State для спавненных объектов
+        const afterEntities = app.serializer.serializeEntities(Array.from(spawnedIds));
+
+        const cmd = new EntitySnapshotCommand(
+          desc,
+          app,
+          [...Array.from(spawnedIds), ...deletedEntitiesData.map((e) => e.id)],
+          deletedEntitiesData, // В Before State кладем то, что удалили
+          afterEntities, // В After State кладем то, что заспавнили
+          { id: null, ids: [] },
+          { id: null, ids: [] }
+        );
+        app.commandHistory.push(cmd);
+        app.captureBaseState();
+      }
+      return;
+    }
+
+    // В момент завершения мазка террейна — формируем команду и отправляем в историю
     if (terrainEditStateRef.current?.isDragging) {
       terrainEditStateRef.current.isDragging = false;
       const terrains = app.world.getEntitiesWith('terrain');
@@ -602,6 +669,209 @@ export const useCanvasInteraction = ({
         targetEntityIds: [],
       });
     }
+  };
+
+  const applyPropBrushAtPoint = (center: Vec3) => {
+    const app = appRef.current;
+    if (!app || !app.propBrush.activePresetId) return;
+
+    const preset = app.propBrushPresets.find((p) => p.id === app.propBrush.activePresetId);
+    if (!preset || preset.items.length === 0) return;
+
+    const brush = app.propBrush;
+    const r = brush.radius;
+
+    // Получаем список моделей, участвующих в текущем пресете
+    const registry = getPropRegistry();
+    const activeModelIds = new Set(
+      preset.items
+        .map((i) => {
+          const regItem = registry.find((r) => r.id === i.propId);
+          if (!regItem) return null;
+          return regItem.create().visualModel?.modelId;
+        })
+        .filter(Boolean)
+    );
+
+    if (brush.mode === 'erase') {
+      // ЛАСТИК: ищем объекты в пределах формы кисти
+      const entities = app.world.getEntitiesWith('transform', 'visualModel');
+      for (const [eId, { transform, visualModel }] of entities) {
+        if (!activeModelIds.has(visualModel.modelId)) continue;
+
+        const dx = transform.x - center.x;
+        const dz = transform.z - center.z;
+        let inBounds = false;
+
+        if (brush.shape === 'square') {
+          const rad = (-(brush.rotation || 0) * Math.PI) / 180;
+          const cosA = Math.cos(rad);
+          const sinA = Math.sin(rad);
+          const rx = dx * cosA - dz * sinA;
+          const rz = dx * sinA + dz * cosA;
+          inBounds = Math.abs(rx) <= r && Math.abs(rz) <= r;
+        } else {
+          inBounds = Math.hypot(dx, dz) <= r;
+        }
+
+        if (inBounds) {
+          // Сериализуем ПЕРЕД удалением
+          const serialized = app.serializer.serializeEntities([eId])[0];
+          if (serialized) {
+            propBrushStateRef.current.deletedEntitiesData.push(serialized);
+          }
+          app.simulation.deleteEntityRecursive(eId);
+        }
+      }
+      app.syncPhysicsStructures();
+      updateStats();
+      return;
+    }
+
+    // ПОСАДКА:
+    // 1. Проверяем плотность (шанс срабатывания кисти в этот тик)
+    if (Math.random() > brush.density) return;
+
+    // 2. Генерируем случайную точку внутри выбранной формы (круг или повернутый квадрат)
+    let spawnX = center.x;
+    let spawnZ = center.z;
+
+    if (brush.shape === 'square') {
+      const localX = (Math.random() * 2 - 1) * r;
+      const localZ = (Math.random() * 2 - 1) * r;
+      const rad = (-(brush.rotation || 0) * Math.PI) / 180;
+      const cosA = Math.cos(rad);
+      const sinA = Math.sin(rad);
+      spawnX = center.x + (localX * cosA + localZ * sinA);
+      spawnZ = center.z + (-localX * sinA + localZ * cosA);
+    } else {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.sqrt(Math.random()) * r;
+      spawnX = center.x + Math.cos(angle) * dist;
+      spawnZ = center.z + Math.sin(angle) * dist;
+    }
+
+    // 3. Проверка minDistance
+    if (brush.minDistance > 0) {
+      const minDSq = brush.minDistance * brush.minDistance;
+      const entities = app.world.getEntitiesWith('transform', 'physicsStats');
+      for (const [_, { transform }] of entities) {
+        const dx = transform.x - spawnX;
+        const dz = transform.z - spawnZ;
+        if (dx * dx + dz * dz < minDSq) {
+          return; // Слишком близко к другому объекту
+        }
+      }
+    }
+
+    // 4. Выбор элемента из пресета с учетом весов
+    const totalWeight = preset.items.reduce((sum, item) => sum + item.weight, 0);
+    let rand = Math.random() * totalWeight;
+    let selectedItem = preset.items[0];
+    for (const item of preset.items) {
+      if (rand < item.weight) {
+        selectedItem = item;
+        break;
+      }
+      rand -= item.weight;
+    }
+
+    const regItem = registry.find((r) => r.id === selectedItem.propId);
+    if (!regItem) return;
+
+    // 5. Подготовка конфига
+    const config = regItem.create();
+
+    // Получение высоты ландшафта
+    let spawnY = center.y;
+    const terrains = app.world.getEntitiesWith('terrain');
+    if (terrains.length > 0) {
+      const terrainHeight = terrains[0][1].terrain.heights;
+      // Используем движковый рэйкаст или грубое приближение для Y
+      const hit = app.raycastPhysics(0, 0); // Нельзя использовать экранные координаты тут.
+      // Лучше использовать getTerrainHeightAt
+      // Но у нас нет прямого импорта getTerrainHeightAt, так что берем через ECS, или полагаемся на компенсацию:
+    }
+
+    // Применяем случайный поворот по всем 3 осям (Pitch X, Yaw Y, Roll Z)
+    const rotX =
+      selectedItem.rotMin.x + Math.random() * (selectedItem.rotMax.x - selectedItem.rotMin.x);
+    const rotY =
+      selectedItem.rotMin.y + Math.random() * (selectedItem.rotMax.y - selectedItem.rotMin.y);
+    const rotZ =
+      selectedItem.rotMin.z + Math.random() * (selectedItem.rotMax.z - selectedItem.rotMin.z);
+
+    if (config.transform) {
+      const radX = deg2Rad(rotX);
+      const radY = deg2Rad(rotY);
+      const radZ = deg2Rad(rotZ);
+
+      // Аналитический расчет 3D-кватерниона из углов Эйлера XYZ без сторонних зависимостей
+      const c1 = Math.cos(radX * 0.5);
+      const c2 = Math.cos(radY * 0.5);
+      const c3 = Math.cos(radZ * 0.5);
+      const s1 = Math.sin(radX * 0.5);
+      const s2 = Math.sin(radY * 0.5);
+      const s3 = Math.sin(radZ * 0.5);
+
+      const qx = s1 * c2 * c3 + c1 * s2 * s3;
+      const qy = c1 * s2 * c3 - s1 * c2 * s3;
+      const qz = c1 * c2 * s3 + s1 * s2 * c3;
+      const qw = c1 * c2 * c3 - s1 * s2 * s3;
+
+      config.transform.angle = radY;
+      config.transform.rotation = { x: qx, y: qy, z: qz, w: qw };
+    }
+
+    // Применяем случайный масштаб (модификация physics)
+    const scaleX =
+      selectedItem.scaleMin.x + Math.random() * (selectedItem.scaleMax.x - selectedItem.scaleMin.x);
+    const scaleY =
+      selectedItem.scaleMin.y + Math.random() * (selectedItem.scaleMax.y - selectedItem.scaleMin.y);
+    const scaleZ =
+      selectedItem.scaleMin.z + Math.random() * (selectedItem.scaleMax.z - selectedItem.scaleMin.z);
+
+    if (config.physics) {
+      config.physics.radius = (config.physics.radius || 1) * Math.max(scaleX, scaleZ);
+      if (config.physics.height) config.physics.height *= scaleY;
+      if (config.physics.points) {
+        config.physics.points = config.physics.points.map((p) => ({
+          x: p.x * scaleX,
+          y: p.y * scaleZ,
+        }));
+      }
+    }
+
+    // Компенсация высоты для склонов
+    const physHit = app.raycastPhysics(
+      (app.renderer as any).canvas.clientWidth / 2, // Хаки, физику лучше через луч вниз делать.
+      (app.renderer as any).canvas.clientHeight / 2
+    );
+    // Для надежности просто пускаем луч строго вниз из небес
+    const rayHit = app.physicsDriver.castRay(
+      { x: spawnX, y: 1000, z: spawnZ },
+      { x: 0, y: -1, z: 0 },
+      2000,
+      true
+    );
+    if (rayHit) {
+      spawnY = rayHit.point.y;
+      const slopeFactor =
+        Math.sqrt(Math.max(0, 1 - rayHit.normal.y * rayHit.normal.y)) / rayHit.normal.y;
+      const r = config.physics?.radius ?? 0.3;
+      spawnY += r * slopeFactor * 0.5 + 0.02; // Компенсация врезания в склон
+    } else {
+      spawnY = center.y;
+    }
+
+    // Применение ручного вертикального смещения (заглубления)
+    if (selectedItem.offsetY !== undefined) {
+      spawnY += selectedItem.offsetY;
+    }
+
+    // 6. Спавн
+    const spawnedId = app.spawnEntity(config, { x: spawnX, y: spawnY, z: spawnZ });
+    propBrushStateRef.current.spawnedIds.add(spawnedId);
   };
 
   const handleMouseLeave = () => {
