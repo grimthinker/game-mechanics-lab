@@ -13,6 +13,7 @@ import { IPhysicsDriver } from '../../physics/IPhysicsDriver';
 import { BALANCE_CONFIG } from '../../config/balanceConfig';
 import { getTerrainHeightAt } from '../components/terrain';
 import { angleDifference } from '../../utils';
+import { buildObstacleColliders } from '../archetypes';
 
 export class PhysicsSystem {
   public obstaclesEnabled: boolean = true;
@@ -294,20 +295,14 @@ export class PhysicsSystem {
     if (!this.driver || !this.driver.isReady) return;
     const phys = world.getComponent(id, 'physicsBody');
     const physStats = world.getComponent(id, 'physicsStats');
-    if (!phys?.rawCollider || !physStats) return;
+    if (!phys || !phys.rawBody || !physStats) return;
 
     const radius = physStats.radius.current;
     const height = physStats.height.current;
-
-    if (phys.lastAppliedRadius === radius && phys.lastAppliedHeight === height) {
-      return;
-    }
-    phys.lastAppliedRadius = radius;
-    phys.lastAppliedHeight = height;
-
     const points = physStats.points;
-    let width = radius * 2;
-    let depth = radius * 2;
+
+    let curW = radius * 2;
+    let curD = radius * 2;
     if (points && points.length > 0) {
       let minX = points[0].x,
         maxX = points[0].x;
@@ -319,15 +314,39 @@ export class PhysicsSystem {
         if (p.y < minY) minY = p.y;
         if (p.y > maxY) maxY = p.y;
       }
-      width = Math.max(0.2, maxX - minX);
-      depth = Math.max(0.2, maxY - minY);
+      curW = Math.max(0.1, maxX - minX);
+      curD = Math.max(0.1, maxY - minY);
     }
 
-    const hx = width / 2;
-    const hy = height / 2;
-    const hz = depth / 2;
+    if (
+      phys.lastAppliedRadius === radius &&
+      phys.lastAppliedHeight === height &&
+      phys.lastAppliedWidth === curW &&
+      phys.lastAppliedDepth === curD
+    ) {
+      return;
+    }
+    phys.lastAppliedRadius = radius;
+    phys.lastAppliedHeight = height;
+    phys.lastAppliedWidth = curW;
+    phys.lastAppliedDepth = curD;
 
-    phys.rawCollider = this.driver.updateCuboidCollider(phys.rawCollider, hx, hy, hz, hy);
+    // Удаляем предыдущие коллайдеры с твердого тела
+    if (phys.rawColliders && phys.rawColliders.length > 0) {
+      for (const col of phys.rawColliders) {
+        (this.driver as any).removeCollider?.(col, false);
+      }
+    } else if (phys.rawCollider) {
+      (this.driver as any).removeCollider?.(phys.rawCollider, false);
+    }
+
+    const { primaryCollider, allColliders } = buildObstacleColliders(this.driver, phys.rawBody, {
+      points,
+      height,
+      colliders: physStats.colliders,
+    });
+    phys.rawCollider = primaryCollider;
+    phys.rawColliders = allColliders;
   }
 
   public update(dt: number, world: World): void {

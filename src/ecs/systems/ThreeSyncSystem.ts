@@ -32,15 +32,37 @@ import { TransformComponent } from '../components/physics';
 import { getTerrainHeightAt } from '../components/terrain';
 import { GRASS_CONFIG } from '../../config/grassConfig';
 
-const PROCEDURAL_PROP_SCALES: Record<string, { baseRadius: number; baseHeight: number }> = {
-  'proc://prop/tree': { baseRadius: 0.6, baseHeight: 4.0 },
-  'proc://prop/house': { baseRadius: 2.7, baseHeight: 5.5 },
-  'proc://prop/fence': { baseRadius: 1.2, baseHeight: 1.15 },
-  'proc://prop/rock_1': { baseRadius: 1.1, baseHeight: 1.25 },
-  'proc://prop/rock_2': { baseRadius: 1.2, baseHeight: 0.75 },
-  'proc://prop/rock_3': { baseRadius: 1.2, baseHeight: 1.5 },
-  'proc://prop/rock_4': { baseRadius: 1.2, baseHeight: 1.6 },
-  'proc://prop/rock_5': { baseRadius: 1.1, baseHeight: 1.45 },
+const PROCEDURAL_PROP_SCALES: Record<
+  string,
+  { baseRadius: number; baseHeight: number; baseWidth?: number; baseDepth?: number }
+> = {
+  'proc://prop/tree': { baseRadius: 0.6, baseHeight: 4.0, baseWidth: 1.2, baseDepth: 1.2 },
+  'proc://prop/tree_2': { baseRadius: 1.2, baseHeight: 4.2, baseWidth: 2.4, baseDepth: 2.4 },
+  'proc://prop/tree_3': { baseRadius: 0.8, baseHeight: 4.8, baseWidth: 1.6, baseDepth: 1.6 },
+  'proc://prop/tree_spruce': { baseRadius: 1.85, baseHeight: 4.2, baseWidth: 3.7, baseDepth: 3.7 },
+  'proc://prop/tree_pine': { baseRadius: 1.4, baseHeight: 5.2, baseWidth: 2.8, baseDepth: 2.8 },
+  'proc://prop/signpost': { baseRadius: 0.4, baseHeight: 2.1, baseWidth: 0.8, baseDepth: 0.8 },
+  'proc://prop/signpost_single': {
+    baseRadius: 0.4,
+    baseHeight: 1.6,
+    baseWidth: 0.8,
+    baseDepth: 0.8,
+  },
+  'proc://prop/log_pile_1': { baseRadius: 0.85, baseHeight: 0.95, baseWidth: 1.7, baseDepth: 1.6 },
+  'proc://prop/log_pile_2': { baseRadius: 0.75, baseHeight: 0.75, baseWidth: 1.5, baseDepth: 1.5 },
+  'proc://prop/stump': { baseRadius: 0.45, baseHeight: 0.85, baseWidth: 0.9, baseDepth: 0.9 },
+  'proc://prop/toilet': { baseRadius: 0.65, baseHeight: 2.3, baseWidth: 1.2, baseDepth: 1.2 },
+  'proc://prop/barrel': { baseRadius: 0.5, baseHeight: 1.1, baseWidth: 1.0, baseDepth: 1.0 },
+  'proc://prop/crate': { baseRadius: 0.6, baseHeight: 0.6, baseWidth: 1.1, baseDepth: 0.85 },
+  'proc://prop/bridge': { baseRadius: 3.0, baseHeight: 1.2, baseWidth: 2.4, baseDepth: 6.0 },
+  'proc://prop/lamp_post': { baseRadius: 0.4, baseHeight: 3.0, baseWidth: 0.8, baseDepth: 0.8 },
+  'proc://prop/house': { baseRadius: 2.7, baseHeight: 5.5, baseWidth: 5.0, baseDepth: 5.4 },
+  'proc://prop/fence': { baseRadius: 1.2, baseHeight: 1.15, baseWidth: 2.4, baseDepth: 0.25 },
+  'proc://prop/rock_1': { baseRadius: 1.1, baseHeight: 1.25, baseWidth: 2.0, baseDepth: 1.4 },
+  'proc://prop/rock_2': { baseRadius: 1.2, baseHeight: 0.75, baseWidth: 2.2, baseDepth: 1.7 },
+  'proc://prop/rock_3': { baseRadius: 1.2, baseHeight: 1.5, baseWidth: 2.3, baseDepth: 2.1 },
+  'proc://prop/rock_4': { baseRadius: 1.2, baseHeight: 1.6, baseWidth: 2.2, baseDepth: 2.0 },
+  'proc://prop/rock_5': { baseRadius: 1.1, baseHeight: 1.45, baseWidth: 2.1, baseDepth: 1.7 },
 };
 
 export class ThreeSyncSystem {
@@ -367,22 +389,37 @@ export class ThreeSyncSystem {
             const visual = world.getComponent(id, 'visualModel');
             const propScale = visual?.modelId ? PROCEDURAL_PROP_SCALES[visual.modelId] : undefined;
 
+            let curW = (physStats?.radius.current ?? 1.0) * 2;
+            let curD = (physStats?.radius.current ?? 1.0) * 2;
+
+            if (physStats?.points && physStats.points.length > 0) {
+              let minX = physStats.points[0].x,
+                maxX = physStats.points[0].x;
+              let minY = physStats.points[0].y,
+                maxY = physStats.points[0].y;
+              for (let pi = 1; pi < physStats.points.length; pi++) {
+                const pt = physStats.points[pi];
+                if (pt.x < minX) minX = pt.x;
+                if (pt.x > maxX) maxX = pt.x;
+                if (pt.y < minY) minY = pt.y;
+                if (pt.y > maxY) maxY = pt.y;
+              }
+              curW = Math.max(0.1, maxX - minX);
+              curD = Math.max(0.1, maxY - minY);
+            }
+
+            const h = physStats?.height?.current ?? 1.5;
+
             if (propScale) {
-              const r = physStats?.radius.current ?? propScale.baseRadius;
-              const h = physStats?.height.current ?? propScale.baseHeight;
-              obj.scale.set(
-                r / propScale.baseRadius,
-                h / propScale.baseHeight,
-                r / propScale.baseRadius
-              );
+              const baseW = propScale.baseWidth ?? propScale.baseRadius * 2;
+              const baseD = propScale.baseDepth ?? propScale.baseRadius * 2;
+              const baseH = propScale.baseHeight;
+              obj.scale.set(curW / baseW, h / baseH, curD / baseD);
             } else {
-              const r = physStats?.radius.current ?? 1.0;
-              const h = physStats?.height.current ?? 1.5;
               const baseW = (obj.userData.baseWidth as number) ?? 2.0;
               const baseD = (obj.userData.baseDepth as number) ?? 2.0;
               const baseH = (obj.userData.baseHeight as number) ?? 1.5;
-              const baseR = Math.max(baseW, baseD) / 2 || 1;
-              obj.scale.set(r / baseR, h / baseH, r / baseR);
+              obj.scale.set(curW / baseW, h / baseH, curD / baseD);
             }
           } else {
             obj.scale.set(1, 1, 1);

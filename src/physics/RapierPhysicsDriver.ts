@@ -136,6 +136,36 @@ export class RapierPhysicsDriver implements IPhysicsDriver {
     return this.createCollider(desc, parent);
   }
 
+  public createCylinderCollider(
+    halfHeight: number,
+    radius: number,
+    parent: RAPIER.RigidBody,
+    mass?: number,
+    offset?: Vec3
+  ): RAPIER.Collider {
+    const desc = RAPIER.ColliderDesc.cylinder(Math.max(0.01, halfHeight), Math.max(0.01, radius));
+    if (offset) {
+      desc.setTranslation(offset.x, offset.y, offset.z);
+    }
+    if (mass !== undefined && mass > 0) {
+      desc.setMass(mass);
+    }
+    return this.createCollider(desc, parent);
+  }
+
+  public createConvexHullCollider(
+    points: Float32Array,
+    parent: RAPIER.RigidBody,
+    mass?: number
+  ): RAPIER.Collider | null {
+    const desc = RAPIER.ColliderDesc.convexHull(points);
+    if (!desc) return null;
+    if (mass !== undefined && mass > 0) {
+      desc.setMass(mass);
+    }
+    return this.createCollider(desc, parent);
+  }
+
   public createCapsuleCollider(
     halfHeight: number,
     radius: number,

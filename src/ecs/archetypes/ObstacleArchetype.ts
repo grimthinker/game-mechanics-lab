@@ -21,6 +21,9 @@ import {
 import { createStat } from '../stats/StatEvaluator';
 import { fastClone } from '../utils/clone';
 
+import { buildObstacleColliders } from '../utils/obstacleColliders';
+export { buildObstacleColliders };
+
 export function createHouseConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
   const width = 5.0;
   const depth = 5.4;
@@ -43,11 +46,441 @@ export function createHouseConfig(position?: Vec3, angle: Radians = 0 as Radians
       weight: 50000,
       isSolid: true,
       points: createRectanglePoints(width, depth),
+      colliders: [
+        // 1. Нижняя часть (цоколь и стены от y=0 до y=3.0)
+        {
+          shape: 'cuboid',
+          halfExtents: { x: 2.4, y: 1.5, z: 2.6 },
+          offset: { x: 0, y: 1.5, z: 0 },
+        },
+        // 2. Верхняя наклонная двускатная крыша (выпуклая треугольная призма от y=3.0 до конька y=5.2)
+        {
+          shape: 'convexHull',
+          points: [
+            -2.4, 3.0, 2.6, 2.4, 3.0, 2.6, 0.0, 5.2, 2.6, -2.4, 3.0, -2.6, 2.4, 3.0, -2.6, 0.0, 5.2,
+            -2.6,
+          ],
+        },
+      ],
     },
     health: {
       maxHp: 5000,
       hp: 5000,
       destructible: false,
+    },
+  };
+}
+
+export function createTreeConfig(
+  modelId: string = 'proc://prop/tree',
+  name: string = 'Дерево',
+  trunkRadius: number = 0.3,
+  trunkHeight: number = 3.0,
+  totalHeight: number = 4.0,
+  crownRadius: number = 0.6,
+  position?: Vec3,
+  angle: Radians = 0 as Radians
+): EntityConfig {
+  return {
+    tag: { archetype: 'obstacle', subType: 'tree' },
+    meta: { name, entityType: 'obstacle', destructible: false },
+    visualModel: { modelId },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: crownRadius,
+      height: totalHeight,
+      weight: 5000,
+      isSolid: true,
+      points: createRectanglePoints(trunkRadius * 2, trunkRadius * 2),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: trunkHeight / 2,
+          radius: trunkRadius,
+          offset: { x: 0, y: trunkHeight / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 1000,
+      hp: 1000,
+      destructible: false,
+    },
+  };
+}
+export function createSignpostConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const height = 2.1;
+  const radius = 0.14;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'signpost' },
+    meta: { name: 'Указатель дорог (3 стрелки)', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/signpost' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: 0.4,
+      height,
+      weight: 70,
+      isSolid: true,
+      points: createRectanglePoints(0.8, 0.8),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: height / 2,
+          radius,
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 80,
+      hp: 80,
+      destructible: true,
+    },
+  };
+}
+
+export function createSignpostSingleConfig(
+  position?: Vec3,
+  angle: Radians = 0 as Radians
+): EntityConfig {
+  const height = 1.6;
+  const radius = 0.14;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'signpost' },
+    meta: { name: 'Указатель дорог (1 стрелка)', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/signpost_single' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: 0.4,
+      height,
+      weight: 50,
+      isSolid: true,
+      points: createRectanglePoints(0.8, 0.8),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: height / 2,
+          radius,
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 60,
+      hp: 60,
+      destructible: true,
+    },
+  };
+}
+
+export function createLogPileConfig(
+  variant: 1 | 2 = 1,
+  position?: Vec3,
+  angle: Radians = 0 as Radians
+): EntityConfig {
+  const isV1 = variant === 1;
+  const width = isV1 ? 1.7 : 1.5;
+  const depth = isV1 ? 1.6 : 1.5;
+  const height = isV1 ? 0.95 : 0.75;
+  const weight = isV1 ? 800 : 550;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'wood' },
+    meta: {
+      name: isV1 ? 'Стопка бревен (Большая)' : 'Стопка бревен (Малая)',
+      entityType: 'obstacle',
+      destructible: true,
+    },
+    visualModel: { modelId: isV1 ? 'proc://prop/log_pile_1' : 'proc://prop/log_pile_2' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: Math.max(width, depth) / 2,
+      height,
+      weight,
+      isSolid: true,
+      points: createRectanglePoints(width, depth),
+      colliders: [
+        {
+          shape: 'cuboid',
+          halfExtents: { x: width / 2, y: height / 2, z: depth / 2 },
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 350,
+      hp: 350,
+      destructible: true,
+    },
+  };
+}
+
+export function createStumpConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const height = 0.85;
+  const radius = 0.45;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'wood' },
+    meta: { name: 'Пень с топором', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/stump' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius,
+      height,
+      weight: 300,
+      isSolid: true,
+      points: createRectanglePoints(radius * 2, radius * 2),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: 0.75 / 2,
+          radius,
+          offset: { x: 0, y: 0.75 / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 400,
+      hp: 400,
+      destructible: true,
+    },
+  };
+}
+
+export function createToiletConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const width = 1.2;
+  const depth = 1.2;
+  const height = 2.3;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'building' },
+    meta: { name: 'Сельский туалет', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/toilet' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: 0.65,
+      height,
+      weight: 350,
+      isSolid: true,
+      points: createRectanglePoints(width, depth),
+      colliders: [
+        {
+          shape: 'cuboid',
+          halfExtents: { x: width / 2, y: height / 2, z: depth / 2 },
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 250,
+      hp: 250,
+      destructible: true,
+    },
+  };
+}
+
+export function createBarrelConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const height = 1.1;
+  const radius = 0.5;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'barrel' },
+    meta: { name: 'Бочка', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/barrel' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius,
+      height,
+      weight: 60,
+      isSolid: true,
+      points: createRectanglePoints(radius * 2, radius * 2),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: height / 2,
+          radius,
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 120,
+      hp: 120,
+      destructible: true,
+    },
+  };
+}
+
+export function createBridgeConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const width = 2.4;
+  const depth = 6.0;
+  const height = 1.2;
+
+  // Формируем выпуклую оболочку (Convex Hull) для плавного подъема по мосту
+  const hullPts: number[] = [];
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    const z = -depth / 2 + t * depth;
+    const y = Math.sin(t * Math.PI) * 0.85; // высота арки
+    // Левая и правая стороны полотна
+    hullPts.push(-width / 2, y, z);
+    hullPts.push(width / 2, y, z);
+    // Добавляем точки чуть ниже для толщины
+    hullPts.push(-width / 2, y - 0.2, z);
+    hullPts.push(width / 2, y - 0.2, z);
+  }
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'building' },
+    meta: { name: 'Деревянный мост', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/bridge' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: Math.max(width, depth) / 2,
+      height,
+      weight: 4500,
+      isSolid: true,
+      points: createRectanglePoints(width, depth),
+      colliders: [
+        {
+          shape: 'convexHull',
+          points: hullPts,
+        },
+      ],
+    },
+    health: {
+      maxHp: 1500,
+      hp: 1500,
+      destructible: true,
+    },
+  };
+}
+
+export function createCratePropConfig(
+  position?: Vec3,
+  angle: Radians = 0 as Radians
+): EntityConfig {
+  const width = 1.1;
+  const depth = 0.85;
+  const height = 0.6;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'crate' },
+    meta: { name: 'Деревянный ящик', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/crate' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: Math.max(width, depth) / 2,
+      height,
+      weight: 35,
+      isSolid: true,
+      points: createRectanglePoints(width, depth),
+      colliders: [
+        {
+          shape: 'cuboid',
+          halfExtents: { x: width / 2, y: height / 2, z: depth / 2 },
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 90,
+      hp: 90,
+      destructible: true,
+    },
+  };
+}
+
+export function createLampPostConfig(position?: Vec3, angle: Radians = 0 as Radians): EntityConfig {
+  const height = 3.0;
+  const radius = 0.14;
+
+  return {
+    tag: { archetype: 'obstacle', subType: 'lamp_post' },
+    meta: { name: 'Столб с фонарем', entityType: 'obstacle', destructible: true },
+    visualModel: { modelId: 'proc://prop/lamp_post' },
+    transform: {
+      x: position?.x ?? 0,
+      y: position?.y ?? 0,
+      z: position?.z ?? 0,
+      rotation: { x: 0, y: Math.sin(angle * 0.5), z: 0, w: Math.cos(angle * 0.5) },
+      angle,
+    },
+    physics: {
+      radius: 0.4,
+      height,
+      weight: 120,
+      isSolid: true,
+      points: createRectanglePoints(radius * 2, radius * 2),
+      colliders: [
+        {
+          shape: 'cylinder',
+          halfHeight: height / 2,
+          radius,
+          offset: { x: 0, y: height / 2, z: 0 },
+        },
+      ],
+    },
+    health: {
+      maxHp: 120,
+      hp: 120,
+      destructible: true,
     },
   };
 }
@@ -182,6 +615,7 @@ export function assembleObstacle(
     weight: createStat(config.physics?.weight ?? 1000),
     isSolid,
     points: fastClone(points),
+    colliders: config.physics?.colliders ? fastClone(config.physics.colliders) : undefined,
   });
 
   // 4. Здоровье (обязательный компонент)
@@ -211,47 +645,32 @@ export function assembleObstacle(
     angle,
   });
 
-  // 6. Физическое тело Fixed Cuboid (Rapier3D)
+  // 6. Физическое тело (Rapier3D) с поддержкой составных и индивидуальных коллайдеров
   const category = CollisionCategory.OBSTACLE;
   const mask = isSolid && hp > 0 ? COLLISION_MASK_ALL : COLLISION_MASK_NONE;
 
-  // Рассчитываем размеры кубоида по точкам
-  let minX = points[0]?.x ?? -2,
-    maxX = points[0]?.x ?? 2;
-  let minY = points[0]?.y ?? -0.5,
-    maxY = points[0]?.y ?? 0.5;
-  for (const p of points) {
-    if (p.x < minX) minX = p.x;
-    if (p.x > maxX) maxX = p.x;
-    if (p.y < minY) minY = p.y;
-    if (p.y > maxY) maxY = p.y;
-  }
-  const width = Math.max(0.2, maxX - minX);
-  const depth = Math.max(0.2, maxY - minY);
-  const height = config.physics?.height ?? 1.5;
-
-  const hx = width / 2;
-  const hy = height / 2;
-  const hz = depth / 2;
-
   let rawBody: RAPIER.RigidBody | undefined;
   let rawCollider: RAPIER.Collider | undefined;
+  let rawColliders: RAPIER.Collider[] | undefined;
 
   if (physics.driver && physics.driver.isReady) {
     const pos3D = { x: posX, y: posY, z: posZ };
     rawBody = physics.driver.createFixedBody(pos3D, id);
     rawBody.setRotation(rotation, false);
 
-    // Смещаем коллайдер вверх на hy, чтобы основание стояло на плоскости Y=0
-    rawCollider = physics.driver.createCuboidCollider(hx, hy, hz, rawBody, 0, {
-      x: 0,
-      y: hy,
-      z: 0,
+    const built = buildObstacleColliders(physics.driver, rawBody, {
+      points,
+      height: config.physics?.height ?? 1.5,
+      colliders: config.physics?.colliders,
     });
+    rawCollider = built.primaryCollider;
+    rawColliders = built.allColliders;
   }
+
   world.addComponent(id, 'physicsBody', {
     rawBody,
     rawCollider,
+    rawColliders,
     bodyType: 'fixed',
     isStatic: true,
     category,

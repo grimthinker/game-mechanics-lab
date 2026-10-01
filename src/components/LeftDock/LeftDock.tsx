@@ -19,7 +19,7 @@ export interface LeftDockProps {
   app?: GameApp | null;
   world: World | null | undefined;
   selectedEntityId: string | null;
-  onSelectEntity: (id: string) => void;
+  onSelectEntity: (id: string, clearGroup?: boolean) => void;
   onFocusEntity: (id: string) => void;
   onSelectSpawnPreset: (config: EntityConfig) => void;
   onSelectModular: (behavior: string, name: string, structureType?: BodyStructureType) => void;

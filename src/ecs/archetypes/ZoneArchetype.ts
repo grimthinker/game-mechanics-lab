@@ -1,5 +1,4 @@
 import { World } from '../World';
-import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
 import {
   EntityId,
@@ -66,7 +65,7 @@ export function getZoneVisuals(
 
 import { ZoneShapeComponent, GameplayZoneComponent, GameplayZoneRole } from '../components/zone';
 
-export function createZoneConfig(
+export function createEffectorZoneConfig(
   effect: ZoneEffectType,
   radius: number = 2.5,
   valuePerSec: number = 15,
@@ -150,7 +149,6 @@ export function createGameplayZoneConfig(
 
 export function assembleZone(
   world: World,
-  physics: PhysicsSystem,
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,

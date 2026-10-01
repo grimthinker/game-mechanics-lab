@@ -41,6 +41,9 @@ export interface IPhysicsDriver {
   /** Создает коллайдер геометрической формы и прикрепляет его к твердому телу */
   createCollider(desc: RAPIER.ColliderDesc, parent: RAPIER.RigidBody): RAPIER.Collider;
 
+  /** Удаляет отдельный коллайдер из физического мира */
+  removeCollider(collider: RAPIER.Collider, wakeUp?: boolean): void;
+
   /** Удаляет твердое тело и все прикрепленные к нему коллайдеры из физического мира */
   removeRigidBody(body: RAPIER.RigidBody): void;
 
@@ -55,6 +58,22 @@ export interface IPhysicsDriver {
 
   /** Создает сферический коллайдер */
   createBallCollider(radius: number, parent: RAPIER.RigidBody, mass?: number): RAPIER.Collider;
+
+  /** Создает вертикальный цилиндрический коллайдер */
+  createCylinderCollider(
+    halfHeight: number,
+    radius: number,
+    parent: RAPIER.RigidBody,
+    mass?: number,
+    offset?: Vec3
+  ): RAPIER.Collider;
+
+  /** Создает выпуклый многогранник (Convex Hull) из массива 3D точек */
+  createConvexHullCollider(
+    points: Float32Array,
+    parent: RAPIER.RigidBody,
+    mass?: number
+  ): RAPIER.Collider | null;
 
   /** Создает вертикальный капсульный коллайдер с опциональным вертикальным смещением */
   createCapsuleCollider(

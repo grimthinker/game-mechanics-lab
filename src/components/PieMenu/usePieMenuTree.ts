@@ -4,7 +4,7 @@ import { PieMenuItem, PieMenuState } from './types';
 import { Vec3 } from '../../types';
 import { EDITOR_CONFIG } from '../../config/editorConfig';
 import { createRectanglePoints, deg2Rad } from '../../utils';
-import { createZoneConfig } from '../../ecs/archetypes';
+import { createEffectorZoneConfig } from '../../ecs/archetypes';
 import { CREATURE_BLUEPRINTS } from '../../ecs/templates';
 import { spawnFetchGroup } from '../../ecs/prefabs/fetchGroupPrefab';
 import { t } from '../../locales';
@@ -389,72 +389,13 @@ export function usePieMenuTree({
         color: '#27ae60',
         children: [
           {
-            id: 'spawn_wall',
-            label: t('pieMenu.wall'),
-            icon: '🧱',
-            onSelect: () => {
-              app.executeTransaction(t('history.spawnWall'), () => {
-                const id = app.spawnEntity(
-                  {
-                    tag: { archetype: 'obstacle' },
-                    meta: {
-                      name: t('palette.wall'),
-                      entityType: 'obstacle',
-                      destructible: false,
-                    },
-                    physics: {
-                      radius: 2.0,
-                      weight: 1000,
-                      isSolid: true,
-                      points: createRectanglePoints(4.0, 1.0),
-                    },
-                  },
-                  worldPos
-                );
-                app.selection.selectEntity(id, true);
-                return id;
-              });
-              syncPlayerControls();
-            },
-          },
-          {
-            id: 'spawn_crate',
-            label: t('pieMenu.crate'),
-            icon: '📦',
-            onSelect: () => {
-              app.executeTransaction(t('history.spawnCrate'), () => {
-                const id = app.spawnEntity(
-                  {
-                    tag: { archetype: 'obstacle' },
-                    meta: {
-                      name: t('palette.crate'),
-                      entityType: 'obstacle',
-                      destructible: true,
-                    },
-                    health: { hp: 100, maxHp: 100 },
-                    physics: {
-                      radius: 0.8,
-                      weight: 50,
-                      isSolid: true,
-                      points: createRectanglePoints(1.5, 1.5),
-                    },
-                  },
-                  worldPos
-                );
-                app.selection.selectEntity(id, true);
-                return id;
-              });
-              syncPlayerControls();
-            },
-          },
-          {
             id: 'spawn_fire_zone',
             label: t('pieMenu.fireZone'),
             icon: '🔥',
             onSelect: () => {
               app.executeTransaction(t('history.spawnFireZone'), () => {
                 const id = app.spawnEntity(
-                  createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
+                  createEffectorZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
                   worldPos
                 );
                 app.selection.selectEntity(id, true);
@@ -470,7 +411,7 @@ export function usePieMenuTree({
             onSelect: () => {
               app.executeTransaction(t('history.spawnFireZone'), () => {
                 const id = app.spawnEntity(
-                  createZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
+                  createEffectorZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
                   worldPos
                 );
                 app.selection.selectEntity(id, true);

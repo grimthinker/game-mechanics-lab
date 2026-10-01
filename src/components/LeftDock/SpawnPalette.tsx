@@ -1,11 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { EntityConfig } from '../../ecs/types';
 import { BodyStructureType } from '../../ecs/templates';
-import { createZoneConfig, createGameplayZoneConfig } from '../../ecs/archetypes/ZoneArchetype';
+import {
+  createEffectorZoneConfig,
+  createGameplayZoneConfig,
+} from '../../ecs/archetypes/ZoneArchetype';
 import {
   createHouseConfig,
   createFenceConfig,
   createRockConfig,
+  createTreeConfig,
+  createSignpostConfig,
+  createSignpostSingleConfig,
+  createLogPileConfig,
+  createStumpConfig,
+  createToiletConfig,
+  createBarrelConfig,
+  createCratePropConfig,
+  createBridgeConfig,
+  createLampPostConfig,
 } from '../../ecs/archetypes/ObstacleArchetype';
 import { createWaterConfig } from '../../ecs/archetypes/WaterArchetype';
 import { createRectanglePoints, deg2Rad } from '../../utils';
@@ -27,18 +40,43 @@ interface PaletteItem {
   onClick?: () => void;
 }
 
-interface PaletteCategory {
+export interface PaletteGroup {
+  id: string;
   title: string;
-  items: PaletteItem[];
+  items?: PaletteItem[];
+  subgroups?: PaletteGroup[];
 }
+
+const STORAGE_KEY = 'spawn_palette_collapsed_groups_v3';
+const PALETTE_ACCENT_COLORS = ['#3498db', '#2ecc71', '#e67e22'];
+
 export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
   onSelectPreset,
   onSelectModular,
   onSelectPrefab,
   onOpenWizard,
 }) => {
-  const categories: PaletteCategory[] = [
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {};
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [groupId]: !prev[groupId] };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const categories: PaletteGroup[] = [
     {
+      id: 'groups',
       title: t('palette.categoryGroups'),
       items: [
         {
@@ -55,6 +93,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
       ],
     },
     {
+      id: 'creatures',
       title: t('palette.categoryCreatures'),
       items: [
         {
@@ -102,362 +141,473 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
       ],
     },
     {
-      title: t('palette.categoryWeapons'),
-      items: [
+      id: 'items',
+      title: t('palette.categoryItems'),
+      subgroups: [
         {
-          id: 'weapon_stick',
-          name: 'Мячик для апорта',
-          description: 'Упругий спортивный мячик для собак',
-          icon: '🎾',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'weapon' },
-            meta: { name: 'Мячик для апорта', entityType: 'item' },
-            visualModel: { modelId: 'proc://prop/ball' },
-            item: {
+          id: 'weapons',
+          title: t('palette.categoryWeapons'),
+          items: [
+            {
+              id: 'weapon_stick',
               name: 'Мячик для апорта',
-              type: 'weapon',
-              maxStack: 1,
-              size: 4,
-              equipTypes: [],
-              equippable: false,
-              equipTimeMultiplier: 1.0,
+              description: 'Упругий спортивный мячик для собак',
+              icon: '🎾',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'weapon' },
+                meta: { name: 'Мячик для апорта', entityType: 'item' },
+                visualModel: { modelId: 'proc://prop/ball' },
+                item: {
+                  name: 'Мячик для апорта',
+                  type: 'weapon',
+                  maxStack: 1,
+                  size: 4,
+                  equipTypes: [],
+                  equippable: false,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: {
+                  radius: 0.15,
+                  weight: 0.5,
+                  isSolid: true,
+                  shape: 'ball',
+                  restitution: 0.88,
+                  friction: 0.85,
+                  linearDamping: 0.25,
+                  angularDamping: 2.0,
+                },
+                weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
+                weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
+              }),
             },
-            physics: {
-              radius: 0.15,
-              weight: 0.5,
-              isSolid: true,
-              shape: 'ball',
-              restitution: 0.88,
-              friction: 0.85,
-              linearDamping: 0.25,
-              angularDamping: 2.0,
-            },
-            weaponStats: { baseDamage: 5, prepTime: 0.2, recoveryTime: 0.3 },
-            weaponZone: { hitZoneType: 'forward_line', length: 1.5 },
-          }),
-        },
-        {
-          id: 'weapon_sword',
-          name: 'Меч',
-          description: 'Оружие ближнего боя',
-          icon: '🗡️',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'weapon' },
-            meta: { name: 'Меч', entityType: 'item' },
-            visualModel: { modelId: 'proc://prop/sword' },
-            item: {
+            {
+              id: 'weapon_sword',
               name: 'Меч',
-              type: 'weapon',
-              maxStack: 1,
-              size: 10,
-              equipTypes: [],
-              equippable: false,
-              equipTimeMultiplier: 1.0,
+              description: 'Оружие ближнего боя',
+              icon: '🗡️',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'weapon' },
+                meta: { name: 'Меч', entityType: 'item' },
+                visualModel: { modelId: 'proc://prop/sword' },
+                item: {
+                  name: 'Меч',
+                  type: 'weapon',
+                  maxStack: 1,
+                  size: 10,
+                  equipTypes: [],
+                  equippable: false,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: {
+                  radius: 0.4,
+                  weight: 2,
+                  isSolid: true,
+                  halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
+                  colliderOffset: { x: 0, y: 0.36, z: 0 },
+                },
+                weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
+                weaponZone: { hitZoneType: 'angle', radius: 2.5, angle: deg2Rad(90) },
+              }),
             },
-            physics: {
-              radius: 0.4,
-              weight: 2,
-              isSolid: true,
-              halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
-              colliderOffset: { x: 0, y: 0.36, z: 0 },
-            },
-            weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
-            weaponZone: { hitZoneType: 'angle', radius: 2.5, angle: deg2Rad(90) },
-          }),
-        },
-        {
-          id: 'weapon_shotgun',
-          name: t('palette.shotgun'),
-          description: t('palette.shotgunDesc'),
-          icon: '💥',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'weapon' },
-            item: {
+            {
+              id: 'weapon_shotgun',
               name: t('palette.shotgun'),
-              type: 'weapon',
-              maxStack: 1,
-              size: 10,
-              equipTypes: [],
-              equippable: false,
-              equipTimeMultiplier: 1.0,
+              description: t('palette.shotgunDesc'),
+              icon: '💥',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'weapon' },
+                item: {
+                  name: t('palette.shotgun'),
+                  type: 'weapon',
+                  maxStack: 1,
+                  size: 10,
+                  equipTypes: [],
+                  equippable: false,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: { radius: 0.4, weight: 1, isSolid: true },
+                weaponStats: { baseDamage: 15, prepTime: 0.4, recoveryTime: 0.5 },
+                weaponZone: {
+                  hitZoneType: 'shrapnel',
+                  length: 4.0,
+                  angle: deg2Rad(60),
+                  rayCount: 5,
+                },
+              }),
             },
-            physics: { radius: 0.4, weight: 1, isSolid: true },
-            weaponStats: { baseDamage: 15, prepTime: 0.4, recoveryTime: 0.5 },
-            weaponZone: { hitZoneType: 'shrapnel', length: 4.0, angle: deg2Rad(60), rayCount: 5 },
-          }),
-        },
-        {
-          id: 'weapon_aura',
-          name: t('palette.auraWeapon'),
-          description: t('palette.auraWeaponDesc'),
-          icon: '✨',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'weapon' },
-            item: {
+            {
+              id: 'weapon_aura',
               name: t('palette.auraWeapon'),
-              type: 'weapon',
-              maxStack: 1,
-              size: 10,
-              equipTypes: [],
-              equippable: false,
-              equipTimeMultiplier: 1.0,
+              description: t('palette.auraWeaponDesc'),
+              icon: '✨',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'weapon' },
+                item: {
+                  name: t('palette.auraWeapon'),
+                  type: 'weapon',
+                  maxStack: 1,
+                  size: 10,
+                  equipTypes: [],
+                  equippable: false,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: { radius: 0.4, weight: 1, isSolid: true },
+                weaponStats: { baseDamage: 30, prepTime: 0.3, recoveryTime: 0.4 },
+                weaponZone: { hitZoneType: 'radius', radius: 2.0 },
+              }),
             },
-            physics: { radius: 0.4, weight: 1, isSolid: true },
-            weaponStats: { baseDamage: 30, prepTime: 0.3, recoveryTime: 0.4 },
-            weaponZone: { hitZoneType: 'radius', radius: 2.0 },
-          }),
+          ],
         },
-      ],
-    },
-    {
-      title: t('palette.categoryEquipment'),
-      items: [
         {
-          id: 'armor_belt',
-          name: t('palette.tacticalBelt'),
-          description: t('palette.tacticalBeltDesc'),
-          icon: '🥋',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'armor' },
-            item: {
+          id: 'equipment',
+          title: t('palette.categoryEquipment'),
+          items: [
+            {
+              id: 'armor_belt',
               name: t('palette.tacticalBelt'),
-              type: 'armor',
-              maxStack: 1,
-              size: 5,
-              equipTypes: ['waist'],
-              equippable: true,
-              equipTimeMultiplier: 1.0,
-            },
-            physics: { radius: 0.4, weight: 1.5, isSolid: true },
-            armorStats: { defense: 5, flatReduction: 0 },
-            equip: {
-              equipmentAreas: [
-                {
-                  id: 'belt_sheath',
-                  name: 'belt_sheath',
-                  type: 'sheath',
-                  space: 15,
-                  itemIds: [],
+              description: t('palette.tacticalBeltDesc'),
+              icon: '🥋',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'armor' },
+                item: {
+                  name: t('palette.tacticalBelt'),
+                  type: 'armor',
+                  maxStack: 1,
+                  size: 5,
+                  equipTypes: ['waist'],
+                  equippable: true,
+                  equipTimeMultiplier: 1.0,
                 },
-                {
-                  id: 'belt_slot_1',
-                  name: 'belt_slot_1',
-                  type: 'belt_slot',
-                  space: 10,
-                  itemIds: [],
+                physics: { radius: 0.4, weight: 1.5, isSolid: true },
+                armorStats: { defense: 5, flatReduction: 0 },
+                equip: {
+                  equipmentAreas: [
+                    {
+                      id: 'belt_sheath',
+                      name: 'belt_sheath',
+                      type: 'sheath',
+                      space: 15,
+                      itemIds: [],
+                    },
+                    {
+                      id: 'belt_slot_1',
+                      name: 'belt_slot_1',
+                      type: 'belt_slot',
+                      space: 10,
+                      itemIds: [],
+                    },
+                    {
+                      id: 'belt_pouch_1',
+                      name: 'belt_pouch_1',
+                      type: 'pouch',
+                      space: 8,
+                      itemIds: [],
+                    },
+                  ],
                 },
-                { id: 'belt_pouch_1', name: 'belt_pouch_1', type: 'pouch', space: 8, itemIds: [] },
-              ],
+              }),
             },
-          }),
-        },
-        {
-          id: 'armor_vest',
-          name: t('palette.vest'),
-          description: t('palette.vestDesc'),
-          icon: '🦺',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'armor' },
-            item: {
+            {
+              id: 'armor_vest',
               name: t('palette.vest'),
-              type: 'armor',
-              maxStack: 1,
-              size: 20,
-              equipTypes: ['torso'],
-              equippable: true,
-              equipTimeMultiplier: 1.0,
-            },
-            physics: { radius: 0.4, weight: 12, isSolid: true },
-            armorStats: { defense: 20, flatReduction: 3 },
-            inventory: { size: { width: 3, height: 2 } },
-            equip: {
-              equipmentAreas: [
-                {
-                  id: 'vest_holster',
-                  name: 'vest_holster',
-                  type: 'holster',
-                  space: 10,
-                  itemIds: [],
+              description: t('palette.vestDesc'),
+              icon: '🦺',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'armor' },
+                item: {
+                  name: t('palette.vest'),
+                  type: 'armor',
+                  maxStack: 1,
+                  size: 20,
+                  equipTypes: ['torso'],
+                  equippable: true,
+                  equipTimeMultiplier: 1.0,
                 },
-                {
-                  id: 'vest_pouch',
-                  name: 'vest_pouch',
-                  type: 'pouch',
-                  space: 10,
-                  itemIds: [],
+                physics: { radius: 0.4, weight: 12, isSolid: true },
+                armorStats: { defense: 20, flatReduction: 3 },
+                inventory: { size: { width: 3, height: 2 } },
+                equip: {
+                  equipmentAreas: [
+                    {
+                      id: 'vest_holster',
+                      name: 'vest_holster',
+                      type: 'holster',
+                      space: 10,
+                      itemIds: [],
+                    },
+                    {
+                      id: 'vest_pouch',
+                      name: 'vest_pouch',
+                      type: 'pouch',
+                      space: 10,
+                      itemIds: [],
+                    },
+                  ],
                 },
-              ],
+              }),
             },
-          }),
-        },
-        {
-          id: 'armor_chest',
-          name: t('palette.chestplate'),
-          description: t('palette.chestplateDesc'),
-          icon: '🛡️',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'armor' },
-            item: {
+            {
+              id: 'armor_chest',
               name: t('palette.chestplate'),
-              type: 'armor',
-              maxStack: 1,
-              size: 20,
-              equipTypes: ['torso'],
-              equippable: true,
-              equipTimeMultiplier: 1.0,
+              description: t('palette.chestplateDesc'),
+              icon: '🛡️',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'armor' },
+                item: {
+                  name: t('palette.chestplate'),
+                  type: 'armor',
+                  maxStack: 1,
+                  size: 20,
+                  equipTypes: ['torso'],
+                  equippable: true,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: { radius: 0.4, weight: 20, isSolid: true },
+                armorStats: { defense: 25, flatReduction: 5 },
+              }),
             },
-            physics: { radius: 0.4, weight: 20, isSolid: true },
-            armorStats: { defense: 25, flatReduction: 5 },
-          }),
-        },
-        {
-          id: 'armor_helmet',
-          name: t('palette.helmet'),
-          description: t('palette.helmetDesc'),
-          icon: '⛑️',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'armor' },
-            item: {
+            {
+              id: 'armor_helmet',
               name: t('palette.helmet'),
-              type: 'armor',
-              maxStack: 1,
-              size: 10,
-              equipTypes: ['head'],
-              equippable: true,
-              equipTimeMultiplier: 1.0,
+              description: t('palette.helmetDesc'),
+              icon: '⛑️',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'armor' },
+                item: {
+                  name: t('palette.helmet'),
+                  type: 'armor',
+                  maxStack: 1,
+                  size: 10,
+                  equipTypes: ['head'],
+                  equippable: true,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: { radius: 0.3, weight: 10, isSolid: true },
+                armorStats: { defense: 15, flatReduction: 2 },
+              }),
             },
-            physics: { radius: 0.3, weight: 10, isSolid: true },
-            armorStats: { defense: 15, flatReduction: 2 },
-          }),
-        },
-        {
-          id: 'bag_backpack',
-          name: t('palette.backpack'),
-          description: t('palette.backpackDesc'),
-          icon: '🎒',
-          createConfig: () => ({
-            tag: { archetype: 'item', subType: 'bag' },
-            item: {
+            {
+              id: 'bag_backpack',
               name: t('palette.backpack'),
-              type: 'bag',
-              maxStack: 1,
-              size: 10,
-              equipTypes: ['torso', 'sling'],
-              equippable: true,
-              equipTimeMultiplier: 1.0,
+              description: t('palette.backpackDesc'),
+              icon: '🎒',
+              createConfig: () => ({
+                tag: { archetype: 'item', subType: 'bag' },
+                item: {
+                  name: t('palette.backpack'),
+                  type: 'bag',
+                  maxStack: 1,
+                  size: 10,
+                  equipTypes: ['torso', 'sling'],
+                  equippable: true,
+                  equipTimeMultiplier: 1.0,
+                },
+                physics: { radius: 0.4, weight: 1, isSolid: true },
+                inventory: { size: { width: 6, height: 4 } },
+              }),
             },
-            physics: { radius: 0.4, weight: 1, isSolid: true },
-            inventory: { size: { width: 6, height: 4 } },
-          }),
+          ],
         },
       ],
     },
     {
+      id: 'obstacles',
       title: t('palette.categoryObstacles'),
-      items: [
+      subgroups: [
         {
-          id: 'obstacle_house',
-          name: t('palette.house'),
-          description: t('palette.houseDesc'),
-          icon: '🏠',
-          createConfig: () => createHouseConfig(),
-        },
-        {
-          id: 'obstacle_fence',
-          name: t('palette.fence'),
-          description: t('palette.fenceDesc'),
-          icon: '🪵',
-          createConfig: () => createFenceConfig(2.4),
-        },
-        {
-          id: 'obstacle_rock_1',
-          name: t('palette.rock1'),
-          description: t('palette.rockDesc'),
-          icon: '🪨',
-          createConfig: () => createRockConfig(1, 1.0),
-        },
-        {
-          id: 'obstacle_rock_2',
-          name: t('palette.rock2'),
-          description: t('palette.rockDesc'),
-          icon: '🪨',
-          createConfig: () => createRockConfig(2, 1.0),
-        },
-        {
-          id: 'obstacle_rock_3',
-          name: t('palette.rock3'),
-          description: t('palette.rockDesc'),
-          icon: '🪨',
-          createConfig: () => createRockConfig(3, 1.0),
-        },
-        {
-          id: 'obstacle_rock_4',
-          name: t('palette.rock4'),
-          description: t('palette.rockDesc'),
-          icon: '🪨',
-          createConfig: () => createRockConfig(4, 1.0),
-        },
-        {
-          id: 'obstacle_rock_5',
-          name: t('palette.rock5'),
-          description: t('palette.rockDesc'),
-          icon: '🪨',
-          createConfig: () => createRockConfig(5, 1.0),
-        },
-        {
-          id: 'obstacle_tree',
-          name: 'Дерево',
-          description: 'Процедурное дерево',
-          icon: '🌳',
-          createConfig: () => ({
-            tag: { archetype: 'obstacle' },
-            meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
-            visualModel: { modelId: 'proc://prop/tree' },
-            physics: {
-              radius: 0.6,
-              weight: 5000,
-              isSolid: true,
-              height: 4.0,
-              points: createRectanglePoints(0.6, 0.6),
+          id: 'trees',
+          title: t('palette.subgroupTrees'),
+          items: [
+            {
+              id: 'obstacle_tree',
+              name: t('palette.tree'),
+              description: t('palette.treeDesc'),
+              icon: '🌳',
+              createConfig: () =>
+                createTreeConfig('proc://prop/tree', t('palette.tree'), 0.3, 3.0, 4.0, 0.6),
             },
-          }),
+            {
+              id: 'obstacle_tree_2',
+              name: t('palette.tree2'),
+              description: t('palette.tree2Desc'),
+              icon: '🌳',
+              createConfig: () =>
+                createTreeConfig('proc://prop/tree_2', t('palette.tree2'), 0.4, 3.2, 4.2, 1.2),
+            },
+            {
+              id: 'obstacle_tree_3',
+              name: t('palette.tree3'),
+              description: t('palette.tree3Desc'),
+              icon: '🌲',
+              createConfig: () =>
+                createTreeConfig('proc://prop/tree_3', t('palette.tree3'), 0.22, 4.0, 4.8, 0.8),
+            },
+            {
+              id: 'obstacle_spruce',
+              name: t('palette.spruce'),
+              description: t('palette.spruceDesc'),
+              icon: '🌲',
+              createConfig: () =>
+                createTreeConfig(
+                  'proc://prop/tree_spruce',
+                  t('palette.spruce'),
+                  0.26,
+                  1.0,
+                  4.2,
+                  1.85
+                ),
+            },
+            {
+              id: 'obstacle_pine',
+              name: t('palette.pine'),
+              description: t('palette.pineDesc'),
+              icon: '🌲',
+              createConfig: () =>
+                createTreeConfig('proc://prop/tree_pine', t('palette.pine'), 0.24, 4.5, 5.2, 1.4),
+            },
+          ],
         },
         {
-          id: 'obstacle_wall',
-          name: t('palette.wall'),
-          description: t('palette.wallDesc'),
-          icon: '🧱',
-          createConfig: () => ({
-            tag: { archetype: 'obstacle' },
-            meta: { name: t('palette.wall'), entityType: 'obstacle', destructible: false },
-            physics: {
-              radius: 2.0,
-              weight: 1000,
-              isSolid: true,
-              points: createRectanglePoints(4.0, 1.0),
+          id: 'rocks',
+          title: t('palette.subgroupRocks'),
+          items: [
+            {
+              id: 'obstacle_rock_1',
+              name: t('palette.rock1'),
+              description: t('palette.rockDesc'),
+              icon: '🪨',
+              createConfig: () => createRockConfig(1, 1.0),
             },
-          }),
+            {
+              id: 'obstacle_rock_2',
+              name: t('palette.rock2'),
+              description: t('palette.rockDesc'),
+              icon: '🪨',
+              createConfig: () => createRockConfig(2, 1.0),
+            },
+            {
+              id: 'obstacle_rock_3',
+              name: t('palette.rock3'),
+              description: t('palette.rockDesc'),
+              icon: '🪨',
+              createConfig: () => createRockConfig(3, 1.0),
+            },
+            {
+              id: 'obstacle_rock_4',
+              name: t('palette.rock4'),
+              description: t('palette.rockDesc'),
+              icon: '🪨',
+              createConfig: () => createRockConfig(4, 1.0),
+            },
+            {
+              id: 'obstacle_rock_5',
+              name: t('palette.rock5'),
+              description: t('palette.rockDesc'),
+              icon: '🪨',
+              createConfig: () => createRockConfig(5, 1.0),
+            },
+          ],
         },
         {
-          id: 'obstacle_crate',
-          name: t('palette.crate'),
-          description: t('palette.crateDesc'),
-          icon: '📦',
-          createConfig: () => ({
-            tag: { archetype: 'obstacle' },
-            meta: { name: t('palette.crate'), entityType: 'obstacle', destructible: true },
-            health: { hp: 100, maxHp: 100 },
-            physics: {
-              radius: 0.8,
-              weight: 50,
-              isSolid: true,
-              points: createRectanglePoints(1.5, 1.5),
+          id: 'buildings',
+          title: t('palette.subgroupBuildings'),
+          items: [
+            {
+              id: 'obstacle_house',
+              name: t('palette.house'),
+              description: t('palette.houseDesc'),
+              icon: '🏠',
+              createConfig: () => createHouseConfig(),
             },
-          }),
+            {
+              id: 'obstacle_bridge',
+              name: t('palette.bridge'),
+              description: t('palette.bridgeDesc'),
+              icon: '🌉',
+              createConfig: () => createBridgeConfig(),
+            },
+            {
+              id: 'obstacle_toilet',
+              name: t('palette.toilet'),
+              description: t('palette.toiletDesc'),
+              icon: '🚪',
+              createConfig: () => createToiletConfig(),
+            },
+          ],
+        },
+        {
+          id: 'other',
+          title: t('palette.subgroupOther'),
+          items: [
+            {
+              id: 'obstacle_signpost',
+              name: t('palette.signpost'),
+              description: t('palette.signpostDesc'),
+              icon: '🪧',
+              createConfig: () => createSignpostConfig(),
+            },
+            {
+              id: 'obstacle_signpost_single',
+              name: t('palette.signpostSingle'),
+              description: t('palette.signpostSingleDesc'),
+              icon: '🪧',
+              createConfig: () => createSignpostSingleConfig(),
+            },
+            {
+              id: 'obstacle_log_pile_1',
+              name: t('palette.logPile1'),
+              description: t('palette.logPile1Desc'),
+              icon: '🪵',
+              createConfig: () => createLogPileConfig(1),
+            },
+            {
+              id: 'obstacle_log_pile_2',
+              name: t('palette.logPile2'),
+              description: t('palette.logPile2Desc'),
+              icon: '🪵',
+              createConfig: () => createLogPileConfig(2),
+            },
+            {
+              id: 'obstacle_stump',
+              name: t('palette.stump'),
+              description: t('palette.stumpDesc'),
+              icon: '🪓',
+              createConfig: () => createStumpConfig(),
+            },
+            {
+              id: 'obstacle_barrel',
+              name: t('palette.barrel'),
+              description: t('palette.barrelDesc'),
+              icon: '🛢️',
+              createConfig: () => createBarrelConfig(),
+            },
+            {
+              id: 'obstacle_wooden_crate',
+              name: t('palette.woodenCrate'),
+              description: t('palette.woodenCrateDesc'),
+              icon: '📦',
+              createConfig: () => createCratePropConfig(),
+            },
+            {
+              id: 'obstacle_lamp_post',
+              name: t('palette.lampPost'),
+              description: t('palette.lampPostDesc'),
+              icon: '🏮',
+              createConfig: () => createLampPostConfig(),
+            },
+            {
+              id: 'obstacle_fence',
+              name: t('palette.fence'),
+              description: t('palette.fenceDesc'),
+              icon: '🪵',
+              createConfig: () => createFenceConfig(2.4),
+            },
+          ],
         },
       ],
     },
     {
+      id: 'zones',
       title: t('palette.categoryZones'),
       items: [
         {
@@ -510,7 +660,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           name: t('palette.zoneFire'),
           description: t('palette.zoneFireDesc'),
           icon: '🔥',
-          createConfig: () => createZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
+          createConfig: () => createEffectorZoneConfig('damage', 2.5, 15, t('palette.zoneFire')),
         },
         {
           id: 'zone_joint_damage',
@@ -518,14 +668,14 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           description: t('palette.zoneJointDamageDesc'),
           icon: '⛓️‍💥',
           createConfig: () =>
-            createZoneConfig('joint_damage', 2.5, 25, t('palette.zoneJointDamage')),
+            createEffectorZoneConfig('joint_damage', 2.5, 25, t('palette.zoneJointDamage')),
         },
         {
           id: 'zone_heal',
           name: t('palette.zoneHeal'),
           description: t('palette.zoneHealDesc'),
           icon: '💚',
-          createConfig: () => createZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
+          createConfig: () => createEffectorZoneConfig('heal', 2.5, 15, t('palette.zoneHeal')),
         },
         {
           id: 'zone_repel',
@@ -533,7 +683,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           description: t('palette.zoneRepelDesc'),
           icon: '💨',
           createConfig: () =>
-            createZoneConfig(
+            createEffectorZoneConfig(
               'repel',
               2.5,
               20,
@@ -552,7 +702,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           description: t('palette.zoneAttractDesc'),
           icon: '🌀',
           createConfig: () =>
-            createZoneConfig(
+            createEffectorZoneConfig(
               'attract',
               2.5,
               20,
@@ -571,7 +721,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           description: t('palette.zoneTimeSlowDesc'),
           icon: '⏳',
           createConfig: () =>
-            createZoneConfig(
+            createEffectorZoneConfig(
               'time_dilation',
               2.5,
               0.5,
@@ -588,7 +738,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           description: t('palette.zoneTimeFastDesc'),
           icon: '⚡',
           createConfig: () =>
-            createZoneConfig(
+            createEffectorZoneConfig(
               'time_dilation',
               2.5,
               1.8,
@@ -605,7 +755,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
           description: t('palette.zoneTimeVortexDesc'),
           icon: '🌀',
           createConfig: () =>
-            createZoneConfig(
+            createEffectorZoneConfig(
               'time_dilation',
               3.5,
               0.5,
@@ -621,6 +771,7 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
       ],
     },
     {
+      id: 'water',
       title: t('palette.categoryWater'),
       items: [
         {
@@ -686,63 +837,130 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '2px' }}>
-        {categories.map((category) => (
-          <div key={category.title} style={{ marginBottom: '16px' }}>
+        {(() => {
+          const getTotalItemCount = (group: PaletteGroup): number => {
+            let count = group.items ? group.items.length : 0;
+            if (group.subgroups) {
+              for (const sub of group.subgroups) {
+                count += getTotalItemCount(sub);
+              }
+            }
+            return count;
+          };
+
+          const renderItemCard = (item: PaletteItem) => (
             <div
+              key={item.id}
+              onClick={() => {
+                if (item.onClick) item.onClick();
+                else if (item.createConfig) onSelectPreset(item.createConfig());
+              }}
               style={{
-                fontSize: '11px',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                color: '#bdc3c7',
-                marginBottom: '6px',
-                paddingBottom: '4px',
-                borderBottom: '1px solid #2a2a2a',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                backgroundColor: '#1e1e1e',
+                border: '1px solid #333',
+                borderRadius: '6px',
+                padding: '8px 10px',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s, border-color 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#252525';
+                e.currentTarget.style.borderColor = '#3498db';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#1e1e1e';
+                e.currentTarget.style.borderColor = '#333';
               }}
             >
-              {category.title}
+              <span style={{ fontSize: '20px' }}>{item.icon}</span>
+              <div style={{ overflow: 'hidden' }}>
+                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#ecf0f1' }}>
+                  {item.name}
+                </div>
+                <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
+                  {item.description}
+                </div>
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {category.items.map((item) => (
+          );
+
+          const renderGroup = (group: PaletteGroup, depth: number = 0) => {
+            const isCollapsed = Boolean(collapsedGroups[group.id]);
+            const totalCount = getTotalItemCount(group);
+            const accentColor = PALETTE_ACCENT_COLORS[depth % PALETTE_ACCENT_COLORS.length];
+
+            const bg = depth === 0 ? '#202020' : depth === 1 ? '#1a1a1a' : '#151515';
+            const border = depth === 0 ? '#2e2e2e' : depth === 1 ? '#282828' : '#222222';
+            const fontSize = depth === 0 ? '11px' : '10px';
+            const padding = depth === 0 ? '6px 10px' : '5px 8px';
+
+            return (
+              <div key={group.id} style={{ marginBottom: depth === 0 ? '10px' : '6px' }}>
                 <div
-                  key={item.id}
-                  onClick={() => {
-                    if (item.onClick) item.onClick();
-                    else if (item.createConfig) onSelectPreset(item.createConfig());
-                  }}
+                  onClick={() => toggleGroup(group.id)}
                   style={{
+                    fontSize,
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    color: isCollapsed ? '#888' : '#ecf0f1',
+                    padding,
+                    backgroundColor: bg,
+                    borderRadius: '4px',
+                    border: `1px solid ${border}`,
                     display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '10px',
-                    backgroundColor: '#1e1e1e',
-                    border: '1px solid #333',
-                    borderRadius: '6px',
-                    padding: '8px 10px',
                     cursor: 'pointer',
-                    transition: 'background-color 0.15s, border-color 0.15s',
+                    userSelect: 'none',
+                    transition: 'background-color 0.15s, color 0.15s',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#252525';
-                    e.currentTarget.style.borderColor = '#3498db';
+                    e.currentTarget.style.backgroundColor = depth === 0 ? '#2a2a2a' : '#222222';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#1e1e1e';
-                    e.currentTarget.style.borderColor = '#333';
+                    e.currentTarget.style.backgroundColor = bg;
                   }}
                 >
-                  <span style={{ fontSize: '20px' }}>{item.icon}</span>
-                  <div style={{ overflow: 'hidden' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#ecf0f1' }}>
-                      {item.name}
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#888', marginTop: '2px' }}>
-                      {item.description}
-                    </div>
-                  </div>
+                  <span>
+                    {group.title} ({totalCount})
+                  </span>
+                  <span
+                    style={{
+                      fontSize: depth === 0 ? '10px' : '9px',
+                      color: isCollapsed ? '#666' : accentColor,
+                      transition: 'transform 0.15s',
+                    }}
+                  >
+                    {isCollapsed ? '▶' : '▼'}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
+
+                {!isCollapsed && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      marginLeft: '8px',
+                      paddingLeft: '8px',
+                      borderLeft: `2px solid ${accentColor}`,
+                      marginTop: '6px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {group.items && group.items.map(renderItemCard)}
+                    {group.subgroups && group.subgroups.map((sub) => renderGroup(sub, depth + 1))}
+                  </div>
+                )}
+              </div>
+            );
+          };
+
+          return categories.map((cat) => renderGroup(cat, 0));
+        })()}
       </div>
     </div>
   );

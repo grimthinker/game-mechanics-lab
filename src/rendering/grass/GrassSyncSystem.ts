@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { World } from '../../ecs/World';
-import { TerrainComponent } from '../../ecs/components/terrain';
+import { getTerrainHeightAt, TerrainComponent } from '../../ecs/components/terrain';
 import { GrassGeometryBuilder } from './GrassGeometryBuilder';
 import { createGrassMaterial } from './GrassMaterial';
 import { GRASS_CONFIG } from '../../config/grassConfig';
@@ -87,7 +87,7 @@ export class GrassSyncSystem {
     }
 
     if (this.renderer) {
-      const stamps = this.collectTrampleStamps(world);
+      const stamps = this.collectTrampleStamps(world, terrainComp);
       this.trampleManager.update(this.renderer, dt, stamps, camX, camZ);
 
       if (shader) {
@@ -153,13 +153,24 @@ export class GrassSyncSystem {
     }
   }
 
-  private collectTrampleStamps(world: World): TrampleStamp[] {
+  private collectTrampleStamps(world: World, terrainComp?: TerrainComponent): TrampleStamp[] {
     const stamps: TrampleStamp[] = [];
+
+    const isNearGround = (y: number, x: number, z: number): boolean => {
+      let groundY = 0;
+      if (terrainComp) {
+        const h = getTerrainHeightAt(terrainComp, x, z);
+        if (h !== null) groundY = h;
+      }
+      return y - groundY < 0.6; // Трава приминается только если объект не выше 60 см над землей
+    };
 
     // 1. Игрок
     const entities = world.getEntitiesWith('transform', 'aiStats', 'health');
     for (const [id, { transform, aiStats, health }] of entities) {
       if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
+        if (!isNearGround(transform.y, transform.x, transform.z)) continue;
+
         const physStats = world.getComponent(id, 'physicsStats');
         const vel = world.getComponent(id, 'velocity');
         const speed = Math.hypot(vel?.vx ?? 0, vel?.vz ?? 0);
@@ -187,6 +198,8 @@ export class GrassSyncSystem {
     const creatures = world.getEntitiesWith('transform', 'health', 'meta');
     for (const [id, { transform, health, meta }] of creatures) {
       if (meta.entityType === 'creature' && health.isAlive) {
+        if (!isNearGround(transform.y, transform.x, transform.z)) continue;
+
         const ai = world.getComponent(id, 'aiStats');
         if (ai?.behavior.current === 'PlayerTree') continue;
 
@@ -218,6 +231,11 @@ export class GrassSyncSystem {
       if (world.getComponent(id, 'ownership')) continue;
 
       const physStats = world.getComponent(id, 'physicsStats');
+      const itemRadius = physStats?.radius.current ?? 0.3;
+
+      // Для предметов проверяем высоту с учетом их радиуса (так как у них origin в центре)
+      if (!isNearGround(transform.y - itemRadius, transform.x, transform.z)) continue;
+
       const thrown = world.getComponent(id, 'thrownObject');
       const vel = world.getComponent(id, 'velocity');
 

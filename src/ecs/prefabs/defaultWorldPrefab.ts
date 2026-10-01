@@ -1,13 +1,14 @@
 import { GameSimulation } from '../../core/GameSimulation';
 import { Vec3, Radians } from '../../types';
 import { deg2Rad, createRectanglePoints } from '../../utils';
-import { createZoneConfig } from '../archetypes/ZoneArchetype';
+import { createEffectorZoneConfig } from '../archetypes/ZoneArchetype';
 import { createDefaultTerrainConfig } from '../archetypes/TerrainArchetype';
 import { createDefaultEnvironmentConfig } from '../archetypes/EnvironmentArchetype';
 import {
   createHouseConfig,
   createFenceConfig,
   createRockConfig,
+  createTreeConfig,
 } from '../archetypes/ObstacleArchetype';
 import { getTerrainHeightAt } from '../components/terrain';
 import { spawnFetchGroup } from './fetchGroupPrefab';
@@ -70,30 +71,16 @@ export function initDefaultWorldPrefab(simulation: GameSimulation, center?: Vec3
     const ty = getHeight(tx, tz);
     const randomAngle = (Math.random() * Math.PI * 2) as Radians;
     simulation.spawnEntity(
-      {
-        tag: { archetype: 'obstacle' },
-        meta: { name: 'Дерево', entityType: 'obstacle', destructible: false },
-        visualModel: { modelId: 'proc://prop/tree' },
-        transform: {
-          x: tx,
-          y: ty,
-          z: tz,
-          rotation: {
-            x: 0,
-            y: Math.sin(randomAngle * 0.5),
-            z: 0,
-            w: Math.cos(randomAngle * 0.5),
-          },
-          angle: randomAngle,
-        },
-        physics: {
-          radius: 0.6,
-          weight: 5000,
-          isSolid: true,
-          height: 4.0,
-          points: createRectanglePoints(0.6, 0.6),
-        },
-      },
+      createTreeConfig(
+        'proc://prop/tree',
+        'Дерево',
+        0.3,
+        3.0,
+        4.0,
+        0.6,
+        { x: tx, y: ty, z: tz },
+        randomAngle
+      ),
       { x: tx, y: ty, z: tz }
     );
   };
@@ -186,7 +173,11 @@ export function initDefaultWorldPrefab(simulation: GameSimulation, center?: Vec3
 
   // 8. Зона эффектора
   const healY = getHeight(bx + 4.0, bz - 4.5);
-  simulation.spawnEntity(createZoneConfig('heal', 2.5, 15), { x: bx + 4.0, y: healY, z: bz - 4.5 });
+  simulation.spawnEntity(createEffectorZoneConfig('heal', 2.5, 15), {
+    x: bx + 4.0,
+    y: healY,
+    z: bz - 4.5,
+  });
 
   // 9. Предметы экипировки и оружие во дворе
   const yardItemY = getHeight(bx - 2.5, bz + 2.2);

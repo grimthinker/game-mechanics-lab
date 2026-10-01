@@ -234,6 +234,8 @@ export const useCanvasInteraction = ({
 
         const isBodyPart =
           comp?.tag?.archetype === 'bodyPart' || !!app.world.getComponent(entityId, 'socketDef');
+        const isMultiSelect = e.shiftKey || e.ctrlKey || e.metaKey;
+
         if (isBodyPart) {
           const rootId = getRootOwner(app.world, entityId);
           if (rootId && rootId !== entityId) {
@@ -241,10 +243,10 @@ export const useCanvasInteraction = ({
             if (rootTag?.archetype === 'creature') {
               const creatureName = app.world.getComponent(rootId, 'meta')?.name || 'Существо';
 
-              if (e.shiftKey && app.selection.selectedEntityIds.has(rootId)) {
+              if (isMultiSelect && app.selection.selectedEntityIds.has(rootId)) {
                 app.selection.deselectEntity(rootId);
               } else {
-                app.selection.selectEntity(rootId, !e.shiftKey);
+                app.selection.selectEntity(rootId, !isMultiSelect);
                 EventBus.emit('inspector:navigate', {
                   rootEntityId: rootId,
                   path: [{ id: rootId, label: creatureName }],
@@ -257,10 +259,10 @@ export const useCanvasInteraction = ({
           }
         }
 
-        if (e.shiftKey && app.selection.selectedEntityIds.has(entityId)) {
+        if (isMultiSelect && app.selection.selectedEntityIds.has(entityId)) {
           app.selection.deselectEntity(entityId);
         } else {
-          app.selection.selectEntity(entityId, !e.shiftKey);
+          app.selection.selectEntity(entityId, !isMultiSelect);
         }
         syncPlayerControls();
         updateStats();

@@ -597,8 +597,14 @@ export const App: React.FC = () => {
             app={appRef.current}
             world={appRef.current?.world}
             selectedEntityId={selectedEntityId}
-            onSelectEntity={(id) => {
-              appRef.current?.selection.selectEntity(id, true);
+            onSelectEntity={(id, clearGroup = true) => {
+              if (appRef.current) {
+                if (!clearGroup && appRef.current.selection.selectedEntityIds.has(id)) {
+                  appRef.current.selection.deselectEntity(id);
+                } else {
+                  appRef.current.selection.selectEntity(id, clearGroup);
+                }
+              }
             }}
             onFocusEntity={handleFocusEntity}
             onSelectSpawnPreset={handleSelectSpawnPreset}

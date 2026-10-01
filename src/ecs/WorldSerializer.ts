@@ -19,6 +19,7 @@ import {
   base64ToUint8Array,
 } from './utils/terrainCompression';
 import { TerrainComponent } from './components/terrain';
+import { buildObstacleColliders } from './utils/obstacleColliders';
 
 export interface SerializedTerrainData {
   width?: number;
@@ -494,6 +495,7 @@ export class WorldSerializer {
 
             let rawBody: RAPIER.RigidBody | undefined = undefined;
             let rawCollider: RAPIER.Collider | undefined = undefined;
+            let rawColliders: RAPIER.Collider[] | undefined = undefined;
 
             if (this.app.physicsDriver?.isReady) {
               const pos3D = { x: trans?.x ?? 0, y: trans?.y ?? 0, z: trans?.z ?? 0 };
@@ -504,34 +506,19 @@ export class WorldSerializer {
                 false
               );
 
-              let minX = points[0]?.x ?? -2,
-                maxX = points[0]?.x ?? 2;
-              let minY = points[0]?.y ?? -0.5,
-                maxY = points[0]?.y ?? 0.5;
-              for (const p of points) {
-                if (p.x < minX) minX = p.x;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.y > maxY) maxY = p.y;
-              }
-              const width = Math.max(0.2, maxX - minX);
-              const depth = Math.max(0.2, maxY - minY);
-              const height = comps.physicsStats?.height?.current ?? 1.5;
-
-              const hx = width / 2;
-              const hy = height / 2;
-              const hz = depth / 2;
-
-              rawCollider = this.app.physicsDriver.createCuboidCollider(hx, hy, hz, rawBody, 0, {
-                x: 0,
-                y: hy,
-                z: 0,
+              const built = buildObstacleColliders(this.app.physicsDriver, rawBody, {
+                points,
+                height: comps.physicsStats?.height?.current ?? 1.5,
+                colliders: comps.physicsStats?.colliders,
               });
+              rawCollider = built.primaryCollider;
+              rawColliders = built.allColliders;
             }
 
             this.app.world.addComponent(ent.id, 'physicsBody', {
               rawBody,
               rawCollider,
+              rawColliders,
               bodyType: 'fixed',
               isStatic: true,
               category,

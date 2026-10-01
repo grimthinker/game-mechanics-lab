@@ -15,11 +15,24 @@ export interface TransformComponent {
   isDirty?: boolean;
 }
 
+export type ColliderShapeType = 'cuboid' | 'ball' | 'cylinder' | 'capsule' | 'convexHull';
+
+export interface ColliderPartDesc {
+  shape: ColliderShapeType;
+  halfExtents?: Vec3;
+  radius?: number;
+  halfHeight?: number;
+  offset?: Vec3;
+  points?: number[]; // [x, y, z, x, y, z...] для convexHull
+}
+
 export interface PhysicsBodyComponent {
   /** Нативное твердое тело Rapier3D (WASM) */
   rawBody?: RAPIER.RigidBody;
   /** Основной коллайдер тела в Rapier3D */
   rawCollider?: RAPIER.Collider;
+  /** Список всех составных коллайдеров тела в Rapier3D */
+  rawColliders?: RAPIER.Collider[];
   /** Тип физического поведения в 3D */
   bodyType?: PhysicsBodyType;
 
@@ -30,6 +43,8 @@ export interface PhysicsBodyComponent {
   currentColliderStance?: string;
   lastAppliedRadius?: number;
   lastAppliedHeight?: number;
+  lastAppliedWidth?: number;
+  lastAppliedDepth?: number;
 }
 
 export const STANDARD_RADII = [8, 16, 24, 32] as const;
@@ -46,7 +61,7 @@ export interface PhysicsConfig {
   size?: number;
   height?: number;
   isSolid?: boolean;
-  shape?: 'cuboid' | 'ball';
+  shape?: 'cuboid' | 'ball' | 'cylinder';
   restitution?: number;
   friction?: number;
   points?: Point[];
@@ -54,6 +69,7 @@ export interface PhysicsConfig {
   angularDamping?: number;
   halfExtents?: Vec3;
   colliderOffset?: Vec3;
+  colliders?: ColliderPartDesc[];
 }
 
 export interface PhysicsStatsComponent {
@@ -63,7 +79,7 @@ export interface PhysicsStatsComponent {
   totalWeight?: number;
   size?: number;
   isSolid: boolean;
-  shape?: 'cuboid' | 'ball';
+  shape?: 'cuboid' | 'ball' | 'cylinder';
   restitution?: number;
   friction?: number;
   linearDamping?: number;
@@ -71,4 +87,5 @@ export interface PhysicsStatsComponent {
   points?: Point[];
   halfExtents?: Vec3;
   colliderOffset?: Vec3;
+  colliders?: ColliderPartDesc[];
 }

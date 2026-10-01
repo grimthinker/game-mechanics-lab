@@ -1,8 +1,9 @@
 import { setBaseStat } from '../ecs/stats/StatEvaluator';
-import { createRectanglePoints, deg2Rad } from '../utils';
+import { createRectanglePoints, deg2Rad, calculateBoundingRadius } from '../utils';
 import { HitZoneType, WaterComponent, ZoneEffectType } from '../ecs/types';
 import { World } from '../ecs/World';
 import { EnvironmentComponent } from '../ecs/components/environment';
+import { scaleObstacleColliders } from '../ecs/utils/obstacleColliders';
 
 export interface MovementStatsPatch {
   maxSpeed?: number;
@@ -165,7 +166,14 @@ export class EditorMutationsAPI {
 
   public updateEntityPhysics(
     id: string,
-    patch: { radius?: number; height?: number; weight?: number; isSolid?: boolean }
+    patch: {
+      radius?: number;
+      width?: number;
+      depth?: number;
+      height?: number;
+      weight?: number;
+      isSolid?: boolean;
+    }
   ): boolean {
     const physStats = this.world.getComponent(id, 'physicsStats');
     if (!physStats) return false;
@@ -174,28 +182,97 @@ export class EditorMutationsAPI {
     const prevRadius = physStats.radius.base;
     const prevHeight = physStats.height.base;
 
-    if (patch.radius !== undefined && physStats.radius.base !== patch.radius) {
-      const oldRadius = physStats.radius.base;
+    const oldRadius = physStats.radius.base;
+    const oldHeight = physStats.height.base;
+
+    // Вычисляем текущие габариты по X и Z из точек полигона
+    let curWidth = oldRadius * 2;
+    let curDepth = oldRadius * 2;
+    if (physStats.points && physStats.points.length > 0) {
+      let minX = physStats.points[0].x,
+        maxX = physStats.points[0].x;
+      let minY = physStats.points[0].y,
+        maxY = physStats.points[0].y;
+      for (const p of physStats.points) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+      curWidth = Math.max(0.1, maxX - minX);
+      curDepth = Math.max(0.1, maxY - minY);
+    }
+
+    let ratioX = 1.0;
+    let ratioZ = 1.0;
+    let ratioY = 1.0;
+
+    if (patch.width !== undefined || patch.depth !== undefined) {
+      const newW = patch.width !== undefined ? Math.max(0.1, patch.width) : curWidth;
+      const newD = patch.depth !== undefined ? Math.max(0.1, patch.depth) : curDepth;
+
+      ratioX = curWidth > 0 ? newW / curWidth : 1.0;
+      ratioZ = curDepth > 0 ? newD / curDepth : 1.0;
+
+      if (physStats.points) {
+        for (const p of physStats.points) {
+          p.x *= ratioX;
+          p.y *= ratioZ;
+        }
+      }
+
+      const newRadius = physStats.points
+        ? calculateBoundingRadius(physStats.points)
+        : Math.max(newW, newD) / 2;
+
+      setBaseStat(physStats.radius, newRadius);
+      changed = true;
+    } else if (patch.radius !== undefined && physStats.radius.base !== patch.radius) {
+      const ratioXZ = oldRadius > 0 ? patch.radius / oldRadius : 1.0;
+      ratioX = ratioXZ;
+      ratioZ = ratioXZ;
       setBaseStat(physStats.radius, patch.radius);
+
       // Если это зона — синхронизируем радиус эффектора
       const effector = this.world.getComponent(id, 'areaEffector');
       if (effector && effector.radius !== patch.radius) {
         effector.radius = patch.radius;
       }
+      const shape = this.world.getComponent(id, 'zoneShape');
+      if (shape && patch.radius !== undefined) {
+        shape.radius = patch.radius;
+        shape.width = patch.radius * 2;
+        shape.depth = patch.radius * 2;
+      }
       // Если это препятствие с полигоном точек — масштабируем точки от центра
       if (physStats.points && oldRadius > 0) {
-        const ratio = patch.radius / oldRadius;
         for (const p of physStats.points) {
-          p.x *= ratio;
-          p.y *= ratio;
+          p.x *= ratioXZ;
+          p.y *= ratioXZ;
         }
       }
       changed = true;
     }
 
     if (patch.height !== undefined && physStats.height.base !== patch.height) {
+      ratioY = oldHeight > 0 ? patch.height / oldHeight : 1.0;
       setBaseStat(physStats.height, patch.height);
       changed = true;
+    }
+
+    if (patch.weight !== undefined && physStats.weight.base !== patch.weight) {
+      setBaseStat(physStats.weight, patch.weight);
+      changed = true;
+    }
+
+    if (patch.isSolid !== undefined && physStats.isSolid !== patch.isSolid) {
+      physStats.isSolid = patch.isSolid;
+      changed = true;
+    }
+
+    // Если у препятствия есть составные коллайдеры (ствол дерева, крыша дома) — масштабируем их геометрию
+    if (changed && physStats.colliders && (ratioX !== 1.0 || ratioY !== 1.0 || ratioZ !== 1.0)) {
+      scaleObstacleColliders(physStats.colliders, ratioX, ratioY, ratioZ);
     }
 
     // Если это составное существо — пропорционально масштабируем его дочерние части тела
@@ -203,9 +280,9 @@ export class EditorMutationsAPI {
     const tag = this.world.getComponent(id, 'tag');
     if (changed && (tag?.archetype === 'creature' || assembly) && assembly?.partIds) {
       const scaleDeltaXZ =
-        patch.radius !== undefined && prevRadius > 0 ? patch.radius / prevRadius : 1.0;
+        patch.radius !== undefined && prevRadius > 0 ? patch.radius / prevRadius : ratioX;
       const scaleDeltaY =
-        patch.height !== undefined && prevHeight > 0 ? patch.height / prevHeight : 1.0;
+        patch.height !== undefined && prevHeight > 0 ? patch.height / prevHeight : ratioY;
       const scaleDeltaVol = scaleDeltaXZ * scaleDeltaXZ * scaleDeltaY;
 
       for (const partId of assembly.partIds) {

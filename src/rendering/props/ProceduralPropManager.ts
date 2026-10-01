@@ -28,6 +28,34 @@ export class ProceduralPropManager {
       prop = this.buildSword();
     } else if (name === 'tree') {
       prop = this.buildTree();
+    } else if (name === 'tree_2') {
+      prop = this.buildTree2();
+    } else if (name === 'tree_3') {
+      prop = this.buildTree3();
+    } else if (name === 'tree_spruce') {
+      prop = this.buildSpruce();
+    } else if (name === 'tree_pine') {
+      prop = this.buildPine();
+    } else if (name === 'signpost') {
+      prop = this.buildSignpost();
+    } else if (name === 'signpost_single') {
+      prop = this.buildSignpostSingle();
+    } else if (name === 'log_pile_1') {
+      prop = this.buildLogPile1();
+    } else if (name === 'log_pile_2') {
+      prop = this.buildLogPile2();
+    } else if (name === 'stump') {
+      prop = this.buildStump();
+    } else if (name === 'toilet') {
+      prop = this.buildToilet();
+    } else if (name === 'barrel') {
+      prop = this.buildBarrel();
+    } else if (name === 'crate') {
+      prop = this.buildCrateProp();
+    } else if (name === 'bridge') {
+      prop = this.buildBridge();
+    } else if (name === 'lamp_post') {
+      prop = this.buildLampPost();
     } else if (name === 'ball') {
       prop = this.buildBall();
     } else if (name === 'house') {
@@ -125,12 +153,12 @@ export class ProceduralPropManager {
       flatShading: true,
     });
 
-    // Ствол (Trunk) - цилиндр с низким кол-вом полигонов (low-poly)
+    // Ствол (Trunk)
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 3.0, 6), barkMat);
-    trunk.position.set(0, 1.5, 0); // Основание у земли (y=0)
+    trunk.position.set(0, 1.5, 0);
     group.add(trunk);
 
-    // Крона (Leaves) - состоит из 3 пересекающихся додекаэдров разного размера
+    // Крона (Leaves)
     const crown1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.6, 0), leafMat);
     crown1.position.set(0, 3.5, 0);
     group.add(crown1);
@@ -142,6 +170,824 @@ export class ProceduralPropManager {
     const crown3 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), leafMat);
     crown3.position.set(-0.7, 2.8, 0.5);
     group.add(crown3);
+
+    return group;
+  }
+
+  /** Лиственное дерево 2: раскидистое с мощным толстым стволом (дуб) */
+  private buildTree2(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'Tree2Root';
+
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0x4e342e, roughness: 0.95 });
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x33691e,
+      roughness: 0.8,
+      flatShading: true,
+    });
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.55, 3.2, 7), barkMat);
+    trunk.position.set(0, 1.6, 0);
+    group.add(trunk);
+
+    // Широкая приплюснутая раскидистая крона
+    const cCenter = new THREE.Mesh(new THREE.DodecahedronGeometry(1.8, 0), leafMat);
+    cCenter.position.set(0, 3.8, 0);
+    group.add(cCenter);
+
+    const cEast = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4, 0), leafMat);
+    cEast.position.set(1.2, 3.4, 0.3);
+    group.add(cEast);
+
+    const cWest = new THREE.Mesh(new THREE.DodecahedronGeometry(1.5, 0), leafMat);
+    cWest.position.set(-1.3, 3.3, -0.4);
+    group.add(cWest);
+
+    const cNorth = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), leafMat);
+    cNorth.position.set(0.2, 3.5, 1.2);
+    group.add(cNorth);
+
+    const cSouth = new THREE.Mesh(new THREE.DodecahedronGeometry(1.4, 0), leafMat);
+    cSouth.position.set(-0.4, 3.4, -1.2);
+    group.add(cSouth);
+
+    return group;
+  }
+
+  /** Лиственное дерево 3: стройное высокое (береза / тополь) */
+  private buildTree3(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'Tree3Root';
+
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0xd7ccc8, roughness: 0.85 });
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x558b2f,
+      roughness: 0.8,
+      flatShading: true,
+    });
+
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 4.0, 6), barkMat);
+    trunk.position.set(0, 2.0, 0);
+    group.add(trunk);
+
+    // Вертикально вытянутая крона
+    const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), leafMat);
+    c1.position.set(0, 3.4, 0);
+    group.add(c1);
+
+    const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.1, 0), leafMat);
+    c2.position.set(0.2, 4.3, -0.1);
+    group.add(c2);
+
+    const c3 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.85, 0), leafMat);
+    c3.position.set(-0.1, 5.0, 0.1);
+    group.add(c3);
+
+    return group;
+  }
+
+  /** Ель: пышная 8-гранная ель с расширенными ярусами и двухцветным стволом по референсу */
+  private buildSpruce(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'SpruceRoot';
+
+    const barkMat = new THREE.MeshStandardMaterial({
+      color: 0x935128,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const barkShadowMat = new THREE.MeshStandardMaterial({
+      color: 0x422213,
+      roughness: 0.95,
+      flatShading: true,
+    });
+    const needleMat = new THREE.MeshStandardMaterial({
+      color: 0x2e8540,
+      roughness: 0.65,
+      flatShading: true,
+    });
+
+    // 1. Двухцветный 8-гранный граненый ствол (светлый низ, темный верх под кроной)
+    const trunkLowerGeo = new THREE.CylinderGeometry(0.22, 0.26, 0.55, 8).toNonIndexed();
+    trunkLowerGeo.computeVertexNormals();
+    const trunkLower = new THREE.Mesh(trunkLowerGeo, barkMat);
+    trunkLower.position.set(0, 0.275, 0);
+    trunkLower.rotation.y = Math.PI / 8;
+    group.add(trunkLower);
+
+    const trunkUpperGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.55, 8).toNonIndexed();
+    trunkUpperGeo.computeVertexNormals();
+    const trunkUpper = new THREE.Mesh(trunkUpperGeo, barkShadowMat);
+    trunkUpper.position.set(0, 0.75, 0);
+    trunkUpper.rotation.y = Math.PI / 8;
+    group.add(trunkUpper);
+
+    // Вспомогательная функция сборки 8-гранного многогранника хвои
+    const createFacetedTier = (radius: number, height: number, bottomY: number) => {
+      const geo = new THREE.ConeGeometry(radius, height, 8).toNonIndexed();
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, needleMat);
+      mesh.position.set(0, bottomY + height / 2, 0);
+      mesh.rotation.y = Math.PI / 8;
+      return mesh;
+    };
+
+    // 2. 3 широких яруса хвои (нижний широкий, средний переходный, верхний остроконечный)
+    const tierBottom = createFacetedTier(1.85, 1.25, 0.75);
+    group.add(tierBottom);
+
+    const tierMid = createFacetedTier(1.45, 1.35, 1.55);
+    group.add(tierMid);
+
+    const tierTop = createFacetedTier(0.95, 1.85, 2.35);
+    group.add(tierTop);
+
+    return group;
+  }
+
+  /** Сосна: высокий ствол с плоскими зонтичными шапками хвои на вершине */
+  private buildPine(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'PineRoot';
+
+    const barkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+    const needleMat = new THREE.MeshStandardMaterial({
+      color: 0x234d31,
+      roughness: 0.85,
+      flatShading: true,
+    });
+
+    // Высокий голый ствол
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 4.5, 6), barkMat);
+    trunk.position.set(0, 2.25, 0);
+    group.add(trunk);
+
+    // 3 приплюснутые шапки хвои на верхушке
+    const cap1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3, 0), needleMat);
+    cap1.scale.set(1.4, 0.65, 1.4);
+    cap1.position.set(0.4, 4.1, 0.2);
+    group.add(cap1);
+
+    const cap2 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2, 0), needleMat);
+    cap2.scale.set(1.3, 0.6, 1.3);
+    cap2.position.set(-0.5, 4.6, -0.3);
+    group.add(cap2);
+
+    const cap3 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.0, 0), needleMat);
+    cap3.scale.set(1.1, 0.75, 1.1);
+    cap3.position.set(0.0, 5.2, 0.0);
+    group.add(cap3);
+
+    return group;
+  }
+
+  /** Создает плоскую стрелку указателя с острием и крепежным болтом */
+  private createArrowSignMesh(
+    length: number,
+    height: number,
+    material: THREE.Material,
+    boltMat: THREE.Material
+  ): THREE.Group {
+    const arrowGroup = new THREE.Group();
+    const depth = 0.04;
+    const bodyLen = length * 0.72;
+    const tipLen = length * 0.28;
+
+    const shape = new THREE.Shape();
+    shape.moveTo(0, -height / 2);
+    shape.lineTo(bodyLen, -height / 2);
+    shape.lineTo(bodyLen, -height * 0.75);
+    shape.lineTo(bodyLen + tipLen, 0);
+    shape.lineTo(bodyLen, height * 0.75);
+    shape.lineTo(bodyLen, height / 2);
+    shape.lineTo(0, height / 2);
+    shape.closePath();
+
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    geo.translate(0, 0, -depth / 2);
+    const arrowMesh = new THREE.Mesh(geo, material);
+    arrowGroup.add(arrowMesh);
+
+    // Центральный крепежный болт
+    const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, depth + 0.02, 8), boltMat);
+    bolt.rotation.x = Math.PI / 2;
+    bolt.position.set(bodyLen * 0.45, 0, 0);
+    arrowGroup.add(bolt);
+
+    return arrowGroup;
+  }
+
+  /** Указатель дорог (3 цветные стрелки): синяя, коралловая и белая на круглом столбе с каменной базой */
+  private buildSignpost(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'SignpostRoot';
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0x5c636e,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const poleMat = new THREE.MeshStandardMaterial({
+      color: 0xc47d52,
+      roughness: 0.8,
+      flatShading: true,
+    });
+    const boltMat = new THREE.MeshStandardMaterial({
+      color: 0x222222,
+      roughness: 0.5,
+      metalness: 0.8,
+      flatShading: true,
+    });
+
+    const matBlue = new THREE.MeshStandardMaterial({
+      color: 0x4299e1,
+      roughness: 0.65,
+      flatShading: true,
+    });
+    const matRed = new THREE.MeshStandardMaterial({
+      color: 0xdd5b66,
+      roughness: 0.65,
+      flatShading: true,
+    });
+    const matWhite = new THREE.MeshStandardMaterial({
+      color: 0xecf0f1,
+      roughness: 0.65,
+      flatShading: true,
+    });
+
+    // 1. Каменный восьмигранный башмак в основании
+    const baseGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.35, 8).toNonIndexed();
+    baseGeo.computeVertexNormals();
+    const baseMesh = new THREE.Mesh(baseGeo, stoneMat);
+    baseMesh.position.set(0, 0.175, 0);
+    group.add(baseMesh);
+
+    // 2. Деревянный цилиндрический столб
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.08, 2.1, 10), poleMat);
+    pole.position.set(0, 1.15, 0);
+    group.add(pole);
+
+    // 3. Стрелка 1 (верхняя, синяя)
+    const arrowTop = this.createArrowSignMesh(0.65, 0.16, matBlue, boltMat);
+    arrowTop.position.set(0, 1.85, 0);
+    arrowTop.rotation.y = Math.PI * 0.9;
+    group.add(arrowTop);
+
+    // 4. Стрелка 2 (средняя, коралловая)
+    const arrowMid = this.createArrowSignMesh(0.55, 0.15, matRed, boltMat);
+    arrowMid.position.set(0, 1.5, 0);
+    arrowMid.rotation.y = -Math.PI * 0.25;
+    group.add(arrowMid);
+
+    // 5. Стрелка 3 (нижняя, белая)
+    const arrowBot = this.createArrowSignMesh(0.7, 0.17, matWhite, boltMat);
+    arrowBot.position.set(0, 1.15, 0);
+    arrowBot.rotation.y = 0.0;
+    group.add(arrowBot);
+
+    return group;
+  }
+
+  /** Новый указатель дорог (1 стрелка) с каменным основанием */
+  private buildSignpostSingle(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'SignpostSingleRoot';
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0x5c636e,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const poleMat = new THREE.MeshStandardMaterial({
+      color: 0xc47d52,
+      roughness: 0.8,
+      flatShading: true,
+    });
+    const arrowMat = new THREE.MeshStandardMaterial({
+      color: 0xb8734c,
+      roughness: 0.75,
+      flatShading: true,
+    });
+    const boltMat = new THREE.MeshStandardMaterial({
+      color: 0x222222,
+      roughness: 0.5,
+      metalness: 0.8,
+      flatShading: true,
+    });
+
+    // Каменное основание
+    const baseGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.35, 8).toNonIndexed();
+    baseGeo.computeVertexNormals();
+    const baseMesh = new THREE.Mesh(baseGeo, stoneMat);
+    baseMesh.position.set(0, 0.175, 0);
+    group.add(baseMesh);
+
+    // Деревянный столб
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.08, 1.6, 10), poleMat);
+    pole.position.set(0, 0.9, 0);
+    group.add(pole);
+
+    // Одиночная деревянная стрелка вправо с крепежом
+    const arrow = this.createArrowSignMesh(0.68, 0.18, arrowMat, boltMat);
+    arrow.position.set(0, 1.32, 0);
+    group.add(arrow);
+
+    return group;
+  }
+
+  /** Вспомогательный метод для создания одного шестигранного бревна со светлыми срезами */
+  private createSingleLog(radius: number, length: number): THREE.Group {
+    const logGroup = new THREE.Group();
+    const barkMat = new THREE.MeshStandardMaterial({
+      color: 0x8a5229,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const cutMat = new THREE.MeshStandardMaterial({
+      color: 0xe0ad70,
+      roughness: 0.8,
+      flatShading: true,
+    });
+
+    // 6-гранный цилиндр бревна, ориентированный вдоль оси Z
+    const logGeo = new THREE.CylinderGeometry(radius, radius, length, 6, 1, false).toNonIndexed();
+    logGeo.computeVertexNormals();
+    logGeo.rotateX(Math.PI / 2);
+
+    const logMesh = new THREE.Mesh(logGeo, barkMat);
+    logGroup.add(logMesh);
+
+    // Светлые спилы на торцах
+    const endGeo = new THREE.CircleGeometry(radius * 0.96, 6);
+    const endFront = new THREE.Mesh(endGeo, cutMat);
+    endFront.position.set(0, 0, length / 2 + 0.002);
+    logGroup.add(endFront);
+
+    const endBack = new THREE.Mesh(endGeo, cutMat);
+    endBack.rotation.y = Math.PI;
+    endBack.position.set(0, 0, -length / 2 - 0.002);
+    logGroup.add(endBack);
+
+    return logGroup;
+  }
+
+  /** Вариант 1 стопки бревен: пирамида из 7 бревен со смещенным бревном сбоку по референсу */
+  private buildLogPile1(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'LogPile1Root';
+
+    const r = 0.18;
+    const len = 1.6;
+
+    // Нижний ряд (3 бревна + 1 лежащее слева)
+    const logSide = this.createSingleLog(r * 0.95, len * 0.95);
+    logSide.position.set(-0.68, r, 0.05);
+    group.add(logSide);
+
+    const l1 = this.createSingleLog(r, len);
+    l1.position.set(-0.35, r, 0);
+    group.add(l1);
+
+    const l2 = this.createSingleLog(r, len);
+    l2.position.set(0.0, r, 0);
+    group.add(l2);
+
+    const l3 = this.createSingleLog(r, len);
+    l3.position.set(0.35, r, 0);
+    group.add(l3);
+
+    // Средний ряд (2 бревна в пазах)
+    const l4 = this.createSingleLog(r, len);
+    l4.position.set(-0.175, r + r * 1.6, 0.03);
+    group.add(l4);
+
+    const l5 = this.createSingleLog(r, len);
+    l5.position.set(0.175, r + r * 1.6, -0.02);
+    group.add(l5);
+
+    // Верхнее бревно
+    const l6 = this.createSingleLog(r, len);
+    l6.position.set(0.0, r + r * 3.15, 0.02);
+    group.add(l6);
+
+    return group;
+  }
+
+  /** Вариант 2 стопки бревен: компактная поленница из 5 бревен (3 снизу, 2 сверху) */
+  private buildLogPile2(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'LogPile2Root';
+
+    const r = 0.18;
+    const len = 1.5;
+
+    // Нижний ряд (3 бревна)
+    const l1 = this.createSingleLog(r, len);
+    l1.position.set(-0.35, r, 0);
+    group.add(l1);
+
+    const l2 = this.createSingleLog(r, len);
+    l2.position.set(0.0, r, 0);
+    group.add(l2);
+
+    const l3 = this.createSingleLog(r, len);
+    l3.position.set(0.35, r, 0);
+    group.add(l3);
+
+    // Верхний ряд (2 бревна)
+    const l4 = this.createSingleLog(r, len);
+    l4.position.set(-0.175, r + r * 1.6, 0.02);
+    group.add(l4);
+
+    const l5 = this.createSingleLog(r, len);
+    l5.position.set(0.175, r + r * 1.6, -0.02);
+    group.add(l5);
+
+    return group;
+  }
+
+  /** Пень с топором: колотый ствол со светлым спилом и низкополигональным топором по референсу */
+  private buildStump(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'StumpRoot';
+
+    const barkMat = new THREE.MeshStandardMaterial({
+      color: 0x8a5229,
+      roughness: 0.9,
+      flatShading: true,
+    });
+    const cutMat = new THREE.MeshStandardMaterial({
+      color: 0xdeb078,
+      roughness: 0.8,
+      flatShading: true,
+    });
+    const steelMat = new THREE.MeshStandardMaterial({
+      color: 0x95a5a6,
+      roughness: 0.35,
+      metalness: 0.8,
+      flatShading: true,
+    });
+    const handleMat = new THREE.MeshStandardMaterial({
+      color: 0xb57348,
+      roughness: 0.75,
+      flatShading: true,
+    });
+
+    // 8-гранный массивный ствол пня
+    const stumpH = 0.75;
+    const stumpR = 0.44;
+    const stumpGeo = new THREE.CylinderGeometry(
+      stumpR * 0.92,
+      stumpR,
+      stumpH,
+      8,
+      1,
+      false
+    ).toNonIndexed();
+    stumpGeo.computeVertexNormals();
+    const stumpMesh = new THREE.Mesh(stumpGeo, barkMat);
+    stumpMesh.position.set(0, stumpH / 2, 0);
+    stumpMesh.rotation.y = Math.PI / 8;
+    group.add(stumpMesh);
+
+    // Светлый спил на верхней плоскости
+    const cutTop = new THREE.Mesh(new THREE.CircleGeometry(stumpR * 0.91, 8), cutMat);
+    cutTop.rotation.x = -Math.PI / 2;
+    cutTop.rotation.z = Math.PI / 8;
+    cutTop.position.set(0, stumpH + 0.002, 0);
+    group.add(cutTop);
+
+    // Топор, врубленный в пень
+    const axeGroup = new THREE.Group();
+    axeGroup.position.set(-0.06, stumpH, 0);
+
+    // Лезвие топора
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.16, 0.22), steelMat);
+    blade.position.set(0, 0.05, 0.02);
+    blade.rotation.x = 0.15;
+    axeGroup.add(blade);
+
+    // Длинное деревянное топорище
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.048, 0.72), handleMat);
+    handle.position.set(0, 0.17, 0.26);
+    handle.rotation.x = -0.32;
+    axeGroup.add(handle);
+
+    group.add(axeGroup);
+
+    return group;
+  }
+
+  /** Уличный сельский туалет: деревянная кабинка с наклонной крышей и вырезом полумесяца */
+  private buildToilet(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'ToiletRoot';
+
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x936348,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const roofMat = new THREE.MeshStandardMaterial({
+      color: 0x734832,
+      roughness: 0.8,
+      flatShading: true,
+    });
+    const doorMat = new THREE.MeshStandardMaterial({
+      color: 0x82543c,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const metalMat = new THREE.MeshStandardMaterial({
+      color: 0xdcdcdc,
+      roughness: 0.4,
+      metalness: 0.6,
+      flatShading: true,
+    });
+    const darkHoleMat = new THREE.MeshStandardMaterial({
+      color: 0x24160f,
+      roughness: 0.9,
+      flatShading: true,
+    });
+
+    const w = 1.15;
+    const d = 1.15;
+    const hFront = 2.25;
+    const hBack = 1.95;
+
+    // Стены кабинки (Правильная трапециевидная призма, чтобы крыша не пересекалась)
+    const cabinGeo = new THREE.BoxGeometry(w, 1, d).toNonIndexed();
+    const pos = cabinGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      const z = pos.getZ(i);
+      if (y > 0) {
+        // Верхние вершины: высота зависит от положения по оси Z (глубина)
+        const t = (z + d / 2) / d; // 0 сзади, 1 спереди
+        const localH = hBack + (hFront - hBack) * t;
+        pos.setY(i, localH);
+      } else {
+        // Плоское дно у земли
+        pos.setY(i, 0);
+      }
+    }
+    cabinGeo.computeVertexNormals();
+    const cabin = new THREE.Mesh(cabinGeo, woodMat);
+    group.add(cabin);
+
+    // Наклонная односкатная крыша с выносом козырька
+    const roofSlopeAngle = Math.atan2(hFront - hBack, d);
+    const roofL = Math.hypot(d, hFront - hBack);
+
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.22, 0.09, roofL + 0.35), roofMat);
+    roof.position.set(0, (hFront + hBack) / 2 + 0.04, 0.0);
+    roof.rotation.x = -roofSlopeAngle;
+    group.add(roof);
+
+    // Дверь туалета на фасаде
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.72, 1.8, 0.05), doorMat);
+    door.position.set(0, 0.95, d / 2 + 0.026);
+    group.add(door);
+
+    // Петли двери
+    [-0.55, 0.55].forEach((dy) => {
+      const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.09, 0.02), metalMat);
+      hinge.position.set(0.36, 0.95 + dy, d / 2 + 0.04);
+      group.add(hinge);
+    });
+
+    // Дверная ручка-скоба
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.16, 0.05), metalMat);
+    handle.position.set(-0.28, 0.95, d / 2 + 0.055);
+    group.add(handle);
+
+    // Символ полумесяца в верхней части двери
+    const moon = new THREE.Mesh(
+      new THREE.TorusGeometry(0.07, 0.022, 6, 12, Math.PI * 1.3),
+      darkHoleMat
+    );
+    moon.rotation.z = Math.PI * 0.85;
+    moon.position.set(0, 1.55, d / 2 + 0.052);
+    group.add(moon);
+
+    return group;
+  }
+
+  /** Низкополигональная бочка с выпуклыми боками и стальными обручами */
+  private buildBarrel(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'BarrelRoot';
+
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x935c2b,
+      roughness: 0.8,
+      flatShading: true,
+    });
+    const woodLidMat = new THREE.MeshStandardMaterial({
+      color: 0x804e22,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const hoopMat = new THREE.MeshStandardMaterial({
+      color: 0x68788a,
+      roughness: 0.5,
+      metalness: 0.65,
+      flatShading: true,
+    });
+
+    const segments = 10;
+    const height = 1.1;
+    const rBase = 0.42;
+    const rMid = 0.52;
+
+    // Нижняя половина бочки (расширение к центру)
+    const lowerGeo = new THREE.CylinderGeometry(
+      rMid,
+      rBase,
+      height / 2,
+      segments,
+      1,
+      false
+    ).toNonIndexed();
+    lowerGeo.computeVertexNormals();
+    const lowerMesh = new THREE.Mesh(lowerGeo, woodMat);
+    lowerMesh.position.set(0, height / 4, 0);
+    group.add(lowerMesh);
+
+    // Верхняя половина бочки (сужение к верху)
+    const upperGeo = new THREE.CylinderGeometry(
+      rBase,
+      rMid,
+      height / 2,
+      segments,
+      1,
+      false
+    ).toNonIndexed();
+    upperGeo.computeVertexNormals();
+    const upperMesh = new THREE.Mesh(upperGeo, woodMat);
+    upperMesh.position.set(0, (height * 3) / 4, 0);
+    group.add(upperMesh);
+
+    // Утопленная верхняя крышка
+    const topLid = new THREE.Mesh(new THREE.CircleGeometry(rBase * 0.94, segments), woodLidMat);
+    topLid.rotation.x = -Math.PI / 2;
+    topLid.position.set(0, height - 0.02, 0);
+    group.add(topLid);
+
+    // Металлические обручи (верхний и нижний)
+    const rHoop = (rBase + rMid) / 2 + 0.015;
+    const hoopTop = new THREE.Mesh(
+      new THREE.CylinderGeometry(rHoop, rHoop, 0.06, segments, 1, true),
+      hoopMat
+    );
+    hoopTop.position.set(0, 0.78, 0);
+    group.add(hoopTop);
+
+    const hoopBottom = new THREE.Mesh(
+      new THREE.CylinderGeometry(rHoop, rHoop, 0.06, segments, 1, true),
+      hoopMat
+    );
+    hoopBottom.position.set(0, 0.32, 0);
+    group.add(hoopBottom);
+
+    return group;
+  }
+
+  /** Открытый деревянный ящик по референсу */
+  private buildCrateProp(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'CratePropRoot';
+
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: 0x9e6c46,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const darkWoodMat = new THREE.MeshStandardMaterial({
+      color: 0x7e5233,
+      roughness: 0.9,
+      flatShading: true,
+    });
+
+    const w = 1.1;
+    const d = 0.85;
+    const h = 0.58;
+    const postW = 0.09;
+    const slatT = 0.04;
+
+    // 4 угловых бруска
+    [-1, 1].forEach((sx) => {
+      [-1, 1].forEach((sz) => {
+        const post = new THREE.Mesh(new THREE.BoxGeometry(postW, h, postW), darkWoodMat);
+        post.position.set(sx * (w / 2 - postW / 2), h / 2, sz * (d / 2 - postW / 2));
+        group.add(post);
+      });
+    });
+
+    // Дно ящика
+    const bottom = new THREE.Mesh(
+      new THREE.BoxGeometry(w - postW * 2, slatT, d - postW * 2),
+      woodMat
+    );
+    bottom.position.set(0, slatT / 2, 0);
+    group.add(bottom);
+
+    // Боковые планки (по 2 горизонтальные доски на каждой стороне)
+    [0.16, 0.44].forEach((py) => {
+      // Длинные стороны
+      [-1, 1].forEach((sz) => {
+        const slatLong = new THREE.Mesh(new THREE.BoxGeometry(w, 0.18, slatT), woodMat);
+        slatLong.position.set(0, py, sz * (d / 2 - slatT / 2));
+        group.add(slatLong);
+      });
+
+      // Короткие стороны
+      [-1, 1].forEach((sx) => {
+        const slatShort = new THREE.Mesh(
+          new THREE.BoxGeometry(slatT, 0.18, d - postW * 2),
+          woodMat
+        );
+        slatShort.position.set(sx * (w / 2 - slatT / 2), py, 0);
+        group.add(slatShort);
+      });
+    });
+
+    return group;
+  }
+
+  /** Столбик с фонарем: деревянный столб 3.0м с кованым кронштейном и масляным фонарем */
+  private buildLampPost(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'LampPostRoot';
+
+    const woodTex = this.createWoodPlankTexture(true);
+    const postMat = new THREE.MeshStandardMaterial({
+      map: woodTex,
+      color: 0x5d4037,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const ironMat = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      roughness: 0.5,
+      metalness: 0.8,
+    });
+    const lanternGlassMat = new THREE.MeshStandardMaterial({
+      color: 0xfef08a,
+      emissive: new THREE.Color(0xf59e0b),
+      emissiveIntensity: 0.85,
+      roughness: 0.3,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    // Вертикальный граненый столб высотой 3.0 м
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.0, 0.16), postMat);
+    pole.position.set(0, 1.5, 0);
+    group.add(pole);
+
+    // Декоративный железный наконечник на столбе
+    const poleCap = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.22, 4), ironMat);
+    poleCap.position.set(0, 3.11, 0);
+    poleCap.rotation.y = Math.PI / 4;
+    group.add(poleCap);
+
+    // Кованый кронштейн, выступающий вперед
+    const armH = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.04, 0.04), ironMat);
+    armH.position.set(0.23, 2.82, 0);
+    group.add(armH);
+
+    const brace = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, 0.035), ironMat);
+    brace.position.set(0.15, 2.67, 0);
+    brace.rotation.z = -Math.PI / 4;
+    group.add(brace);
+
+    // Фонарь (подвес, стеклянная колба, козырек)
+    const lanternRoot = new THREE.Group();
+    lanternRoot.position.set(0.42, 2.65, 0);
+
+    // Кольцо подвеса
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12, 6), ironMat);
+    ring.position.set(0, 0.18, 0);
+    lanternRoot.add(ring);
+
+    // Крышка фонаря
+    const lCap = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.1, 4), ironMat);
+    lCap.position.set(0, 0.1, 0);
+    lCap.rotation.y = Math.PI / 4;
+    lanternRoot.add(lCap);
+
+    // Светящаяся колба фонаря
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.18), lanternGlassMat);
+    glass.position.set(0, -0.04, 0);
+    lanternRoot.add(glass);
+
+    // Металлическое основание фонаря
+    const lBase = new THREE.Mesh(new THREE.BoxGeometry(0.19, 0.04, 0.19), ironMat);
+    lBase.position.set(0, -0.16, 0);
+    lanternRoot.add(lBase);
+
+    group.add(lanternRoot);
 
     return group;
   }
@@ -330,11 +1176,12 @@ export class ProceduralPropManager {
     canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
 
-    ctx.fillStyle = '#6b7280';
+    // Яркая базовая каменная текстура
+    ctx.fillStyle = '#9aa4b2';
     ctx.fillRect(0, 0, 256, 256);
 
-    // Случайные штрихи и трещины скальной породы
-    ctx.fillStyle = '#9ca3af';
+    // Светлые пятна сколов и минералов
+    ctx.fillStyle = '#c5d0de';
     for (let i = 0; i < 40; i++) {
       const x = Math.random() * 256;
       const y = Math.random() * 256;
@@ -343,9 +1190,10 @@ export class ProceduralPropManager {
       ctx.fillRect(x, y, w, h);
     }
 
-    ctx.strokeStyle = '#4b5563';
+    // Трещины умеренного контраста
+    ctx.strokeStyle = '#707b8a';
     ctx.lineWidth = 2;
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 14; i++) {
       ctx.beginPath();
       const sx = Math.random() * 256;
       const sy = Math.random() * 256;
@@ -428,10 +1276,21 @@ export class ProceduralPropManager {
       flatShading: true,
     });
 
-    // 1. Каменный цоколь (Foundation)
-    const foundation = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.8, 5.4), foundationMat);
-    foundation.position.set(0, 0.4, 0);
-    group.add(foundation);
+    // 1. Каменный цоколь (Foundation) с вырезом под входную дверь
+    // Основной массив фундамента (до линии фасада)
+    const foundationMain = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.8, 4.7), foundationMat);
+    foundationMain.position.set(0, 0.4, -0.35);
+    group.add(foundationMain);
+
+    // Левый блок цоколя на фасаде (слева от двери)
+    const foundationLeft = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.8, 0.7), foundationMat);
+    foundationLeft.position.set(-1.975, 0.4, 2.35);
+    group.add(foundationLeft);
+
+    // Правый блок цоколя на фасаде (справа от двери)
+    const foundationRight = new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.8, 0.7), foundationMat);
+    foundationRight.position.set(1.075, 0.4, 2.35);
+    group.add(foundationRight);
 
     // 2. Основной корпус стен (Walls)
     const walls = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2.2, 5.2), wallMat);
@@ -502,14 +1361,15 @@ export class ProceduralPropManager {
     });
 
     // 5. Входная дверь (Door), порог и козырек на фасаде (+Z)
+    // Теперь дверь опущена до порога (y=0.16) и видна целиком без перекрытия фундаментом
     const door = new THREE.Mesh(new THREE.BoxGeometry(1.05, 1.8, 0.08), doorMat);
-    door.position.set(-0.9, 0.9, 2.63);
+    door.position.set(-0.9, 1.06, 2.58);
     group.add(door);
 
     // Арочное стекло в двери
     const doorGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 12), glassMat);
     doorGlass.rotation.x = Math.PI / 2;
-    doorGlass.position.set(-0.9, 1.45, 2.68);
+    doorGlass.position.set(-0.9, 1.55, 2.63);
     group.add(doorGlass);
 
     // Дверная ручка
@@ -517,10 +1377,10 @@ export class ProceduralPropManager {
       new THREE.SphereGeometry(0.04, 8, 8),
       new THREE.MeshStandardMaterial({ color: 0xf1c40f, metalness: 0.8, roughness: 0.3 })
     );
-    doorHandle.position.set(-0.52, 0.95, 2.7);
+    doorHandle.position.set(-0.52, 1.05, 2.64);
     group.add(doorHandle);
 
-    // Порог перед дверью
+    // Порог перед дверью (на земле перед дверным проемом)
     const doorStep = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.16, 0.5), foundationMat);
     doorStep.position.set(-0.9, 0.08, 2.85);
     group.add(doorStep);
@@ -812,8 +1672,8 @@ export class ProceduralPropManager {
 
     const rockMat = new THREE.MeshStandardMaterial({
       map: this.getRockTexture(),
-      color: 0x757d8a,
-      roughness: 0.85,
+      color: 0x98a2af,
+      roughness: 0.82,
       metalness: 0.05,
       flatShading: true,
     });
@@ -946,6 +1806,126 @@ export class ProceduralPropManager {
 
     const mesh = new THREE.Mesh(geo, rockMat);
     group.add(mesh);
+    return group;
+  }
+
+  /** Низкополигональный деревянный выгнутый мост */
+  private buildBridge(): THREE.Group {
+    const group = new THREE.Group();
+    group.name = 'BridgeRoot';
+
+    const woodTex = this.createWoodPlankTexture(false);
+    const woodMat = new THREE.MeshStandardMaterial({
+      map: woodTex,
+      color: 0xb57b4f,
+      roughness: 0.85,
+      flatShading: true,
+    });
+    const darkWoodMat = new THREE.MeshStandardMaterial({
+      map: woodTex,
+      color: 0x8a5229,
+      roughness: 0.9,
+      flatShading: true,
+    });
+
+    const length = 6.0;
+    const width = 2.4;
+    const archHeight = 0.8;
+    const segments = 16;
+
+    // 1. Поперечные доски моста (настил)
+    const plankGeo = new THREE.BoxGeometry(width - 0.2, 0.08, (length / segments) * 0.9);
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const z = -length / 2 + t * length;
+      const archFactor = Math.sin(t * Math.PI);
+      const y = archFactor * archHeight;
+      const angle = -Math.cos(t * Math.PI) * (archHeight / (length / 2)); // Производная синусоиды
+
+      const plank = new THREE.Mesh(plankGeo, woodMat);
+      plank.position.set(0, y, z);
+      plank.rotation.x = angle;
+      group.add(plank);
+    }
+
+    // 2. Изогнутые продольные несущие балки (2 штуки по краям)
+    const beamShape = new THREE.Shape();
+    beamShape.moveTo(0, -0.15);
+    beamShape.lineTo(0.12, -0.15);
+    beamShape.lineTo(0.12, 0.15);
+    beamShape.lineTo(0, 0.15);
+    beamShape.closePath();
+
+    const pathPoints = [];
+    for (let i = 0; i <= 10; i++) {
+      const t = i / 10;
+      pathPoints.push(
+        new THREE.Vector3(0, Math.sin(t * Math.PI) * archHeight - 0.06, -length / 2 + t * length)
+      );
+    }
+    const path = new THREE.CatmullRomCurve3(pathPoints);
+    const beamGeo = new THREE.ExtrudeGeometry(beamShape, {
+      steps: 12,
+      extrudePath: path,
+      bevelEnabled: false,
+    });
+
+    [-width / 2 + 0.1, width / 2 - 0.1].forEach((px) => {
+      const beam = new THREE.Mesh(beamGeo, darkWoodMat);
+      beam.position.x = px - 0.06; // Центровка профиля
+      group.add(beam);
+    });
+
+    // 3. Четыре массивных столба по углам
+    const postGeo = new THREE.BoxGeometry(0.25, 1.2, 0.25);
+    [-1, 1].forEach((sz) => {
+      [-1, 1].forEach((sx) => {
+        const post = new THREE.Mesh(postGeo, darkWoodMat);
+        post.position.set(sx * (width / 2), 0.6, sz * (length / 2 - 0.15));
+        group.add(post);
+      });
+    });
+
+    // 4. Изогнутые перила (поручни)
+    const railPoints = [];
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      railPoints.push(
+        new THREE.Vector3(
+          0,
+          Math.sin(t * Math.PI) * archHeight + 1.05,
+          -length / 2 + 0.15 + t * (length - 0.3)
+        )
+      );
+    }
+    const railPath = new THREE.CatmullRomCurve3(railPoints);
+    const railShape = new THREE.Shape();
+    railShape.moveTo(-0.06, -0.06);
+    railShape.lineTo(0.06, -0.06);
+    railShape.lineTo(0.06, 0.06);
+    railShape.lineTo(-0.06, 0.06);
+    const railGeo = new THREE.ExtrudeGeometry(railShape, {
+      steps: 8,
+      extrudePath: railPath,
+      bevelEnabled: false,
+    });
+
+    [-width / 2, width / 2].forEach((px) => {
+      const rail = new THREE.Mesh(railGeo, woodMat);
+      rail.position.x = px;
+      group.add(rail);
+
+      // Промежуточные опорные стойки перил
+      for (let j = 1; j < 4; j++) {
+        const t = j / 4;
+        const pz = -length / 2 + 0.15 + t * (length - 0.3);
+        const py = Math.sin(t * Math.PI) * archHeight;
+        const sp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.0, 0.08), darkWoodMat);
+        sp.position.set(px, py + 0.5, pz);
+        group.add(sp);
+      }
+    });
+
     return group;
   }
 }

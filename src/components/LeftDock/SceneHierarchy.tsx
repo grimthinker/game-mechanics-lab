@@ -11,7 +11,7 @@ import { getRootOwner } from '../../ecs/utils/hierarchy';
 interface SceneHierarchyProps {
   world: World | null | undefined;
   selectedEntityId: string | null;
-  onSelectEntity: (id: string) => void;
+  onSelectEntity: (id: string, clearGroup?: boolean) => void;
   onFocusEntity: (id: string) => void;
 }
 
@@ -24,7 +24,7 @@ const HierarchyNodeItem: React.FC<{
   searchActive: boolean;
   activeId: string | null;
   onToggle: (id: string, recursive: boolean, node: HierarchyTreeNode) => void;
-  onSelect: (node: HierarchyTreeNode) => void;
+  onSelect: (node: HierarchyTreeNode, isMultiSelect?: boolean) => void;
   onDoubleClick: (node: HierarchyTreeNode) => void;
   onAutoExpand: (id: string) => void;
 }> = ({
@@ -153,10 +153,15 @@ const HierarchyNodeItem: React.FC<{
             wasDraggingRef.current = false;
             return;
           }
-          if (e.ctrlKey && hasChildren) {
+          // Ctrl / Meta (Mac) добавляют к выделению, обычный клик заменяет выделение
+          const isMultiSelect = e.ctrlKey || e.metaKey || e.shiftKey;
+          onSelect(node, !isMultiSelect);
+        }}
+        onAuxClick={(e) => {
+          // Клик колесиком мыши (кнопка 1)
+          if (e.button === 1 && hasChildren) {
+            e.stopPropagation();
             onToggle(node.id, e.altKey, node);
-          } else {
-            onSelect(node);
           }
         }}
         onDoubleClick={(e) => {
@@ -389,7 +394,7 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
     setExpandedNodes(new Set());
   };
 
-  const handleSelect = (node: HierarchyTreeNode) => {
+  const handleSelect = (node: HierarchyTreeNode, clearGroup: boolean = true) => {
     if (node.type === 'group') {
       toggleExpand(node.id, false, node);
       return;
@@ -398,21 +403,20 @@ export const SceneHierarchy: React.FC<SceneHierarchyProps> = ({
     const rootId = node.inspectorRootId || node.entityId;
     if (!rootId) return;
 
-    // Запоминаем корень, чтобы предотвратить сброс выделения эффектом useEffect
     lastSelectedRootRef.current = rootId;
 
     if (node.isVirtual) {
-      onSelectEntity(rootId);
+      // Для виртуальных узлов (слоты/экипировка) всегда используем моно-выбор
+      onSelectEntity(rootId, true);
       EventBus.emit('inspector:navigate', {
         rootEntityId: rootId,
         path: node.inspectorPath || [],
         targetSection: node.targetSection,
       });
     } else {
-      onSelectEntity(rootId);
+      onSelectEntity(rootId, clearGroup);
       EventBus.emit('inspector:navigate', {
         rootEntityId: rootId,
-        // Если кликнули прямо на корень (Игрок), сбрасываем хлебные крошки до него
         path: node.inspectorPath || [{ id: node.entityId!, label: node.name }],
       });
     }
