@@ -16,6 +16,7 @@ import { GameSimulation } from './core/GameSimulation';
 import { EditorInteractionManager } from './editor/EditorInteractionManager';
 import { PhysicalRaycastResult } from './physics/IPhysicsDriver';
 import { calculateThrowVelocity } from './utils';
+import { FPSMonitor } from './core/FPSMonitor';
 
 export { EntityAdapter } from './EntityAdapter';
 
@@ -27,6 +28,7 @@ export class GameApp {
   public time: TimeManager;
   public simulation: GameSimulation;
   public editor: EditorInteractionManager;
+  public fpsMonitor: FPSMonitor = new FPSMonitor();
 
   public throwTargeting: { slotIndex: number; partId: string; itemId: string } | null = null;
   private mouseScreenPos: Point | null = null;
@@ -66,6 +68,20 @@ export class GameApp {
     if (this._celShading === val) return;
     this._celShading = val;
     localStorage.setItem('engine_cel_shading', String(val));
+    this.emitState();
+  }
+
+  private _showFPSMonitor: boolean = (() => {
+    const saved = localStorage.getItem('engine_show_fps_monitor');
+    return saved !== null ? saved === 'true' : true;
+  })();
+  public get showFPSMonitor() {
+    return this._showFPSMonitor;
+  }
+  public set showFPSMonitor(val: boolean) {
+    if (this._showFPSMonitor === val) return;
+    this._showFPSMonitor = val;
+    localStorage.setItem('engine_show_fps_monitor', String(val));
     this.emitState();
   }
 
@@ -235,6 +251,7 @@ export class GameApp {
       showUIOverlays: this._showUIOverlays,
       showAIDebug: this._showAIDebug,
       celShading: this._celShading,
+      showFPSMonitor: this._showFPSMonitor,
     });
   }
 
@@ -458,6 +475,8 @@ export class GameApp {
         throwTrajectory,
       },
       showUIOverlays: this.showUIOverlays,
+      showFPSMonitor: this.showFPSMonitor,
+      fpsStats: this.fpsMonitor.getStats(),
     });
   }
 }

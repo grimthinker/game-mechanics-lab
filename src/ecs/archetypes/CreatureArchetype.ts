@@ -44,6 +44,21 @@ export function assembleCreature(
   // 4. Передвижение (в метрической системе)
   const maxSpeed = config.movement?.maxSpeed ?? BALANCE_CONFIG.creature.maxSpeed;
   const maxTurnSpeed = config.movement?.maxTurnSpeed ?? BALANCE_CONFIG.creature.maxTurnSpeed;
+  const headTurnSpeed =
+    config.headOrientation?.turnSpeed ??
+    config.movement?.headTurnSpeed ??
+    BALANCE_CONFIG.creature.defaultHeadTurnSpeed;
+
+  world.addComponent(id, 'headOrientation', {
+    yaw: 0 as Radians,
+    pitch: 0 as Radians,
+    relativeYaw: 0 as Radians,
+    relativePitch: 0 as Radians,
+    yawVelocity: 0,
+    pitchVelocity: 0,
+    turnSpeed: createStat(headTurnSpeed),
+  });
+
   world.addComponent(id, 'movementStats', {
     maxSpeed: createStat(maxSpeed),
     maxTurnSpeed: createStat(maxTurnSpeed),

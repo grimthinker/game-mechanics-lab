@@ -80,6 +80,12 @@ export class ModifierSystem {
       }
     }
 
+    // 5.1. Характеристики ориентации головы
+    for (const [id, { headOrientation }] of world.getEntitiesWith('headOrientation')) {
+      const localDt = getLocalDt(id);
+      this.tickStatModifiers(headOrientation.turnSpeed, localDt);
+    }
+
     // 6. Скрытность
     for (const [id, { stealthStats }] of world.getEntitiesWith('stealthStats')) {
       const localDt = getLocalDt(id);

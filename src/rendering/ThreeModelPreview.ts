@@ -94,18 +94,32 @@ export class ThreeModelPreview implements IModelPreview {
     disposeObject(this.modelGroup);
     this.modelGroup.clear();
 
-    const rigProfile = CREATURE_RIG_PROFILES[this.currentStructureType];
-    if (!rigProfile?.rigAsset) return;
-
     try {
-      const rig = await AssetManager.getInstance().getClonedModel(rigProfile.rigAsset);
+      let modelToLoad: string | null = null;
+      const rigProfile = CREATURE_RIG_PROFILES[this.currentStructureType];
+
+      if (rigProfile?.rigAsset) {
+        modelToLoad = rigProfile.rigAsset;
+      } else if (
+        this.currentStructureType &&
+        (this.currentStructureType.startsWith('proc://') ||
+          this.currentStructureType.endsWith('.glb'))
+      ) {
+        modelToLoad = this.currentStructureType;
+      }
+
+      if (!modelToLoad) return;
+
+      const rig = await AssetManager.getInstance().getClonedModel(modelToLoad);
       if (this.isDisposed || !rig) return;
 
       rig.scale.set(1, 1, 1);
-      rig.rotation.y = Math.PI / 2;
+      if (rigProfile) {
+        rig.rotation.y = Math.PI / 2;
+      }
       this.modelGroup.add(rig);
 
-      if (assemblyPartIds && world) {
+      if (rigProfile && assemblyPartIds && world) {
         for (const partId of assemblyPartIds) {
           const visual = world.getComponent(partId, 'visualModel');
           if (visual?.modelId && visual?.rigNodeName) {
@@ -135,10 +149,11 @@ export class ThreeModelPreview implements IModelPreview {
       updatedBox.getSize(size);
       this.orbitParams.distance = Math.max(1.8, Math.max(size.x, size.y, size.z) * 1.9);
 
-      this.mixer = new THREE.AnimationMixer(rig);
-
-      const animToPlay = this.pendingAnimName || 'stand_idle';
-      this.applyAnimation(animToPlay);
+      if ((rig.animations && rig.animations.length > 0) || rigProfile) {
+        this.mixer = new THREE.AnimationMixer(rig);
+        const animToPlay = this.pendingAnimName || 'stand_idle';
+        this.applyAnimation(animToPlay);
+      }
     } catch (err) {
       console.error('[ThreeModelPreview] Ошибка загрузки модели превью:', err);
     }

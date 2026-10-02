@@ -494,6 +494,8 @@ export class ThreeRenderer implements IRenderer {
 
     const visibleRadius = dist * GRAPHICS_CONFIG.shadows.frustumMargin;
 
+    this.environmentManager.setVisibility(context.gameMode !== 'menu');
+    this.scene.background = context.gameMode === 'menu' ? new THREE.Color('#111111') : null;
     this.environmentManager.update(
       this.scene,
       this.camera,
@@ -632,6 +634,121 @@ export class ThreeRenderer implements IRenderer {
     if (context.editorData.throwTrajectory) {
       this.renderThrowTrajectory(context.editorData.throwTrajectory);
     }
+    if (context.showFPSMonitor && context.fpsStats && context.gameMode !== 'menu') {
+      this.renderFPSMonitor(context.fpsStats, context.gameMode);
+    }
+  }
+
+  private renderFPSMonitor(stats: import('../core/FPSMonitor').FPSStats, gameMode: string): void {
+    const w = this.uiCanvas.width;
+    const pad = 12;
+    const boxW = 160;
+    const boxH = 72;
+    const posX = w - boxW - pad;
+    // В режиме игры смещаем график чуть ниже, чтобы он не перекрывал кнопки HUD
+    const posY = gameMode === 'game' ? 62 : pad;
+
+    const ctx = this.uiCtx;
+    ctx.save();
+
+    // 1. Фон контейнера (тёмный графитовый оттенок со стилизованным зеленым отсветом)
+    ctx.fillStyle = 'rgba(8, 20, 14, 0.88)';
+    ctx.fillRect(posX, posY, boxW, boxH);
+
+    // Рамка контейнера
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(posX, posY, boxW, boxH);
+
+    // 2. Блок текстовых метрик
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    // Текущий FPS
+    ctx.fillStyle = '#00ff66';
+    ctx.fillText(`FPS: ${stats.current}`, posX + 8, posY + 6);
+
+    // AVG и MIN FPS
+    ctx.font = '10px monospace';
+    ctx.fillStyle = '#a7f3d0';
+    ctx.fillText(`AVG: ${stats.avg.toFixed(1)}`, posX + 74, posY + 6);
+
+    ctx.fillStyle = stats.min < 30 ? '#f87171' : '#6ee7b7';
+    ctx.fillText(`MIN: ${stats.min.toFixed(1)}`, posX + 74, posY + 18);
+
+    // 3. Область графика
+    const graphX = posX + 6;
+    const graphY = posY + 30;
+    const graphW = boxW - 12;
+    const graphH = boxH - 35;
+
+    // Сетка графика в стиле Task Manager (горизонтальные и вертикальные деления)
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.16)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    const gridRows = 3;
+    for (let i = 1; i <= gridRows; i++) {
+      const gy = graphY + (graphH * i) / (gridRows + 1);
+      ctx.moveTo(graphX, gy);
+      ctx.lineTo(graphX + graphW, gy);
+    }
+    const gridCols = 5;
+    for (let j = 1; j <= gridCols; j++) {
+      const gx = graphX + (graphW * j) / (gridCols + 1);
+      ctx.moveTo(gx, graphY);
+      ctx.lineTo(gx, graphY + graphH);
+    }
+    ctx.stroke();
+
+    // 4. Отрисовка кривой и полупрозрачной заливки
+    const history = stats.history;
+    if (history.length >= 2) {
+      let maxVal = 60;
+      for (let i = 0; i < history.length; i++) {
+        if (history[i] > maxVal) maxVal = history[i];
+      }
+      maxVal = Math.ceil(maxVal * 1.12);
+
+      const stepX = graphW / (history.length - 1);
+
+      // Заливка под графиком градиентом
+      ctx.beginPath();
+      ctx.moveTo(graphX, graphY + graphH);
+
+      for (let i = 0; i < history.length; i++) {
+        const val = Math.min(maxVal, Math.max(0, history[i]));
+        const ratio = val / maxVal;
+        const px = graphX + i * stepX;
+        const py = graphY + graphH - ratio * graphH;
+        ctx.lineTo(px, py);
+      }
+
+      ctx.lineTo(graphX + graphW, graphY + graphH);
+      ctx.closePath();
+
+      const grad = ctx.createLinearGradient(0, graphY, 0, graphY + graphH);
+      grad.addColorStop(0, 'rgba(16, 185, 129, 0.45)');
+      grad.addColorStop(1, 'rgba(16, 185, 129, 0.02)');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Линия графика
+      ctx.beginPath();
+      for (let i = 0; i < history.length; i++) {
+        const val = Math.min(maxVal, Math.max(0, history[i]));
+        const ratio = val / maxVal;
+        const px = graphX + i * stepX;
+        const py = graphY + graphH - ratio * graphH;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = '#00ff66';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   private renderThrowTrajectory(trajectory: { start: Vec3; v0: Vec3 }): void {
@@ -830,9 +947,11 @@ export class ThreeRenderer implements IRenderer {
 
     const brain =
       getEffectiveLogicBrain(world, selectedId) ?? getEffectiveLogicBrain(world, rootId);
-    const bb = brain?.blackboard;
-
     const aiStats = rootEntity.aiStats ?? entity.aiStats;
+
+    if (!brain && !aiStats) return;
+
+    const bb = brain?.blackboard;
     const perception = rootEntity.perception ?? entity.perception;
 
     let detectRadius: number | undefined = bb?.get('detectDist') ?? bb?.get('detect_dist');

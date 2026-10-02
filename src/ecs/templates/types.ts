@@ -22,6 +22,13 @@ export interface BlueprintItemDef {
   config: EntityConfig;
 }
 
+export interface HeadLimitsConfig {
+  minYaw: number;
+  maxYaw: number;
+  minPitch: number;
+  maxPitch: number;
+}
+
 export interface CreatureBodyBlueprint {
   id: BodyStructureType;
   name: string;
@@ -29,6 +36,7 @@ export interface CreatureBodyBlueprint {
   baseRadius?: number;
   rigAsset?: string;
   movement?: Partial<MovementConfig>;
+  headLimits?: HeadLimitsConfig;
   parts: BlueprintPartDef[];
   connections: BlueprintConnectionDef[];
   defaultItems?: BlueprintItemDef[];

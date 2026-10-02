@@ -3,6 +3,12 @@ import { LOGIC_CONFIG } from './config';
 import { Point, Vec3 } from '../types';
 import { EntityAdapter } from '../EntityAdapter';
 import { GlobalInput } from '../input/GlobalInput';
+import { NodeBBSchema } from './schema';
+import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
+import { getTerrainHeightAt } from '../ecs/types';
+import { CREATURE_BLUEPRINTS, BodyStructureType } from '../ecs/templates';
+import { normalizeAngle, angleDifference } from '../utils';
+import { BALANCE_CONFIG } from '../config/balanceConfig';
 
 export class BTServiceFindNearestTarget extends BTService {
   public static readonly nodeName = 'Поиск ближайшей цели';
@@ -110,6 +116,7 @@ export class BTServicePathUpdater extends BTService {
   public static readonly defaultParams = {
     ...BTService.defaultParams,
     interval: 0.1,
+    targetPosKey: 'targetPos',
     ...LOGIC_CONFIG.pathUpdaterParams,
   };
 
@@ -132,16 +139,34 @@ export class BTServicePathUpdater extends BTService {
     if (bb.get('isEngaged')) return;
 
     const targetId = bb.get('targetId');
-    if (targetId === undefined) return;
+    let targetPos: Vec3 | undefined;
 
-    const target = entity.utils.getEntity(targetId);
+    if (targetId !== undefined && targetId !== null) {
+      const target = entity.utils.getEntity(targetId);
+      if (target) targetPos = target.getPos();
+    } else {
+      targetPos = bb.get(this.params.targetPosKey ?? 'targetPos');
+    }
 
-    if (target) {
+    if (targetPos) {
       const selfPos = entity.getPos();
-      const targetPos = target.getPos();
       const dx = targetPos.x - selfPos.x;
       const dz = targetPos.z - selfPos.z;
       const distSq = dx * dx + dz * dz;
+
+      // Если агент прибыл к точке навигации navTargetPos — очищаем цель и прекращаем зацикленные запросы
+      const inPosDist = LOGIC_CONFIG.inPosDist;
+      if (!targetId && distSq <= inPosDist * inPosDist) {
+        bb.remove(this.params.targetPosKey ?? 'targetPos');
+        bb.remove('currentPath');
+        if (entity.input) {
+          entity.input.desiredMoveVector = null;
+          entity.input.moveForward = 0;
+          entity.input.moveStrafe = 0;
+          entity.input.isMovingForward = false;
+        }
+        return;
+      }
 
       this.updatePathingLogic(entity, selfPos, targetPos, distSq);
     }
@@ -209,9 +234,99 @@ export class BTServicePathUpdater extends BTService {
   }
 }
 
-import { NodeBBSchema } from './schema';
-import { getAggregatedInteractionSlots } from '../ecs/utils/hierarchy';
-import { getTerrainHeightAt } from '../ecs/types';
+export class BTServiceBodyTurnOnLookLimit extends BTService {
+  public static readonly nodeName = 'Поворот тела по лимиту шеи';
+  public static readonly description =
+    'Если существо стоит на месте и угол взгляда упирается в анатомический предел шеи, плавно поворачивает корпус вслед за взглядом';
+
+  public static readonly defaultParams = { interval: 0 };
+  protected override params = { interval: 0 };
+
+  private isControllingBody = false;
+
+  constructor(child: BTNode, params?: Partial<typeof BTServiceBodyTurnOnLookLimit.defaultParams>) {
+    super(child, params);
+    this.params = { ...BTServiceBodyTurnOnLookLimit.defaultParams, ...params };
+  }
+
+  protected override onAbort(entity: EntityAdapter): void {
+    if (this.isControllingBody && entity.input) {
+      entity.input.desiredBodyAngle = undefined;
+      this.isControllingBody = false;
+    }
+    super.onAbort(entity);
+  }
+
+  protected override onClose(entity: EntityAdapter): void {
+    if (this.isControllingBody && entity.input) {
+      entity.input.desiredBodyAngle = undefined;
+      this.isControllingBody = false;
+    }
+    super.onClose(entity);
+  }
+
+  protected tickService(entity: EntityAdapter): void {
+    const input = entity.input;
+    if (!input || !entity.isAlive) return;
+
+    // 1. Проверяем, стоит ли существо на месте (нет вектора движения и фактическая скорость близка к 0)
+    const hasMoveIntent =
+      input.desiredMoveVector !== null &&
+      (input.desiredMoveVector.x !== 0 || input.desiredMoveVector.z !== 0);
+    const isMoving = hasMoveIntent || entity.currentSpeed > 0.1;
+
+    if (isMoving) {
+      if (this.isControllingBody) {
+        input.desiredBodyAngle = undefined;
+        this.isControllingBody = false;
+      }
+      return;
+    }
+
+    // 2. Проверяем наличие угла взгляда
+    if (input.targetLookAngle === undefined || input.wantsLookNeutral) {
+      if (this.isControllingBody) {
+        input.desiredBodyAngle = undefined;
+        this.isControllingBody = false;
+      }
+      return;
+    }
+
+    // 3. Получаем анатомические ограничения шеи для текущего шаблона существа
+    const animator = entity.getComponent('animator');
+    const rigType = animator?.rigType as BodyStructureType | undefined;
+    const limits = rigType ? CREATURE_BLUEPRINTS[rigType]?.headLimits : undefined;
+
+    if (!limits) {
+      input.desiredBodyAngle = input.targetLookAngle;
+      this.isControllingBody = true;
+      return;
+    }
+
+    // 4. Проверяем отклонение угла взгляда с гистерезисом (старт при 80%, завершение при 25%)
+    const angleDiff = angleDifference(input.targetLookAngle, entity.angle);
+    const startThresholdMax = limits.maxYaw * BALANCE_CONFIG.creature.headTurnBodyFollowRatio;
+    const startThresholdMin = limits.minYaw * BALANCE_CONFIG.creature.headTurnBodyFollowRatio;
+    const stopThresholdMax = limits.maxYaw * BALANCE_CONFIG.creature.headTurnBodyStopRatio;
+    const stopThresholdMin = limits.minYaw * BALANCE_CONFIG.creature.headTurnBodyStopRatio;
+
+    if (this.isControllingBody) {
+      // Корпус уже плавно поворачивается: удерживаем поворот, пока голова не вернется в комфортный сектор
+      if (angleDiff > stopThresholdMax || angleDiff < stopThresholdMin) {
+        input.desiredBodyAngle = input.targetLookAngle;
+      } else {
+        input.desiredBodyAngle = undefined;
+        this.isControllingBody = false;
+      }
+    } else {
+      // Начинаем поворот корпуса только тогда, когда отклонение превысило 80% предела шеи
+      if (angleDiff > startThresholdMax || angleDiff < startThresholdMin) {
+        input.desiredBodyAngle = input.targetLookAngle;
+        this.isControllingBody = true;
+      }
+    }
+  }
+}
 
 export class BTServiceSyncStats extends BTService {
   public static readonly nodeName = 'Синхронизация параметров';
@@ -355,14 +470,13 @@ export class BTServiceInputController extends BTService {
       input.desiredMoveVector = null;
       input.moveForward = 0;
       input.moveStrafe = 0;
+      input.desiredBodyAngle = undefined;
       input.isMovingForward = false;
       input.isRunning = false;
-      input.isSlowWalking = false;
       input.wantsAttack = false;
       input.attackSlotIndex = undefined;
       input.attackSlotKind = undefined;
       input.wantsJump = false;
-      input.desiredStance = 'standing';
     }
     super.onAbort(entity);
   }
@@ -373,14 +487,13 @@ export class BTServiceInputController extends BTService {
       input.desiredMoveVector = null;
       input.moveForward = 0;
       input.moveStrafe = 0;
+      input.desiredBodyAngle = undefined;
       input.isMovingForward = false;
       input.isRunning = false;
-      input.isSlowWalking = false;
       input.wantsAttack = false;
       input.attackSlotIndex = undefined;
       input.attackSlotKind = undefined;
       input.wantsJump = false;
-      input.desiredStance = 'standing';
     }
     super.onClose(entity);
   }
@@ -392,39 +505,6 @@ export class BTServiceInputController extends BTService {
     const bb = entity.brain?.blackboard;
     const keys = bb?.get('pressedKeys') || [];
     const keysSet = new Set(keys);
-
-    // Линия прицеливания (направление на курсор мыши либо текущий угол корпуса)
-    const aimAngle = entity.targetLookAngle ?? entity.angle;
-
-    let forwardIntent = 0;
-    if (keysSet.has('w')) forwardIntent += 1;
-    if (keysSet.has('s')) forwardIntent -= 1;
-
-    let strafeIntent = 0;
-    if (keysSet.has('d')) strafeIntent += 1;
-    if (keysSet.has('a')) strafeIntent -= 1;
-
-    if (forwardIntent !== 0 || strafeIntent !== 0) {
-      const cosA = Math.cos(aimAngle);
-      const sinA = Math.sin(aimAngle);
-
-      // Проекция намерения движения относительно направления курсора в плоскости XZ:
-      // W/S — вдоль линии прицеливания (cosA, sinA)
-      // D/A — перпендикулярно вправо (-sinA, cosA)
-      const dirX = forwardIntent * cosA - strafeIntent * sinA;
-      const dirZ = forwardIntent * sinA + strafeIntent * cosA;
-      const len = Math.hypot(dirX, dirZ);
-
-      input.desiredMoveVector = { x: dirX / len, z: dirZ / len };
-      input.moveForward = forwardIntent !== 0 ? (Math.sign(forwardIntent) as -1 | 1) : 0;
-      input.moveStrafe = strafeIntent !== 0 ? (Math.sign(strafeIntent) as -1 | 1) : 0;
-      input.isMovingForward = forwardIntent > 0;
-    } else {
-      input.desiredMoveVector = null;
-      input.moveForward = 0;
-      input.moveStrafe = 0;
-      input.isMovingForward = false;
-    }
 
     input.isRunning = keysSet.has('shift');
     input.isSlowWalking = keysSet.has('x');

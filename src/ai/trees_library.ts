@@ -26,9 +26,9 @@ import {
   BTConditionMasterCanPickupDeliveredStick,
   BTConditionMasterShouldFollowDog,
   BTActionMasterLookAtDog,
+  BTActionFollowPathSmooth,
 } from './actions';
 import { BTSelector, BTReactiveSelector, BTSequence } from './composites';
-import { LOGIC_CONFIG } from './config';
 import { BTNode, BTService } from './core';
 import {
   BTServiceFindNearestTarget,
@@ -36,6 +36,7 @@ import {
   BTServiceSyncStats,
   BTServiceInputListener,
   BTServiceInputController,
+  BTServiceBodyTurnOnLookLimit,
   BTServiceFetchWatcher,
   BTServiceEnforceWalkMode,
   BTServiceFetchMasterWatcher,
@@ -79,11 +80,17 @@ export const BEHAVIOR_TREE_NAMES: Record<string, string> = {
 export function PlayerTree(): BTNode {
   return new BTServiceInputListener(
     new BTServiceInputController(
-      new BTReactiveSelector([
-        new BTActionDropItem(),
-        new BTActionPickupItem(),
-        new BTAlwaysRunning(),
-      ])
+      new BTServiceBodyTurnOnLookLimit(
+        new BTServicePathUpdater(
+          new BTReactiveSelector([
+            new BTActionDropItem(),
+            new BTActionPickupItem(),
+            new BTActionFollowPathSmooth('currentPath'),
+            new BTAlwaysRunning(),
+          ]),
+          { targetPosKey: 'navTargetPos', interval: 0.1 }
+        )
+      )
     )
   );
 }
@@ -228,54 +235,59 @@ export function DogFetchTree(): BTNode {
 export function MasterFetchTree(): BTNode {
   return new BTServiceSyncStats(
     new BTServiceEnforceWalkMode(
-      new BTServiceFetchMasterWatcher(
-        new BTReactiveSelector([
-          // ВЕТКА 1: Подбор принесенных палок (Высший приоритет — собираем все доступные палки в любой точке карты)
-          new BTSequence([
-            new BTConditionMasterCanPickupDeliveredStick(),
-            new BTActionSetTarget({ sourceKey: 'nearestDeliveredStickId' }),
-            new BTServicePathUpdater(
-              new BTSequence([
-                new BTActionPursue({ stopDist: 0.6, sprintMinDistance: undefined }),
-                new BTActionPickup({ targetKey: 'nearestDeliveredStickId' }),
-              ])
-            ),
-          ]),
+      new BTServiceBodyTurnOnLookLimit(
+        new BTServiceFetchMasterWatcher(
+          new BTReactiveSelector([
+            // ВЕТКА 1: Подбор принесенных палок (Высший приоритет — собираем все доступные палки в любой точке карты)
+            new BTSequence([
+              new BTConditionMasterCanPickupDeliveredStick(),
+              new BTActionSetTarget({ sourceKey: 'nearestDeliveredStickId' }),
+              new BTServicePathUpdater(
+                new BTSequence([
+                  new BTActionPursue({ stopDist: 0.6, sprintMinDistance: undefined }),
+                  new BTActionPickup({ targetKey: 'nearestDeliveredStickId' }),
+                ])
+              ),
+            ]),
 
-          // ВЕТКА 2: Бросок палок (или возврат в центр зоны вместе с собакой перед броском, когда всё собрано)
-          new BTSequence([
-            new BTConditionMasterReadyToThrow(),
-            new BTSelector([
-              // 2.1: Собака рядом, но мы вне зоны — возвращаемся в центр перед броском
-              new BTSequence([
-                new BTConditionMasterOutsidePlayZone(),
-                new BTActionMoveToPos({ posKey: 'playZoneCenter', stopDist: 3.0, sprint: false }),
-              ]),
-              // 2.2: Мы в зоне игры и собака рядом — бросаем палку
-              new BTSequence([
-                new BTActionCalculateRandomPositionInRange({
-                  minDistance: 10.0,
-                  maxDistance: 22.0,
-                  targetPosKey: 'throwTargetPos',
-                }),
-                new BTActionThrow({ targetPosKey: 'throwTargetPos', cooldownKey: 'lastThrowTime' }),
+            // ВЕТКА 2: Бросок палок (или возврат в центр зоны вместе с собакой перед броском, когда всё собрано)
+            new BTSequence([
+              new BTConditionMasterReadyToThrow(),
+              new BTSelector([
+                // 2.1: Собака рядом, но мы вне зоны — возвращаемся в центр перед броском
+                new BTSequence([
+                  new BTConditionMasterOutsidePlayZone(),
+                  new BTActionMoveToPos({ posKey: 'playZoneCenter', stopDist: 3.0, sprint: false }),
+                ]),
+                // 2.2: Мы в зоне игры и собака рядом — бросаем палку
+                new BTSequence([
+                  new BTActionCalculateRandomPositionInRange({
+                    minDistance: 10.0,
+                    maxDistance: 22.0,
+                    targetPosKey: 'throwTargetPos',
+                  }),
+                  new BTActionThrow({
+                    targetPosKey: 'throwTargetPos',
+                    cooldownKey: 'lastThrowTime',
+                  }),
+                ]),
               ]),
             ]),
-          ]),
 
-          // ВЕТКА 3: Следование за убежавшей собакой (в том числе с палками в руках)
-          new BTSequence([
-            new BTConditionMasterShouldFollowDog(),
-            new BTActionSetTarget({ sourceKey: 'priorityDogId' }),
-            new BTServicePathUpdater(
-              new BTActionPursue({ stopDist: 5.0, sprintMinDistance: undefined })
-            ),
-          ]),
+            // ВЕТКА 3: Следование за убежавшей собакой (в том числе с палками в руках)
+            new BTSequence([
+              new BTConditionMasterShouldFollowDog(),
+              new BTActionSetTarget({ sourceKey: 'priorityDogId' }),
+              new BTServicePathUpdater(
+                new BTActionPursue({ stopDist: 5.0, sprintMinDistance: undefined })
+              ),
+            ]),
 
-          // ВЕТКА 4: Ожидание / Поворот к собакам в зоне
-          new BTSequence([new BTActionMasterLookAtDog(), new BTWait({ duration: 0.5 })]),
-        ]),
-        { interval: 0.1 }
+            // ВЕТКА 4: Ожидание / Поворот к собакам в зоне
+            new BTSequence([new BTActionMasterLookAtDog(), new BTWait({ duration: 0.5 })]),
+          ]),
+          { interval: 0.1 }
+        )
       )
     ),
     { interval: 0.5 }

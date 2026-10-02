@@ -266,6 +266,13 @@ export class ThreeSyncSystem {
         state.currentAction.setEffectiveTimeScale(profileSpeed * ecsSpeed);
       }
 
+      // Отменяем процедурный поворот головы с прошлого кадра ПЕРЕД применением новых кадров анимации миксером
+      const headBone = state.rig.getObjectByName('HeadPivot');
+      if (headBone && headBone.userData.lastProceduralQuat) {
+        const invQuat = headBone.userData.lastProceduralQuat.clone().invert();
+        headBone.quaternion.multiply(invQuat);
+      }
+
       const ts = world.getComponent(id, 'timeScale')?.multiplier.current ?? 1.0;
       state.mixer.timeScale = ts;
       state.mixer.update(dt);
@@ -625,6 +632,30 @@ export class ThreeSyncSystem {
               this.playAnimation(id, animatorComp, animatorComp.currentAnimation).catch((e) =>
                 console.warn(e)
               );
+            }
+
+            // Наложение вращения головы (Пост-обработка после миксера анимаций)
+            const headBone = animState.rig.getObjectByName('HeadPivot');
+            const health = world.getComponent(id, 'health');
+            const consciousness = world.getComponent(id, 'consciousness');
+            const isConscious =
+              health?.isAlive && (!consciousness || consciousness.state === 'CONSCIOUS');
+            const headOrientation = world.getComponent(id, 'headOrientation');
+
+            if (headBone && isConscious && headOrientation) {
+              const headPitch = headOrientation.relativePitch ?? 0;
+              const headYaw = headOrientation.relativeYaw ?? 0;
+              if (Number.isFinite(headPitch) && Number.isFinite(headYaw)) {
+                const headQuat = new THREE.Quaternion().setFromEuler(
+                  new THREE.Euler(-headPitch, -headYaw, 0, 'YXZ')
+                );
+                headBone.quaternion.multiply(headQuat);
+                headBone.userData.lastProceduralQuat = headQuat;
+              } else {
+                headBone.userData.lastProceduralQuat = null;
+              }
+            } else if (headBone) {
+              headBone.userData.lastProceduralQuat = null;
             }
 
             // Управление отрубленными конечностями

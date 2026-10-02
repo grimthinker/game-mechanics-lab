@@ -9,4 +9,6 @@ export const GAMEPLAY_CONFIG = {
   minInteractionTime: 0.4,
   /** Макс. время взаимодействия с предметами */
   maxInteractionTime: 1.5,
+  /** Интервал обновления целевой точки навигации при удерживаемой ПКМ (в секундах) */
+  rmbNavUpdateInterval: 0.1,
 };

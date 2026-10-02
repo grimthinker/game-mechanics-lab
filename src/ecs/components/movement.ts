@@ -62,7 +62,10 @@ export interface InputComponent {
   desiredMoveVector: { x: number; z: number } | null;
   moveForward?: -1 | 0 | 1;
   moveStrafe?: -1 | 0 | 1;
+  desiredBodyAngle?: Radians;
   targetLookAngle?: Radians;
+  targetLookPitch?: Radians;
+  wantsLookNeutral?: boolean;
   isMovingForward: boolean;
   turnDirection: -1 | 0 | 1;
   turnRatio: number;
@@ -79,6 +82,7 @@ export interface InputComponent {
 export interface MovementConfig {
   maxSpeed: number;
   maxTurnSpeed: Radians;
+  headTurnSpeed?: number;
   runSpeedMultiplier?: number;
   crouchSpeedMultiplier?: number;
   proneSpeedMultiplier?: number;

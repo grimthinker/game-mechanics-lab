@@ -24,6 +24,7 @@ import { TerrainBrushController } from '../editor/TerrainBrushController';
 import { TerrainModifyCommand } from '../history/commands/TerrainModifyCommand';
 import { spawnFetchGroup } from '../ecs/prefabs/fetchGroupPrefab';
 import { t } from '../locales';
+import { GlobalInput } from '../input/GlobalInput';
 
 interface UseCanvasInteractionProps {
   appRef: MutableRefObject<GameApp | null>;
@@ -110,9 +111,18 @@ export const useCanvasInteraction = ({
       }
     };
 
+    const onWindowMouseUp = (e: MouseEvent) => {
+      if (e.button === 2) {
+        GlobalInput.isRmbDown = false;
+      }
+    };
+
     container.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('mouseup', onWindowMouseUp);
     return () => {
       container.removeEventListener('wheel', onWheel);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      GlobalInput.isRmbDown = false;
     };
   }, [placementMode, onClosePieMenu]);
 
@@ -157,6 +167,15 @@ export const useCanvasInteraction = ({
       e.preventDefault();
       app.startPan(e.clientX, e.clientY);
       e.currentTarget.style.cursor = 'grabbing';
+      return;
+    }
+
+    // В режиме игры: движение по ПКМ и активация непрерывного ведения
+    if (e.button === 2 && mode === GameMode.GAME) {
+      GlobalInput.isRmbDown = true;
+      const physHit = app.raycastPhysics(e.clientX, e.clientY);
+      const targetPos = physHit ? physHit.point : app.getCanvasPoint(e.clientX, e.clientY);
+      app.simulation.setPlayerNavigationTarget(targetPos);
       return;
     }
 
@@ -427,6 +446,10 @@ export const useCanvasInteraction = ({
     const app = appRef.current;
     if (!app) return;
 
+    if (e.button === 2) {
+      GlobalInput.isRmbDown = false;
+    }
+
     if (app.camera.isRotating) {
       app.camera.endRotate();
       e.currentTarget.style.cursor = 'default';
@@ -599,6 +622,7 @@ export const useCanvasInteraction = ({
 
   const handleContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
     dragCandidateRef.current = null;
     const app = appRef.current;
     if (!app || mode !== GameMode.EDITOR || !containerRef.current) return;
@@ -875,6 +899,7 @@ export const useCanvasInteraction = ({
   };
 
   const handleMouseLeave = () => {
+    GlobalInput.isRmbDown = false;
     if (isDragging) {
       setHoverTarget(null);
     }

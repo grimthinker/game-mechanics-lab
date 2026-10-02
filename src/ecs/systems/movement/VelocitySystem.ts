@@ -112,57 +112,6 @@ export class VelocitySystem {
         }
       }
 
-      // Вращение / Угол взгляда
-      if (input.targetLookAngle !== undefined) {
-        const diff = angleDifference(input.targetLookAngle, transform.angle);
-
-        if (Math.abs(diff) <= LOGIC_CONFIG.angleDiffTolerance) {
-          transform.angle = input.targetLookAngle;
-          velocity.currentTurnSpeed = 0 as Radians;
-        } else if (localDt > 0) {
-          const turnRatio = Math.max(
-            LOGIC_CONFIG.minRotationSpeed,
-            Math.min(1, Math.abs(diff) / LOGIC_CONFIG.slowDownAngle)
-          );
-          const effectiveTurnSpeed = movementStats.maxTurnSpeed.current * turnRatio;
-          const maxTurnStep = effectiveTurnSpeed * localDt;
-
-          if (Math.abs(diff) <= maxTurnStep) {
-            transform.angle = input.targetLookAngle;
-            velocity.currentTurnSpeed = (diff / localDt) as Radians;
-          } else {
-            const sign = Math.sign(diff) as -1 | 1;
-            transform.angle = (transform.angle + sign * maxTurnStep) as Radians;
-            velocity.currentTurnSpeed = (sign * effectiveTurnSpeed) as Radians;
-          }
-        } else {
-          velocity.currentTurnSpeed = 0 as Radians;
-        }
-      } else {
-        const turnSpeed = movementStats.maxTurnSpeed.current * input.turnRatio;
-        velocity.currentTurnSpeed = (input.turnDirection * turnSpeed) as Radians;
-        if (velocity.currentTurnSpeed !== 0) {
-          transform.angle = (transform.angle + velocity.currentTurnSpeed * localDt) as Radians;
-        }
-      }
-      transform.angle = normalizeAngle(transform.angle);
-
-      // Синхронизируем 3D-кватернион с рысканием
-      // Минус добавлен, так как ось Y в 3D направлена вверх, а в 2D - вниз
-      const halfAngle = -transform.angle * 0.5;
-      transform.rotation = {
-        x: 0,
-        y: Math.sin(halfAngle),
-        z: 0,
-        w: Math.cos(halfAngle),
-      };
-
-      const physBodyComp = world.getComponent(id, 'physicsBody');
-      if (physBodyComp && physBodyComp.rawBody) {
-        // Установка кинематического вращения для тел
-        physBodyComp.rawBody.setRotation(transform.rotation, true);
-      }
-
       // Расчет вектора движения
       let moveVecX = input.desiredMoveVector ? input.desiredMoveVector.x : 0;
       let moveVecZ = input.desiredMoveVector ? input.desiredMoveVector.z : 0;
@@ -198,7 +147,78 @@ export class VelocitySystem {
         moveVecZ /= inputMag;
       }
 
-      // Direction Mode
+      let targetBodyAngle = transform.angle;
+      let shouldTurnBody = false;
+
+      if (hasMoveInput) {
+        // Поворот корпуса строго по направлению перемещения (при ходьбе/беге)
+        targetBodyAngle = Math.atan2(moveVecZ, moveVecX) as Radians;
+        shouldTurnBody = true;
+      } else if (
+        interactionAction?.type === 'throw' &&
+        interactionAction.phase === 'throw_turn' &&
+        interactionAction.targetItemPos
+      ) {
+        // Поворот корпуса к точке броска во время выполнения действия броска
+        const dx = interactionAction.targetItemPos.x - transform.x;
+        const dz = interactionAction.targetItemPos.z - transform.z;
+        if (Math.hypot(dx, dz) > 0.001) {
+          targetBodyAngle = Math.atan2(dz, dx) as Radians;
+          shouldTurnBody = true;
+        }
+      } else if (input.desiredBodyAngle !== undefined) {
+        // Явный поворот корпуса по команде из BT (BTActionRotateToPos, BTActionLookAt)
+        targetBodyAngle = input.desiredBodyAngle;
+        shouldTurnBody = true;
+      }
+
+      if (shouldTurnBody) {
+        const diff = angleDifference(targetBodyAngle, transform.angle);
+        if (Math.abs(diff) <= LOGIC_CONFIG.angleDiffTolerance) {
+          transform.angle = targetBodyAngle;
+          velocity.currentTurnSpeed = 0 as Radians;
+        } else if (localDt > 0) {
+          const turnRatio = Math.max(
+            LOGIC_CONFIG.minRotationSpeed,
+            Math.min(1, Math.abs(diff) / LOGIC_CONFIG.slowDownAngle)
+          );
+          const effectiveTurnSpeed = movementStats.maxTurnSpeed.current * turnRatio;
+          const maxTurnStep = effectiveTurnSpeed * localDt;
+
+          if (Math.abs(diff) <= maxTurnStep) {
+            transform.angle = targetBodyAngle;
+            velocity.currentTurnSpeed = (diff / localDt) as Radians;
+          } else {
+            const sign = Math.sign(diff) as -1 | 1;
+            transform.angle = normalizeAngle(transform.angle + sign * maxTurnStep);
+            velocity.currentTurnSpeed = (sign * effectiveTurnSpeed) as Radians;
+          }
+        } else {
+          velocity.currentTurnSpeed = 0 as Radians;
+        }
+      } else {
+        velocity.currentTurnSpeed = 0 as Radians;
+      }
+
+      transform.angle = normalizeAngle(transform.angle);
+
+      // Синхронизируем 3D-кватернион с рысканием
+      // Минус добавлен, так как ось Y в 3D направлена вверх, а в 2D - вниз
+      const halfAngle = -transform.angle * 0.5;
+      transform.rotation = {
+        x: 0,
+        y: Math.sin(halfAngle),
+        z: 0,
+        w: Math.cos(halfAngle),
+      };
+
+      const physBodyComp = world.getComponent(id, 'physicsBody');
+      if (physBodyComp && physBodyComp.rawBody) {
+        // Установка кинематического вращения для тел
+        physBodyComp.rawBody.setRotation(transform.rotation, true);
+      }
+
+      // Direction Mode (считается относительно взгляда головы)
       let directionMode: CreatureDirectionMode = 'immobile';
       const prevDirectionMode = meta.directionMode;
       const forwardThreshold =
@@ -206,9 +226,12 @@ export class VelocitySystem {
       const backwardThreshold =
         prevDirectionMode === 'backward' ? (3 * Math.PI) / 4 - 0.17 : (3 * Math.PI) / 4;
 
+      const headOrientation = world.getComponent(id, 'headOrientation');
+      const lookAngle = headOrientation?.yaw ?? transform.angle;
+
       if (hasMoveInput) {
         const desiredMoveAngle = Math.atan2(moveVecZ, moveVecX);
-        const angleDiff = Math.abs(angleDifference(desiredMoveAngle, transform.angle));
+        const angleDiff = Math.abs(angleDifference(desiredMoveAngle, lookAngle));
 
         if (angleDiff <= forwardThreshold) {
           directionMode = 'forward';
@@ -219,7 +242,7 @@ export class VelocitySystem {
         }
       } else if (velocity.currentSpeed > 0.1) {
         const actualMoveAngle = Math.atan2(velocity.vz, velocity.vx);
-        const angleDiff = Math.abs(angleDifference(actualMoveAngle, transform.angle));
+        const angleDiff = Math.abs(angleDifference(actualMoveAngle, lookAngle));
 
         if (angleDiff <= forwardThreshold) {
           directionMode = 'forward';
@@ -273,7 +296,7 @@ export class VelocitySystem {
         }
       } else if (
         input.turnDirection !== 0 ||
-        (input.targetLookAngle !== undefined && Math.abs(velocity.currentTurnSpeed) > 0.01)
+        (shouldTurnBody && Math.abs(velocity.currentTurnSpeed) > 0.01)
       ) {
         movementMode = 'turning';
       } else {

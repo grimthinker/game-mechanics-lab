@@ -48,6 +48,8 @@ export class TimeManager {
     const realDt = Math.min(this.MAX_ACCUMULATOR_DT, (time - this.lastTime) / 1000);
     this.lastTime = time;
 
+    this.app.fpsMonitor.update(realDt);
+
     if (!this.isPaused) {
       const simulatedDt = realDt * this.globalTimeScale;
       this.physicsAccumulator += simulatedDt;

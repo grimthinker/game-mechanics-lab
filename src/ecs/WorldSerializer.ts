@@ -9,8 +9,9 @@ import {
   StatValue,
 } from './types';
 import { Radians } from '../utils';
-import { evaluateStat } from './stats/StatEvaluator';
+import { evaluateStat, createStat } from './stats/StatEvaluator';
 import { fastClone } from './utils/clone';
+import { BALANCE_CONFIG } from '../config/balanceConfig';
 
 import {
   packBitsCompress,
@@ -398,6 +399,23 @@ export class WorldSerializer {
         } else {
           normalizeStat(comps.physicsStats.height as any);
         }
+      }
+
+      if (comps.headOrientation) {
+        normalizeStat(comps.headOrientation.turnSpeed);
+        comps.headOrientation.yawVelocity = 0;
+        comps.headOrientation.pitchVelocity = 0;
+      } else if (comps.movementStats || comps.animator || comps.tag?.archetype === 'creature') {
+        const headTurnSpeed = BALANCE_CONFIG.creature.defaultHeadTurnSpeed;
+        this.app.world.addComponent(ent.id, 'headOrientation', {
+          yaw: (trans?.angle ?? 0) as Radians,
+          pitch: 0 as Radians,
+          relativeYaw: 0 as Radians,
+          relativePitch: 0 as Radians,
+          yawVelocity: 0,
+          pitchVelocity: 0,
+          turnSpeed: createStat(headTurnSpeed),
+        });
       }
 
       if (comps.movementStats) {

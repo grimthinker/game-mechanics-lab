@@ -10,6 +10,7 @@ export interface EventMap {
     showUIOverlays: boolean;
     showAIDebug: boolean;
     celShading: boolean;
+    showFPSMonitor: boolean;
   };
   'selection:changed': {
     selectedEntityId: string | null;

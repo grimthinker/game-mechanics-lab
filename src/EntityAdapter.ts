@@ -25,6 +25,7 @@ import {
   ArmorStatsComponent,
   BaseCreatureStance,
   CreatureStance,
+  HeadOrientationComponent,
 } from './ecs/types';
 import { EntityUtils, BTLogicComponent, AttackStatus, BehaviorStatsConfig } from './ai/core';
 import { LOGIC_CONFIG } from './ai/config';
@@ -100,6 +101,9 @@ export class EntityAdapter {
   }
   public get perception(): PerceptionComponent | undefined {
     return this.getComponent('perception');
+  }
+  public get headOrientation(): HeadOrientationComponent | undefined {
+    return this.getComponent('headOrientation');
   }
   public get brain(): BTLogicComponent | undefined {
     return getEffectiveLogicBrain(this.world, this.id);

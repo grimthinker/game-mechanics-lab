@@ -116,6 +116,12 @@ export class DeathService {
       meta.actionMode = 'idle';
     }
 
+    const headOrientation = world.getComponent(id, 'headOrientation');
+    if (headOrientation) {
+      headOrientation.yawVelocity = 0;
+      headOrientation.pitchVelocity = 0;
+    }
+
     // 8. Отключение твердых коллизий у разрушенных препятствий
     const tag = world.getComponent(id, 'tag');
     if (tag?.archetype === 'obstacle') {

@@ -51,6 +51,10 @@ export const App: React.FC = () => {
       localStorage.getItem('engine_cel_shading') !== null
         ? localStorage.getItem('engine_cel_shading') === 'true'
         : true,
+    showFPSMonitor:
+      localStorage.getItem('engine_show_fps_monitor') !== null
+        ? localStorage.getItem('engine_show_fps_monitor') === 'true'
+        : true,
   }));
 
   const [isWasmReady, setIsWasmReady] = useState<boolean>(false);
@@ -585,6 +589,10 @@ export const App: React.FC = () => {
           celShading={engineState.celShading}
           setCelShading={(val) => {
             if (appRef.current) appRef.current.celShading = val;
+          }}
+          showFPSMonitor={engineState.showFPSMonitor}
+          setShowFPSMonitor={(val) => {
+            if (appRef.current) appRef.current.showFPSMonitor = val;
           }}
         />
       )}

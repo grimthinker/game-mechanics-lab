@@ -60,6 +60,13 @@ export class EnvironmentManager {
     cam.far = cfg.far;
   }
 
+  public setVisibility(visible: boolean): void {
+    this.skyDome.mesh.visible = visible;
+    this.sunLight.visible = visible;
+    this.moonLight.visible = visible;
+    this.hemisphereLight.visible = visible;
+  }
+
   public update(
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,

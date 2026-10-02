@@ -9,18 +9,10 @@ interface UseKeyboardControlsProps {
   mode: GameMode;
 }
 
-const CONTROL_KEYS = new Set(['w', 'a', 's', 'd', 'shift', 'c', 'v', 'x', ' ', 'f', 'g']);
+const CONTROL_KEYS = new Set(['shift', 'c', 'v', 'x', ' ', 'f', 'g']);
 
 const getKeyName = (e: KeyboardEvent): string => {
   switch (e.code) {
-    case 'KeyW':
-      return 'w';
-    case 'KeyA':
-      return 'a';
-    case 'KeyS':
-      return 's';
-    case 'KeyD':
-      return 'd';
     case 'KeyF':
       return 'f';
     case 'KeyG':
@@ -46,17 +38,20 @@ export const useKeyboardControls = ({
   isEditModalOpen,
   mode,
 }: UseKeyboardControlsProps) => {
-  // Стабильная ссылка: очистка ввода безопасна в любой момент
+  // Сброс только кратковременно зажимаемых клавиш (Shift, Space, F, G), сохраняя активные тумблеры (x, c, v)
   const syncPlayerControls = useCallback(() => {
+    const activeToggles = ['x', 'c', 'v'].filter((k) => GlobalInput.keys.has(k));
     GlobalInput.keys.clear();
+    activeToggles.forEach((k) => GlobalInput.keys.add(k));
+    GlobalInput.isRmbDown = false;
   }, []);
 
-  // Автоматический сброс зажатых клавиш при открытии любого модального окна
+  // Автоматический сброс зажатых клавиш при открытии любого модального окна без сброса походки и стойки
   useEffect(() => {
     if (isModalOpen || isEditModalOpen) {
-      GlobalInput.keys.clear();
+      syncPlayerControls();
     }
-  }, [isModalOpen, isEditModalOpen]);
+  }, [isModalOpen, isEditModalOpen, syncPlayerControls]);
 
   useEffect(() => {
     const isTextInputTarget = (target: EventTarget | null): boolean => {
@@ -139,16 +134,20 @@ export const useKeyboardControls = ({
     };
 
     const onBlur = () => {
-      GlobalInput.keys.clear();
+      syncPlayerControls();
     };
 
-    const onContextMenu = () => {
-      GlobalInput.keys.clear();
+    const onContextMenu = (e: MouseEvent) => {
+      if (mode === GameMode.GAME) {
+        e.preventDefault();
+        return;
+      }
+      syncPlayerControls();
     };
 
     const onVisibilityChange = () => {
       if (document.hidden) {
-        GlobalInput.keys.clear();
+        syncPlayerControls();
       }
     };
 
@@ -165,7 +164,7 @@ export const useKeyboardControls = ({
       window.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [isModalOpen, isEditModalOpen, mode]);
+  }, [isModalOpen, isEditModalOpen, mode, syncPlayerControls]);
 
   return { syncPlayerControls };
 };

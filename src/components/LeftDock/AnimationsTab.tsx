@@ -33,16 +33,23 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, select
     direction: 'resize-top',
   });
 
-  // Находим целевое существо (со скелетом и аниматором)
-  const creatureRootId = useMemo(() => {
+  // Находим целевое существо или объект
+  const targetEntityId = useMemo(() => {
     if (!world || !selectedEntityId) return null;
     const root = getRootOwner(world, selectedEntityId) ?? selectedEntityId;
-    const anim = world.getComponent(root, 'animator');
-    if (anim) return root;
-    return world.getComponent(selectedEntityId, 'animator') ? selectedEntityId : null;
+    if (world.getComponent(root, 'visualModel') || world.getComponent(root, 'animator'))
+      return root;
+    if (
+      world.getComponent(selectedEntityId, 'visualModel') ||
+      world.getComponent(selectedEntityId, 'animator')
+    )
+      return selectedEntityId;
+    return null;
   }, [world, selectedEntityId]);
 
-  const animator = creatureRootId && world ? world.getComponent(creatureRootId, 'animator') : null;
+  const animator = targetEntityId && world ? world.getComponent(targetEntityId, 'animator') : null;
+  const visualModel =
+    targetEntityId && world ? world.getComponent(targetEntityId, 'visualModel') : null;
 
   // Извлекаем все доступные анимации для рига существа
   const animationsList = useMemo(() => {
@@ -87,14 +94,16 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, select
     setSpeed(newSpeed);
   };
 
-  if (!selectedEntityId || !creatureRootId || !animator) {
+  if (!selectedEntityId || !targetEntityId) {
     return (
       <div style={{ padding: '24px 16px', textAlign: 'center', color: '#777', fontSize: '12px' }}>
         <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎭</div>
-        <div>{selectedEntityId ? t('dock.noAnimations') : t('dock.selectCreaturePrompt')}</div>
+        <div>{t('dock.selectCreaturePrompt')}</div>
       </div>
     );
   }
+
+  const hasAnimations = filteredAnimations.length > 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -160,6 +169,8 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, select
               gap: '8px',
               flex: 1,
               justifyContent: 'flex-end',
+              opacity: hasAnimations ? 1 : 0.5,
+              pointerEvents: hasAnimations ? 'auto' : 'none',
             }}
           >
             <input
@@ -188,98 +199,111 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, select
 
       {/* 2. Верхний блок: Список доступных анимаций */}
       <div style={{ flex: 1, minHeight: '80px', overflowY: 'auto', padding: '6px 8px' }}>
-        <div
-          style={{
-            fontSize: '10px',
-            color: '#666',
-            marginBottom: '6px',
-            textTransform: 'uppercase',
-          }}
-        >
-          {t('dock.totalAnimations')} {filteredAnimations.length}
-        </div>
+        {hasAnimations ? (
+          <>
+            <div
+              style={{
+                fontSize: '10px',
+                color: '#666',
+                marginBottom: '6px',
+                textTransform: 'uppercase',
+              }}
+            >
+              {t('dock.totalAnimations')} {filteredAnimations.length}
+            </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {filteredAnimations.map((animName) => {
-            const isPlaying = activeAnim === animName;
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {filteredAnimations.map((animName) => {
+                const isPlaying = activeAnim === animName;
 
-            let badgeColor = '#555';
-            if (animName.startsWith('swim')) badgeColor = '#00bcd4';
-            else if (animName.startsWith('attack')) badgeColor = '#e74c3c';
-            else if (animName.startsWith('pickup')) badgeColor = '#27ae60';
-            else if (animName.startsWith('drop_item') || animName.startsWith('throw'))
-              badgeColor = '#e67e22';
-            else if (
-              animName.includes('walk') ||
-              animName.includes('jog') ||
-              animName.includes('sprint') ||
-              animName.includes('crawl')
-            )
-              badgeColor = '#2980b9';
-            else if (animName.includes('idle')) badgeColor = '#8e44ad';
-            else if (animName === 'dead' || animName.includes('fall')) badgeColor = '#7f8c8d';
+                let badgeColor = '#555';
+                if (animName.startsWith('swim')) badgeColor = '#00bcd4';
+                else if (animName.startsWith('attack')) badgeColor = '#e74c3c';
+                else if (animName.startsWith('pickup')) badgeColor = '#27ae60';
+                else if (animName.startsWith('drop_item') || animName.startsWith('throw'))
+                  badgeColor = '#e67e22';
+                else if (
+                  animName.includes('walk') ||
+                  animName.includes('jog') ||
+                  animName.includes('sprint') ||
+                  animName.includes('crawl')
+                )
+                  badgeColor = '#2980b9';
+                else if (animName.includes('idle')) badgeColor = '#8e44ad';
+                else if (animName === 'dead' || animName.includes('fall')) badgeColor = '#7f8c8d';
 
-            return (
-              <div
-                key={animName}
-                onClick={() => handleSelectAnimation(animName)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 10px',
-                  backgroundColor: isPlaying ? '#1b4332' : '#202020',
-                  border: isPlaying ? '1px solid #2ecc71' : '1px solid #2e2e2e',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.12s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isPlaying) e.currentTarget.style.backgroundColor = '#282828';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isPlaying) e.currentTarget.style.backgroundColor = '#202020';
-                }}
-              >
-                <div
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}
-                >
-                  <span style={{ fontSize: '12px' }}>{isPlaying ? '▶' : '🎬'}</span>
-                  <span
+                return (
+                  <div
+                    key={animName}
+                    onClick={() => handleSelectAnimation(animName)}
                     style={{
-                      fontSize: '12px',
-                      color: isPlaying ? '#2ecc71' : '#ecf0f1',
-                      fontWeight: isPlaying ? 'bold' : 'normal',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '6px 10px',
+                      backgroundColor: isPlaying ? '#1b4332' : '#202020',
+                      border: isPlaying ? '1px solid #2ecc71' : '1px solid #2e2e2e',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'background-color 0.12s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isPlaying) e.currentTarget.style.backgroundColor = '#282828';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isPlaying) e.currentTarget.style.backgroundColor = '#202020';
                     }}
                   >
-                    {animName}
-                  </span>
-                </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <span style={{ fontSize: '12px' }}>{isPlaying ? '▶' : '🎬'}</span>
+                      <span
+                        style={{
+                          fontSize: '12px',
+                          color: isPlaying ? '#2ecc71' : '#ecf0f1',
+                          fontWeight: isPlaying ? 'bold' : 'normal',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {animName}
+                      </span>
+                    </div>
 
-                <span
-                  style={{
-                    backgroundColor: badgeColor,
-                    color: '#fff',
-                    fontSize: '9px',
-                    padding: '2px 5px',
-                    borderRadius: '3px',
-                    fontWeight: 'bold',
-                    flexShrink: 0,
-                  }}
-                >
-                  {animName.includes('left_hand')
-                    ? 'LEFT'
-                    : animName.includes('right_hand')
-                      ? 'RIGHT'
-                      : animName.split('_')[0].toUpperCase()}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+                    <span
+                      style={{
+                        backgroundColor: badgeColor,
+                        color: '#fff',
+                        fontSize: '9px',
+                        padding: '2px 5px',
+                        borderRadius: '3px',
+                        fontWeight: 'bold',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {animName.includes('left_hand')
+                        ? 'LEFT'
+                        : animName.includes('right_hand')
+                          ? 'RIGHT'
+                          : animName.split('_')[0].toUpperCase()}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#777', fontSize: '11px', marginTop: '20px' }}>
+            У объекта нет анимаций.
+          </div>
+        )}
       </div>
 
       {/* 3. Сплиттер регулировки высоты окна превью */}
@@ -310,8 +334,8 @@ export const AnimationsTab: React.FC<AnimationsTabProps> = ({ app, world, select
         <ModelPreviewViewport
           app={app}
           world={world}
-          creatureId={creatureRootId}
-          structureType={animator.rigType}
+          creatureId={targetEntityId}
+          structureType={animator?.rigType || visualModel?.modelId || ''}
           animName={activeAnim}
           speed={speed}
         />

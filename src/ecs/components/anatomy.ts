@@ -1,3 +1,4 @@
+import { Radians } from '../../utils';
 import { StatValue } from './stats';
 
 export type SocketType = string;
@@ -64,4 +65,21 @@ export interface LocomotionStateComponent {
 
 export interface HeartComponent {
   requiresBrain: boolean;
+}
+
+export interface HeadOrientationComponent {
+  /** Мировой угол поворота головы по горизонтали (Yaw) */
+  yaw: Radians;
+  /** Мировой угол наклона головы по вертикали (Pitch) */
+  pitch: Radians;
+  /** Локальный угол поворота относительно корпуса (Yaw) */
+  relativeYaw: Radians;
+  /** Локальный угол наклона относительно корпуса (Pitch) */
+  relativePitch: Radians;
+  /** Текущая скорость поворота головы (рад/с) */
+  yawVelocity: number;
+  /** Текущая скорость наклона головы (рад/с) */
+  pitchVelocity: number;
+  /** Стат максимальной скорости поворота головы, подверженный воздействию эффектов */
+  turnSpeed: StatValue<number>;
 }

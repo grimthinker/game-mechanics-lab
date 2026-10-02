@@ -91,6 +91,7 @@ import {
   HeartComponent,
   ConsciousnessComponent,
   LocomotionStateComponent,
+  HeadOrientationComponent,
 } from './components/anatomy';
 
 export interface EntityComponents {
@@ -134,6 +135,7 @@ export interface EntityComponents {
   assemblyRoot?: AssemblyRootComponent;
   locomotion?: LocomotionComponent;
   heart?: HeartComponent;
+  headOrientation?: HeadOrientationComponent;
   vision?: VisionStatsComponent;
   hearing?: HearingStatsComponent;
   perception?: PerceptionComponent;
@@ -188,6 +190,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'vision',
   'hearing',
   'perception',
+  'headOrientation',
   'consciousness',
   'locomotionState',
   'terrain',
@@ -233,6 +236,7 @@ export interface EntityConfig {
   vision?: VisionConfig;
   hearing?: HearingConfig;
   perception?: PerceptionComponent;
+  headOrientation?: { turnSpeed?: number };
   terrain?: TerrainComponent;
   thrownObject?: ThrownObjectComponent;
   fetchStick?: FetchStickComponent;

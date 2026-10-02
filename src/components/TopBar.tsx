@@ -30,6 +30,8 @@ export interface TopBarProps {
   setShowAIDebug: (val: boolean) => void;
   celShading: boolean;
   setCelShading: (val: boolean) => void;
+  showFPSMonitor: boolean;
+  setShowFPSMonitor: (val: boolean) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -60,6 +62,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   setShowAIDebug,
   celShading,
   setCelShading,
+  showFPSMonitor,
+  setShowFPSMonitor,
 }) => {
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
   const locale = useLocale();
@@ -423,6 +427,25 @@ export const TopBar: React.FC<TopBarProps> = ({
             style={{ accentColor: '#9b59b6' }}
           />
           {t('topbar.celShading')}
+        </label>
+
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            color: '#10b981',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={showFPSMonitor}
+            onChange={(e) => setShowFPSMonitor(e.target.checked)}
+            style={{ accentColor: '#10b981' }}
+          />
+          {t('topbar.fpsMonitor')}
         </label>
 
         {/* Переключатель языка RU / EN */}

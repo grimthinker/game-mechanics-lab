@@ -6,6 +6,7 @@ import { Point, Vec3 } from '../types';
 import { IModelPreview } from './IModelPreview';
 
 import { TerrainBrushState, PropBrushState } from '../types';
+import { FPSStats } from '../core/FPSMonitor';
 
 export interface EditorRenderData {
   selectedId: EntityId | null;
@@ -27,6 +28,8 @@ export interface RenderContext {
   gameMode: string;
   editorData: EditorRenderData;
   showUIOverlays: boolean;
+  showFPSMonitor?: boolean;
+  fpsStats?: FPSStats;
 }
 
 export interface IRenderer {

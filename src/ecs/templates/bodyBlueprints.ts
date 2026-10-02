@@ -7,6 +7,12 @@ export const HUMANOID_BLUEPRINT: CreatureBodyBlueprint = {
   baseHeight: 1.8,
   baseRadius: 0.4,
   rigAsset: 'proc://rig/humanoid',
+  headLimits: {
+    minYaw: deg2Rad(-50),
+    maxYaw: deg2Rad(50),
+    minPitch: deg2Rad(-30),
+    maxPitch: deg2Rad(40),
+  },
   parts: [
     {
       key: 'torso',
@@ -198,6 +204,12 @@ export const QUADRUPED_BLUEPRINT: CreatureBodyBlueprint = {
   baseHeight: 0.8,
   baseRadius: 0.35,
   rigAsset: 'proc://rig/quadruped',
+  headLimits: {
+    minYaw: deg2Rad(-65),
+    maxYaw: deg2Rad(65),
+    minPitch: deg2Rad(-30),
+    maxPitch: deg2Rad(35),
+  },
   movement: {
     maxSpeed: 5.5, // Базовая скорость собаки (5.5 м/с против 4.5 м/с у человека)
     runSpeedMultiplier: 1.8, // Быстрый спринт (9.9 м/с)
@@ -374,6 +386,7 @@ export const ARACHNID_BLUEPRINT: CreatureBodyBlueprint = {
   name: 'Паукообразный',
   baseHeight: 0.5,
   baseRadius: 0.6,
+  headLimits: { minYaw: 0, maxYaw: 0, minPitch: 0, maxPitch: 0 },
   movement: {
     maxSpeed: 4.8,
     runSpeedMultiplier: 1.6,

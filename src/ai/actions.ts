@@ -74,6 +74,7 @@ export class BTActionPursue extends BTAction {
     sprintMinDistance: undefined as number | undefined,
     walkDistance: undefined as number | undefined,
     hysteresis: 1.0,
+    lookAtTarget: true,
   };
   private params: typeof BTActionPursue.defaultParams;
   private movementNode: BTActionFollowPathSmooth = new BTActionFollowPathSmooth('currentPath');
@@ -207,12 +208,29 @@ export class BTActionPursue extends BTAction {
     } else {
       if (dist > 0.001 && input && entity.isAlive) {
         input.desiredMoveVector = { x: dx / dist, z: dz / dist };
-        input.targetLookAngle = Math.atan2(dz, dx) as Radians;
       } else if (input) {
         input.desiredMoveVector = null;
         input.moveForward = 0;
         input.moveStrafe = 0;
         input.isMovingForward = false;
+      }
+    }
+
+    if (this.params.lookAtTarget && input && entity.isAlive && targetPos) {
+      const hdx = targetPos.x - selfPos.x;
+      const hdz = targetPos.z - selfPos.z;
+      const distXZ = Math.hypot(hdx, hdz);
+      if (distXZ > 0.001) {
+        input.targetLookAngle = Math.atan2(hdz, hdx) as Radians;
+
+        const myHeight = entity.getComponent('physicsStats')?.height?.current ?? 0.8;
+        const targetPhys = target?.getComponent('physicsStats');
+        const targetHeight = targetPhys?.height?.current ?? (target?.itemData ? 0.3 : 1.8);
+        const targetCenterY = targetPos.y + targetHeight * 0.5;
+        const myHeadY = selfPos.y + myHeight * 0.75;
+        const hdy = targetCenterY - myHeadY;
+
+        input.targetLookPitch = Math.atan2(hdy, distXZ) as Radians;
       }
     }
 
@@ -227,6 +245,10 @@ export class BTActionPursue extends BTAction {
     if (entity.input && hasCustomGait) {
       entity.input.isRunning = false;
       entity.input.isSlowWalking = false;
+    }
+    if (this.params.lookAtTarget && entity.input) {
+      entity.input.targetLookAngle = undefined;
+      entity.input.targetLookPitch = undefined;
     }
     this.currentGait = 'jog';
   }
@@ -394,6 +416,99 @@ export class BTSucceedImmediately extends BTSimpleAction {
   }
 }
 
+export class BTActionRotateHeadToPos extends BTAction {
+  public static readonly nodeName = 'Повернуть голову';
+  public static readonly description =
+    'Поворачивает только голову к указанной точке. FAILURE, если цель вне анатомических лимитов шеи.';
+  public static readonly defaultParams = { tolerance: 0.05, targetPosKey: 'targetPos' };
+
+  private params: typeof BTActionRotateHeadToPos.defaultParams;
+
+  constructor(params?: Partial<typeof BTActionRotateHeadToPos.defaultParams>) {
+    super();
+    this.params = { ...BTActionRotateHeadToPos.defaultParams, ...params };
+  }
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const bb = entity.brain!.blackboard;
+    const targetId = bb.get<string | undefined>('targetId');
+    let targetPos: Vec3 | undefined;
+
+    if (targetId !== undefined) {
+      const target = entity.utils.getEntity(targetId);
+      targetPos = target?.getPos();
+    } else {
+      targetPos = bb.get<Vec3>(this.params.targetPosKey);
+    }
+
+    if (!targetPos) return NodeStatus.FAILURE;
+
+    const selfPos = entity.getPos();
+    const dx = targetPos.x - selfPos.x;
+    const dz = targetPos.z - selfPos.z;
+    const distXZ = Math.hypot(dx, dz);
+
+    const headHeight = entity.getComponent('physicsStats')?.height?.current ?? 1.8;
+    const dy = targetPos.y - (selfPos.y + headHeight * 0.88);
+
+    const targetYaw = Math.atan2(dz, dx) as Radians;
+    const targetPitch = Math.atan2(dy, distXZ) as Radians;
+
+    if (entity.input && entity.isAlive) {
+      entity.input.targetLookAngle = targetYaw;
+      entity.input.targetLookPitch = targetPitch;
+    }
+
+    const animator = entity.getComponent('animator');
+    const limits = animator
+      ? CREATURE_BLUEPRINTS[animator.rigType as BodyStructureType]?.headLimits
+      : null;
+
+    if (limits) {
+      const localYaw = angleDifference(targetYaw, entity.angle);
+      if (localYaw < limits.minYaw - 0.1 || localYaw > limits.maxYaw + 0.1) {
+        return NodeStatus.FAILURE;
+      }
+    }
+
+    const headYaw = entity.headOrientation?.yaw ?? entity.angle;
+    if (Math.abs(angleDifference(targetYaw, headYaw)) <= this.params.tolerance) {
+      return NodeStatus.SUCCESS;
+    }
+
+    return NodeStatus.RUNNING;
+  }
+
+  protected stopAction(entity: EntityAdapter): void {
+    if (entity.input) {
+      entity.input.targetLookAngle = undefined;
+      entity.input.targetLookPitch = undefined;
+    }
+  }
+}
+
+export class BTActionLookAt extends BTAction {
+  public static readonly nodeName = 'Смотреть на цель (комплексно)';
+  public static readonly description =
+    'Поворачивает голову к цели. Если цель уходит за спину - плавно доворачивает корпус.';
+
+  private headAction = new BTActionRotateHeadToPos({ tolerance: 0.05, targetPosKey: 'targetPos' });
+  private bodyAction = new BTActionRotateToPos({ tolerance: 0.1 });
+
+  protected onTick(entity: EntityAdapter): NodeStatus {
+    const headStatus = this.headAction.tick(entity);
+    if (headStatus === NodeStatus.FAILURE) {
+      return this.bodyAction.tick(entity);
+    }
+    return headStatus;
+  }
+
+  protected stopAction(entity: EntityAdapter): void {
+    this.headAction.abort(entity);
+    this.bodyAction.abort(entity);
+  }
+}
+
 export class BTWait extends BTAction {
   public static readonly nodeName = 'Ожидание времени';
   public static readonly description = 'Ждёт заданное количество секунд и возвращает SUCCESS';
@@ -474,9 +589,9 @@ export class BTActionRotateToPos extends BTAction {
       return NodeStatus.SUCCESS;
     }
 
-    // Задаем угол направления взгляда напрямую в InputComponent для VelocitySystem
+    // Задаем угол направления корпуса напрямую в InputComponent для VelocitySystem
     if (entity.input && entity.isAlive) {
-      entity.input.targetLookAngle = targetAngle;
+      entity.input.desiredBodyAngle = targetAngle;
     }
 
     return NodeStatus.RUNNING;
@@ -484,7 +599,7 @@ export class BTActionRotateToPos extends BTAction {
 
   protected stopAction(entity: EntityAdapter): void {
     if (entity.input) {
-      entity.input.targetLookAngle = undefined;
+      entity.input.desiredBodyAngle = undefined;
       entity.input.turnDirection = 0;
       entity.input.turnRatio = 0;
     }
@@ -497,6 +612,7 @@ export class BTActionStopTurn extends BTSimpleAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     if (entity.input) {
+      entity.input.desiredBodyAngle = undefined;
       entity.input.turnDirection = 0;
       entity.input.turnRatio = 0;
       entity.input.targetLookAngle = undefined;
@@ -518,17 +634,17 @@ export class BTActionFollowPathSmooth extends BTAction {
 
   protected onTick(entity: EntityAdapter): NodeStatus {
     const bb = entity.brain!.blackboard;
-    const path = bb.get(this.pathKey) || [];
+    const path = bb.get(this.pathKey);
     const input = entity.input;
 
-    if (path.length === 0) {
+    if (!path || path.length === 0) {
       if (input) {
         input.desiredMoveVector = null;
         input.moveForward = 0;
         input.moveStrafe = 0;
         input.isMovingForward = false;
       }
-      return NodeStatus.SUCCESS;
+      return NodeStatus.FAILURE;
     }
 
     const selfPos = entity.getPos();
@@ -544,6 +660,16 @@ export class BTActionFollowPathSmooth extends BTAction {
         input.isMovingForward = false;
       }
       bb.remove(this.pathKey);
+
+      // Полное завершение навигации игрока: удаляем целевую точку при достижении
+      const navTarget = bb.get<Vec3>('navTargetPos');
+      if (navTarget) {
+        const distToNav = Math.hypot(navTarget.x - selfPos.x, navTarget.z - selfPos.z);
+        if (distToNav <= LOGIC_CONFIG.inPosDist) {
+          bb.remove('navTargetPos');
+        }
+      }
+
       return NodeStatus.SUCCESS;
     }
 
@@ -555,7 +681,6 @@ export class BTActionFollowPathSmooth extends BTAction {
 
     if (dist > 0.001 && input && entity.isAlive) {
       input.desiredMoveVector = { x: dx / dist, z: dz / dist };
-      input.targetLookAngle = Math.atan2(dz, dx) as Radians;
     } else if (input) {
       input.desiredMoveVector = null;
       input.moveForward = 0;
@@ -835,14 +960,20 @@ export class BTActionPickup extends BTAction {
     const yMax = selfPos.y + currentHeight * 1.2;
     const isWithinVerticalReach = targetTrans.y >= yMin && targetTrans.y <= yMax;
 
+    if (entity.input && distXZ > 0.001 && entity.isAlive) {
+      entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+      const targetHeight = targetPhysStats?.height?.current ?? 0.3;
+      const targetCenterY = targetTrans.y + targetHeight * 0.5;
+      const myHeadY = selfPos.y + myBaseHeight * 0.75;
+      const dy = targetCenterY - myHeadY;
+      entity.input.targetLookPitch = Math.atan2(dy, distXZ) as Radians;
+    }
+
     const interactDist = freeSlot.slot.interactDist ?? 0.6;
     if (distBetweenBorders <= interactDist + 0.1 && isWithinVerticalReach) {
       if (entity.input) {
         entity.input.desiredMoveVector = null;
         entity.input.isMovingForward = false;
-        if (Math.hypot(dx, dz) > 0.001) {
-          entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
-        }
       }
       entity.world.addComponent(entity.id, 'pickupIntent', { targetItemId: targetId });
       return NodeStatus.RUNNING;
@@ -851,7 +982,12 @@ export class BTActionPickup extends BTAction {
     return NodeStatus.FAILURE;
   }
 
-  protected stopAction(_entity: EntityAdapter): void {}
+  protected stopAction(entity: EntityAdapter): void {
+    if (entity.input) {
+      entity.input.targetLookAngle = undefined;
+      entity.input.targetLookPitch = undefined;
+    }
+  }
 }
 
 export class BTActionDrop extends BTAction {
@@ -1148,15 +1284,21 @@ export class BTActionMasterLookAtDog extends BTSimpleAction {
     const selfPos = entity.getPos();
     const dx = dogTrans.x - selfPos.x;
     const dz = dogTrans.z - selfPos.z;
+    const distXZ = Math.hypot(dx, dz);
 
-    if (Math.hypot(dx, dz) > 0.001) {
+    if (distXZ > 0.001) {
       entity.input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+      const myHeight = entity.getComponent('physicsStats')?.height?.current ?? 1.8;
+      const dogHeight = entity.world.getComponent(dogId, 'physicsStats')?.height?.current ?? 0.8;
+      const dy = dogTrans.y + dogHeight * 0.7 - (selfPos.y + myHeight * 0.88);
+      entity.input.targetLookPitch = Math.atan2(dy, distXZ) as Radians;
     }
     return NodeStatus.SUCCESS;
   }
 }
 
 import { getRandomPointInZone, getZoneCenter } from '../ecs/components/zone';
+import { BodyStructureType, CREATURE_BLUEPRINTS } from '../ecs/templates';
 
 export class BTConditionDistance extends BTSimpleAction {
   public static readonly nodeName = 'Проверка дистанции до цели';

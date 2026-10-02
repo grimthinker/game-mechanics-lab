@@ -32,9 +32,12 @@ import { Radians } from '../utils';
 import { EventBus } from './EventBus';
 import { initDefaultWorldPrefab } from '../ecs/prefabs/defaultWorldPrefab';
 import { BALANCE_CONFIG } from '../config/balanceConfig';
+import { GAMEPLAY_CONFIG } from '../config/gameplayConfig';
+import { GlobalInput } from '../input/GlobalInput';
 
 export class GameSimulation {
   public world: World;
+  private playerNavTimer: number = 0;
   public physicsDriver: IPhysicsDriver;
   public physics: PhysicsSystem;
   public movementSystem: MovementSystem;
@@ -99,6 +102,21 @@ export class GameSimulation {
       const playerId = this.getPlayerEntityId() ?? undefined;
       const worldPoint = this.app.getCanvasPoint(mousePos.x, mousePos.y, playerId);
       this.updatePlayerAim(worldPoint);
+
+      // Непрерывное обновление точки навигации при удерживаемой ПКМ раз в 0.1 сек
+      if (GlobalInput.isRmbDown) {
+        this.playerNavTimer += dt;
+        if (this.playerNavTimer >= GAMEPLAY_CONFIG.rmbNavUpdateInterval) {
+          this.playerNavTimer = 0;
+          const physHit = this.app.raycastPhysics(mousePos.x, mousePos.y);
+          const targetPos = physHit ? physHit.point : worldPoint;
+          this.setPlayerNavigationTarget(targetPos);
+        }
+      } else {
+        this.playerNavTimer = 0;
+      }
+    } else {
+      this.playerNavTimer = 0;
     }
 
     // Привязка фокуса камеры к голове игрока в режиме игры
@@ -169,15 +187,35 @@ export class GameSimulation {
   }
 
   public updatePlayerAim(worldPoint: Vec3): void {
-    const entities = this.world.getEntitiesWith('transform', 'input', 'health', 'aiStats');
-    for (const [, { transform, input, health, aiStats }] of entities) {
+    const entities = this.world.getEntitiesWith(
+      'transform',
+      'input',
+      'health',
+      'aiStats',
+      'physicsStats'
+    );
+    for (const [, { transform, input, health, aiStats, physicsStats }] of entities) {
       if (health.isAlive && aiStats.behavior.current === 'PlayerTree') {
         const dx = worldPoint.x - transform.x;
         const dz = worldPoint.z - transform.z;
-        const dist = Math.hypot(dx, dz);
-        if (dist > 0.05) {
+        const headHeight = physicsStats.height.current ?? 1.8;
+        const dy = worldPoint.y - (transform.y + headHeight * 0.88);
+        const distXZ = Math.hypot(dx, dz);
+
+        if (distXZ > 0.05) {
           input.targetLookAngle = Math.atan2(dz, dx) as Radians;
+          input.targetLookPitch = Math.atan2(dy, distXZ) as Radians;
         }
+      }
+    }
+  }
+
+  public setPlayerNavigationTarget(targetPos: Vec3): void {
+    const playerId = this.getPlayerEntityId();
+    if (playerId) {
+      const bb = this.world.getComponent(playerId, 'brain')?.blackboard;
+      if (bb) {
+        bb.set('navTargetPos', targetPos);
       }
     }
   }
