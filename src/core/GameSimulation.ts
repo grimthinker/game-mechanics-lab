@@ -220,7 +220,26 @@ export class GameSimulation {
     }
   }
 
+  public clearPlayerNavigationTarget(): void {
+    const playerId = this.getPlayerEntityId();
+    if (playerId) {
+      const bb = this.world.getComponent(playerId, 'brain')?.blackboard;
+      if (bb) {
+        bb.remove('navTargetPos');
+        bb.remove('currentPath');
+      }
+      const input = this.world.getComponent(playerId, 'input');
+      if (input) {
+        input.desiredMoveVector = null;
+        input.moveForward = 0;
+        input.moveStrafe = 0;
+        input.isMovingForward = false;
+      }
+    }
+  }
+
   public clearPlayerAim(): void {
+    this.clearPlayerNavigationTarget();
     const entities = this.world.getEntitiesWith('input');
     for (const [, { input }] of entities) {
       input.targetLookAngle = undefined;

@@ -114,6 +114,9 @@ export const useCanvasInteraction = ({
     const onWindowMouseUp = (e: MouseEvent) => {
       if (e.button === 2) {
         GlobalInput.isRmbDown = false;
+        if (appRef.current?.gameMode === GameMode.GAME) {
+          appRef.current.simulation.clearPlayerNavigationTarget();
+        }
       }
     };
 
@@ -323,6 +326,8 @@ export const useCanvasInteraction = ({
     }
   };
 
+  const lastHoverCheckRef = useRef<number>(0);
+
   const handleMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
     const app = appRef.current;
     if (!app) return;
@@ -339,26 +344,19 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Передаем координаты мыши в движок для обновления 3D-кисти прямо в цикле рендера
+    // Сохраняем экранную позицию курсора (быстрая операция без raycast)
     app.setMouseScreenPos(e.clientX, e.clientY);
-    const point = app.getCanvasPoint(e.clientX, e.clientY);
-
-    const now = performance.now();
-    if (now - lastCursorUpdateRef.current > 60) {
-      lastCursorUpdateRef.current = now;
-      setCursorWorldPos({ x: point.x, y: point.y, z: point.z });
-    }
 
     if (isDragging) {
       setHoverTarget({ type: 'ground' });
       return;
     }
 
-    // Во время движения кистью пропов
+    // Во время движения кистью пропов расчет точки производим только в момент спавна
     if (propBrushStateRef.current.isDragging && app.propBrush.active) {
       const now = performance.now();
-      // Ограничиваем частоту спавна при драге (каждые 80мс)
       if (now - propBrushStateRef.current.lastSpawnTime > 80) {
+        const point = app.getCanvasPoint(e.clientX, e.clientY);
         applyPropBrushAtPoint(point);
         propBrushStateRef.current.lastSpawnTime = now;
       }
@@ -367,6 +365,7 @@ export const useCanvasInteraction = ({
 
     // Во время движения кистью террейна наносим мазки
     if (terrainEditStateRef.current?.isDragging && app.terrainBrush.active) {
+      const point = app.getCanvasPoint(e.clientX, e.clientY);
       const terrains = app.world.getEntitiesWith('terrain');
       if (terrains.length > 0) {
         TerrainBrushController.applyBrush(
@@ -423,22 +422,33 @@ export const useCanvasInteraction = ({
       return;
     }
 
-    // Подсветка при наведении
-    let isHoveringEntity = false;
-    if (placementMode) {
-      app.selection.hoverEntity(null);
-    } else {
-      const nearestId = app.selection.pickNearestEntity(point, undefined, e.clientX, e.clientY);
-      app.selection.hoverEntity(nearestId);
-      isHoveringEntity = nearestId !== null;
-    }
+    // Троттлинг тяжелых операций (raycast, hover-поиск в ECS и обновление React-статуса)
+    const now = performance.now();
+    if (now - lastHoverCheckRef.current >= 30) {
+      lastHoverCheckRef.current = now;
+      const point = app.getCanvasPoint(e.clientX, e.clientY);
 
-    if (placementMode || bbPicking) {
-      e.currentTarget.style.cursor = 'crosshair';
-    } else if (isHoveringEntity) {
-      e.currentTarget.style.cursor = 'pointer';
-    } else {
-      e.currentTarget.style.cursor = 'default';
+      if (now - lastCursorUpdateRef.current > 120) {
+        lastCursorUpdateRef.current = now;
+        setCursorWorldPos({ x: point.x, y: point.y, z: point.z });
+      }
+
+      let isHoveringEntity = false;
+      if (placementMode) {
+        app.selection.hoverEntity(null);
+      } else if (mode === GameMode.EDITOR) {
+        const nearestId = app.selection.pickNearestEntity(point, undefined, e.clientX, e.clientY);
+        app.selection.hoverEntity(nearestId);
+        isHoveringEntity = nearestId !== null;
+      }
+
+      if (placementMode || bbPicking) {
+        e.currentTarget.style.cursor = 'crosshair';
+      } else if (isHoveringEntity) {
+        e.currentTarget.style.cursor = 'pointer';
+      } else {
+        e.currentTarget.style.cursor = 'default';
+      }
     }
   };
 
@@ -448,6 +458,9 @@ export const useCanvasInteraction = ({
 
     if (e.button === 2) {
       GlobalInput.isRmbDown = false;
+      if (app.gameMode === GameMode.GAME) {
+        app.simulation.clearPlayerNavigationTarget();
+      }
     }
 
     if (app.camera.isRotating) {
@@ -900,6 +913,9 @@ export const useCanvasInteraction = ({
 
   const handleMouseLeave = () => {
     GlobalInput.isRmbDown = false;
+    if (appRef.current?.gameMode === GameMode.GAME) {
+      appRef.current.simulation.clearPlayerNavigationTarget();
+    }
     if (isDragging) {
       setHoverTarget(null);
     }

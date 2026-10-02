@@ -226,7 +226,11 @@ export class BTServicePathUpdater extends BTService {
     promise
       .then((newPath) => {
         this.isRequesting = false;
-        if (newPath) entity.brain!.blackboard.set('currentPath', newPath);
+        const targetPosKey = this.params.targetPosKey ?? 'targetPos';
+        const bb = entity.brain?.blackboard;
+        if (newPath && bb && (bb.has('targetId') || bb.has(targetPosKey))) {
+          bb.set('currentPath', newPath);
+        }
       })
       .catch(() => {
         this.isRequesting = false;

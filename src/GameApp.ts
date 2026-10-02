@@ -438,11 +438,14 @@ export class GameApp {
     let cursorWorldPos: Vec3 | null = null;
     let throwTrajectory: { start: Vec3; v0: Vec3 } | null = null;
 
-    if (this.mouseScreenPos) {
+    const isBrushActive = Boolean(this.terrainBrush?.active || this.propBrush?.active);
+    const isThrowTargeting = Boolean(this.throwTargeting && this.gameMode === GameMode.GAME);
+
+    if (this.mouseScreenPos && (isBrushActive || isThrowTargeting)) {
       const pt = this.getCanvasPoint(this.mouseScreenPos.x, this.mouseScreenPos.y);
       cursorWorldPos = { x: pt.x, y: pt.y, z: pt.z };
 
-      if (this.throwTargeting && this.gameMode === GameMode.GAME) {
+      if (isThrowTargeting && this.throwTargeting) {
         const slot = this.world.getComponent(this.throwTargeting.partId, 'interactionSlots');
         const physStats = this.world.getComponent(this.throwTargeting.itemId, 'physicsStats');
         const transform =
