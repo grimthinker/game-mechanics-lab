@@ -87,8 +87,14 @@ export const InfoTabParameters: React.FC<InfoTabParametersProps> = ({
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
-        maxHeight: '160px',
+        flex: 1,
+        height: '100%',
+        minHeight: 0,
         overflowY: 'auto',
+        paddingRight: '6px',
+        boxSizing: 'border-box',
+        scrollbarWidth: 'thin',
+        scrollbarColor: '#383838 #757575',
       }}
     >
       {rows.map((row, idx) => (
@@ -97,10 +103,12 @@ export const InfoTabParameters: React.FC<InfoTabParametersProps> = ({
           style={{
             display: 'flex',
             justifyContent: 'space-between',
-            padding: '3px 6px',
+            alignItems: 'center',
+            padding: '4px 8px',
             backgroundColor: idx % 2 === 0 ? '#b8b8b8' : 'transparent',
             borderRadius: '2px',
             fontSize: '12px',
+            boxSizing: 'border-box',
           }}
         >
           <span style={{ color: '#222', fontWeight: 'bold' }}>{row.label}:</span>

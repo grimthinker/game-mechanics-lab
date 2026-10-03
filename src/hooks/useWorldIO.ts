@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { GameApp } from '../GameApp';
 import { saveWorldToStorage } from '../storage/autoSave';
 import { t } from '../locales';
+import demoWorldData from '../assets/levels/demo.json';
 
 export interface UseWorldIOOptions {
   appRef: React.MutableRefObject<GameApp | null>;
@@ -79,7 +80,7 @@ export function useWorldIO({
     if (!app) return;
 
     app.editorSnapshot = null;
-    app.initDefaultWorld();
+    app.deserializeWorld(demoWorldData);
     saveWorldToStorage(app);
     syncPlayerControls();
     updateStats();

@@ -123,18 +123,21 @@ export class ThreeRenderer implements IRenderer {
     this.container.appendChild(this.uiCanvas);
     this.uiCtx = this.uiCanvas.getContext('2d')!;
 
-    // Холст мониторинга FPS: размещается строго поверх всех React HUD элементов
+    // Холст мониторинга FPS: компактная перетаскиваемая панель размером 160x72
     this.fpsCanvas = document.createElement('canvas');
-    this.fpsCanvas.style.display = 'block';
-    this.fpsCanvas.style.width = '100%';
-    this.fpsCanvas.style.height = '100%';
+    this.fpsCanvas.style.display = 'none';
+    this.fpsCanvas.style.width = '160px';
+    this.fpsCanvas.style.height = '72px';
     this.fpsCanvas.style.position = 'absolute';
-    this.fpsCanvas.style.top = '0';
-    this.fpsCanvas.style.left = '0';
     this.fpsCanvas.style.zIndex = '99999';
-    this.fpsCanvas.style.pointerEvents = 'none';
+    this.fpsCanvas.style.cursor = 'grab';
+    this.fpsCanvas.style.userSelect = 'none';
+    this.fpsCanvas.style.pointerEvents = 'auto';
+    this.fpsCanvas.title = 'Перетащите для перемещения панели';
     this.container.appendChild(this.fpsCanvas);
     this.fpsCtx = this.fpsCanvas.getContext('2d')!;
+
+    this.initFpsDragListeners();
 
     // Инициализируем сцену
     this.scene = new THREE.Scene();
@@ -338,6 +341,70 @@ export class ThreeRenderer implements IRenderer {
     return null;
   }
 
+  // Состояние позиции и перетаскивания панели FPS
+  private fpsPos: { x: number; y: number } = { x: -1, y: -1 };
+  private isDraggingFps: boolean = false;
+  private fpsDragStart = { mouseX: 0, mouseY: 0, startX: 0, startY: 0 };
+  private onFpsMouseMoveHandler?: (e: MouseEvent) => void;
+  private onFpsMouseUpHandler?: () => void;
+
+  private initFpsDragListeners(): void {
+    try {
+      const saved = localStorage.getItem('engine_fps_monitor_pos');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          this.fpsPos = { x: parsed.x, y: parsed.y };
+        }
+      }
+    } catch {}
+
+    this.fpsCanvas.addEventListener('mousedown', (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.isDraggingFps = true;
+      this.fpsCanvas.style.cursor = 'grabbing';
+      this.fpsDragStart = {
+        mouseX: e.clientX,
+        mouseY: e.clientY,
+        startX: this.fpsPos.x,
+        startY: this.fpsPos.y,
+      };
+    });
+
+    this.onFpsMouseMoveHandler = (e: MouseEvent) => {
+      if (!this.isDraggingFps) return;
+      e.preventDefault();
+      const dx = e.clientX - this.fpsDragStart.mouseX;
+      const dy = e.clientY - this.fpsDragStart.mouseY;
+
+      const maxW = Math.max(0, this.container.clientWidth - 160);
+      const maxH = Math.max(0, this.container.clientHeight - 72);
+
+      const newX = Math.max(0, Math.min(maxW, this.fpsDragStart.startX + dx));
+      const newY = Math.max(0, Math.min(maxH, this.fpsDragStart.startY + dy));
+
+      this.fpsPos.x = newX;
+      this.fpsPos.y = newY;
+      this.fpsCanvas.style.left = `${newX}px`;
+      this.fpsCanvas.style.top = `${newY}px`;
+    };
+
+    this.onFpsMouseUpHandler = () => {
+      if (this.isDraggingFps) {
+        this.isDraggingFps = false;
+        this.fpsCanvas.style.cursor = 'grab';
+        try {
+          localStorage.setItem('engine_fps_monitor_pos', JSON.stringify(this.fpsPos));
+        } catch {}
+      }
+    };
+
+    window.addEventListener('mousemove', this.onFpsMouseMoveHandler);
+    window.addEventListener('mouseup', this.onFpsMouseUpHandler);
+  }
+
   public resize(width: number, height: number): void {
     // Расчет эффективного разрешения рендера (Render Scale & HiDPI)
     const resCfg = GRAPHICS_CONFIG.resolution;
@@ -355,11 +422,34 @@ export class ThreeRenderer implements IRenderer {
     this.uiCanvas.width = width;
     this.uiCanvas.height = height;
 
-    this.fpsCanvas.width = width;
-    this.fpsCanvas.height = height;
-  }
+    // Холст FPS имеет фиксированный размер 160x72 с поддержкой HiDPI
+    const dpr = Math.min(window.devicePixelRatio || 1.0, 2.0);
+    this.fpsCanvas.width = Math.round(160 * dpr);
+    this.fpsCanvas.height = Math.round(72 * dpr);
 
+    // Удержание панели FPS в пределах видимой области экрана при изменении окна
+    const maxW = Math.max(0, width - 160);
+    const maxH = Math.max(0, height - 72);
+
+    if (this.fpsPos.x < 0) {
+      this.fpsPos.x = Math.max(0, width - 160 - 12);
+      this.fpsPos.y = 12;
+    } else {
+      this.fpsPos.x = Math.max(0, Math.min(maxW, this.fpsPos.x));
+      this.fpsPos.y = Math.max(0, Math.min(maxH, this.fpsPos.y));
+    }
+
+    this.fpsCanvas.style.left = `${this.fpsPos.x}px`;
+    this.fpsCanvas.style.top = `${this.fpsPos.y}px`;
+  }
   public destroy(): void {
+    if (this.onFpsMouseMoveHandler) {
+      window.removeEventListener('mousemove', this.onFpsMouseMoveHandler);
+    }
+    if (this.onFpsMouseUpHandler) {
+      window.removeEventListener('mouseup', this.onFpsMouseUpHandler);
+    }
+
     if (this.circleCursorGeo) this.circleCursorGeo.dispose();
     if (this.squareCursorGeo) this.squareCursorGeo.dispose();
 
@@ -669,26 +759,28 @@ export class ThreeRenderer implements IRenderer {
     }
   }
 
-  private renderFPSMonitor(stats: import('../core/FPSMonitor').FPSStats, gameMode: string): void {
-    const w = this.fpsCanvas.width;
-    const pad = 12;
+  private renderFPSMonitor(stats: import('../core/FPSMonitor').FPSStats, _gameMode: string): void {
+    if (this.fpsCanvas.style.display !== 'block') {
+      this.fpsCanvas.style.display = 'block';
+    }
+
     const boxW = 160;
     const boxH = 72;
-    const posX = w - boxW - pad;
-    const posY = pad;
+    const dpr = Math.min(window.devicePixelRatio || 1.0, 2.0);
 
     const ctx = this.fpsCtx;
     ctx.clearRect(0, 0, this.fpsCanvas.width, this.fpsCanvas.height);
     ctx.save();
+    ctx.scale(dpr, dpr);
 
-    // 1. Фон контейнера (тёмный графитовый оттенок со стилизованным зеленым отсветом)
-    ctx.fillStyle = 'rgba(8, 20, 14, 0.88)';
-    ctx.fillRect(posX, posY, boxW, boxH);
+    // 1. Фон контейнера
+    ctx.fillStyle = 'rgba(8, 20, 14, 0.9)';
+    ctx.fillRect(0, 0, boxW, boxH);
 
     // Рамка контейнера
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(posX, posY, boxW, boxH);
+    ctx.strokeRect(0, 0, boxW, boxH);
 
     // 2. Блок текстовых метрик
     ctx.font = 'bold 11px monospace';
@@ -697,23 +789,23 @@ export class ThreeRenderer implements IRenderer {
 
     // Текущий FPS
     ctx.fillStyle = '#00ff66';
-    ctx.fillText(`FPS: ${stats.current}`, posX + 8, posY + 6);
+    ctx.fillText(`FPS: ${stats.current}`, 8, 6);
 
     // AVG и MIN FPS
     ctx.font = '10px monospace';
     ctx.fillStyle = '#a7f3d0';
-    ctx.fillText(`AVG: ${stats.avg.toFixed(1)}`, posX + 74, posY + 6);
+    ctx.fillText(`AVG: ${stats.avg.toFixed(1)}`, 74, 6);
 
     ctx.fillStyle = stats.min < 30 ? '#f87171' : '#6ee7b7';
-    ctx.fillText(`MIN: ${stats.min.toFixed(1)}`, posX + 74, posY + 18);
+    ctx.fillText(`MIN: ${stats.min.toFixed(1)}`, 74, 18);
 
     // 3. Область графика
-    const graphX = posX + 6;
-    const graphY = posY + 30;
+    const graphX = 6;
+    const graphY = 30;
     const graphW = boxW - 12;
     const graphH = boxH - 35;
 
-    // Сетка графика в стиле Task Manager (горизонтальные и вертикальные деления)
+    // Сетка графика
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.16)';
     ctx.lineWidth = 1;
     ctx.beginPath();

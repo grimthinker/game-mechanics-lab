@@ -6,6 +6,7 @@ import { BlockQuests } from './gameHud/BlockQuests';
 import { BlockEquipment } from './gameHud/BlockEquipment';
 import { BlockLog } from './gameHud/BlockLog';
 import { BlockToolbar } from './gameHud/BlockToolbar';
+import { BlockMinimap } from './gameHud/BlockMinimap';
 import { BlockMap } from './gameHud/BlockMap';
 import { BlockStatus } from './gameHud/BlockStatus';
 import { BlockCompass } from './gameHud/BlockCompass';
@@ -39,10 +40,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onGotoSimulation,
   onGotoMenu,
 }) => {
-  // Панели А, В, Д открыты по умолчанию при старте игры
+  // Панели А, В открыты по умолчанию; большая карта [M] открывается по требованию
   const [isQuestsOpen, setIsQuestsOpen] = useState(true);
   const [isLogOpen, setIsLogOpen] = useState(true);
-  const [isMinimapOpen, setIsMinimapOpen] = useState(true);
+  const [isFullMapOpen, setIsFullMapOpen] = useState(false);
   const [isGameMenuOpen, setIsGameMenuOpen] = useState(false);
 
   // Менеджер окон инфо осмотра
@@ -150,9 +151,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       } else if (e.code === 'KeyJ' || e.key.toLowerCase() === 'j') {
         e.preventDefault();
         setIsLogOpen((prev) => !prev);
-      } else if (e.code === 'KeyK' || e.key.toLowerCase() === 'k') {
+      } else if (
+        e.code === 'KeyM' ||
+        e.key.toLowerCase() === 'm' ||
+        e.key === 'ь' ||
+        e.key === 'Ь'
+      ) {
         e.preventDefault();
-        setIsMinimapOpen((prev) => !prev);
+        setIsFullMapOpen((prev) => !prev);
       }
     };
 
@@ -170,8 +176,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       {/* Блок Ж: Компас направлений сторон света (верхний центр) */}
       <BlockCompass camera={app?.camera} />
 
-      {/* Блок Д: Миникарта (верхний правый угол) */}
-      <BlockMap isOpen={isMinimapOpen} onClose={() => setIsMinimapOpen(false)} />
+      {/* Постоянная фиксированная миникарта (верхний правый угол, 30..60м) */}
+      <BlockMinimap world={world} playerId={playerId} camera={app?.camera} />
+
+      {/* Полноценная интерактивная карта (открывается по клавише [M]) */}
+      <BlockMap
+        isOpen={isFullMapOpen}
+        onClose={() => setIsFullMapOpen(false)}
+        world={world}
+        playerId={playerId}
+        camera={app?.camera}
+      />
 
       {/* Блок А: Активные квесты (средний левый край) */}
       <BlockQuests isOpen={isQuestsOpen} onClose={() => setIsQuestsOpen(false)} />
@@ -209,14 +224,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       {/* Блок В: Журнал сообщений и диалогов (нижний правый угол) */}
       <BlockLog isOpen={isLogOpen} onClose={() => setIsLogOpen(false)} />
 
-      {/* Блок Г: Панель управляющих кнопок [H], [J], [K], [Esc] (нижний левый угол) */}
+      {/* Блок Г: Панель управляющих кнопок [H], [J], [M], [Esc] (нижний левый угол) */}
       <BlockToolbar
         isQuestsOpen={isQuestsOpen}
         onToggleQuests={() => setIsQuestsOpen((prev) => !prev)}
         isLogOpen={isLogOpen}
         onToggleLog={() => setIsLogOpen((prev) => !prev)}
-        isMinimapOpen={isMinimapOpen}
-        onToggleMinimap={() => setIsMinimapOpen((prev) => !prev)}
+        isMinimapOpen={isFullMapOpen}
+        onToggleMinimap={() => setIsFullMapOpen((prev) => !prev)}
         onOpenGameMenu={openGameMenu}
       />
 

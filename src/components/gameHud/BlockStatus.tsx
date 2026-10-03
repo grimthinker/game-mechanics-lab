@@ -3,6 +3,7 @@ import { World } from '../../ecs/World';
 import { getAnatomyParts } from '../../ecs/utils/hierarchy';
 import { RETRO_PANEL_STYLE, RETRO_SUNKEN_STYLE } from './RetroStyles';
 import { HUD_CONFIG } from '../../config/hudConfig';
+import { StatusBars } from './StatusBars';
 
 export interface BlockStatusProps {
   world: World | null | undefined;
@@ -182,101 +183,48 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
         position: 'absolute',
         top: 16,
         left: 16,
-        width: 440,
-        height: 168,
+        width: 480,
+        height: 196,
         ...RETRO_PANEL_STYLE,
-        padding: '10px 14px',
+        padding: '12px 16px',
         zIndex: 90,
         display: 'flex',
         flexDirection: 'column',
+        boxSizing: 'border-box',
       }}
     >
       {/* Имя персонажа */}
       <div
         style={{
-          fontSize: '16px',
+          fontSize: '20px',
+          lineHeight: '22px',
           fontWeight: 'bold',
           color: HUD_CONFIG.status.playerNameText,
           letterSpacing: '1px',
           textTransform: 'uppercase',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          marginBottom: '8px',
+          overflow: 'visible',
+          margin: 0,
+          padding: 0,
         }}
         title={playerName}
       >
         {playerName}
       </div>
 
-      {/* Блок полосок и куклы: центр круга куклы выровнен строго по 3-й полоске */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {bars.map((bar) => {
-            const ratio = Math.max(0, Math.min(1, bar.current / bar.max));
-            const isHovered = hoveredBarId === bar.id;
-
-            return (
-              <div key={bar.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '13px', cursor: 'help', flexShrink: 0 }} title={bar.title}>
-                  {bar.icon}
-                </span>
-
-                <div
-                  onClick={() => handleSpendBar(bar.id)}
-                  onMouseEnter={() => setHoveredBarId(bar.id)}
-                  onMouseLeave={() => setHoveredBarId(null)}
-                  style={{
-                    flex: 1,
-                    height: '11px',
-                    ...RETRO_SUNKEN_STYLE,
-                    position: 'relative',
-                    cursor: 'pointer',
-                    overflow: 'hidden',
-                    backgroundColor: HUD_CONFIG.status.bars.barBg,
-                  }}
-                  title="Кликните для демонстрации расхода ресурса"
-                >
-                  <div
-                    style={{
-                      width: `${ratio * 100}%`,
-                      height: '100%',
-                      backgroundColor: bar.color,
-                      transition: 'width 0.2s ease-out',
-                    }}
-                  />
-
-                  {isHovered && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '11px',
-                        lineHeight: '11px',
-                        fontWeight: 'bold',
-                        color: HUD_CONFIG.status.bars.barText,
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      {bar.current} / {bar.max}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {/* Блок полосок и куклы: отступ до имени и до низа панели строго равен 18px */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '18px', marginTop: '18px' }}>
+        <div style={{ flex: 1, display: 'flex' }}>
+          <StatusBars bars={bars} gap={11} onBarClick={handleSpendBar} />
         </div>
 
-        {/* Кукла анатомии на круглой плашке */}
+        {/* Кукла анатомии: диаметр 114px строго вровень с высотой колонки полосок */}
         <div
           style={{
-            width: 104,
-            height: 104,
-            minWidth: 104,
-            minHeight: 104,
+            width: 114,
+            height: 114,
+            minWidth: 114,
+            minHeight: 114,
             ...RETRO_SUNKEN_STYLE,
             backgroundColor: HUD_CONFIG.status.paperDoll.circleBg,
             borderRadius: '50%',
@@ -290,12 +238,12 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
         >
           {isHumanoid ? (
             <>
-              <svg width="100" height="100" viewBox="0 0 100 100" style={{ overflow: 'visible' }}>
+              <svg width="110" height="110" viewBox="0 0 100 100" style={{ overflow: 'visible' }}>
                 {/* Голова */}
                 <circle
                   cx="50"
-                  cy="18"
-                  r="9"
+                  cy="15"
+                  r="9.5"
                   fill={partColors.head}
                   stroke={getPartStroke('head')}
                   strokeWidth={getPartStrokeWidth('head')}
@@ -309,11 +257,11 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
                 </circle>
                 {/* Туловище */}
                 <rect
-                  x="42"
-                  y="30"
-                  width="16"
-                  height="27"
-                  rx="1.5"
+                  x="41"
+                  y="28"
+                  width="18"
+                  height="30"
+                  rx="2"
                   fill={partColors.torso}
                   stroke={getPartStroke('torso')}
                   strokeWidth={getPartStrokeWidth('torso')}
@@ -327,11 +275,11 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
                 </rect>
                 {/* Левая рука */}
                 <rect
-                  x="13"
-                  y="32"
-                  width="27"
-                  height="7"
-                  rx="1.5"
+                  x="10"
+                  y="30"
+                  width="29"
+                  height="8"
+                  rx="2"
                   fill={partColors.arm_l}
                   stroke={getPartStroke('arm_l')}
                   strokeWidth={getPartStrokeWidth('arm_l')}
@@ -345,11 +293,11 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
                 </rect>
                 {/* Правая рука */}
                 <rect
-                  x="60"
-                  y="32"
-                  width="27"
-                  height="7"
-                  rx="1.5"
+                  x="61"
+                  y="30"
+                  width="29"
+                  height="8"
+                  rx="2"
                   fill={partColors.arm_r}
                   stroke={getPartStroke('arm_r')}
                   strokeWidth={getPartStrokeWidth('arm_r')}
@@ -363,15 +311,15 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
                 </rect>
                 {/* Левая нога */}
                 <rect
-                  x="41"
-                  y="59"
-                  width="7"
-                  height="31"
-                  rx="1.5"
+                  x="40"
+                  y="60"
+                  width="8"
+                  height="33"
+                  rx="2"
                   fill={partColors.leg_l}
                   stroke={getPartStroke('leg_l')}
                   strokeWidth={getPartStrokeWidth('leg_l')}
-                  transform="rotate(15 44.5 59)"
+                  transform="rotate(15 44 60)"
                   style={{ cursor: 'pointer' }}
                   onMouseEnter={() => setHoveredPartKey('leg_l')}
                   onMouseLeave={() => setHoveredPartKey(null)}
@@ -383,14 +331,14 @@ export const BlockStatus: React.FC<BlockStatusProps> = ({ world, playerId }) => 
                 {/* Правая нога */}
                 <rect
                   x="52"
-                  y="59"
-                  width="7"
-                  height="31"
-                  rx="1.5"
+                  y="60"
+                  width="8"
+                  height="33"
+                  rx="2"
                   fill={partColors.leg_r}
                   stroke={getPartStroke('leg_r')}
                   strokeWidth={getPartStrokeWidth('leg_r')}
-                  transform="rotate(-15 55.5 59)"
+                  transform="rotate(-15 56 60)"
                   style={{ cursor: 'pointer' }}
                   onMouseEnter={() => setHoveredPartKey('leg_r')}
                   onMouseLeave={() => setHoveredPartKey(null)}

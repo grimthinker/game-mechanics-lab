@@ -309,7 +309,7 @@ export class GameApp {
   public serializeWorld(): SerializedWorldData {
     return this.simulation.serializeWorld();
   }
-  public deserializeWorld(data: SerializedWorldData): void {
+  public deserializeWorld(data: SerializedWorldData | Record<string, any>): void {
     this.simulation.deserializeWorld(data);
   }
   public clearPlayerAim(): void {

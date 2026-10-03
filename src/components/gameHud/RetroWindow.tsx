@@ -13,6 +13,7 @@ export interface RetroWindowProps {
   minHeight?: number;
   children: React.ReactNode;
   zIndex?: number;
+  storageKey?: string;
 }
 
 export const RetroWindow: React.FC<RetroWindowProps> = ({
@@ -27,19 +28,58 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
   minHeight = 140,
   children,
   zIndex = 90,
+  storageKey,
 }) => {
-  const [pos, setPos] = useState({ x: initialX, y: initialY });
-  const [size, setSize] = useState({ width: initialWidth, height: initialHeight });
+  const effectiveKey = storageKey || `hud_window_${title.replace(/[^a-zA-Zа-яА-Я0-9_]/g, '_')}`;
 
-  const dragRef = useRef<{ startX: number; startY: number; posX: number; posY: number } | null>(
-    null
+  const [pos, setPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem(effectiveKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return {
+            x: Math.max(0, Math.min(window.innerWidth - 100, parsed.x)),
+            y: Math.max(0, Math.min(window.innerHeight - 100, parsed.y)),
+          };
+        }
+      }
+    } catch {}
+    return { x: initialX, y: initialY };
+  });
+
+  const [size, setSize] = useState(() => {
+    try {
+      const saved = localStorage.getItem(effectiveKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.w === 'number' && typeof parsed.h === 'number') {
+          return {
+            width: Math.max(minWidth, Math.min(window.innerWidth, parsed.w)),
+            height: Math.max(minHeight, Math.min(window.innerHeight, parsed.h)),
+          };
+        }
+      }
+    } catch {}
+    return { width: initialWidth, height: initialHeight };
+  });
+
+  const posRef = useRef(pos);
+  posRef.current = pos;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+
+  const saveWindowState = useCallback(
+    (newPos: { x: number; y: number }, newSize: { width: number; height: number }) => {
+      try {
+        localStorage.setItem(
+          effectiveKey,
+          JSON.stringify({ x: newPos.x, y: newPos.y, w: newSize.width, h: newSize.height })
+        );
+      } catch {}
+    },
+    [effectiveKey]
   );
-  const resizeRef = useRef<{
-    startX: number;
-    startY: number;
-    startW: number;
-    startH: number;
-  } | null>(null);
 
   // Коррекция позиции при изменении размеров экрана
   useEffect(() => {
@@ -58,76 +98,76 @@ export const RetroWindow: React.FC<RetroWindowProps> = ({
       if ((e.target as HTMLElement).tagName === 'BUTTON') return;
       e.preventDefault();
       e.stopPropagation();
-      dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        posX: pos.x,
-        posY: pos.y,
-      };
+      let lastCalculatedPos = { ...posRef.current };
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const originX = posRef.current.x;
+      const originY = posRef.current.y;
 
       const handleMouseMove = (moveEvt: MouseEvent) => {
-        if (!dragRef.current) return;
-        const dx = moveEvt.clientX - dragRef.current.startX;
-        const dy = moveEvt.clientY - dragRef.current.startY;
+        const dx = moveEvt.clientX - startX;
+        const dy = moveEvt.clientY - startY;
         const nextX = Math.max(
           0,
-          Math.min(window.innerWidth - size.width, dragRef.current.posX + dx)
+          Math.min(window.innerWidth - sizeRef.current.width, originX + dx)
         );
         const nextY = Math.max(
           0,
-          Math.min(window.innerHeight - size.height, dragRef.current.posY + dy)
+          Math.min(window.innerHeight - sizeRef.current.height, originY + dy)
         );
-        setPos({ x: nextX, y: nextY });
+        lastCalculatedPos = { x: nextX, y: nextY };
+        setPos(lastCalculatedPos);
       };
 
       const handleMouseUp = () => {
-        dragRef.current = null;
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+        saveWindowState(lastCalculatedPos, sizeRef.current);
       };
 
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     },
-    [pos, size]
+    [saveWindowState]
   );
 
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      resizeRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
-        startW: size.width,
-        startH: size.height,
-      };
+      let lastCalculatedSize = { ...sizeRef.current };
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const originW = sizeRef.current.width;
+      const originH = sizeRef.current.height;
 
       const handleMouseMove = (moveEvt: MouseEvent) => {
-        if (!resizeRef.current) return;
-        const dx = moveEvt.clientX - resizeRef.current.startX;
-        const dy = moveEvt.clientY - resizeRef.current.startY;
+        const dx = moveEvt.clientX - startX;
+        const dy = moveEvt.clientY - startY;
         const nextW = Math.max(
           minWidth,
-          Math.min(window.innerWidth - pos.x, resizeRef.current.startW + dx)
+          Math.min(window.innerWidth - posRef.current.x, originW + dx)
         );
         const nextH = Math.max(
           minHeight,
-          Math.min(window.innerHeight - pos.y, resizeRef.current.startH + dy)
+          Math.min(window.innerHeight - posRef.current.y, originH + dy)
         );
-        setSize({ width: nextW, height: nextH });
+        lastCalculatedSize = { width: nextW, height: nextH };
+        setSize(lastCalculatedSize);
       };
 
       const handleMouseUp = () => {
-        resizeRef.current = null;
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+        saveWindowState(posRef.current, lastCalculatedSize);
       };
 
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     },
-    [pos, size, minWidth, minHeight]
+    [minWidth, minHeight, saveWindowState]
   );
 
   if (!isOpen) return null;

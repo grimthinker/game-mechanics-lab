@@ -6,6 +6,7 @@ import { HUD_CONFIG } from '../../config/hudConfig';
 import { t } from '../../locales';
 
 import { GAMEPLAY_CONFIG } from '../../config/gameplayConfig';
+import { StatusBars } from './StatusBars';
 
 export interface InfoTabStatusProps {
   world: World;
@@ -182,61 +183,9 @@ export const InfoTabStatus: React.FC<InfoTabStatusProps> = ({
 
   return (
     <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-      {/* 5 статусных полосок с иконками */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {bars.map((bar) => {
-          const ratio = Math.max(0, Math.min(1, bar.current / bar.max));
-          const isHovered = hoveredBarId === bar.id;
-
-          return (
-            <div key={bar.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '13px', cursor: 'help', flexShrink: 0 }} title={bar.title}>
-                {bar.icon}
-              </span>
-
-              <div
-                onMouseEnter={() => setHoveredBarId(bar.id)}
-                onMouseLeave={() => setHoveredBarId(null)}
-                style={{
-                  flex: 1,
-                  height: '11px',
-                  ...RETRO_SUNKEN_STYLE,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  backgroundColor: HUD_CONFIG.status.bars.barBg,
-                }}
-              >
-                <div
-                  style={{
-                    width: `${ratio * 100}%`,
-                    height: '100%',
-                    backgroundColor: bar.color,
-                    transition: 'width 0.2s ease-out',
-                  }}
-                />
-
-                {isHovered && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      lineHeight: '11px',
-                      fontWeight: 'bold',
-                      color: HUD_CONFIG.status.bars.barText,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {bar.current} / {bar.max}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      {/* 5 статусных полосок с черным контуром без фасок */}
+      <div style={{ flex: 1, display: 'flex' }}>
+        <StatusBars bars={bars} gap={9} />
       </div>
 
       {/* Кукла анатомии на круглой плашке */}

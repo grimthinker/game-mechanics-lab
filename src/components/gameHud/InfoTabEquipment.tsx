@@ -72,9 +72,6 @@ export const InfoTabEquipment: React.FC<InfoTabEquipmentProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {/* Ряд 1: Слоты взаимодействия */}
       <div>
-        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
-          СЛОТЫ ВЗАИМОДЕЙСТВИЯ ({slotsData.length})
-        </div>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
           {slotsData.length > 0 ? (
             slotsData.map((slotInfo, idx) => {
@@ -119,9 +116,6 @@ export const InfoTabEquipment: React.FC<InfoTabEquipmentProps> = ({
 
       {/* Ряд 2: Области экипировки */}
       <div>
-        <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>
-          ОБЛАСТИ ЭКИПИРОВКИ ({areasData.length})
-        </div>
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
           {areasData.length > 0 ? (
             areasData.map(({ area, containerId, item }, idx) => (

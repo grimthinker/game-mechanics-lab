@@ -56,9 +56,9 @@ export const BlockToolbar: React.FC<BlockToolbarProps> = ({
         type="button"
         style={isMinimapOpen ? RETRO_BUTTON_PRESSED_STYLE : RETRO_BUTTON_STYLE}
         onClick={onToggleMinimap}
-        title="МИНИКАРТА [K]"
+        title="КАРТА [M]"
       >
-        🗺️ [K] КАРТА
+        🗺️ [M] КАРТА
       </button>
 
       <button

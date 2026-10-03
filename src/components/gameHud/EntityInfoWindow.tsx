@@ -121,9 +121,12 @@ export const EntityInfoWindow: React.FC<EntityInfoWindowProps> = ({
           <div
             style={{
               flex: 1,
+              minHeight: 0,
               ...RETRO_SUNKEN_STYLE,
-              padding: '10px',
-              overflowY: 'auto',
+              padding: currentTab === 'parameters' ? '6px' : '10px',
+              overflow: currentTab === 'parameters' ? 'hidden' : 'auto',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             {currentTab === 'status' && (

@@ -23,6 +23,7 @@ export const BlockLog: React.FC<BlockLogProps> = ({ isOpen, onClose }) => {
       initialHeight={230}
       minWidth={200}
       minHeight={140}
+      storageKey="hud_window_log"
     >
       <div
         style={{

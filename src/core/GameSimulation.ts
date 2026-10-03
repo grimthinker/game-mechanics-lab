@@ -529,7 +529,7 @@ export class GameSimulation {
     return this.serializer.serializeWorld();
   }
 
-  public deserializeWorld(data: SerializedWorldData): void {
+  public deserializeWorld(data: SerializedWorldData | Record<string, any>): void {
     this.serializer.deserializeWorld(data);
     this.syncPhysicsStructures();
   }

@@ -31,6 +31,7 @@ import { t } from './locales';
 import { EventBus } from './core/EventBus';
 import { initRapier } from './physics/rapierLoader';
 import { TreeBBSchema } from './ai/schema';
+import demoWorldData from './assets/levels/demo.json';
 import './editor.css';
 
 export const App: React.FC = () => {
@@ -659,7 +660,16 @@ export const App: React.FC = () => {
           {engineState.mode === GameMode.MENU && (
             <MainMenu
               onOpenEditor={goToEditor}
-              onDemoLevel={() => {}}
+              onDemoLevel={() => {
+                const app = appRef.current;
+                if (!app) return;
+                app.editorSnapshot = null;
+                app.deserializeWorld(demoWorldData);
+                saveWorldToStorage(app);
+                syncPlayerControls();
+                updateStats();
+                goToGame();
+              }}
               onOpenSettings={() => setIsSettingsOpen(true)}
             />
           )}

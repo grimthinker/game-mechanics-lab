@@ -15,11 +15,12 @@ export const BlockQuests: React.FC<BlockQuestsProps> = ({ isOpen, onClose }) => 
       isOpen={isOpen}
       onClose={onClose}
       initialX={16}
-      initialY={170}
+      initialY={232}
       initialWidth={260}
       initialHeight={230}
       minWidth={180}
       minHeight={140}
+      storageKey="hud_window_quests"
     >
       <div
         style={{

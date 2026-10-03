@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { ProceduralPropManager } from './props/ProceduralPropManager';
+import { ProceduralCreatureAssetManager } from './creatures/ProceduralAssetManager';
 
 export class AssetManager {
   private static instance: AssetManager;
@@ -53,12 +55,9 @@ export class AssetManager {
       let model: THREE.Object3D | null = null;
 
       if (url.startsWith('proc://prop/')) {
-        const { ProceduralPropManager } = await import('./props/ProceduralPropManager');
         const propName = url.replace('proc://prop/', '');
         model = ProceduralPropManager.getInstance().getProp(propName);
       } else {
-        const { ProceduralCreatureAssetManager } =
-          await import('./creatures/ProceduralAssetManager');
         model = ProceduralCreatureAssetManager.getInstance().getClonedAsset(url);
       }
 

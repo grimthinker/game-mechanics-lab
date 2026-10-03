@@ -1,4 +1,5 @@
 import { World } from '../World';
+import { PhysicsSystem } from '../systems/PhysicsSystem';
 import { AISystem } from '../systems/AISystem';
 import {
   EntityId,
@@ -149,6 +150,7 @@ export function createGameplayZoneConfig(
 
 export function assembleZone(
   world: World,
+  _physics: PhysicsSystem,
   _aiSystem: AISystem,
   id: EntityId,
   config: EntityConfig,
