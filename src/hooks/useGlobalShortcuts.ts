@@ -51,7 +51,7 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         onCancelPicker,
       } = propsRef.current;
 
-      // Закрытие радиального меню, отмена манипулятора, пикера или выход из игры по Escape
+      // Закрытие радиального меню, отмена манипулятора или пикера по Escape
       if (e.key === 'Escape' || e.code === 'Escape') {
         if (mode === GameMode.EDITOR && onCancelPicker && onCancelPicker()) {
           e.preventDefault();
@@ -63,11 +63,6 @@ export const useGlobalShortcuts = (props: GlobalShortcutsProps) => {
         }
         if (mode === GameMode.EDITOR && onCancelGizmo && onCancelGizmo()) {
           e.preventDefault();
-          return;
-        }
-        if (mode === GameMode.GAME && onExitGame) {
-          e.preventDefault();
-          onExitGame();
           return;
         }
       }

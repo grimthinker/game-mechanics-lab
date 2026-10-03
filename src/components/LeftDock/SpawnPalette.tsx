@@ -205,6 +205,8 @@ export const SpawnPalette: React.FC<SpawnPaletteProps> = ({
                   isSolid: true,
                   halfExtents: { x: 0.15, y: 0.64, z: 0.02 },
                   colliderOffset: { x: 0, y: 0.36, z: 0 },
+                  restitution: 0.78,
+                  linearDamping: 1,
                 },
                 weaponStats: { baseDamage: 25, prepTime: 0.2, recoveryTime: 0.3 },
                 weaponZone: { hitZoneType: 'angle', radius: 2.5, angle: deg2Rad(90) },

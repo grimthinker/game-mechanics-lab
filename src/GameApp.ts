@@ -453,7 +453,15 @@ export class GameApp {
           this.world.getComponent(this.getPlayerEntityId() ?? '', 'transform');
 
         if (slot && physStats && transform) {
-          const startPos = { x: transform.x, y: transform.y + 1.2, z: transform.z };
+          const dx = pt.x - transform.x;
+          const dz = pt.z - transform.z;
+          const d = Math.max(0.001, Math.hypot(dx, dz));
+          const spawnOffset = 0.65;
+          const startPos = {
+            x: transform.x + (dx / d) * spawnOffset,
+            y: transform.y + 1.2,
+            z: transform.z + (dz / d) * spawnOffset,
+          };
           const v0 = calculateThrowVelocity(startPos, pt, slot.strength, physStats.weight.current);
           throwTrajectory = { start: startPos, v0 };
         }
@@ -470,7 +478,7 @@ export class GameApp {
         selectedIds: this.selection.selectedEntityIds,
         hoveredId: this.selection.hoveredEntityId,
         marqueeBox: this.selection.marqueeBox,
-        showAIDebug: this.showAIDebug,
+        showAIDebug: this.gameMode === GameMode.GAME ? false : this.showAIDebug,
         gizmoTool: this.gizmo.tool,
         terrainBrush: this.terrainBrush,
         propBrush: this.propBrush,

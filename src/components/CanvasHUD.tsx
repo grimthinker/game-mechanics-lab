@@ -3,6 +3,7 @@ import { Camera } from '../Camera';
 import { Vec3, GizmoTool } from '../types';
 import { t } from '../locales';
 import { CAMERA_CONFIG } from '../config/cameraConfig';
+import { HUD_CONFIG } from '../config/hudConfig';
 
 export interface CanvasHUDProps {
   camera: Camera | null | undefined;
@@ -49,12 +50,12 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
       {/* Главная информационная плашка */}
       <div
         style={{
-          backgroundColor: 'rgba(20, 20, 20, 0.78)',
+          backgroundColor: HUD_CONFIG.canvasHud.barBg,
           backdropFilter: 'blur(6px)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          border: `1px solid ${HUD_CONFIG.canvasHud.barBorder}`,
           borderRadius: '6px',
           padding: '6px 10px',
-          color: '#ccc',
+          color: HUD_CONFIG.canvasHud.textNormal,
           fontSize: '11px',
           fontFamily: 'monospace',
           display: 'flex',
@@ -64,16 +65,16 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ color: '#888' }}>{t('hud.zoom')}</span>
-          <strong style={{ color: '#fff' }}>{scalePercent}%</strong>
+          <span style={{ color: HUD_CONFIG.canvasHud.textLabel }}>{t('hud.zoom')}</span>
+          <strong style={{ color: HUD_CONFIG.canvasHud.textValue }}>{scalePercent}%</strong>
           <button
             onClick={onResetCamera}
             title={t('hud.resetTitle')}
             style={{
-              backgroundColor: '#2c3e50',
+              backgroundColor: HUD_CONFIG.canvasHud.btnBg,
               border: 'none',
               borderRadius: '3px',
-              color: '#fff',
+              color: HUD_CONFIG.canvasHud.textValue,
               cursor: 'pointer',
               padding: '2px 5px',
               fontSize: '10px',
@@ -85,21 +86,21 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
         </div>
 
         <div style={{ borderLeft: '1px solid #333', paddingLeft: '8px' }}>
-          <span style={{ color: '#888' }}>{t('hud.camera')} </span>
-          <span style={{ color: '#3498db' }}>
+          <span style={{ color: HUD_CONFIG.canvasHud.textLabel }}>{t('hud.camera')} </span>
+          <span style={{ color: HUD_CONFIG.canvasHud.textCamera }}>
             X:{cameraX}m Y:{cameraY}m Z:{cameraZ}m
           </span>
         </div>
 
         <div style={{ borderLeft: '1px solid #333', paddingLeft: '8px' }}>
-          <span style={{ color: '#888' }}>{t('hud.cursor')} </span>
+          <span style={{ color: HUD_CONFIG.canvasHud.textLabel }}>{t('hud.cursor')} </span>
           {cursorWorldPos ? (
-            <span style={{ color: '#2ecc71' }}>
+            <span style={{ color: HUD_CONFIG.canvasHud.textCursor }}>
               X:{cursorWorldPos.x.toFixed(1)}m Y:{cursorWorldPos.y.toFixed(1)}m Z:
               {cursorWorldPos.z.toFixed(1)}m
             </span>
           ) : (
-            <span style={{ color: '#666' }}>—</span>
+            <span style={{ color: HUD_CONFIG.canvasHud.textNone }}>—</span>
           )}
         </div>
 
@@ -114,15 +115,18 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               paddingLeft: '8px',
             }}
           >
-            <span style={{ color: '#888' }}>{t('hud.gizmo')}</span>
+            <span style={{ color: HUD_CONFIG.canvasHud.textLabel }}>{t('hud.gizmo')}</span>
             <button
               onClick={() => onSelectGizmoTool('select')}
               title={t('hud.gizmoSelect')}
               style={{
-                backgroundColor: gizmoTool === 'select' ? '#2980b9' : '#2c3e50',
+                backgroundColor:
+                  gizmoTool === 'select'
+                    ? HUD_CONFIG.canvasHud.btnActiveBg
+                    : HUD_CONFIG.canvasHud.btnBg,
                 border: 'none',
                 borderRadius: '3px',
-                color: '#fff',
+                color: HUD_CONFIG.canvasHud.textValue,
                 cursor: 'pointer',
                 padding: '2px 6px',
                 fontSize: '10px',
@@ -135,10 +139,13 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               onClick={() => onSelectGizmoTool('translate')}
               title={t('hud.gizmoTranslate')}
               style={{
-                backgroundColor: gizmoTool === 'translate' ? '#2980b9' : '#2c3e50',
+                backgroundColor:
+                  gizmoTool === 'translate'
+                    ? HUD_CONFIG.canvasHud.btnActiveBg
+                    : HUD_CONFIG.canvasHud.btnBg,
                 border: 'none',
                 borderRadius: '3px',
-                color: '#fff',
+                color: HUD_CONFIG.canvasHud.textValue,
                 cursor: 'pointer',
                 padding: '2px 6px',
                 fontSize: '10px',
@@ -151,10 +158,13 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
               onClick={() => onSelectGizmoTool('rotate')}
               title={t('hud.gizmoRotate')}
               style={{
-                backgroundColor: gizmoTool === 'rotate' ? '#2980b9' : '#2c3e50',
+                backgroundColor:
+                  gizmoTool === 'rotate'
+                    ? HUD_CONFIG.canvasHud.btnActiveBg
+                    : HUD_CONFIG.canvasHud.btnBg,
                 border: 'none',
                 borderRadius: '3px',
-                color: '#fff',
+                color: HUD_CONFIG.canvasHud.textValue,
                 cursor: 'pointer',
                 padding: '2px 6px',
                 fontSize: '10px',
@@ -170,10 +180,12 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           onClick={() => setIsSettingsOpen(!isSettingsOpen)}
           title={t('hud.sensitivityBtnTitle')}
           style={{
-            backgroundColor: isSettingsOpen ? '#2980b9' : '#2c3e50',
+            backgroundColor: isSettingsOpen
+              ? HUD_CONFIG.canvasHud.btnActiveBg
+              : HUD_CONFIG.canvasHud.btnBg,
             border: 'none',
             borderRadius: '3px',
-            color: '#fff',
+            color: HUD_CONFIG.canvasHud.textValue,
             cursor: 'pointer',
             padding: '2px 6px',
             fontSize: '10px',
@@ -192,9 +204,9 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
         <div
           style={{
             marginTop: '6px',
-            backgroundColor: 'rgba(24, 24, 24, 0.95)',
+            backgroundColor: HUD_CONFIG.canvasHud.settingsPanelBg,
             backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
+            border: `1px solid ${HUD_CONFIG.canvasHud.settingsPanelBorder}`,
             borderRadius: '6px',
             padding: '10px 14px',
             color: '#eee',
@@ -211,7 +223,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
             style={{
               fontWeight: 'bold',
               fontSize: '11px',
-              color: '#3498db',
+              color: HUD_CONFIG.canvasHud.settingsHeader,
               borderBottom: '1px solid #333',
               paddingBottom: '4px',
             }}
@@ -223,7 +235,9 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#bbb' }}>
               <span>{t('hud.panSpeed')}</span>
-              <span style={{ color: '#2ecc71', fontWeight: 'bold' }}>{panSpeed.toFixed(1)}x</span>
+              <span style={{ color: HUD_CONFIG.canvasHud.panAccent, fontWeight: 'bold' }}>
+                {panSpeed.toFixed(1)}x
+              </span>
             </div>
             <input
               type="range"
@@ -236,7 +250,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
                 setPanSpeed(val);
                 camera?.setPanSpeed(val);
               }}
-              style={{ cursor: 'pointer', accentColor: '#2ecc71' }}
+              style={{ cursor: 'pointer', accentColor: HUD_CONFIG.canvasHud.panAccent }}
             />
           </label>
 
@@ -244,7 +258,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
           <label style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#bbb' }}>
               <span>{t('hud.rotateSpeed')}</span>
-              <span style={{ color: '#f39c12', fontWeight: 'bold' }}>
+              <span style={{ color: HUD_CONFIG.canvasHud.rotateAccent, fontWeight: 'bold' }}>
                 {rotateSpeed.toFixed(1)}x
               </span>
             </div>
@@ -259,7 +273,7 @@ export const CanvasHUD: React.FC<CanvasHUDProps> = ({
                 setRotateSpeed(val);
                 camera?.setRotateSpeed(val);
               }}
-              style={{ cursor: 'pointer', accentColor: '#f39c12' }}
+              style={{ cursor: 'pointer', accentColor: HUD_CONFIG.canvasHud.rotateAccent }}
             />
           </label>
 

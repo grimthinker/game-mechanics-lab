@@ -89,7 +89,7 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
       float origY = max(0.001, bladeOffset.y);
 
       // Угол изгиба от давления (max ~85 градусов или 1.5 радиан)
-      float trampleAngle = maxTrampleFactor * 1.5;
+      float trampleAngle = maxTrampleFactor * 1.56;
       vec2 trampleVec = tramplingDir * trampleAngle;
 
       // Процедурный ветер
@@ -102,7 +102,7 @@ export function createGrassMaterial(): THREE.MeshStandardMaterial {
       vec2 bendDir = bendAngle > 0.001 ? totalBendVec / bendAngle : vec2(0.0, 1.0);
 
       // Ограничиваем угол, чтобы трава не уходила под землю
-      bendAngle = clamp(bendAngle, 0.001, 1.55);
+      bendAngle = clamp(bendAngle, 0.001, 1.56);
 
       // Угол наклона конкретно для этой вершины (от 0 до bendAngle)
       float currentAngle = bendAngle * hFactor;

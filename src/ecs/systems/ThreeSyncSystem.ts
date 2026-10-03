@@ -713,11 +713,18 @@ export class ThreeSyncSystem {
           }
 
           if (archetype === 'zone') {
-            const mat = this.getZoneMaterial(world, id);
-            const mainMesh = obj.children.find(
-              (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
-            ) as THREE.Mesh;
-            if (mainMesh && mainMesh.material !== mat) mainMesh.material = mat;
+            const gameplayZone = world.getComponent(id, 'gameplayZone');
+            // В игровом режиме скрываем отладочные объемы логических зон (квесты, лагеря, цели броска)
+            if (_gameMode === GameMode.GAME && gameplayZone) {
+              obj.visible = false;
+            } else {
+              obj.visible = true;
+              const mat = this.getZoneMaterial(world, id);
+              const mainMesh = obj.children.find(
+                (c) => c instanceof THREE.Mesh && !c.userData.isSelectionOutline
+              ) as THREE.Mesh;
+              if (mainMesh && mainMesh.material !== mat) mainMesh.material = mat;
+            }
           }
         }
       }
@@ -740,8 +747,12 @@ export class ThreeSyncSystem {
       }
     }
 
-    // Синхронизация 3D зон атак в активных фазах prep и cast через менеджер
-    this.attackVisualsManager.update(world);
+    // Синхронизация 3D зон атак только вне игрового режима
+    if (_gameMode === GameMode.GAME) {
+      this.attackVisualsManager.clear();
+    } else {
+      this.attackVisualsManager.update(world);
+    }
 
     // Синхронизация процедурной интерактивной травы с поддержкой многоуровневых мешей
     const terrainEntities = world.getEntitiesWith('terrain');

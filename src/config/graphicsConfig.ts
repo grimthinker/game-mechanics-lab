@@ -23,6 +23,9 @@ export const DEFAULT_GRAPHICS_CONFIG = {
     upscaleFilter: 'smooth' as 'smooth' | 'crisp' | 'pixelated',
   },
 
+  /** Показ панели мониторинга FPS в режиме игры */
+  showGameFPSMonitor: true,
+
   /** Настройки камеры обзора */
   camera: {
     fov: 50,
@@ -48,7 +51,7 @@ export const DEFAULT_GRAPHICS_CONFIG = {
     /** Максимальный полуразмер охвата теней при максимальном отдалении камеры */
     maxBounds: 100.0,
     /** Коэффициент охвата видимой области земли от дистанции орбиты камеры */
-    frustumMargin: 2.2,
+    frustumMargin: 2.9,
     near: 1.0,
     far: 160.0,
     /** Дистанция выноса источника света от точки фокуса камеры */

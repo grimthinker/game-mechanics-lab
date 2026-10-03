@@ -44,8 +44,8 @@ export class PhysicsSystem {
     const rawBody = this.driver.createDynamicBody(pos, itemId);
     const isBall = physStats.shape === 'ball';
 
-    const linDamping = physStats.linearDamping ?? (isBall ? 0.25 : 0.95);
-    const angDamping = physStats.angularDamping ?? (isBall ? 2.0 : 0.95);
+    const linDamping = physStats.linearDamping ?? (isBall ? 0.25 : 1);
+    const angDamping = physStats.angularDamping ?? (isBall ? 2.0 : 1);
     rawBody.setLinearDamping(linDamping);
     rawBody.setAngularDamping(angDamping);
 

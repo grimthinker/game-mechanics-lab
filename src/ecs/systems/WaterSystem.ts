@@ -234,9 +234,9 @@ export class WaterSystem {
         }
       } else {
         const defaultLinDamping =
-          physicsStats.linearDamping ?? (physicsStats.shape === 'ball' ? 0.25 : 0.95);
+          physicsStats.linearDamping ?? (physicsStats.shape === 'ball' ? 0.25 : 1);
         const defaultAngDamping =
-          physicsStats.angularDamping ?? (physicsStats.shape === 'ball' ? 2.0 : 0.95);
+          physicsStats.angularDamping ?? (physicsStats.shape === 'ball' ? 2.0 : 1);
         rawBody.setLinearDamping(defaultLinDamping);
         rawBody.setAngularDamping(defaultAngDamping);
       }

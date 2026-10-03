@@ -27,8 +27,6 @@ export class TrampleTextureManager {
   private stampsUniform: THREE.Vector4[];
   private dirsUniform: THREE.Vector2[];
 
-  /** Скорость распрямления травы */
-  public recoverySpeed: number = GRASS_CONFIG.trample.recoverySpeed;
   /** Скорость приминания вниз при наступании */
   public bendSpeed: number = GRASS_CONFIG.trample.bendSpeed;
   /** Приоритет вектора движения над боковым расталкиванием */
@@ -45,7 +43,7 @@ export class TrampleTextureManager {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
-      type: THREE.UnsignedByteType,
+      type: THREE.HalfFloatType,
       wrapS: THREE.ClampToEdgeWrapping,
       wrapT: THREE.ClampToEdgeWrapping,
       depthBuffer: false,
@@ -66,7 +64,8 @@ export class TrampleTextureManager {
         tPrev: { value: null },
         uOffset: { value: new THREE.Vector2(0, 0) },
         uDeltaTime: { value: 0.016 },
-        uRecoverySpeed: { value: this.recoverySpeed },
+        uRecoveryTime: { value: GRASS_CONFIG.trample.recoveryDuration },
+        uDelay: { value: GRASS_CONFIG.trample.delay },
         uBendSpeed: { value: this.bendSpeed },
         uMotionBias: { value: this.motionBias },
         uStamps: { value: this.stampsUniform },
@@ -84,7 +83,8 @@ export class TrampleTextureManager {
         uniform sampler2D tPrev;
         uniform vec2 uOffset;
         uniform float uDeltaTime;
-        uniform float uRecoverySpeed;
+        uniform float uRecoveryTime;
+        uniform float uDelay;
         uniform float uBendSpeed;
         uniform float uMotionBias;
         uniform vec4 uStamps[32];
@@ -94,7 +94,6 @@ export class TrampleTextureManager {
         varying vec2 vUv;
 
         void main() {
-          // Смещение текстуры истории при движении камеры
           vec2 prevUv = vUv + uOffset;
           vec4 prev = (prevUv.x >= 0.0 && prevUv.x <= 1.0 && prevUv.y >= 0.0 && prevUv.y <= 1.0)
             ? texture2D(tPrev, prevUv)
@@ -104,6 +103,7 @@ export class TrampleTextureManager {
           vec2 prevDir = prev.gb * 2.0 - 1.0;
           float prevDirLen = length(prevDir);
           prevDir = prevDirLen > 0.01 ? prevDir / prevDirLen : vec2(0.0, 1.0);
+          float prevTimer = prev.a;
 
           float targetTrample = 0.0;
           vec2 targetDir = prevDir;
@@ -116,7 +116,7 @@ export class TrampleTextureManager {
             float radius = stamp.z;
             if (radius <= 0.0001) continue;
 
-           vec2 toPixel = vUv - stamp.xy;
+            vec2 toPixel = vUv - stamp.xy;
             float dist = length(toPixel);
             if (dist < radius) {
               float coreRadius = radius * 0.25;
@@ -137,7 +137,6 @@ export class TrampleTextureManager {
 
               vec2 stampDir = radialDir;
 
-              // Кильватерная модель при движении: трава разваливается по бокам и заглаживается строго вперед
               if (motionSpeed > 0.01) {
                 vec2 normMotion = motionDir / motionSpeed;
                 vec2 lateralNorm = vec2(-normMotion.y, normMotion.x);
@@ -148,8 +147,6 @@ export class TrampleTextureManager {
                 vec2 wakeDir = normMotion * uMotionBias + lateralPush * (1.0 - uMotionBias);
                 stampDir = normalize(wakeDir);
               } else {
-                // Если существо остановилось на уже примятой траве, не разворачиваем вектор в противоположную сторону,
-                // чтобы векторы не гасили друг друга в ноль
                 if (prevTrample > 0.15 && dot(prevDir, radialDir) < 0.0) {
                   stampDir = prevDir;
                 }
@@ -162,35 +159,46 @@ export class TrampleTextureManager {
             }
           }
 
-          // 1. Инерция через 2D-вектор (Vector Bend Inertia)
-          // Объединяем силу примятости и направление в единый вектор
           vec2 currentBend = prevDir * prevTrample;
           vec2 nextBend;
+          float nextTimer;
 
           if (maxWeight > 0.01) {
-            // Наступание: вектор плавно тянется к новой цели.
-            // Если идем в обратную сторону, он сам пройдет через (0,0), трава встанет и согнется обратно!
+            // Наступание: трава приминается под давлением и взводится задержка перед подъемом
             vec2 targetBend = targetDir * maxWeight;
             float bendFactor = clamp(uBendSpeed * uDeltaTime, 0.0, 1.0);
             nextBend = mix(currentBend, targetBend, bendFactor);
+            nextTimer = -uDelay;
           } else {
-            // Распрямление: линейно уменьшаем длину вектора (трава встает вертикально)
-            float currentLen = length(currentBend);
-            if (currentLen > 0.001) {
-              float decayAmount = uRecoverySpeed * uDeltaTime;
-              float nextLen = max(0.0, currentLen - decayAmount);
-              nextBend = (currentBend / currentLen) * nextLen;
+            // Нога ушла: сначала выдерживаем задержку, затем плавно распрямляемся по S-кривой
+            float timer = prevTimer + uDeltaTime;
+            nextTimer = timer;
+
+            if (timer < 0.0) {
+              // Фаза задержки: трава остается полностью примятой
+              nextBend = currentBend;
             } else {
-              nextBend = vec2(0.0);
+              // Фаза подъема: плавный разгон и замедление (Smoothstep S-curve)
+              float prevT = clamp((timer - uDeltaTime) / max(0.005, uRecoveryTime), 0.0, 1.0);
+              float currT = clamp(timer / max(0.01, uRecoveryTime), 0.0, 1.0);
+
+              if (currT >= 1.0) {
+                nextBend = vec2(0.0);
+                nextTimer = uRecoveryTime;
+              } else {
+                float fPrev = (1.0 - prevT) * (1.0 - prevT) * (1.0 + 2.0 * prevT);
+                float fCurr = (1.0 - currT) * (1.0 - currT) * (1.0 + 2.0 * currT);
+                float ratio = fCurr / max(0.0001, fPrev);
+                nextBend = currentBend * ratio;
+              }
             }
           }
 
           float finalTrample = length(nextBend);
-          // Защита: если трава полностью встала, сохраняем её последнее направление
           vec2 finalDir = finalTrample > 0.001 ? nextBend / finalTrample : prevDir;
-
           vec2 encodedDir = finalDir * 0.5 + 0.5;
-          gl_FragColor = vec4(clamp(finalTrample, 0.0, 1.0), encodedDir.x, encodedDir.y, 1.0);
+
+          gl_FragColor = vec4(clamp(finalTrample, 0.0, 1.0), encodedDir.x, encodedDir.y, nextTimer);
         }
       `,
       depthTest: false,
@@ -230,7 +238,8 @@ export class TrampleTextureManager {
     this.lastCenter.set(snappedX, snappedZ);
 
     this.simMaterial.uniforms.uDeltaTime.value = dt;
-    this.simMaterial.uniforms.uRecoverySpeed.value = this.recoverySpeed;
+    this.simMaterial.uniforms.uRecoveryTime.value = GRASS_CONFIG.trample.recoveryDuration;
+    this.simMaterial.uniforms.uDelay.value = GRASS_CONFIG.trample.delay;
     this.simMaterial.uniforms.uBendSpeed.value = this.bendSpeed;
     this.simMaterial.uniforms.uMotionBias.value = this.motionBias;
     this.simMaterial.uniforms.tPrev.value = this.readTarget.texture;

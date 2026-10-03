@@ -17,6 +17,7 @@ import { IModelPreview } from './IModelPreview';
 import { ThreeModelPreview } from './ThreeModelPreview';
 import { TERRAIN_CONFIG } from '../config/terrainConfig';
 import { GRAPHICS_CONFIG } from '../config/graphicsConfig';
+import { getTerrainHeightAt } from '../ecs/components/terrain';
 
 const DASH_THROW_TRAJECTORY = [5, 5];
 const DASH_EMPTY: number[] = [];
@@ -38,6 +39,8 @@ export class ThreeRenderer implements IRenderer {
   private canvas: HTMLCanvasElement;
   private uiCanvas: HTMLCanvasElement;
   private uiCtx: CanvasRenderingContext2D;
+  private fpsCanvas: HTMLCanvasElement;
+  private fpsCtx: CanvasRenderingContext2D;
 
   public renderer: THREE.WebGLRenderer;
   public scene: THREE.Scene;
@@ -119,6 +122,19 @@ export class ThreeRenderer implements IRenderer {
     this.uiCanvas.style.pointerEvents = 'none'; // Мышь прокликивает на WebGL
     this.container.appendChild(this.uiCanvas);
     this.uiCtx = this.uiCanvas.getContext('2d')!;
+
+    // Холст мониторинга FPS: размещается строго поверх всех React HUD элементов
+    this.fpsCanvas = document.createElement('canvas');
+    this.fpsCanvas.style.display = 'block';
+    this.fpsCanvas.style.width = '100%';
+    this.fpsCanvas.style.height = '100%';
+    this.fpsCanvas.style.position = 'absolute';
+    this.fpsCanvas.style.top = '0';
+    this.fpsCanvas.style.left = '0';
+    this.fpsCanvas.style.zIndex = '99999';
+    this.fpsCanvas.style.pointerEvents = 'none';
+    this.container.appendChild(this.fpsCanvas);
+    this.fpsCtx = this.fpsCanvas.getContext('2d')!;
 
     // Инициализируем сцену
     this.scene = new THREE.Scene();
@@ -338,6 +354,9 @@ export class ThreeRenderer implements IRenderer {
     // 2D UI холст строго равен размерам контейнера в CSS-пикселях (1:1 с мышью и текстом)
     this.uiCanvas.width = width;
     this.uiCanvas.height = height;
+
+    this.fpsCanvas.width = width;
+    this.fpsCanvas.height = height;
   }
 
   public destroy(): void {
@@ -372,6 +391,9 @@ export class ThreeRenderer implements IRenderer {
     }
     if (this.uiCanvas && this.uiCanvas.parentNode) {
       this.uiCanvas.parentNode.removeChild(this.uiCanvas);
+    }
+    if (this.fpsCanvas && this.fpsCanvas.parentNode) {
+      this.fpsCanvas.parentNode.removeChild(this.fpsCanvas);
     }
     if (this.transformControl) {
       this.transformControl.dispose();
@@ -621,7 +643,7 @@ export class ThreeRenderer implements IRenderer {
     if (context.editorData.marqueeBox) {
       this.renderScreenMarqueeBox(context.editorData.marqueeBox);
     }
-    if (context.editorData.showAIDebug) {
+    if (context.editorData.showAIDebug && context.gameMode !== 'game') {
       const activeSelectedId =
         context.editorData.selectedId ??
         (context.editorData.selectedIds.size > 0
@@ -632,23 +654,31 @@ export class ThreeRenderer implements IRenderer {
       }
     }
     if (context.editorData.throwTrajectory) {
-      this.renderThrowTrajectory(context.editorData.throwTrajectory);
+      this.renderThrowTrajectory(context.editorData.throwTrajectory, context.world);
     }
-    if (context.showFPSMonitor && context.fpsStats && context.gameMode !== 'menu') {
+
+    const shouldShowFPS =
+      context.gameMode === 'game'
+        ? Boolean(GRAPHICS_CONFIG.showGameFPSMonitor)
+        : Boolean(context.showFPSMonitor && context.gameMode !== 'menu');
+
+    if (shouldShowFPS && context.fpsStats) {
       this.renderFPSMonitor(context.fpsStats, context.gameMode);
+    } else {
+      this.fpsCtx.clearRect(0, 0, this.fpsCanvas.width, this.fpsCanvas.height);
     }
   }
 
   private renderFPSMonitor(stats: import('../core/FPSMonitor').FPSStats, gameMode: string): void {
-    const w = this.uiCanvas.width;
+    const w = this.fpsCanvas.width;
     const pad = 12;
     const boxW = 160;
     const boxH = 72;
     const posX = w - boxW - pad;
-    // В режиме игры смещаем график чуть ниже, чтобы он не перекрывал кнопки HUD
-    const posY = gameMode === 'game' ? 62 : pad;
+    const posY = pad;
 
-    const ctx = this.uiCtx;
+    const ctx = this.fpsCtx;
+    ctx.clearRect(0, 0, this.fpsCanvas.width, this.fpsCanvas.height);
     ctx.save();
 
     // 1. Фон контейнера (тёмный графитовый оттенок со стилизованным зеленым отсветом)
@@ -751,19 +781,42 @@ export class ThreeRenderer implements IRenderer {
     ctx.restore();
   }
 
-  private renderThrowTrajectory(trajectory: { start: Vec3; v0: Vec3 }): void {
+  private renderThrowTrajectory(trajectory: { start: Vec3; v0: Vec3 }, world: World): void {
     const g = 9.81;
-    const dt = 0.05;
+    const dt = 0.03;
     const maxTime = 3.0; // Защита от бесконечного цикла
 
     let prevX = trajectory.start.x;
     let prevY = trajectory.start.y;
     let prevZ = trajectory.start.z;
 
+    const terrainEntities = world.getEntitiesWith('terrain');
+    const terrain = terrainEntities.length > 0 ? terrainEntities[0][1].terrain : undefined;
+
     for (let t = dt; t <= maxTime; t += dt) {
       const currX = trajectory.start.x + trajectory.v0.x * t;
       const currY = trajectory.start.y + trajectory.v0.y * t - (g * t * t) / 2;
       const currZ = trajectory.start.z + trajectory.v0.z * t;
+
+      const floorY = terrain ? (getTerrainHeightAt(terrain, currX, currZ) ?? 0) : 0;
+
+      if (currY <= floorY) {
+        this.drawProjectedLine(
+          prevX,
+          prevY,
+          prevZ,
+          currX,
+          floorY,
+          currZ,
+          'rgba(231, 76, 60, 0.8)',
+          DASH_THROW_TRAJECTORY,
+          2
+        );
+        prevX = currX;
+        prevY = floorY;
+        prevZ = currZ;
+        break;
+      }
 
       this.drawProjectedLine(
         prevX,
@@ -780,8 +833,6 @@ export class ThreeRenderer implements IRenderer {
       prevX = currX;
       prevY = currY;
       prevZ = currZ;
-
-      if (currY < 0) break; // Упрощенное пересечение с нулевым полом
     }
 
     this.drawProjectedCircle(prevX, prevY, prevZ, 0.4, '#e74c3c', DASH_EMPTY, 'Прицел', 0, 16);
@@ -886,13 +937,15 @@ export class ThreeRenderer implements IRenderer {
         this.uiCtx.fillRect(-barW / 2, -10, barW * hpRatio, barH);
       }
 
-      // Отрисовка текста ID/Name
-      this.uiCtx.fillStyle = '#ffffff';
-      this.uiCtx.font = '11px sans-serif';
-      this.uiCtx.textAlign = 'center';
-      this.uiCtx.textBaseline = 'bottom';
-      const displayName = meta?.name ?? id;
-      this.uiCtx.fillText(displayName, 0, health && isObstacle ? -14 : -4);
+      // Отрисовка текста ID/Name (только вне игрового режима)
+      if (gameMode !== 'game') {
+        this.uiCtx.fillStyle = '#ffffff';
+        this.uiCtx.font = '11px sans-serif';
+        this.uiCtx.textAlign = 'center';
+        this.uiCtx.textBaseline = 'bottom';
+        const displayName = meta?.name ?? id;
+        this.uiCtx.fillText(displayName, 0, health && isObstacle ? -14 : -4);
+      }
 
       this.uiCtx.restore();
     }

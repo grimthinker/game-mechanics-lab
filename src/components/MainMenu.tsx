@@ -56,6 +56,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         backdropFilter: 'blur(4px)',
         zIndex: 150,
         userSelect: 'none',
+        fontFamily: "'WendyNeue', monospace",
       }}
     >
       <div
@@ -76,26 +77,27 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         <div style={{ textAlign: 'center', marginBottom: '8px' }}>
           <div
             style={{
-              fontSize: '20px',
+              fontSize: '28px',
               fontWeight: '900',
-              letterSpacing: '2px',
+              letterSpacing: '3px',
               color: '#3498db',
-              textShadow: '0 2px 8px rgba(52, 152, 219, 0.4)',
+              textTransform: 'uppercase',
             }}
           >
             {t('mainMenu.title')}
           </div>
-          <div
+          {/* <div
             style={{
               fontSize: '11px',
               color: '#888',
               letterSpacing: '1px',
               marginTop: '4px',
               textTransform: 'uppercase',
+              fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
             }}
           >
             {t('mainMenu.subtitle')}
-          </div>
+          </div> */}
         </div>
 
         {/* Кнопка 1: ДЕМО УРОВЕНЬ */}

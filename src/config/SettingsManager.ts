@@ -12,6 +12,7 @@ export interface UserSettings {
   waterFoam: number;
   waterFps: number;
   grassDensity: number;
+  showGameFPSMonitor: boolean;
 }
 
 export class SettingsManager {
@@ -70,6 +71,11 @@ export class SettingsManager {
       'gfx_grass_density',
       GRASS_CONFIG.defaultDensityFactor
     );
+
+    GRAPHICS_CONFIG.showGameFPSMonitor = loadBool(
+      'gfx_show_game_fps_monitor',
+      GRAPHICS_CONFIG.showGameFPSMonitor
+    );
   }
 
   /**
@@ -86,6 +92,7 @@ export class SettingsManager {
     localStorage.setItem('gfx_water_foam', settings.waterFoam.toString());
     localStorage.setItem('gfx_water_fps', settings.waterFps.toString());
     localStorage.setItem('gfx_grass_density', settings.grassDensity.toString());
+    localStorage.setItem('gfx_show_game_fps_monitor', settings.showGameFPSMonitor.toString());
 
     // Синхронизация с рабочей памятью
     GRAPHICS_CONFIG.resolution.scale = settings.resScale;
@@ -98,5 +105,6 @@ export class SettingsManager {
     GRAPHICS_CONFIG.water.ripples.foamThreshold = settings.waterFoam;
     GRAPHICS_CONFIG.water.ripples.simFps = settings.waterFps;
     GRASS_CONFIG.defaultDensityFactor = settings.grassDensity;
+    GRAPHICS_CONFIG.showGameFPSMonitor = settings.showGameFPSMonitor;
   }
 }

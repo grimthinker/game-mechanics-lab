@@ -26,6 +26,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     waterFoam: GRAPHICS_CONFIG.water.ripples.foamThreshold,
     waterFps: GRAPHICS_CONFIG.water.ripples.simFps,
     grassDensity: GRASS_CONFIG.defaultDensityFactor,
+    showGameFPSMonitor: GRAPHICS_CONFIG.showGameFPSMonitor,
   }));
 
   // Синхронизируем стейт при каждом открытии окна (на случай, если конфиги изменились извне)
@@ -42,6 +43,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         waterFoam: GRAPHICS_CONFIG.water.ripples.foamThreshold,
         waterFps: GRAPHICS_CONFIG.water.ripples.simFps,
         grassDensity: GRASS_CONFIG.defaultDensityFactor,
+        showGameFPSMonitor: GRAPHICS_CONFIG.showGameFPSMonitor,
       });
     }
   }, [isOpen]);
@@ -157,6 +159,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
               <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase' }}>
                 {t('settingsModal.graphics.general')}
               </div>
+              <label
+                style={{
+                  ...labelStyle,
+                  justifyContent: 'flex-start',
+                  gap: '10px',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.showGameFPSMonitor}
+                  onChange={(e) =>
+                    setSettings({ ...settings, showGameFPSMonitor: e.target.checked })
+                  }
+                  style={{ accentColor: '#10b981', transform: 'scale(1.2)' }}
+                />
+                <span>Мониторинг FPS в игре</span>
+              </label>
               <label style={labelStyle}>
                 <span>
                   {t('settingsModal.graphics.resScale')} ({settings.resScale.toFixed(2)}x)

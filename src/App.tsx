@@ -525,6 +525,7 @@ export const App: React.FC = () => {
         height: '100vh',
         overflow: 'hidden',
         position: 'relative',
+        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       }}
     >
       {/* Экран загрузки WASM ядра физики */}
@@ -682,6 +683,7 @@ export const App: React.FC = () => {
               selectedEntityId={selectedEntityId}
               onExitToEditor={goToEditor}
               onGotoSimulation={goToSimulation}
+              onGotoMenu={goToMenu}
             />
           )}
 
