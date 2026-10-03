@@ -172,4 +172,15 @@ export function assembleItem(
     isVisible: !isPossessed,
     syncWithTransform: true,
   });
+
+  // 8. Интерактивность предмета
+  world.addComponent(id, 'interactable', {
+    options: [
+      { id: 'inspect', verb: 'inspect', label: 'Осмотреть', icon: '🔍' },
+      { id: 'take', verb: 'take', label: 'Взять', icon: '✋' },
+      { id: 'push', verb: 'push', label: 'Толкнуть', icon: '🦶' },
+    ],
+    defaultVerb: 'take',
+    interactDistance: 2.0,
+  });
 }

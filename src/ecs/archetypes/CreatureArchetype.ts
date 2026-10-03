@@ -229,7 +229,18 @@ export function assembleCreature(
     world.addComponent(id, 'perception', fastClone(config.perception));
   }
 
-  // 12. Инициализация логического мозга ИИ
+  // 12. Интерактивность существа
+  world.addComponent(id, 'interactable', {
+    options: [
+      { id: 'inspect', verb: 'inspect', label: 'Осмотреть', icon: '🔍' },
+      { id: 'follow', verb: 'follow', label: 'Следовать', icon: '🚶' },
+      { id: 'push', verb: 'push', label: 'Толкнуть', icon: '✋' },
+    ],
+    defaultVerb: 'inspect',
+    interactDistance: 2.5,
+  });
+
+  // 13. Инициализация логического мозга ИИ
   if (aiSystem) {
     aiSystem.initBotBrain(world, id, behavior);
   }

@@ -34,6 +34,7 @@ import { initDefaultWorldPrefab } from '../ecs/prefabs/defaultWorldPrefab';
 import { BALANCE_CONFIG } from '../config/balanceConfig';
 import { GAMEPLAY_CONFIG } from '../config/gameplayConfig';
 import { GlobalInput } from '../input/GlobalInput';
+import { LOGIC_CONFIG } from '../ai/config';
 
 export class GameSimulation {
   public world: World;
@@ -98,10 +99,64 @@ export class GameSimulation {
 
   public fixedUpdate(dt: number): void {
     const mousePos = this.app.getMouseScreenPos();
+    const playerId = this.getPlayerEntityId() ?? undefined;
+
     if (this.app.gameMode === GameMode.GAME && mousePos) {
-      const playerId = this.getPlayerEntityId() ?? undefined;
       const worldPoint = this.app.getCanvasPoint(mousePos.x, mousePos.y, playerId);
-      this.updatePlayerAim(worldPoint);
+
+      // Проверка дистанции потери цели и ориентация головы игрока
+      const selectedId = this.app.selection.selectedEntityId;
+      let isAimingAtTarget = false;
+
+      if (selectedId && playerId && selectedId !== playerId) {
+        const targetEntity = this.world.getEntity(selectedId);
+        const targetTrans = this.world.getComponent(selectedId, 'transform');
+        const playerTrans = this.world.getComponent(playerId, 'transform');
+        const health = this.world.getComponent(selectedId, 'health');
+
+        const playerPerception = this.world.getComponent(playerId, 'perception');
+        const playerAi = this.world.getComponent(playerId, 'aiStats');
+        const loseDist =
+          (playerPerception?.visionMaxDistance
+            ? playerPerception.visionMaxDistance * 1.4
+            : undefined) ??
+          playerAi?.stats?.loseTargetDist ??
+          LOGIC_CONFIG.loseTargetDist;
+
+        const ownership = this.world.getComponent(selectedId, 'ownership');
+
+        let shouldLose = false;
+        if (!targetEntity || (health && !health.isAlive) || ownership) {
+          shouldLose = true;
+        } else if (playerTrans && targetTrans) {
+          const dist = Math.hypot(
+            targetTrans.x - playerTrans.x,
+            targetTrans.y - playerTrans.y,
+            targetTrans.z - playerTrans.z
+          );
+          if (dist > loseDist) {
+            shouldLose = true;
+          }
+        }
+
+        if (shouldLose) {
+          this.app.selection.selectGameTarget(null);
+        } else if (!this.app.throwTargeting && targetTrans) {
+          const targetPhys = this.world.getComponent(selectedId, 'physicsStats');
+          const targetH = targetPhys?.height?.current ?? 1.2;
+          const targetCenter: Vec3 = {
+            x: targetTrans.x,
+            y: targetTrans.y + targetH * 0.75,
+            z: targetTrans.z,
+          };
+          this.updatePlayerAim(targetCenter);
+          isAimingAtTarget = true;
+        }
+      }
+
+      if (!isAimingAtTarget) {
+        this.updatePlayerAim(worldPoint);
+      }
 
       // Непрерывное обновление точки навигации при удерживаемой ПКМ раз в 0.1 сек
       if (GlobalInput.isRmbDown) {

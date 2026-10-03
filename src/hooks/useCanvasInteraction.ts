@@ -224,39 +224,52 @@ export const useCanvasInteraction = ({
         return;
       }
 
-      // В режиме игры: подбор предмета через Ctrl+ЛКМ
-      if (mode === GameMode.GAME && (e.ctrlKey || e.metaKey)) {
-        let targetEntityId = app.selection.pickNearestEntity(
-          point,
-          undefined,
-          e.clientX,
-          e.clientY
-        );
-        if (targetEntityId) {
-          if (!app.world.getComponent(targetEntityId, 'item')) {
-            const assemblyRoots = app.world.getEntitiesWith('assemblyRoot', 'tag');
-            const parentItem = assemblyRoots.find(
-              ([, comp]) =>
-                comp.tag.archetype === 'item' &&
-                comp.assemblyRoot.partIds?.includes(targetEntityId!)
-            );
-            if (parentItem) {
-              targetEntityId = parentItem[0];
+      // В режиме игры: взаимодействие и выбор цели
+      if (mode === GameMode.GAME) {
+        // Подбор предмета через Ctrl+ЛКМ
+        if (e.ctrlKey || e.metaKey) {
+          let targetEntityId = app.selection.pickNearestEntity(
+            point,
+            undefined,
+            e.clientX,
+            e.clientY
+          );
+          if (targetEntityId) {
+            if (!app.world.getComponent(targetEntityId, 'item')) {
+              const assemblyRoots = app.world.getEntitiesWith('assemblyRoot', 'tag');
+              const parentItem = assemblyRoots.find(
+                ([, comp]) =>
+                  comp.tag.archetype === 'item' &&
+                  comp.assemblyRoot.partIds?.includes(targetEntityId!)
+              );
+              if (parentItem) {
+                targetEntityId = parentItem[0];
+              }
+            }
+
+            const itemComp = app.world.getComponent(targetEntityId, 'item');
+            const tagComp = app.world.getComponent(targetEntityId, 'tag');
+            const ownershipComp = app.world.getComponent(targetEntityId, 'ownership');
+            const isItem = (tagComp?.archetype === 'item' || !!itemComp) && !ownershipComp;
+
+            if (isItem) {
+              const playerId = app.getPlayerEntityId();
+              if (playerId) {
+                app.updateEntityBlackboard(playerId, 'requestedPickupId', targetEntityId);
+              }
             }
           }
-
-          const itemComp = app.world.getComponent(targetEntityId, 'item');
-          const tagComp = app.world.getComponent(targetEntityId, 'tag');
-          const ownershipComp = app.world.getComponent(targetEntityId, 'ownership');
-          const isItem = (tagComp?.archetype === 'item' || !!itemComp) && !ownershipComp;
-
-          if (isItem) {
-            const playerId = app.getPlayerEntityId();
-            if (playerId) {
-              app.updateEntityBlackboard(playerId, 'requestedPickupId', targetEntityId);
-            }
-          }
+          return;
         }
+
+        // Обычный ЛКМ: выбор интерактивной цели или сброс при клике в пустоту
+        const pickedId =
+          app.selection.pickEntityAt(point, e.clientX, e.clientY) ??
+          app.selection.pickNearestEntity(point, undefined, e.clientX, e.clientY);
+
+        app.selection.selectGameTarget(pickedId);
+        syncPlayerControls();
+        updateStats();
         return;
       }
 

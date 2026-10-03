@@ -5,6 +5,8 @@ import { GameMode } from '../config/gameConfig';
 import { EDITOR_CONFIG } from '../config/editorConfig';
 import { VISUAL_CONFIG } from '../config/visualConfig';
 import type { GameApp } from '../GameApp';
+import { getRootOwner } from '../ecs/utils/hierarchy';
+import { LOGIC_CONFIG } from '../ai/config';
 
 export class SelectionController {
   public selectedEntityId: string | null = null;
@@ -156,6 +158,73 @@ export class SelectionController {
   public hoverEntity(id: string | null): void {
     if (this.hoveredEntityId === id) return;
     this.hoveredEntityId = id;
+  }
+
+  public selectGameTarget(id: string | null): boolean {
+    const playerId = this.app.getPlayerEntityId();
+
+    if (!id) {
+      if (this.selectedEntityId !== null) {
+        this.selectEntity(null, true);
+        if (playerId) {
+          const bb = this.app.world.getComponent(playerId, 'brain')?.blackboard;
+          if (bb) bb.remove('selectedId');
+        }
+      }
+      return true;
+    }
+
+    // Запрещаем игроку выбирать самого себя
+    const rootId = getRootOwner(this.app.world, id) ?? id;
+    if (rootId === playerId || id === playerId) {
+      return false;
+    }
+
+    const entity = this.app.world.getEntity(rootId);
+    if (!entity) return false;
+
+    // Нельзя выбирать предметы, находящиеся в руках или инвентаре
+    if (this.app.world.getComponent(rootId, 'ownership')) {
+      return false;
+    }
+
+    // В игровом режиме разрешено выбирать только интерактивные сущности
+    const hasInteractable = this.app.world.getComponent(rootId, 'interactable') !== undefined;
+    const arch = entity.tag?.archetype ?? entity.meta?.entityType;
+    if (!hasInteractable && arch !== 'creature' && arch !== 'item' && arch !== 'bodyPart') {
+      return false;
+    }
+
+    // Проверяем расстояние от игрока до цели с учетом detectDist
+    if (playerId) {
+      const playerTrans = this.app.world.getComponent(playerId, 'transform');
+      const targetTrans = this.app.world.getComponent(rootId, 'transform');
+      if (playerTrans && targetTrans) {
+        const dx = targetTrans.x - playerTrans.x;
+        const dy = targetTrans.y - playerTrans.y;
+        const dz = targetTrans.z - playerTrans.z;
+        const dist = Math.hypot(dx, dy, dz);
+
+        const playerPerception = this.app.world.getComponent(playerId, 'perception');
+        const playerAi = this.app.world.getComponent(playerId, 'aiStats');
+        const detectDist =
+          playerPerception?.visionMaxDistance ??
+          playerAi?.stats?.detectDist ??
+          LOGIC_CONFIG.detectDist;
+
+        if (dist > detectDist) {
+          return false;
+        }
+      }
+
+      const bb = this.app.world.getComponent(playerId, 'brain')?.blackboard;
+      if (bb) {
+        bb.set('selectedId', rootId);
+      }
+    }
+
+    this.selectEntity(rootId, true);
+    return true;
   }
 
   public pickEntityAt(worldPoint: Vec3, clientX?: number, clientY?: number): string | null {

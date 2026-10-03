@@ -8,6 +8,7 @@ export type ItemType = 'weapon' | 'armor' | 'bag' | 'bodyPart' | 'resource' | 'c
 export interface ItemData {
   name: string;
   type: ItemType;
+  icon?: string;
   maxStack: number;
   count: number;
   size: number;

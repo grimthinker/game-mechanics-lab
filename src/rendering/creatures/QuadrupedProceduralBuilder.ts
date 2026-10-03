@@ -271,9 +271,9 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
     };
 
     // 2. Локомоция стоя
-    const dogJoggingClip = createDogWalkCycleClip('stand_jog', 0.5, 0.7, 0.07, 0, 0.18, 0.3);
+    const dogJoggingClip = createDogWalkCycleClip('stand_jog', 0.5, 0.7, 0.105, 0, 0.18, 0.3);
     const dogWalkClip = createDogWalkCycleClip('stand_walk', 0.8, 0.4, 0.03, 0, 0.18, 0.3);
-    const dogSprintClip = createDogWalkCycleClip('stand_sprint', 0.35, 1.1, 0.03, 0, 0.11, 0.34);
+    const dogSprintClip = createDogWalkCycleClip('stand_sprint', 0.35, 1.1, 0.036, 0, 0.11, 0.34);
 
     // 3. Локомоция в приседе / подкрадывание (Crouch - Stalking)
     const dogCrouchIdle = new AnimationTrackBuilder()
@@ -307,7 +307,7 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       'crouch_jog',
       0.5,
       0.6,
-      0.02,
+      0.03,
       0.12,
       0.1,
       0.34,
@@ -318,7 +318,7 @@ export class QuadrupedProceduralBuilder implements IProceduralCreatureBuilder {
       'crouch_sprint',
       0.35,
       0.9,
-      0.025,
+      0.03,
       0.15,
       0.08,
       0.35,

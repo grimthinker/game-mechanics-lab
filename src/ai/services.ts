@@ -117,6 +117,7 @@ export class BTServicePathUpdater extends BTService {
     ...BTService.defaultParams,
     interval: 0.1,
     targetPosKey: 'targetPos',
+    useTargetId: true,
     ...LOGIC_CONFIG.pathUpdaterParams,
   };
 
@@ -138,7 +139,7 @@ export class BTServicePathUpdater extends BTService {
 
     if (bb.get('isEngaged')) return;
 
-    const targetId = bb.get('targetId');
+    const targetId = this.params.useTargetId !== false ? bb.get('targetId') : undefined;
     let targetPos: Vec3 | undefined;
 
     if (targetId !== undefined && targetId !== null) {

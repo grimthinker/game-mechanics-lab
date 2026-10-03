@@ -15,6 +15,7 @@ export * from './components/fetch';
 export * from './components/environment';
 export * from './components/water';
 export * from './components/zone';
+export * from './components/interaction';
 
 import { FetchStickComponent } from './components/fetch';
 import { ZoneShapeComponent, GameplayZoneComponent } from './components/zone';
@@ -93,6 +94,7 @@ import {
   LocomotionStateComponent,
   HeadOrientationComponent,
 } from './components/anatomy';
+import { InteractableComponent } from './components/interaction';
 
 export interface EntityComponents {
   tag?: TagComponent;
@@ -148,6 +150,7 @@ export interface EntityComponents {
   water?: WaterComponent;
   zoneShape?: ZoneShapeComponent;
   gameplayZone?: GameplayZoneComponent;
+  interactable?: InteractableComponent;
 }
 
 export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> = [
@@ -200,6 +203,7 @@ export const SERIALIZABLE_COMPONENT_KEYS: ReadonlyArray<keyof EntityComponents> 
   'water',
   'zoneShape',
   'gameplayZone',
+  'interactable',
 ] as const;
 
 export interface EntityConfig {
@@ -244,4 +248,5 @@ export interface EntityConfig {
   water?: WaterConfig;
   zoneShape?: ZoneShapeComponent;
   gameplayZone?: GameplayZoneComponent;
+  interactable?: InteractableComponent;
 }

@@ -297,7 +297,8 @@ export const BlockEquipment: React.FC<BlockEquipmentProps> = ({ app, world, play
 
               {item ? (
                 <span style={{ fontSize: '22px' }}>
-                  {item.type === 'weapon' ? '⚔️' : item.type === 'armor' ? '🛡️' : '📦'}
+                  {item.icon ||
+                    (item.type === 'weapon' ? '⚔️' : item.type === 'armor' ? '🛡️' : '📦')}
                 </span>
               ) : (
                 <span style={{ fontSize: '18px', opacity: 0.4 }}>✋</span>
@@ -385,13 +386,14 @@ export const BlockEquipment: React.FC<BlockEquipmentProps> = ({ app, world, play
               >
                 {item ? (
                   <span style={{ fontSize: '20px' }}>
-                    {item.type === 'armor'
-                      ? '🦺'
-                      : item.type === 'weapon'
-                        ? '🗡️'
-                        : item.type === 'bag'
-                          ? '🎒'
-                          : '🥋'}
+                    {item.icon ||
+                      (item.type === 'armor'
+                        ? '🦺'
+                        : item.type === 'weapon'
+                          ? '🗡️'
+                          : item.type === 'bag'
+                            ? '🎒'
+                            : '🥋')}
                   </span>
                 ) : (
                   <span style={{ fontSize: '10px', color: '#777', fontWeight: 'bold' }}>

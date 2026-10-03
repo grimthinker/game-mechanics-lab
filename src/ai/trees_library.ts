@@ -88,7 +88,7 @@ export function PlayerTree(): BTNode {
             new BTActionFollowPathSmooth('currentPath'),
             new BTAlwaysRunning(),
           ]),
-          { targetPosKey: 'navTargetPos', interval: 0.1 }
+          { targetPosKey: 'navTargetPos', useTargetId: false, interval: 0.1 }
         )
       )
     )

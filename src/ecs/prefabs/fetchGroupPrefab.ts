@@ -72,6 +72,7 @@ export function spawnFetchGroup(simulation: GameSimulation, origin: Vec3): Spawn
     item: {
       name,
       type: 'weapon',
+      icon: '🎾',
       maxStack: 1,
       count: 1,
       size: 4,

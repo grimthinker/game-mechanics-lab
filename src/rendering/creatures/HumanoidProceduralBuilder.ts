@@ -279,15 +279,15 @@ export class HumanoidProceduralBuilder implements IProceduralCreatureBuilder {
     };
 
     // 1. Циклы локомоции на суше
-    const joggingClip = createWalkCycleClip('stand_jog', 0.5, 0.7, 0.07, 0);
+    const joggingClip = createWalkCycleClip('stand_jog', 0.5, 0.7, 0.105, 0);
     const walkClip = createWalkCycleClip('stand_walk', 0.8, 0.4, 0.02, 0);
-    const sprintClip = createWalkCycleClip('stand_sprint', 0.35, 1.1, 0.03, 0);
+    const sprintClip = createWalkCycleClip('stand_sprint', 0.35, 1.1, 0.036, 0);
     const idleClip = createIdleVariant('stand_idle', 0);
 
     const crouchingIdleClip = createIdleVariant('crouch_idle', 0.5);
     const crouchWalkClip = createWalkCycleClip('crouch_walk', 0.8, 0.4, 0.01, 0.45);
-    const crouchJoggingClip = createWalkCycleClip('crouch_jog', 0.5, 0.7, 0.02, 0.45);
-    const crouchSprintingClip = createWalkCycleClip('crouch_sprint', 0.35, 1.0, 0.03, 0.65);
+    const crouchJoggingClip = createWalkCycleClip('crouch_jog', 0.5, 0.7, 0.03, 0.45);
+    const crouchSprintingClip = createWalkCycleClip('crouch_sprint', 0.35, 1.0, 0.036, 0.65);
 
     // ==========================================
     // 2. АНИМАЦИИ ПЛАВАНИЯ (SWIMMING)
